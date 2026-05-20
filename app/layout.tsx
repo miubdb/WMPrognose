@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: '/matches', label: 'Spiele', sub: 'Prognosen' },
   { href: '/tippspiel', label: 'Tippspiel', sub: 'Optimizer' },
   { href: '/tournament', label: 'Simulator', sub: 'Monte Carlo' },
+  { href: '/kader', label: 'Kader', sub: 'Editor' },
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
