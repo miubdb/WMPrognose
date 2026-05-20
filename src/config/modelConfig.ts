@@ -30,13 +30,18 @@ export const MODEL_CONFIG = {
     // Maximaler Rating-Multiplikator aus ELO-Differenz
     maxRatingMultiplier: 1.4,
     minRatingMultiplier: 0.6,
+    // Referenzwert für eloratings.net-Skala: ~1750 = Durchschnitt WM-48-Teams
+    // (Quelle: eloratings.net, Mai 2026; Top-Teams ~1800-2200, schwache ~1200-1600)
+    // ANNAHME: 1750 entspricht einem soliden, aber nicht Top-WM-Teilnehmer
+    referenceRating: 1750,
   },
 
   // ─── Squad-Signale (Peeters 2018, Caley xG, Brechot & Flepp 2020) ───────────
   squad: {
     // Log-Normalisierung des Marktwerts: log(value) / log(referenceValue)
-    // Referenzwert: ~800 Mio EUR (Frankreich 2022, stärkster Squad)
-    marketValueReferenceM: 800,
+    // Referenzwert: ~1400 Mio EUR (England 2026 – teuerster WM-Kader aller Zeiten!)
+    // Quelle: SportsOrca / Transfermarkt, Mai 2026
+    marketValueReferenceM: 1400,
     // Gewichtung der Positionen für SquadScore
     weights: {
       attack: 0.35,

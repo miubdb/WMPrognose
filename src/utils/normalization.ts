@@ -36,10 +36,11 @@ export function marketValueToMultiplier(
 /**
  * Konvertiert ELO-Rating zu einem Stärke-Multiplikator.
  * Hvattum & Arntzen (2010): ELO als lineare Basiskomponente
- * ELO 1000 → 0.7, ELO 1500 (avg) → 1.0, ELO 2000 → 1.35
+ * Referenz 1750 (eloratings.net-Skala, Ø WM-Team 2026):
+ *   ELO 1500 → 0.75, ELO 1750 → 1.0, ELO 2165 (Spanien) → 1.415 → geclampt 1.4
  */
 export function eloToMultiplier(elo: number): number {
-  const reference = 1500; // Durchschnittliches internationales ELO
+  const reference = MODEL_CONFIG.elo.referenceRating; // 1750
   const raw = 1 + (elo - reference) / 1000;
   return clamp(raw, MODEL_CONFIG.elo.minRatingMultiplier, MODEL_CONFIG.elo.maxRatingMultiplier);
 }
