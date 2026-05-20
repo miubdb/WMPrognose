@@ -49,6 +49,50 @@ export function computeScorelineMatrix(
 }
 
 /**
+ * Aggregiert 1X2-Wahrscheinlichkeiten direkt aus einer flachen ScorelineProbability-Liste.
+ * Standalone-Funktion nach Modell-Spezifikation.
+ *
+ * @param matrix - Flache Liste von ScorelineProbability (aus computeScorelineMatrix nach Flatten)
+ */
+export function compute1X2(
+  matrix: ScorelineProbability[]
+): { winA: number; draw: number; winB: number } {
+  let winA = 0, draw = 0, winB = 0;
+
+  for (const cell of matrix) {
+    if (cell.goalsA > cell.goalsB) winA += cell.probability;
+    else if (cell.goalsA === cell.goalsB) draw += cell.probability;
+    else winB += cell.probability;
+  }
+
+  return { winA, draw, winB };
+}
+
+/**
+ * Ranked Probability Score (RPS) für 3 Outcomes (1X2).
+ * Constantinou & Fenton (2012): Berücksichtigt ordinale Struktur.
+ *
+ * @param predicted - [pWinA, pDraw, pWinB] - Prognose-Wahrscheinlichkeiten
+ * @param observed  - [1|0, 1|0, 1|0] - tatsächliches Ergebnis als Indikatorvektor
+ * @returns RPS-Wert (niedriger = besser, 0 = perfekte Prognose)
+ */
+export function rps(
+  predicted: [number, number, number],
+  observed: [number, number, number]
+): number {
+  // Kumulative Prognose-Wahrscheinlichkeiten
+  const F1 = predicted[0];
+  const F2 = predicted[0] + predicted[1];
+
+  // Kumulative tatsächliche Outcomes
+  const O1 = observed[0];
+  const O2 = observed[0] + observed[1];
+
+  // RPS = (1/2) * [(F1-O1)^2 + (F2-O2)^2]  (Constantinou & Fenton 2012)
+  return 0.5 * (Math.pow(F1 - O1, 2) + Math.pow(F2 - O2, 2));
+}
+
+/**
  * Hauptfunktion: Berechnet alle Poisson-Prognosen.
  *
  * @param expectedGoalsA - Erwartete Tore Team A (nach allen Modifikatoren)

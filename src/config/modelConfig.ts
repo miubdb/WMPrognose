@@ -168,10 +168,26 @@ export const MODEL_CONFIG = {
     maxWinProbability: 0.90,
   },
 
+  // ─── Modifier-Cap (alle Kontext-Modifier niemals außerhalb ±15%) ─────────────
+  // Sorgt für Transparenz und verhindert unrealistische Extremwerte
+  modifierCap: {
+    min: 0.85,
+    max: 1.15,
+  },
+
   // ─── Evaluation (Constantinou & Fenton 2012) ─────────────────────────────────
   evaluation: {
     // RPS-Gewichtung: uniform für 3 Outcomes (1X2)
     outcomes: 3,
+  },
+
+  // ─── Kurzform-Aliase für Abwärtskompatibilität und klare API ─────────────────
+  // Damit externe Aufrufer MODEL_CONFIG.baseExpectedGoals statt
+  // MODEL_CONFIG.poisson.baseExpectedGoals schreiben können
+  baseExpectedGoals: 1.15,    // Alias für poisson.baseExpectedGoals
+  rho: 0.08,                  // Alias für dixonColes.rho
+  dixon_coles: {
+    rho: 0.08,                // Alias-Namespace für dixonColes
   },
 
 } as const;

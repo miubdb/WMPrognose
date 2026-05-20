@@ -192,6 +192,76 @@ function computeCrowdSupportModifier(
   return 1.0;
 }
 
+// ─── Standalone-Exports nach Modell-Spezifikation ────────────────────────────
+// Diese Funktionen exportieren die internen Berechnungen als öffentliche API.
+// Alle Modifier werden auf [modifierCap.min, modifierCap.max] geclampt.
+
+/**
+ * Höhen-Modifier (McSharry 2007) – Standalone-Export.
+ * Gibt Multiplikator für ein Team zurück, das auf gegebenem Venue-Niveau spielt.
+ * Ergebnis im Bereich [MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max].
+ */
+export function altitudeModifier(venueAltitude: number, teamAccustomedAltitude: number): number {
+  const raw = computeAltitudeModifier(venueAltitude, teamAccustomedAltitude);
+  return clamp(raw, MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max);
+}
+
+/**
+ * WBGT/Hitze-Modifier (Mohr et al. 2012) – Standalone-Export.
+ * @param wbgt            - Wet Bulb Globe Temperature in °C
+ * @param heatAdaptation  - 0.0 (nicht adaptiert) bis 1.0 (vollständig adaptiert)
+ * Ergebnis im Bereich [MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max].
+ */
+export function wbgtModifier(wbgt: number, heatAdaptation: number): number {
+  const raw = computeHeatModifier(wbgt, heatAdaptation);
+  return clamp(raw, MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max);
+}
+
+/**
+ * Reisemüdigkeit-Modifier (Reilly et al. 2007) – Standalone-Export.
+ * @param distanceKm    - Reisedistanz in km
+ * @param timezoneShift - Zeitzonendifferenz in Stunden (negativ = West, positiv = Ost)
+ * Ergebnis im Bereich [MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max].
+ */
+export function travelFatigueModifier(distanceKm: number, timezoneShift: number): number {
+  const raw = computeTravelFatigueModifier(timezoneShift, distanceKm);
+  return clamp(raw, MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max);
+}
+
+/**
+ * Rest-Tage-Modifier (Field et al. 2022) – Standalone-Export.
+ * Optimal sind 6 Tage Pause (MODEL_CONFIG.context.rest.optimalRestDays).
+ * Ergebnis im Bereich [MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max].
+ */
+export function restDaysModifier(restDays: number): number {
+  const raw = computeRestDaysModifier(restDays);
+  return clamp(raw, MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max);
+}
+
+/**
+ * Heimvorteil-Modifier (Pollard 1986) – Standalone-Export.
+ * @param isHostNation    - Team spielt im eigenen Land
+ * @param diasporaSupport - Team hat Diaspora-Unterstützung vor Ort
+ * Ergebnis im Bereich [MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max].
+ */
+export function homeAdvantageModifier(isHostNation: boolean, diasporaSupport: boolean): number {
+  const raw = computeHomeAdvantageModifier(isHostNation, diasporaSupport, [], '');
+  return clamp(raw, MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max);
+}
+
+/**
+ * Crowd-Support-Modifier (Sors 2020, Bryson 2021) – Standalone-Export.
+ * @param crowdFraction - Anteil des Publikums, das das Team unterstützt (0–1)
+ *                        0.0 = kein Support, 1.0 = volles Heimspiel-Atmosphäre
+ * Ergebnis im Bereich [MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max].
+ */
+export function crowdSupportModifier(crowdFraction: number): number {
+  // Nicht-linearer Crowd-Effekt: 100% Unterstützung → max +4% (MODEL_CONFIG.crowd.maxBonus)
+  const maxBonus = 0.04;  // crowd maxBonus (Sors 2020)
+  const bonus = clamp(crowdFraction, 0, 1) * maxBonus;
+  return clamp(1 + bonus, MODEL_CONFIG.modifierCap.min, MODEL_CONFIG.modifierCap.max);
+}
+
 /**
  * Berechnet alle Kontext-Modifier für beide Teams.
  */
