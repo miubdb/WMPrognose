@@ -38,12 +38,16 @@ export default async function TeamDetailPage({ params }: Props) {
   if (!team) notFound()
 
   // Prefer Supabase data, fall back to static data for teams not yet entered
-  const { data: dbPlayers } = await supabase
-    .from('players')
-    .select('*')
-    .eq('team_id', params.id)
-    .order('is_in_starting_xi', { ascending: false })
-    .order('rating', { ascending: false })
+  let dbPlayers: DBPlayer[] | null = null
+  if (supabase) {
+    const { data } = await supabase
+      .from('players')
+      .select('*')
+      .eq('team_id', params.id)
+      .order('is_in_starting_xi', { ascending: false })
+      .order('rating', { ascending: false })
+    dbPlayers = (data as DBPlayer[] | null) ?? null
+  }
 
   const players: Player[] = dbPlayers && dbPlayers.length > 0
     ? dbPlayers.map(mapDBPlayer)

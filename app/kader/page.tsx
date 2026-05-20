@@ -43,6 +43,11 @@ export default function KaderPage() {
   const bench = players.filter(p => !p.is_in_starting_xi)
 
   const load = useCallback(async () => {
+    if (!supabase) {
+      setPlayers([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data } = await supabase
       .from('players')
@@ -60,6 +65,10 @@ export default function KaderPage() {
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500) }
 
   const handleSave = async () => {
+    if (!supabase) {
+      flash('⚠️ Supabase nicht konfiguriert')
+      return
+    }
     if (!form.name.trim() || !form.age || !form.market_value_m) {
       flash('⚠️ Name, Alter und Marktwert sind Pflichtfelder')
       return
@@ -108,12 +117,14 @@ export default function KaderPage() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!supabase) return
     await supabase.from('players').delete().eq('id', id)
     flash('Spieler entfernt')
     load()
   }
 
   const toggleXI = async (p: DBPlayer) => {
+    if (!supabase) return
     if (!p.is_in_starting_xi && starters.length >= 11) {
       flash('⚠️ Startelf bereits voll (11/11)')
       return

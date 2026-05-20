@@ -11,6 +11,7 @@ export default function TeamsPage() {
   const groups = ['all', ...Object.keys(TEAMS_BY_GROUP).sort()]
 
   useEffect(() => {
+    if (!supabase) return
     supabase
       .from('players')
       .select('team_id')

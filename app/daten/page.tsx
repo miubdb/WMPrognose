@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ALL_TEAMS, TeamBasic } from '@/src/data/allTeams'
-import { supabase, DBPlayer } from '@/lib/supabase'
+import { supabase, DBPlayer, isSupabaseConfigured } from '@/lib/supabase'
 
 // Global data requirements
 const GLOBAL_REQUIREMENTS = [
@@ -54,6 +54,19 @@ export default function DatenPage() {
   useEffect(() => {
     async function fetchData() {
       try {
+        if (!supabase) {
+          setError('Supabase ist nicht konfiguriert – zeige Team-Level-Daten und Fallbacks')
+          setTeamStatuses(ALL_TEAMS.map(team => ({
+            team,
+            playerCount: 0,
+            xgCount: 0,
+            confidence: calcConfidence(0, 0),
+            pctComplete: 0,
+          })))
+          setLoading(false)
+          return
+        }
+
         const { data, error: sbError } = await supabase
           .from('players')
           .select('team_id, xg_per90')
@@ -126,15 +139,21 @@ export default function DatenPage() {
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Datenanforderungen</h1>
+        <h1 className="text-2xl font-bold">Datenqualität</h1>
         <p className="text-gray-400 text-sm mt-1">
-          Übersicht über vorhandene und fehlende Modell-Daten pro Team
+          Welche Team- und Spieler-Daten sind vorhanden – und wie belastbar ist die Prognose?
         </p>
       </div>
 
       {error && (
         <div className="bg-yellow-950/40 border border-yellow-800/60 rounded-lg p-3 text-xs text-yellow-400">
           ⚠️ {error}
+        </div>
+      )}
+
+      {!isSupabaseConfigured && (
+        <div className="bg-blue-950/40 border border-blue-800/60 rounded-lg p-3 text-xs text-blue-300">
+          Ohne Spieler-/Startelfdaten basiert die Prognose stärker auf Team-Level-Daten (ELO, Ratings, Marktwert, Kontext).
         </div>
       )}
 

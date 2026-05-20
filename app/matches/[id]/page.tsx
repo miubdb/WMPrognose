@@ -5,6 +5,7 @@ import { TEAM_BY_ID } from '@/src/data/allTeams'
 import { getMatchPrediction } from '@/lib/modelAdapter'
 import { VENUES } from '@/src/data/venues'
 import MatchDetailTabs from '@/components/MatchDetailTabs'
+import { supabase } from '@/lib/supabase'
 
 export function generateStaticParams() {
   return GROUP_SCHEDULE.map(m => ({ id: m.id }))
@@ -43,6 +44,16 @@ export default async function MatchDetailPage({ params }: Props) {
 
   const venue = VENUES[match.venueId]
   const venueName = VENUE_NAMES[match.venueId] ?? match.venueId
+  let canEditLineups = false
+  if (supabase) {
+    const { data } = await supabase
+      .from('players')
+      .select('team_id')
+      .in('team_id', [match.teamAId, match.teamBId])
+    const counts: Record<string, number> = {}
+    for (const row of data ?? []) counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
+    canEditLineups = (counts[match.teamAId] ?? 0) > 0 && (counts[match.teamBId] ?? 0) > 0
+  }
 
   return (
     <div className="space-y-4">
@@ -61,6 +72,7 @@ export default async function MatchDetailPage({ params }: Props) {
         matchday={match.matchday}
         matchDate={match.date}
         kickoffUTC={match.kickoffUTC}
+        canEditLineups={canEditLineups}
       />
     </div>
   )

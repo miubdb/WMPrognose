@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 async function getNominationCounts(): Promise<Record<string, number>> {
+  if (!supabase) return {}
   const { data } = await supabase
     .from('players')
     .select('team_id')
@@ -42,39 +43,41 @@ const TOP_CONTENDERS = [
   { id: 'germany',   prob:  8.9, color: 'bg-gray-400' },
 ]
 
-const FEATURES = [
-  {
-    href: '/matches',
-    icon: '⚽',
-    title: 'Spiel-Prognosen',
-    desc: 'Alle 72 Gruppenspiele mit Sieg/Remis/Niederlage-Wahrscheinlichkeiten, xG und Scoreline-Heatmap.',
-    cta: 'Spiele ansehen →',
-    accent: 'emerald',
-  },
-  {
-    href: '/tippspiel',
-    icon: '🎯',
-    title: 'Tippspiel-Optimizer',
-    desc: 'Optimierte Tipp-Empfehlungen mit Konfidenz-Bewertung und Value-Bet-Erkennung für dein Tippspiel.',
-    cta: 'Tipps generieren →',
-    accent: 'yellow',
-  },
-  {
-    href: '/tournament',
-    icon: '🏆',
-    title: 'Turnier-Simulator',
-    desc: 'Monte-Carlo-Simulation mit bis zu 10.000 Durchläufen — wer gewinnt die WM 2026?',
-    cta: 'Simulation starten →',
-    accent: 'purple',
-  },
+const PRIMARY_FEATURES = [
   {
     href: '/teams',
     icon: '🌍',
-    title: 'Alle 48 Teams',
-    desc: 'ELO-Ratings, Marktwerte, Kader und Stärke-Profile für alle Teilnehmer.',
-    cta: 'Teams erkunden →',
-    accent: 'blue',
+    title: 'Teams & Kader',
+    desc: 'Nationen, Spielerpool, Ratings und Teamdaten auf einen Blick.',
+    cta: 'Teams ansehen →',
   },
+  {
+    href: '/matches',
+    icon: '⚽',
+    title: 'Spiele & Prognosen',
+    desc: 'Alle Spiele mit 1X2-Wahrscheinlichkeiten, xG und Ergebnisverteilung.',
+    cta: 'Zu den Prognosen →',
+  },
+  {
+    href: '/turnierbaum',
+    icon: '🏆',
+    title: 'Turnierbaum',
+    desc: 'Gruppen- und KO-Logik der WM 2026 übersichtlich dargestellt.',
+    cta: 'Turnierbaum öffnen →',
+  },
+  {
+    href: '/daten',
+    icon: '🧪',
+    title: 'Datenqualität',
+    desc: 'Wo Daten fehlen und wie belastbar die Team-Prognosen sind.',
+    cta: 'Datenqualität prüfen →',
+  },
+]
+
+const ADVANCED_FEATURES = [
+  { href: '/tippspiel', label: 'Tippspiel / Optimizer' },
+  { href: '/tournament', label: 'Simulation / Monte Carlo' },
+  { href: '/kader', label: 'Globaler Kader-Editor' },
 ]
 
 export default async function HomePage() {
@@ -144,7 +147,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold text-emerald-400">{teamsWithData}</span>
             <span className="text-xs text-gray-500">/ {totalTeams} Teams nominiert</span>
-            <Link href="/kader" className="text-xs text-emerald-400 hover:text-emerald-300 ml-2">Kader bearbeiten →</Link>
+            <Link href="/daten" className="text-xs text-emerald-400 hover:text-emerald-300 ml-2">Datenqualität ansehen →</Link>
           </div>
         </div>
         <div className="h-2 bg-gray-800 rounded-full overflow-hidden mb-3">
@@ -183,9 +186,9 @@ export default async function HomePage() {
 
       {/* ── Feature Cards ─────────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Was kannst du hier machen?</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Dein Haupt-Flow</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {FEATURES.map(f => (
+          {PRIMARY_FEATURES.map(f => (
             <Link
               key={f.href}
               href={f.href}
@@ -197,6 +200,18 @@ export default async function HomePage() {
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed mb-4">{f.desc}</p>
               <span className="text-xs text-emerald-400 font-medium">{f.cta}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-gray-300 mb-2">Erweitert</h3>
+        <p className="text-xs text-gray-500 mb-3">Diese Bereiche bleiben verfügbar, sind aber nicht Teil des Kernflows.</p>
+        <div className="flex flex-wrap gap-2">
+          {ADVANCED_FEATURES.map(item => (
+            <Link key={item.href} href={item.href} className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg text-gray-300 transition-colors">
+              {item.label}
             </Link>
           ))}
         </div>

@@ -17,6 +17,7 @@ interface MatchDetailTabsProps {
   matchday?: number
   matchDate: string
   kickoffUTC: string
+  canEditLineups: boolean
 }
 
 type TabKey = 'prediction' | 'lineup' | 'explanation' | 'scorelines' | 'context'
@@ -35,6 +36,7 @@ export default function MatchDetailTabs({
   matchday,
   matchDate,
   kickoffUTC,
+  canEditLineups,
 }: MatchDetailTabsProps) {
   const [tab, setTab] = useState<TabKey>('prediction')
 
@@ -52,7 +54,7 @@ export default function MatchDetailTabs({
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'prediction',   label: 'Prognose'      },
-    { key: 'lineup',       label: 'Startelf'      },
+    ...(canEditLineups ? [{ key: 'lineup' as const, label: 'Startelf' }] : []),
     { key: 'explanation',  label: 'Erklärung'     },
     { key: 'scorelines',   label: 'Scorelines'    },
     { key: 'context',      label: 'Kontext'       },
@@ -126,8 +128,13 @@ export default function MatchDetailTabs({
           prediction={prediction}
         />
       )}
-      {tab === 'lineup' && (
+      {tab === 'lineup' && canEditLineups && (
         <LineupTab matchId={matchId} teamA={teamA} teamB={teamB} />
+      )}
+      {!canEditLineups && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm text-gray-400">
+          Startelf-Auswahl ist verfügbar, sobald Kaderdaten für beide Teams gepflegt sind.
+        </div>
       )}
       {tab === 'explanation' && (
         <ExplanationTab teamA={teamA} teamB={teamB} prediction={prediction} venue={venue} />
@@ -213,6 +220,8 @@ function PredictionTab({
         </div>
       </div>
 
+      <WhyPredictionBlock teamA={teamA} teamB={teamB} prediction={prediction} />
+
       {/* Top 5 Scorelines */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
         <h2 className="font-semibold mb-4 text-sm">Top 5 wahrscheinlichste Ergebnisse</h2>
@@ -271,6 +280,7 @@ function useLocalLineup(matchId: string, teamId: string, defaultLineup: LineupSl
 }
 
 function LineupTab({ matchId, teamA, teamB }: { matchId: string; teamA: TeamBasic; teamB: TeamBasic }) {
+  // TODO Sprint 2: Startelf technisch von teamglobalen Flags auf matchbezogene Lineups umstellen.
   const [formA, setFormA] = useState<Formation>('4-3-3')
   const [formB, setFormB] = useState<Formation>('4-3-3')
   const [lineupA, setLineupA] = useLocalLineup(matchId, teamA.id, [])
@@ -323,6 +333,8 @@ function LineupTab({ matchId, teamA, teamB }: { matchId: string; teamA: TeamBasi
           </select>
         </div>
 
+        <div className="px-3 py-2 text-[11px] text-blue-300 bg-blue-950/30 border-b border-blue-900/40">Startelf für dieses konkrete Spiel (gespeichert pro Match im Browser).</div>
+
         {/* Warnings */}
         <div className="px-3 py-2 space-y-1">
           {missingGK && lineup.length > 0 && (
@@ -369,18 +381,14 @@ function LineupTab({ matchId, teamA, teamB }: { matchId: string; teamA: TeamBasi
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500">
-        Startelf-Konfiguration wird per Spielpaar im Browser gespeichert. Spielerdaten aus dem Kader-Tab oder der Teams-Seite verfügbar.
+        Startelf-Konfiguration gilt für dieses konkrete Spiel und wird pro Match im Browser gespeichert.
       </p>
       <div className="flex gap-3 flex-col sm:flex-row">
         <TeamBox team={teamA} lineup={lineupA} formation={formA} setFormation={setFormA} setLineup={setLineupA} />
         <TeamBox team={teamB} lineup={lineupB} formation={formB} setFormation={setFormB} setLineup={setLineupB} />
       </div>
       <p className="text-xs text-gray-600 text-center">
-        Vorschlag: Nutze die{' '}
-        <Link href={`/teams/${teamA.id}?tab=squad`} className="text-emerald-500 hover:text-emerald-400">
-          Kader-Seite
-        </Link>{' '}
-        um Startelf zu setzen, die dann hier erscheint.
+        Hinweis: In Sprint 2 wird die Startelf technisch auf persistente, matchbezogene Lineups umgestellt.
       </p>
     </div>
   )
@@ -705,6 +713,66 @@ function ContextTab({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+
+function WhyPredictionBlock({ teamA, teamB, prediction }: { teamA: TeamBasic; teamB: TeamBasic; prediction: MatchPredictionResult }) {
+  const a = prediction.ratingBreakdown?.teamA ?? {}
+  const b = prediction.ratingBreakdown?.teamB ?? {}
+  const ctxA = prediction.contextBreakdown?.teamAContextModifier as number | undefined
+  const ctxB = prediction.contextBreakdown?.teamBContextModifier as number | undefined
+
+  const num = (v: unknown, d = 0) => typeof v === 'number' ? v : d
+  const factors = [
+    {
+      key: 'elo',
+      title: 'ELO-Vorteil',
+      delta: num(a.elo) - num(b.elo),
+      text: (d: number) => d === 0 ? 'Beide Teams sind im ELO nahezu gleich.' : `${d > 0 ? teamA.name : teamB.name} hat ${Math.abs(Math.round(d))} ELO Punkte Vorsprung.`
+    },
+    {
+      key: 'squadValue',
+      title: 'Kaderwert-Signal',
+      delta: num(a.squadValue) - num(b.squadValue),
+      text: (d: number) => d === 0 ? 'Kaderwert-Signal ist ausgeglichen.' : `${d > 0 ? teamA.name : teamB.name} hat beim Squad-Value einen leichten Vorteil.`
+    },
+    {
+      key: 'attackDefense',
+      title: 'Offensive vs. Defensive',
+      delta: (num(a.attack) - num(b.defense)) - (num(b.attack) - num(a.defense)),
+      text: (d: number) => d === 0 ? 'Offensiv/Defensiv-Balance ist ähnlich.' : `${d > 0 ? teamA.name : teamB.name} hat die bessere Matchup-Balance in Angriff/Abwehr.`
+    },
+    {
+      key: 'context',
+      title: 'Kontextfaktor',
+      delta: (ctxA ?? 1) - (ctxB ?? 1),
+      text: (d: number) => d === 0 ? 'Kontext-Effekte sind ähnlich.' : `${d > 0 ? teamA.name : teamB.name} profitiert leicht mehr von Venue/Reise/Rest.`
+    },
+  ].sort((x,y)=>Math.abs(y.delta)-Math.abs(x.delta)).slice(0,4)
+
+  factors.push({
+    key: 'lineup',
+    title: 'Startelf-Effekt',
+    delta: 0,
+    text: () => 'Startelf-Effekt noch nicht berechnet – Datenmodell wird in Sprint 2 matchbezogen erweitert.'
+  })
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 className="font-semibold mb-3 text-sm">Warum diese Prognose?</h2>
+      <div className="space-y-2">
+        {factors.slice(0,5).map((f) => (
+          <div key={f.key} className="bg-gray-800/60 rounded-lg p-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-gray-200">{f.title}</span>
+              {f.key !== 'lineup' && <span className="text-[11px] text-gray-500">Δ {f.delta.toFixed(3)}</span>}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">{f.text(f.delta)}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
