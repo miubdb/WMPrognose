@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { TEAM_BY_ID, ALL_TEAMS } from '@/src/data/allTeams'
 import { PLAYERS_BY_TEAM } from '@/src/data/players'
+import SquadEditor from '@/components/SquadEditor'
 
 export function generateStaticParams() {
   return ALL_TEAMS.map(team => ({ id: team.id }))
@@ -16,8 +17,6 @@ export default function TeamDetailPage({ params }: Props) {
   if (!team) notFound()
 
   const players = PLAYERS_BY_TEAM[params.id] ?? []
-  const starters = players.filter(p => p.isInStartingXI)
-  const bench = players.filter(p => !p.isInStartingXI)
 
   const ratings = [
     { label: 'Angriff', value: team.attackRating, color: 'bg-rose-500' },
@@ -26,9 +25,6 @@ export default function TeamDetailPage({ params }: Props) {
     { label: 'Torwart', value: team.goalkeeperRating, color: 'bg-yellow-500' },
     { label: 'Standards', value: team.setPieceRating, color: 'bg-purple-500' },
   ]
-
-  const positionOrder = { GK: 0, DEF: 1, MID: 2, FWD: 3 }
-  const sortedPlayers = [...players].sort((a, b) => positionOrder[a.position] - positionOrder[b.position])
 
   return (
     <div className="space-y-6">
@@ -97,45 +93,10 @@ export default function TeamDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Squad */}
-      {players.length > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-gray-800">
-            <h2 className="font-semibold">Kader ({players.length} Spieler)</h2>
-          </div>
-
-          {/* Starters */}
-          {starters.length > 0 && (
-            <div>
-              <div className="px-4 py-2 bg-gray-800/50">
-                <h3 className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Startelf</h3>
-              </div>
-              <div className="divide-y divide-gray-800">
-                {[...starters].sort((a, b) => positionOrder[a.position] - positionOrder[b.position]).map(player => (
-                  <PlayerRow key={player.id} player={player} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Bench */}
-          {bench.length > 0 && (
-            <div>
-              <div className="px-4 py-2 bg-gray-800/50">
-                <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Weiterer Kader</h3>
-              </div>
-              <div className="divide-y divide-gray-800">
-                {[...bench].sort((a, b) => positionOrder[a.position] - positionOrder[b.position]).map(player => (
-                  <PlayerRow key={player.id} player={player} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* No Player Data */}
-      {players.length === 0 && (
+      {/* Squad Editor (interactive client component) */}
+      {players.length > 0 ? (
+        <SquadEditor players={players} teamId={params.id} />
+      ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
           <p className="text-gray-500 text-sm">Detaillierte Kader-Daten für {team.name} noch nicht verfügbar.</p>
           <p className="text-gray-600 text-xs mt-2">Nur für die 12 Hauptteams sind vollständige Spielerdaten vorhanden.</p>
@@ -156,43 +117,6 @@ export default function TeamDetailPage({ params }: Props) {
         >
           Tipp-Empfehlungen
         </Link>
-      </div>
-    </div>
-  )
-}
-
-function PlayerRow({ player }: { player: import('@/src/data/players').Player }) {
-  const posColors: Record<string, string> = {
-    GK: 'bg-yellow-500/20 text-yellow-400',
-    DEF: 'bg-emerald-500/20 text-emerald-400',
-    MID: 'bg-blue-500/20 text-blue-400',
-    FWD: 'bg-rose-500/20 text-rose-400',
-  }
-
-  return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800/50 transition-colors">
-      {player.jerseyNumber && (
-        <span className="text-xs text-gray-600 w-5 text-right">{player.jerseyNumber}</span>
-      )}
-      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${posColors[player.position]}`}>
-        {player.position}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">{player.name}</div>
-        {player.clubTeam && (
-          <div className="text-xs text-gray-500 truncate">{player.clubTeam}</div>
-        )}
-      </div>
-      <div className="text-right">
-        <div className="text-xs text-gray-400">{player.age} J.</div>
-        <div className="text-xs text-gray-500">€{player.marketValueM}M</div>
-      </div>
-      <div className="text-right">
-        <div className="text-xs font-mono">
-          <span className={player.rating >= 85 ? 'text-emerald-400' : player.rating >= 75 ? 'text-blue-400' : 'text-gray-400'}>
-            {player.rating}
-          </span>
-        </div>
       </div>
     </div>
   )

@@ -47,61 +47,108 @@ export default async function MatchDetailPage({ params }: Props) {
   const draw = Math.round(prediction.drawProbability * 100)
   const winB = Math.round(prediction.winProbabilityTeamB * 100)
 
+  const xgA = prediction.expectedGoalsTeamA
+  const xgB = prediction.expectedGoalsTeamB
+  const xgTotal = xgA + xgB
+  const xgPctA = xgTotal > 0 ? (xgA / xgTotal) * 100 : 50
+  const xgPctB = xgTotal > 0 ? (xgB / xgTotal) * 100 : 50
+
+  // Stärke-Badge: based on overallRating
+  const ratingDiff = teamA.overallRating - teamB.overallRating
+  const favoriteA = ratingDiff > 5
+  const favoriteB = ratingDiff < -5
+
   return (
     <div className="space-y-6">
       <Link href="/matches" className="text-sm text-gray-500 hover:text-gray-300 flex items-center gap-1">
         ← Alle Spiele
       </Link>
 
-      {/* Match Header */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-2">
+      {/* Match Header – enhanced */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-800/60 text-xs text-gray-400">
           {match.group && (
-            <span className="text-xs text-emerald-400 font-medium">
+            <span className="font-medium text-emerald-400">
               Gruppe {match.group} · Spieltag {match.matchday}
             </span>
           )}
-          <span className="text-xs text-gray-500">{match.date} · {match.kickoffUTC} UTC</span>
+          <span>{match.date} · {match.kickoffUTC} UTC</span>
         </div>
 
-        <div className="flex items-center justify-center gap-6 my-6">
-          <div className="text-center">
+        {/* Team tiles */}
+        <div className="flex items-stretch">
+          {/* Team A */}
+          <div className={`flex-1 flex flex-col items-center justify-center py-6 px-4 border-r border-gray-800 ${favoriteA ? 'bg-emerald-950/30' : ''}`}>
             <div className="text-5xl mb-2">{teamA.flag}</div>
-            <Link href={`/teams/${teamA.id}`} className="font-bold hover:text-emerald-400 transition-colors">
+            <Link href={`/teams/${teamA.id}`} className="font-bold text-center hover:text-emerald-400 transition-colors leading-tight">
               {teamA.name}
             </Link>
-            <div className="text-xs text-gray-500 mt-1">ELO {teamA.eloRating}</div>
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <span className="text-xs text-gray-500">ELO {teamA.eloRating}</span>
+              {favoriteA && (
+                <span className="text-xs bg-emerald-800 text-emerald-300 px-2 py-0.5 rounded-full font-medium">
+                  Favorit
+                </span>
+              )}
+              <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${
+                teamA.overallRating >= 85 ? 'bg-emerald-900 text-emerald-400' :
+                teamA.overallRating >= 75 ? 'bg-blue-900 text-blue-400' :
+                'bg-gray-800 text-gray-400'
+              }`}>
+                {teamA.overallRating}/100
+              </span>
+            </div>
           </div>
-          <div className="text-center px-4">
-            <div className="text-gray-500 text-2xl font-bold">vs</div>
-            <div className="text-xs text-gray-600 mt-1">{venueName}</div>
+
+          {/* Center */}
+          <div className="flex flex-col items-center justify-center px-4 py-4 text-center min-w-[80px]">
+            <div className="text-gray-500 text-xl font-bold">vs</div>
+            <div className="text-xs text-gray-600 mt-1 max-w-[100px] leading-tight">{venueName}</div>
           </div>
-          <div className="text-center">
+
+          {/* Team B */}
+          <div className={`flex-1 flex flex-col items-center justify-center py-6 px-4 border-l border-gray-800 ${favoriteB ? 'bg-blue-950/30' : ''}`}>
             <div className="text-5xl mb-2">{teamB.flag}</div>
-            <Link href={`/teams/${teamB.id}`} className="font-bold hover:text-emerald-400 transition-colors">
+            <Link href={`/teams/${teamB.id}`} className="font-bold text-center hover:text-blue-400 transition-colors leading-tight">
               {teamB.name}
             </Link>
-            <div className="text-xs text-gray-500 mt-1">ELO {teamB.eloRating}</div>
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <span className="text-xs text-gray-500">ELO {teamB.eloRating}</span>
+              {favoriteB && (
+                <span className="text-xs bg-blue-800 text-blue-300 px-2 py-0.5 rounded-full font-medium">
+                  Favorit
+                </span>
+              )}
+              <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${
+                teamB.overallRating >= 85 ? 'bg-blue-900 text-blue-400' :
+                teamB.overallRating >= 75 ? 'bg-blue-900 text-blue-400' :
+                'bg-gray-800 text-gray-400'
+              }`}>
+                {teamB.overallRating}/100
+              </span>
+            </div>
           </div>
         </div>
 
         {/* 1X2 Probabilities */}
-        <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="grid grid-cols-3 gap-2 px-4 py-3 border-t border-gray-800">
           {[
-            { label: '1 Sieg ' + teamA.name, prob: winA, color: 'bg-emerald-500' },
-            { label: 'X Unentschieden', prob: draw, color: 'bg-gray-500' },
-            { label: '2 Sieg ' + teamB.name, prob: winB, color: 'bg-blue-500' },
-          ].map(({ label, prob, color }) => (
+            { label: '1', sublabel: teamA.name, prob: winA, color: 'text-emerald-400' },
+            { label: 'X', sublabel: 'Unentschieden', prob: draw, color: 'text-gray-300' },
+            { label: '2', sublabel: teamB.name, prob: winB, color: 'text-blue-400' },
+          ].map(({ label, sublabel, prob, color }) => (
             <div key={label} className="bg-gray-800 rounded-lg p-3 text-center">
-              <div className={`text-xl font-bold ${color.replace('bg-', 'text-')}`}>{prob}%</div>
-              <div className="text-xs text-gray-400 mt-1 leading-tight">{label}</div>
+              <div className="text-xs text-gray-500 font-bold mb-1">{label}</div>
+              <div className={`text-2xl font-bold ${color}`}>{prob}%</div>
+              <div className="text-xs text-gray-500 mt-1 truncate">{sublabel}</div>
             </div>
           ))}
         </div>
 
-        {/* Probability Bar */}
-        <div className="mt-4">
-          <div className="flex h-3 rounded-full overflow-hidden">
+        {/* Probability bar */}
+        <div className="px-4 pb-4">
+          <div className="flex h-2.5 rounded-full overflow-hidden">
             <div className="bg-emerald-500 h-full transition-all" style={{ width: `${winA}%` }} />
             <div className="bg-gray-500 h-full transition-all" style={{ width: `${draw}%` }} />
             <div className="bg-blue-500 h-full transition-all" style={{ width: `${winB}%` }} />
@@ -109,47 +156,83 @@ export default async function MatchDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Expected Goals */}
+      {/* xG Comparison – visual bar */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-4">Expected Goals</h2>
-        <div className="grid grid-cols-3 gap-4 items-center">
-          <div className="text-center">
-            <div className="text-3xl font-mono font-bold text-emerald-400">
-              {prediction.expectedGoalsTeamA.toFixed(2)}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">{teamA.name}</div>
+        <h2 className="font-semibold mb-4">Expected Goals (xG)</h2>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="text-right min-w-[3rem]">
+            <span className="text-2xl font-mono font-bold text-emerald-400">{xgA.toFixed(2)}</span>
           </div>
-          <div className="text-center text-gray-600 text-sm">xG</div>
-          <div className="text-center">
-            <div className="text-3xl font-mono font-bold text-blue-400">
-              {prediction.expectedGoalsTeamB.toFixed(2)}
+          {/* Split bar */}
+          <div className="flex-1 flex h-5 rounded-full overflow-hidden gap-0.5">
+            <div
+              className="bg-emerald-500 flex items-center justify-end pr-1.5 transition-all"
+              style={{ width: `${xgPctA}%` }}
+            >
+              {xgPctA > 25 && (
+                <span className="text-xs text-white font-medium">{teamA.name.slice(0, 3)}</span>
+              )}
             </div>
-            <div className="text-xs text-gray-500 mt-1">{teamB.name}</div>
+            <div
+              className="bg-blue-500 flex items-center justify-start pl-1.5 transition-all"
+              style={{ width: `${xgPctB}%` }}
+            >
+              {xgPctB > 25 && (
+                <span className="text-xs text-white font-medium">{teamB.name.slice(0, 3)}</span>
+              )}
+            </div>
           </div>
+          <div className="min-w-[3rem]">
+            <span className="text-2xl font-mono font-bold text-blue-400">{xgB.toFixed(2)}</span>
+          </div>
+        </div>
+        <div className="flex justify-between text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block" />
+            {teamA.name}
+          </span>
+          <span className="text-gray-600">xG gesamt: {(xgA + xgB).toFixed(2)}</span>
+          <span className="flex items-center gap-1">
+            {teamB.name}
+            <span className="w-2 h-2 bg-blue-500 rounded-full inline-block" />
+          </span>
         </div>
       </div>
 
-      {/* Top 5 Scorelines */}
+      {/* Top 5 Most Likely Results – Cards */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h2 className="font-semibold mb-4">Top 5 Ergebnisse</h2>
-        <div className="space-y-2">
-          {prediction.top5Scorelines.map((s, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className="text-gray-600 text-sm w-5">{i + 1}.</span>
-              <span className="font-mono font-bold text-white w-12">
-                {s.goalsA}:{s.goalsB}
-              </span>
-              <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500/70 rounded-full"
-                  style={{ width: `${Math.min(s.probability * 300, 100)}%` }}
-                />
+        <h2 className="font-semibold mb-4">Top 5 wahrscheinlichste Ergebnisse</h2>
+        <div className="grid grid-cols-5 gap-2">
+          {prediction.top5Scorelines.map((s, i) => {
+            const isWinA = s.goalsA > s.goalsB
+            const isWinB = s.goalsB > s.goalsA
+            const isDraw = s.goalsA === s.goalsB
+            return (
+              <div
+                key={i}
+                className={`rounded-xl p-3 text-center border transition-all ${
+                  i === 0
+                    ? 'border-emerald-700 bg-emerald-950/40'
+                    : 'border-gray-800 bg-gray-800/50'
+                }`}
+              >
+                <div className="text-xs text-gray-500 mb-1">#{i + 1}</div>
+                <div className={`text-xl font-mono font-bold ${
+                  isWinA ? 'text-emerald-400' :
+                  isWinB ? 'text-blue-400' :
+                  'text-gray-300'
+                }`}>
+                  {s.goalsA}:{s.goalsB}
+                </div>
+                <div className={`text-xs font-medium mt-1 ${i === 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
+                  {(s.probability * 100).toFixed(1)}%
+                </div>
+                <div className="text-xs text-gray-600 mt-0.5">
+                  {isWinA ? teamA.flag : isWinB ? teamB.flag : '🤝'}
+                </div>
               </div>
-              <span className="text-sm font-mono text-emerald-400 w-14 text-right">
-                {(s.probability * 100).toFixed(1)}%
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -158,8 +241,8 @@ export default async function MatchDetailPage({ params }: Props) {
         teamAName={teamA.name}
         teamBName={teamB.name}
         scorelines={prediction.top5Scorelines}
-        xgA={prediction.expectedGoalsTeamA}
-        xgB={prediction.expectedGoalsTeamB}
+        xgA={xgA}
+        xgB={xgB}
       />
 
       {/* Rating Comparison */}
@@ -199,8 +282,8 @@ export default async function MatchDetailPage({ params }: Props) {
           })}
         </div>
         <div className="flex justify-between mt-3 text-xs text-gray-600">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full inline-block"/> {teamA.name}</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-500 rounded-full inline-block"/> {teamB.name}</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-full inline-block" /> {teamA.name}</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-500 rounded-full inline-block" /> {teamB.name}</span>
         </div>
       </div>
 
@@ -237,7 +320,6 @@ export default async function MatchDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Context Modifiers */}
           {prediction.contextBreakdown && (
             <div className="mt-3 pt-3 border-t border-gray-800 grid grid-cols-2 gap-2 text-xs">
               {[
@@ -284,7 +366,6 @@ function ScorelineGrid({
   xgA: number
   xgB: number
 }) {
-  // Generiere 5x5 Heatmap aus Poisson-Verteilung
   function poissonPdf(k: number, lambda: number): number {
     let result = Math.exp(-lambda)
     for (let i = 1; i <= k; i++) result *= lambda / i
