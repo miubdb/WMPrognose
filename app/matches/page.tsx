@@ -1,24 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { GROUP_SCHEDULE, KO_SCHEDULE } from '@/src/data/schedule'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
+import { VENUES } from '@/src/data/venues'
 import { generateTipSuggestions } from '@/lib/modelAdapter'
+import { toBerlinTime, fmtDate } from '@/lib/utils'
 
-const VENUE_NAMES: Record<string, string> = {
-  mexico_city: 'Mexico City',
-  guadalajara: 'Guadalajara',
-  monterrey: 'Monterrey',
-  miami: 'Miami',
-  houston: 'Houston',
-  dallas: 'Dallas',
-  new_york: 'New York/NJ',
-  los_angeles: 'Los Angeles',
-  toronto: 'Toronto',
-  vancouver: 'Vancouver',
+const ROUND_NAMES: Record<string, string> = {
+  round_of_32: 'Achtelfinale (Runde der 32)',
+  round_of_16: 'Runde der 16',
+  quarterfinal: 'Viertelfinale',
+  semifinal: 'Halbfinale',
+  final: 'Finale',
 }
 
 function MatchesContent() {
@@ -28,23 +25,62 @@ function MatchesContent() {
   const [tab, setTab] = useState<'group' | 'ko'>('group')
   const [activeGroup, setActiveGroup] = useState<string>(defaultGroup)
   const [matchday, setMatchday] = useState<number>(0)
-
-  const groups = ['all', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
+  const [venueFilter, setVenueFilter] = useState<string>('all')
+  const [teamFilter, setTeamFilter] = useState<string>('all')
 
   const tipSuggestions = generateTipSuggestions()
   const tipMap = Object.fromEntries(tipSuggestions.map(t => [t.matchId, t]))
 
-  const filteredGroupMatches = GROUP_SCHEDULE.filter(m => {
-    if (activeGroup !== 'all' && m.group !== activeGroup) return false
-    if (matchday !== 0 && m.matchday !== matchday) return false
-    return true
-  })
+  // Chronologically sorted group matches
+  const sortedGroupMatches = useMemo(() =>
+    [...GROUP_SCHEDULE].sort((a, b) => {
+      const dt = a.date.localeCompare(b.date)
+      if (dt !== 0) return dt
+      return a.kickoffUTC.localeCompare(b.kickoffUTC)
+    }),
+    []
+  )
+
+  const filteredGroupMatches = useMemo(() =>
+    sortedGroupMatches.filter(m => {
+      if (activeGroup !== 'all' && m.group !== activeGroup) return false
+      if (matchday !== 0 && m.matchday !== matchday) return false
+      if (venueFilter !== 'all' && m.venueId !== venueFilter) return false
+      if (teamFilter !== 'all' && m.teamAId !== teamFilter && m.teamBId !== teamFilter) return false
+      return true
+    }),
+    [sortedGroupMatches, activeGroup, matchday, venueFilter, teamFilter]
+  )
+
+  const groups = ['all', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
+
+  // Venue options used in group stage
+  const venueOptions = useMemo(() => {
+    const ids = [...new Set(GROUP_SCHEDULE.map(m => m.venueId))]
+    return [{ id: 'all', label: 'Alle Spielorte' }, ...ids.map(id => ({
+      id,
+      label: VENUES[id]?.name ?? id,
+    }))]
+  }, [])
+
+  // Team options (all teams in group stage)
+  const teamOptions = useMemo(() => {
+    const ids = [...new Set(GROUP_SCHEDULE.flatMap(m => [m.teamAId, m.teamBId]))]
+    return [
+      { id: 'all', label: 'Alle Teams' },
+      ...ids
+        .map(id => ({ id, label: TEAM_BY_ID[id]?.name ?? id, flag: TEAM_BY_ID[id]?.flag ?? '' }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ]
+  }, [])
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Spiele</h1>
-        <p className="text-gray-400 text-sm mt-1">Alle Spiele der FIFA WM 2026 mit Prognosen</p>
+        <p className="text-gray-400 text-sm mt-1">
+          Alle Spiele der FIFA WM 2026 · Zeiten in Berliner Zeit (MESZ, UTC+2)
+        </p>
       </div>
 
       {/* Phase Tabs */}
@@ -81,34 +117,77 @@ function MatchesContent() {
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >
-                {g === 'all' ? 'Alle' : `Gr. ${g}`}
+                {g === 'all' ? 'Alle Gruppen' : `Gr. ${g}`}
               </button>
             ))}
           </div>
 
-          {/* Matchday Filter */}
-          <div className="flex gap-1.5">
-            {[0, 1, 2, 3].map(d => (
+          {/* Secondary Filters Row */}
+          <div className="flex flex-wrap gap-2">
+            {/* Matchday */}
+            <div className="flex gap-1">
+              {[0, 1, 2, 3].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setMatchday(d)}
+                  className={`px-3 py-1 rounded-lg text-xs transition-colors ${
+                    matchday === d
+                      ? 'bg-gray-700 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {d === 0 ? 'Alle Spieltage' : `Spieltag ${d}`}
+                </button>
+              ))}
+            </div>
+
+            {/* Venue Filter */}
+            <select
+              value={venueFilter}
+              onChange={e => setVenueFilter(e.target.value)}
+              className="bg-gray-800 text-gray-300 text-xs rounded-lg px-2.5 py-1 border-0 outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+              {venueOptions.map(v => (
+                <option key={v.id} value={v.id}>{v.label}</option>
+              ))}
+            </select>
+
+            {/* Team Filter */}
+            <select
+              value={teamFilter}
+              onChange={e => setTeamFilter(e.target.value)}
+              className="bg-gray-800 text-gray-300 text-xs rounded-lg px-2.5 py-1 border-0 outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+              {teamOptions.map(t => (
+                <option key={t.id} value={t.id}>
+                  {'flag' in t ? `${t.flag} ` : ''}{t.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Reset */}
+            {(activeGroup !== 'all' || matchday !== 0 || venueFilter !== 'all' || teamFilter !== 'all') && (
               <button
-                key={d}
-                onClick={() => setMatchday(d)}
-                className={`px-3 py-1 rounded-lg text-xs transition-colors ${
-                  matchday === d
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
+                onClick={() => { setActiveGroup('all'); setMatchday(0); setVenueFilter('all'); setTeamFilter('all') }}
+                className="px-2.5 py-1 rounded-lg text-xs text-gray-500 hover:text-gray-300 bg-gray-800 transition-colors"
               >
-                {d === 0 ? 'Alle Spieltage' : `Spieltag ${d}`}
+                ✕ Filter zurücksetzen
               </button>
-            ))}
+            )}
+          </div>
+
+          <div className="text-xs text-gray-600">
+            {filteredGroupMatches.length} Spiele · chronologisch sortiert
           </div>
 
           {/* Matches */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {filteredGroupMatches.map(match => {
               const teamA = TEAM_BY_ID[match.teamAId]
               const teamB = TEAM_BY_ID[match.teamBId]
               const tip = tipMap[match.id]
+              const venue = VENUES[match.venueId]
+              const berlinTime = toBerlinTime(match.kickoffUTC)
               if (!teamA || !teamB) return null
 
               return (
@@ -118,24 +197,25 @@ function MatchesContent() {
                   className="block bg-gray-900 border border-gray-800 rounded-xl p-3 hover:border-emerald-800 transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    {/* Group/Date */}
-                    <div className="text-center w-14 flex-shrink-0">
-                      <div className="text-xs font-bold text-emerald-400">Gr. {match.group}</div>
-                      <div className="text-xs text-gray-500">MD{match.matchday}</div>
-                      <div className="text-xs text-gray-600">{match.date.slice(5)}</div>
+                    {/* Date/Group */}
+                    <div className="text-center w-16 flex-shrink-0">
+                      <div className="text-[10px] font-bold text-emerald-400">Gr. {match.group} · MD{match.matchday}</div>
+                      <div className="text-xs font-mono text-gray-300">{fmtDate(match.date)}</div>
+                      <div className="text-xs font-mono text-white font-bold">{berlinTime}</div>
+                      <div className="text-[9px] text-gray-600">MESZ</div>
                     </div>
 
                     {/* Teams */}
                     <div className="flex-1 grid grid-cols-3 items-center gap-2">
-                      <div className="flex items-center gap-2 justify-end">
+                      <div className="flex items-center gap-1.5 justify-end">
                         <span className="text-xs font-medium text-right hidden sm:block truncate">{teamA.name}</span>
                         <span className="text-lg">{teamA.flag}</span>
                       </div>
-                      <div className="text-center text-xs text-gray-500 font-mono">
-                        {match.kickoffUTC}
-                        <div className="text-gray-700">{VENUE_NAMES[match.venueId] ?? match.venueId}</div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 font-mono">vs</div>
+                        <div className="text-[10px] text-gray-600 truncate">{venue?.city ?? match.venueId}</div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-lg">{teamB.flag}</span>
                         <span className="text-xs font-medium hidden sm:block truncate">{teamB.name}</span>
                       </div>
@@ -164,6 +244,12 @@ function MatchesContent() {
                 </Link>
               )
             })}
+
+            {filteredGroupMatches.length === 0 && (
+              <div className="text-center text-gray-500 text-sm py-12 bg-gray-900 border border-gray-800 rounded-xl">
+                Keine Spiele für diese Filterauswahl.
+              </div>
+            )}
           </div>
         </>
       )}
@@ -172,35 +258,32 @@ function MatchesContent() {
         <div className="space-y-4">
           {(['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'] as const).map(round => {
             const matches = KO_SCHEDULE.filter(m => m.round === round)
-            const roundNames: Record<string, string> = {
-              round_of_32: 'Achtelfinale (Round of 32)',
-              round_of_16: 'Runde der letzten 16',
-              quarterfinal: 'Viertelfinale',
-              semifinal: 'Halbfinale',
-              final: 'Finale',
-            }
             return (
               <div key={round}>
                 <h3 className="text-sm font-semibold text-gray-400 mb-2 uppercase tracking-wider">
-                  {roundNames[round]}
+                  {ROUND_NAMES[round]}
                 </h3>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {matches.map(match => (
-                    <div
-                      key={match.id}
-                      className="bg-gray-900 border border-gray-800 rounded-xl p-3"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-gray-500">{match.date}</span>
-                        <span className="text-xs text-gray-500">{VENUE_NAMES[match.venueId]}</span>
+                  {matches.map(match => {
+                    const venue = VENUES[match.venueId]
+                    const berlinTime = toBerlinTime(match.kickoffUTC)
+                    return (
+                      <div
+                        key={match.id}
+                        className="bg-gray-900 border border-gray-800 rounded-xl p-3"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-400 font-mono">{match.date} · {berlinTime} MESZ</span>
+                          <span className="text-xs text-gray-500">{venue?.city ?? match.venueId}</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-xs text-gray-300 font-medium text-right flex-1">{match.teamALabel}</span>
+                          <span className="text-xs text-gray-600 px-2">vs</span>
+                          <span className="text-xs text-gray-300 font-medium flex-1">{match.teamBLabel}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-center gap-3">
-                        <span className="text-xs text-gray-300 font-medium text-right flex-1">{match.teamALabel}</span>
-                        <span className="text-xs text-gray-600 px-2">vs</span>
-                        <span className="text-xs text-gray-300 font-medium flex-1">{match.teamBLabel}</span>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )

@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { TEAMS_BY_GROUP, ALL_TEAMS } from '@/src/data/allTeams'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
+import { ALL_VENUES } from '@/src/data/venues'
 import { supabase } from '@/lib/supabase'
+import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 async function getNominationCounts(): Promise<Record<string, number>> {
   const { data } = await supabase
@@ -78,7 +80,13 @@ const FEATURES = [
 export default async function HomePage() {
   const countdown = getCountdown()
   const groups = Object.keys(TEAMS_BY_GROUP).sort()
-  const nextMatches = GROUP_SCHEDULE.slice(0, 6)
+  // Sort chronologically for "Erste Spiele"
+  const nextMatches = [...GROUP_SCHEDULE]
+    .sort((a, b) => {
+      const dt = a.date.localeCompare(b.date)
+      return dt !== 0 ? dt : a.kickoffUTC.localeCompare(b.kickoffUTC)
+    })
+    .slice(0, 6)
   const nominationCounts = await getNominationCounts()
   const teamsWithData = ALL_TEAMS.filter(t => (nominationCounts[t.id] ?? 0) >= 10).length
   const totalTeams = ALL_TEAMS.length
@@ -249,7 +257,7 @@ export default async function HomePage() {
               { label: 'Teams', value: '48', icon: '🌍' },
               { label: 'Gruppenspiele', value: '72', icon: '⚽' },
               { label: 'KO-Runden', value: '5', icon: '🏆' },
-              { label: 'Spielorte', value: '10', icon: '🏟' },
+              { label: 'Spielorte', value: '16', icon: '🏟' },
             ].map(s => (
               <div key={s.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
                 <div className="text-2xl mb-1">{s.icon}</div>
@@ -259,10 +267,10 @@ export default async function HomePage() {
             ))}
           </div>
 
-          {/* Nächste Spiele */}
+          {/* Erste Spiele – chronologisch */}
           <h2 className="text-lg font-bold flex items-center gap-2 pt-2"><span>📅</span> Erste Spiele</h2>
           <div className="space-y-2">
-            {nextMatches.slice(0, 4).map(match => {
+            {nextMatches.slice(0, 5).map(match => {
               const teamA = ALL_TEAMS.find(t => t.id === match.teamAId)
               const teamB = ALL_TEAMS.find(t => t.id === match.teamBId)
               if (!teamA || !teamB) return null
@@ -270,17 +278,20 @@ export default async function HomePage() {
                 <Link
                   key={match.id}
                   href={`/matches/${match.id}`}
-                  className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 hover:border-emerald-800 transition-colors"
+                  className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl px-3 py-2.5 hover:border-emerald-800 transition-colors"
                 >
-                  <span className="text-xs text-gray-500 w-12 flex-shrink-0">Gr.{match.group}</span>
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <span className="text-base">{teamA.flag}</span>
-                    <span className="text-xs text-gray-300 truncate">{teamA.name}</span>
-                    <span className="text-xs text-gray-600 mx-1">–</span>
-                    <span className="text-xs text-gray-300 truncate">{teamB.name}</span>
-                    <span className="text-base">{teamB.flag}</span>
+                  <div className="flex-shrink-0 text-center w-14">
+                    <div className="text-[10px] text-emerald-400 font-bold">Gr.{match.group}</div>
+                    <div className="text-[10px] text-gray-500">{fmtDate(match.date)}</div>
+                    <div className="text-xs font-mono font-bold text-white">{toBerlinTime(match.kickoffUTC)}</div>
                   </div>
-                  <span className="text-xs text-gray-600 flex-shrink-0">{match.date.slice(5)}</span>
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                    <span className="text-sm flex-shrink-0">{teamA.flag}</span>
+                    <span className="text-xs text-gray-300 truncate">{teamA.name}</span>
+                    <span className="text-xs text-gray-600 mx-0.5">–</span>
+                    <span className="text-xs text-gray-300 truncate">{teamB.name}</span>
+                    <span className="text-sm flex-shrink-0">{teamB.flag}</span>
+                  </div>
                 </Link>
               )
             })}
@@ -330,6 +341,68 @@ export default async function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* ── Spielorte ────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <span>🏟</span> 16 Spielorte
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {ALL_VENUES.map(v => {
+            const wbgtColor =
+              v.estimatedWBGT >= 30 ? 'text-rose-400' :
+              v.estimatedWBGT >= 26 ? 'text-orange-400' :
+              v.estimatedWBGT >= 22 ? 'text-yellow-400' : 'text-emerald-400'
+            const wbgtLabel =
+              v.estimatedWBGT >= 30 ? 'Kritisch' :
+              v.estimatedWBGT >= 26 ? 'Sehr hoch' :
+              v.estimatedWBGT >= 22 ? 'Erhöht' : 'Angenehm'
+            const countryFlag =
+              v.country === 'USA' ? '🇺🇸' :
+              v.country === 'Mexico' ? '🇲🇽' : '🇨🇦'
+            return (
+              <div key={v.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">{countryFlag}</span>
+                      <h3 className="font-semibold text-sm text-white">{v.name}</h3>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">{v.country}</div>
+                  </div>
+                  {v.altitudeMeters > 500 && (
+                    <span className="text-[10px] bg-purple-900/40 text-purple-400 border border-purple-700/40 px-1.5 py-0.5 rounded font-medium">
+                      {v.altitudeMeters}m
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-400 italic mb-2">{v.stadium}</div>
+                <div className="text-[10px] text-gray-600 mb-2">{v.fifaName}</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-gray-600">Kapazität</span>
+                    <div className="font-mono text-gray-300">{v.capacity.toLocaleString('de-DE')}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Zeitzone</span>
+                    <div className="font-mono text-gray-300 text-[10px]">{v.timezone}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Hitzebelastung</span>
+                    <div className={`font-mono font-medium ${wbgtColor}`}>{wbgtLabel}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Temp. ∅</span>
+                    <div className="font-mono text-gray-300">{v.expectedTemperatureC}°C</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
 
       {/* ── Methodik-Banner ───────────────────────────────── */}
       <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
