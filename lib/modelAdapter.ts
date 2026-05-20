@@ -120,8 +120,8 @@ export async function getMatchPrediction(
     isKnockout: false,
     teamARestDays: 6,
     teamBRestDays: 6,
-    teamAIsHostNation: ['usa', 'canada', 'mexico'].includes(input.teamAId),
-    teamBIsHostNation: ['usa', 'canada', 'mexico'].includes(input.teamBId),
+    teamAIsHostNation: ['usa', 'canada'].includes(input.teamAId),
+    teamBIsHostNation: ['usa', 'canada'].includes(input.teamBId),
     teamATravelDistanceKm: estimateTravelDistance(teamABasic.confederation, input.venueId),
     teamBTravelDistanceKm: estimateTravelDistance(teamBBasic.confederation, input.venueId),
     teamATimezoneShiftHours: estimateTimezoneShift(teamABasic.confederation),
@@ -197,8 +197,8 @@ function generateTipForMatch(match: ScheduledMatch): TipSuggestion {
   const baseDraw = 1 - baseWinA - baseWinB
 
   // Heimvorteil für Gastgeber
-  const isHostA = ['usa', 'canada', 'mexico'].includes(match.teamAId)
-  const isHostB = ['usa', 'canada', 'mexico'].includes(match.teamBId)
+  const isHostA = ['usa', 'canada'].includes(match.teamAId)
+  const isHostB = ['usa', 'canada'].includes(match.teamBId)
   let winA = baseWinA + (isHostA ? 0.04 : 0) - (isHostB ? 0.02 : 0)
   let winB = baseWinB + (isHostB ? 0.04 : 0) - (isHostA ? 0.02 : 0)
   let draw = 1 - winA - winB
