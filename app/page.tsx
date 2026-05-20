@@ -1,6 +1,19 @@
 import Link from 'next/link'
 import { TEAMS_BY_GROUP, ALL_TEAMS } from '@/src/data/allTeams'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
+import { supabase } from '@/lib/supabase'
+
+async function getNominationCounts(): Promise<Record<string, number>> {
+  const { data } = await supabase
+    .from('players')
+    .select('team_id')
+  if (!data) return {}
+  const counts: Record<string, number> = {}
+  for (const row of data) {
+    counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
+  }
+  return counts
+}
 
 function getCountdown() {
   const now = new Date()
@@ -62,10 +75,13 @@ const FEATURES = [
   },
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
   const countdown = getCountdown()
   const groups = Object.keys(TEAMS_BY_GROUP).sort()
   const nextMatches = GROUP_SCHEDULE.slice(0, 6)
+  const nominationCounts = await getNominationCounts()
+  const teamsWithData = ALL_TEAMS.filter(t => (nominationCounts[t.id] ?? 0) >= 10).length
+  const totalTeams = ALL_TEAMS.length
 
   return (
     <div className="space-y-14">
@@ -108,6 +124,53 @@ export default function HomePage() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* ── Nominierungsstatus ───────────────────────────── */}
+      <section className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📋</span>
+            <h2 className="text-sm font-bold text-gray-300">Kader-Datenstand</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-emerald-400">{teamsWithData}</span>
+            <span className="text-xs text-gray-500">/ {totalTeams} Teams nominiert</span>
+            <Link href="/kader" className="text-xs text-emerald-400 hover:text-emerald-300 ml-2">Kader bearbeiten →</Link>
+          </div>
+        </div>
+        <div className="h-2 bg-gray-800 rounded-full overflow-hidden mb-3">
+          <div
+            className="h-full bg-emerald-500 rounded-full transition-all"
+            style={{ width: `${(teamsWithData / totalTeams) * 100}%` }}
+          />
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-12 gap-1.5">
+          {ALL_TEAMS.map(team => {
+            const count = nominationCounts[team.id] ?? 0
+            const hasData = count >= 10
+            return (
+              <Link
+                key={team.id}
+                href={`/teams/${team.id}`}
+                title={`${team.name}: ${hasData ? count + ' Spieler' : 'Keine Daten'}`}
+                className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-colors ${
+                  hasData
+                    ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20'
+                    : 'bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50'
+                }`}
+              >
+                <span className="text-lg leading-none">{team.flag}</span>
+                <span className={`text-[9px] font-mono leading-none ${hasData ? 'text-emerald-400' : 'text-gray-600'}`}>
+                  {hasData ? count : '–'}
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+        <p className="text-[10px] text-gray-600 mt-2">
+          Grün = Kaderdaten verfügbar · Grau = noch keine Daten eingetragen
+        </p>
       </section>
 
       {/* ── Feature Cards ─────────────────────────────────── */}
@@ -245,7 +308,9 @@ export default function HomePage() {
                     </Link>
                   </div>
                   <div className="space-y-1">
-                    {teams?.map(team => (
+                    {teams?.map(team => {
+                      const hasData = (nominationCounts[team.id] ?? 0) >= 10
+                      return (
                       <Link
                         key={team.id}
                         href={`/teams/${team.id}`}
@@ -253,9 +318,11 @@ export default function HomePage() {
                       >
                         <span className="text-sm flex-shrink-0">{team.flag}</span>
                         <span className="text-xs flex-1 truncate text-gray-200">{team.name}</span>
+                        {hasData && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" title="Kaderdaten vorhanden" />}
                         <span className="text-[10px] text-gray-600 flex-shrink-0 font-mono">{team.eloRating}</span>
                       </Link>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )
