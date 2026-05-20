@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { TeamBasic } from '@/src/data/allTeams'
 import { Player } from '@/src/data/players'
 import { ScheduledMatch } from '@/src/data/schedule'
-import SquadEditor from '@/components/SquadEditor'
 
 interface TeamDetailTabsProps {
   team: TeamBasic
@@ -14,7 +13,7 @@ interface TeamDetailTabsProps {
   opponentMap: Record<string, TeamBasic>
 }
 
-type TabKey = 'overview' | 'squad' | 'matches' | 'model'
+type TabKey = 'overview' | 'squad' | 'ratings' | 'matches' | 'dataQuality'
 type PosFilter = 'all' | 'GK' | 'DEF' | 'MID' | 'FWD'
 type SortKey = 'rating' | 'value' | 'age'
 
@@ -49,8 +48,9 @@ export default function TeamDetailTabs({ team, players, groupMatches, opponentMa
           [
             { key: 'overview', label: 'Übersicht' },
             { key: 'squad',    label: 'Kader'     },
-            { key: 'matches',  label: 'Spiele'    },
-            { key: 'model',    label: 'Modell-Daten' },
+            { key: 'ratings', label: 'Ratings' },
+            { key: 'matches', label: 'Spiele' },
+            { key: 'dataQuality', label: 'Datenqualität' },
           ] as { key: TabKey; label: string }[]
         ).map(t => (
           <button
@@ -73,11 +73,14 @@ export default function TeamDetailTabs({ team, players, groupMatches, opponentMa
       {tab === 'squad' && (
         <SquadTab team={team} players={players} />
       )}
+      {tab === 'ratings' && (
+        <RatingsTab team={team} />
+      )}
       {tab === 'matches' && (
         <MatchesTab team={team} groupMatches={groupMatches} opponentMap={opponentMap} />
       )}
-      {tab === 'model' && (
-        <ModelTab team={team} players={players} />
+      {tab === 'dataQuality' && (
+        <DataQualityTab players={players} />
       )}
     </div>
   )
@@ -340,11 +343,6 @@ function SquadTab({ team, players }: { team: TeamBasic; players: Player[] }) {
               </div>
             </div>
           )}
-          {players.length > 0 && (
-            <div className="pt-2 border-t border-gray-800">
-              <SquadEditor players={players} teamId={team.id} />
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -412,62 +410,59 @@ function MatchesTab({
   )
 }
 
-// ─── Tab: Modell-Daten ─────────────────────────────────────────────────────────
+// ─── Tab: Ratings ─────────────────────────────────────────────────────────────
 
-function ModelTab({ team, players }: { team: TeamBasic; players: Player[] }) {
-  const xgCount = players.filter(p => p.xGPer90 != null && p.xGPer90 > 0).length
-  const dataScore =
-    (players.length > 0 ? 2 : 0) +
-    2 + // ELO immer vorhanden
-    1 + // Marktwert immer vorhanden
-    (xgCount >= 5 ? 2 : 0)
-
-  const confidence =
-    dataScore >= 7 ? 'Hoch' :
-    dataScore >= 4 ? 'Mittel' : 'Niedrig'
-
-  const confColor =
-    confidence === 'Hoch'   ? 'text-emerald-400' :
-    confidence === 'Mittel' ? 'text-yellow-400'  : 'text-rose-400'
-
+function RatingsTab({ team }: { team: TeamBasic }) {
   const rows = [
-    { label: 'ELO Rating',    ok: true,              detail: String(team.eloRating) },
-    { label: 'Marktwert',     ok: true,              detail: `€${team.squadMarketValueM}M` },
-    { label: 'Spielerdaten',  ok: players.length > 0, detail: `${players.length}/26 vorhanden` },
-    { label: 'xG-Daten',      ok: xgCount >= 5,       detail: `${xgCount} Spieler mit xG-Werten` },
-    { label: 'Coach-Daten',   ok: !!team.coach,       detail: team.coach ?? '–' },
+    { label: 'Overall', value: team.overallRating, color: 'bg-emerald-500' },
+    { label: 'Angriff', value: team.attackRating, color: 'bg-rose-500' },
+    { label: 'Mittelfeld', value: team.midfieldRating, color: 'bg-blue-500' },
+    { label: 'Abwehr', value: team.defenseRating, color: 'bg-cyan-500' },
+    { label: 'Torwart', value: team.goalkeeperRating, color: 'bg-yellow-500' },
+    { label: 'Standards', value: team.setPieceRating, color: 'bg-purple-500' },
   ]
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+      <h3 className="font-semibold text-sm">Team-Ratings</h3>
+      {rows.map(r => (
+        <div key={r.label}>
+          <div className="flex justify-between text-xs mb-1"><span className="text-gray-400">{r.label}</span><span className="font-mono">{r.value}/100</span></div>
+          <div className="h-2 bg-gray-800 rounded-full overflow-hidden"><div className={`h-full ${r.color}`} style={{ width: `${r.value}%` }} /></div>
+        </div>
+      ))}
+      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-800 text-xs">
+        <div><span className="text-gray-500">ELO</span><div className="font-mono text-emerald-400">{team.eloRating}</div></div>
+        <div><span className="text-gray-500">Kaderwert</span><div className="font-mono">€{team.squadMarketValueM}M</div></div>
+      </div>
+    </div>
+  )
+}
+
+function DataQualityTab({ players }: { players: Player[] }) {
+  const total = players.length
+  const withClub = players.filter(p => Boolean(p.clubTeam)).length
+  const withXg = players.filter(p => p.xGPer90 != null).length
+  const withRating = players.filter(p => p.rating > 0).length
+
+  const quality = total === 0 ? 0 : Math.round(((withClub + withXg + withRating) / (total * 3)) * 100)
 
   return (
     <div className="space-y-4">
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-sm uppercase tracking-wider text-gray-400">Datenverfügbarkeit</h2>
-          <span className={`text-sm font-bold ${confColor}`}>Modellvertrauen: {confidence}</span>
+        <h3 className="font-semibold text-sm mb-3">Datenqualität für dieses Team</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <div><div className="text-gray-500 text-xs">Spieler im Pool</div><div className="font-mono font-bold">{total}</div></div>
+          <div><div className="text-gray-500 text-xs">Mit Vereinsdaten</div><div className="font-mono font-bold">{withClub}</div></div>
+          <div><div className="text-gray-500 text-xs">Mit xG/90</div><div className="font-mono font-bold">{withXg}</div></div>
+          <div><div className="text-gray-500 text-xs">Mit Rating</div><div className="font-mono font-bold">{withRating}</div></div>
         </div>
-        <div className="space-y-2">
-          {rows.map(({ label, ok, detail }) => (
-            <div key={label} className="flex items-center gap-3 text-sm">
-              <span className={ok ? 'text-emerald-500' : 'text-rose-500'}>{ok ? '✓' : '✗'}</span>
-              <span className="text-gray-300 w-32">{label}</span>
-              <span className="text-gray-500 text-xs">{detail}</span>
-            </div>
-          ))}
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-gray-500 mb-1"><span>Vollständigkeit</span><span>{quality}%</span></div>
+          <div className="h-2 bg-gray-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${quality}%` }} /></div>
         </div>
       </div>
-
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm text-gray-400">
-        <p className="text-xs leading-relaxed">
-          Datenqualitätsscore: <span className="font-mono text-white">{dataScore}/7</span>. Teams mit
-          vollständigen Spielerdaten, xG-Werten und ELO erhalten präzisere Prognosen.
-          Fehlende Daten werden durch Schätzwerte auf Basis von Konföderation und ELO-Rating ersetzt.
-        </p>
-        <div className="mt-3">
-          <Link href="/modell" className="text-emerald-400 hover:text-emerald-300 text-xs transition-colors">
-            Modell-Transparenz → vollständige Übersicht aller Faktoren
-          </Link>
-        </div>
-      </div>
+      <p className="text-xs text-gray-500">Hinweis: Startelf ist in Sprint 1 bewusst nicht Teil der Teamdaten-Ansicht. Die Auswahl erfolgt auf Spiel-Ebene.</p>
     </div>
   )
 }

@@ -8,14 +8,19 @@ export const metadata: Metadata = {
 }
 
 const NAV_LINKS = [
-  { href: '/',            label: 'Dashboard',     sub: 'Übersicht'     },
-  { href: '/teams',       label: 'Teams',          sub: '48 Nationen'   },
-  { href: '/matches',     label: 'Spiele',         sub: 'Prognosen'     },
-  { href: '/tippspiel',   label: 'Tippspiel',      sub: 'Optimizer'     },
-  { href: '/tournament',  label: 'Simulation',     sub: 'Monte Carlo'   },
-  { href: '/turnierbaum', label: 'Turnierbaum',    sub: 'KO-Bracket'    },
-  { href: '/modell',      label: 'Modell-Status',  sub: 'Transparenz'   },
-  { href: '/kader',       label: 'Kader',          sub: 'Editor'        },
+  { href: '/',            label: 'Dashboard',    sub: 'Übersicht'      },
+  { href: '/teams',       label: 'Teams',        sub: 'Kader & Ratings' },
+  { href: '/matches',     label: 'Spiele',       sub: 'Alle Matches'    },
+  { href: '/prognose',    label: 'Prognose',     sub: 'Match-Vorhersage'},
+  { href: '/turnierbaum', label: 'Turnierbaum',  sub: 'KO-Logik'        },
+  { href: '/daten',       label: 'Datenqualität',sub: 'Vollständigkeit' },
+  { href: '/modell',      label: 'Modell',       sub: 'Status'          },
+]
+
+const ADVANCED_LINKS = [
+  { href: '/tippspiel',  label: 'Tippspiel / Optimizer' },
+  { href: '/tournament', label: 'Simulation / Monte Carlo' },
+  { href: '/kader',      label: 'Kader-Editor (global)' },
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -45,6 +50,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <div className="text-[10px] text-gray-500 group-hover:text-gray-400 hidden sm:block">{link.sub}</div>
                   </Link>
                 ))}
+              
+
+              <div className="hidden lg:flex items-center gap-1 ml-2 pl-2 border-l border-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-600">Erweitert</span>
+                {ADVANCED_LINKS.map(link => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="px-2 py-1 rounded-md hover:bg-gray-800 transition-colors text-[11px] text-gray-500 hover:text-gray-300"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+
               </div>
             </div>
           </div>
