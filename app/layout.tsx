@@ -8,11 +8,14 @@ export const metadata: Metadata = {
 }
 
 const NAV_LINKS = [
-  { href: '/teams', label: 'Teams', sub: '48 Nationen' },
-  { href: '/matches', label: 'Spiele', sub: 'Prognosen' },
-  { href: '/tippspiel', label: 'Tippspiel', sub: 'Optimizer' },
-  { href: '/tournament', label: 'Simulator', sub: 'Monte Carlo' },
-  { href: '/kader', label: 'Kader', sub: 'Editor' },
+  { href: '/',            label: 'Dashboard',     sub: 'Übersicht'     },
+  { href: '/teams',       label: 'Teams',          sub: '48 Nationen'   },
+  { href: '/matches',     label: 'Spiele',         sub: 'Prognosen'     },
+  { href: '/tippspiel',   label: 'Tippspiel',      sub: 'Optimizer'     },
+  { href: '/tournament',  label: 'Simulation',     sub: 'Monte Carlo'   },
+  { href: '/turnierbaum', label: 'Turnierbaum',    sub: 'KO-Bracket'    },
+  { href: '/modell',      label: 'Modell-Status',  sub: 'Transparenz'   },
+  { href: '/kader',       label: 'Kader',          sub: 'Editor'        },
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
