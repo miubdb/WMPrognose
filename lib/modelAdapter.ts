@@ -801,8 +801,9 @@ export function analyzeMatch(
   })
 
   // 9. Kader-Qualität: Attack vs Defense
+  // attackDiff is already scaled to [0,1] via /100; MODEL_WEIGHTS.attackDefense = 0.03 per unit
   const attackDiff = (teamA.attackRating - teamB.defenseRating) / 100
-  const attackLogEffectA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiff / 0.01)
+  const attackLogEffectA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiff)
   factors.push({
     category: 'squad',
     label: 'Angriff vs. Abwehr (Ratings)',
