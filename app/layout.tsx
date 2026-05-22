@@ -1,92 +1,30 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import './globals.css'
+import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'WM 2026 Prognosemodell',
-  description: 'Wissenschaftliches Prognosemodell für die FIFA Weltmeisterschaft 2026',
+  title: 'WM 2026 Prognose',
+  description: 'Wissenschaftliches Prognosemodell für die FIFA WM 2026',
 }
-
-const NAV_LINKS = [
-  { href: '/',            label: 'Dashboard',    sub: 'Übersicht'      },
-  { href: '/teams',       label: 'Teams',        sub: 'Kader & Ratings' },
-  { href: '/matches',     label: 'Spiele',       sub: 'Alle Matches'    },
-  { href: '/prognose',    label: 'Prognose',     sub: 'Match-Vorhersage'},
-  { href: '/turnierbaum', label: 'Turnierbaum',  sub: 'KO-Logik'        },
-  { href: '/daten',       label: 'Datenqualität',sub: 'Vollständigkeit' },
-  { href: '/modell',      label: 'Modell',       sub: 'Status'          },
-]
-
-const ADVANCED_LINKS = [
-  { href: '/tippspiel',  label: 'Tippspiel / Optimizer' },
-  { href: '/tournament', label: 'Simulation / Monte Carlo' },
-  { href: '/kader',      label: 'Kader-Editor (global)' },
-]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="de" className="dark">
-      <body className="bg-gray-950 text-white min-h-screen">
-        <nav className="bg-gray-900/95 backdrop-blur border-b border-gray-800 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-14">
-              <Link href="/" className="flex items-center gap-2.5 group">
-                <span className="text-2xl">⚽</span>
-                <div className="hidden sm:block">
-                  <div className="font-bold text-white leading-tight text-sm">WM 2026</div>
-                  <div className="text-xs text-emerald-400 leading-tight">Prognosemodell</div>
-                </div>
-                <div className="sm:hidden font-bold text-emerald-400 text-sm">WM 2026</div>
-              </Link>
-
-              <div className="flex items-center gap-1">
-                {NAV_LINKS.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors group text-center"
-                  >
-                    <div className="text-xs font-medium text-gray-200 group-hover:text-white">{link.label}</div>
-                    <div className="text-[10px] text-gray-500 group-hover:text-gray-400 hidden sm:block">{link.sub}</div>
-                  </Link>
-                ))}
-              
-
-              <div className="hidden lg:flex items-center gap-1 ml-2 pl-2 border-l border-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-600">Erweitert</span>
-                {ADVANCED_LINKS.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="px-2 py-1 rounded-md hover:bg-gray-800 transition-colors text-[11px] text-gray-500 hover:text-gray-300"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-
-              </div>
-            </div>
+    <html lang="de">
+      <body className="min-h-screen bg-gray-950 text-gray-100">
+        <header className="border-b border-gray-800 sticky top-0 z-50 bg-gray-950/95 backdrop-blur">
+          <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+            <Link href="/" className="font-bold text-white tracking-tight">
+              WM 2026 <span className="text-emerald-400">Prognose</span>
+            </Link>
+            <nav className="flex items-center gap-6 text-sm text-gray-400">
+              <Link href="/" className="hover:text-white transition-colors">Spiele</Link>
+              <Link href="/teams" className="hover:text-white transition-colors">Teams</Link>
+            </nav>
           </div>
-        </nav>
-
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        </header>
+        <main className="max-w-5xl mx-auto px-4 py-8">
           {children}
         </main>
-
-        <footer className="mt-16 border-t border-gray-800/60 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">⚽</span>
-                <span className="text-sm font-medium text-gray-400">WM 2026 Prognosemodell</span>
-              </div>
-              <div className="text-xs text-gray-600 text-center">
-                Poisson · Dixon-Coles · ELO · Kontext-Modifier · Alle Prognosen sind Wahrscheinlichkeitsschätzungen
-              </div>
-            </div>
-          </div>
-        </footer>
       </body>
     </html>
   )

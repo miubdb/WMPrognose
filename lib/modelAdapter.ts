@@ -372,6 +372,257 @@ function buildReasoning(
   return parts.join('. ')
 }
 
+// ─── Match Analysis (Faktor-Aufschlüsselung) ──────────────────────────────────
+
+export interface MatchFactor {
+  category: 'elo' | 'squad' | 'context' | 'experience'
+  label: string
+  source: string
+  valueA: string
+  valueB: string
+  effectA: number   // multiplier delta for team A xG, e.g. +0.05 = +5%
+  effectB: number
+  explanation: string
+}
+
+export interface MatchAnalysis {
+  matchId: string
+  teamA: TeamBasic
+  teamB: TeamBasic
+  venueId: string
+  venueName: string
+  venueCity: string
+  winProbA: number
+  drawProb: number
+  winProbB: number
+  expectedGoalsA: number
+  expectedGoalsB: number
+  suggestedTip: '1' | 'X' | '2'
+  confidence: 'very_high' | 'high' | 'medium' | 'low'
+  factors: MatchFactor[]
+}
+
+export function analyzeMatch(match: ScheduledMatch): MatchAnalysis {
+  const teamA = TEAM_BY_ID[match.teamAId]
+  const teamB = TEAM_BY_ID[match.teamBId]
+  const venue = VENUES[match.venueId] ?? VENUES['new_york']
+
+  if (!teamA || !teamB) {
+    return {
+      matchId: match.id, teamA: teamA ?? { id: match.teamAId, name: match.teamAId, flag: '🏳' } as TeamBasic,
+      teamB: teamB ?? { id: match.teamBId, name: match.teamBId, flag: '🏳' } as TeamBasic,
+      venueId: match.venueId, venueName: venue.name, venueCity: venue.city,
+      winProbA: 0.33, drawProb: 0.34, winProbB: 0.33,
+      expectedGoalsA: 1.3, expectedGoalsB: 1.3,
+      suggestedTip: 'X', confidence: 'low', factors: [],
+    }
+  }
+
+  const factors: MatchFactor[] = []
+
+  // 1. ELO-Rating (Hvattum & Arntzen 2010)
+  const eloDiff = teamA.eloRating - teamB.eloRating
+  const eloEffectA = eloDiff / 400 * 0.15
+  factors.push({
+    category: 'elo',
+    label: 'ELO-Rating',
+    source: 'Hvattum & Arntzen (2010)',
+    valueA: String(teamA.eloRating),
+    valueB: String(teamB.eloRating),
+    effectA: eloEffectA,
+    effectB: -eloEffectA,
+    explanation: 'Höheres ELO-Rating bedeutet statistisch mehr Expected Goals. Differenz von 400 Punkten entspricht ~15% mehr Torchancen.',
+  })
+
+  // 2. Kader-Marktwert (Peeters 2018)
+  const mvA = teamA.squadMarketValueM
+  const mvB = teamB.squadMarketValueM
+  const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
+  const mvEffectA = mvRatio * 0.06
+  factors.push({
+    category: 'squad',
+    label: 'Kader-Marktwert',
+    source: 'Peeters (2018) – Log-normalisierung',
+    valueA: `${Math.round(mvA)}M€`,
+    valueB: `${Math.round(mvB)}M€`,
+    effectA: mvEffectA,
+    effectB: -mvEffectA,
+    explanation: 'Log-normalisierter Kader-Marktwert als Proxy für Spielerqualität. Teuerere Kader haben im Schnitt mehr Torchancen.',
+  })
+
+  // 3. Heimvorteil (Pollard 1986)
+  const isHostA = ['usa', 'canada', 'mexico'].includes(match.teamAId)
+  const isHostB = ['usa', 'canada', 'mexico'].includes(match.teamBId)
+  if (isHostA || isHostB) {
+    factors.push({
+      category: 'context',
+      label: 'Gastgeberland-Heimvorteil',
+      source: 'Pollard (1986) – Home Advantage',
+      valueA: isHostA ? 'Gastgeber ✓' : '–',
+      valueB: isHostB ? 'Gastgeber ✓' : '–',
+      effectA: isHostA ? 0.04 : isHostB ? -0.02 : 0,
+      effectB: isHostB ? 0.04 : isHostA ? -0.02 : 0,
+      explanation: 'Gastgebernationen (USA, Mexiko, Kanada) profitieren von Heimvorteil durch bekannte Umgebung, Fans und Atmosphäre (+4%).',
+    })
+  }
+
+  // 4. Spielort-Höhe (McSharry 2007)
+  const altitude = venue.altitudeMeters
+  const altPenalty = altitude > 1500 ? Math.min((altitude - 1500) / 1000 * 0.06, 0.12) : 0
+  const heatAdaptA = inferHeatAdaptation(teamA.confederation)
+  const heatAdaptB = inferHeatAdaptation(teamB.confederation)
+  factors.push({
+    category: 'context',
+    label: 'Spielort-Höhe',
+    source: 'McSharry (2007) – Altitude & Performance',
+    valueA: `Gewohnt ~200m`,
+    valueB: `Gewohnt ~200m`,
+    effectA: -(altPenalty * (1 - heatAdaptA * 0.3)),
+    effectB: -(altPenalty * (1 - heatAdaptB * 0.3)),
+    explanation: `Höhe ${altitude}m. Ab 1500m sinkt die Sauerstoffversorgung – nicht akklimatisierte Teams haben weniger Ausdauer und erzielen weniger Tore.`,
+  })
+
+  // 5. Hitze/WBGT (Mohr et al. 2012)
+  const wbgt = venue.estimatedWBGT
+  const heatPenalty = wbgt > 28 ? Math.min((wbgt - 28) * 0.02, 0.08) : 0
+  if (heatPenalty > 0.005) {
+    factors.push({
+      category: 'context',
+      label: 'Hitze-Belastung (WBGT)',
+      source: 'Mohr et al. (2012) – WBGT & Physical Performance',
+      valueA: teamA.confederation === 'CAF' || teamA.confederation === 'AFC' ? 'Gut adaptiert' : 'Wenig adaptiert',
+      valueB: teamB.confederation === 'CAF' || teamB.confederation === 'AFC' ? 'Gut adaptiert' : 'Wenig adaptiert',
+      effectA: -(heatPenalty * (1 - heatAdaptA)),
+      effectB: -(heatPenalty * (1 - heatAdaptB)),
+      explanation: `WBGT ${wbgt}°C. Hitzebelastung über 28°C reduziert physische Leistung. Teams aus heißen Klimazonen sind besser adaptiert.`,
+    })
+  }
+
+  // 6. Reisedistanz (Reilly et al. 2007)
+  const travelA = estimateTravelDistance(teamA.confederation, match.venueId)
+  const travelB = estimateTravelDistance(teamB.confederation, match.venueId)
+  const travelEffectA = travelA > 5000 ? -Math.min((travelA - 5000) / 10000 * 0.06, 0.05) : 0
+  const travelEffectB = travelB > 5000 ? -Math.min((travelB - 5000) / 10000 * 0.06, 0.05) : 0
+  factors.push({
+    category: 'context',
+    label: 'Reisedistanz',
+    source: 'Reilly et al. (2007) – Travel Fatigue',
+    valueA: `~${Math.round(travelA / 100) * 100} km`,
+    valueB: `~${Math.round(travelB / 100) * 100} km`,
+    effectA: travelEffectA,
+    effectB: travelEffectB,
+    explanation: 'Lange Reisen (>5000 km) verursachen Jet-Lag und Erschöpfung, die Expected Goals reduzieren.',
+  })
+
+  // 7. Zeitzonen-Shift (Reilly et al. 2007)
+  const tzA = Math.abs(estimateTimezoneShift(teamA.confederation))
+  const tzB = Math.abs(estimateTimezoneShift(teamB.confederation))
+  const tzEffectA = tzA > 6 ? -Math.min((tzA - 6) / 12 * 0.04, 0.04) : 0
+  const tzEffectB = tzB > 6 ? -Math.min((tzB - 6) / 12 * 0.04, 0.04) : 0
+  if (tzEffectA < -0.005 || tzEffectB < -0.005) {
+    factors.push({
+      category: 'context',
+      label: 'Zeitzonenwechsel',
+      source: 'Reilly et al. (2007) – Circadian Rhythm Disruption',
+      valueA: `${tzA}h Differenz`,
+      valueB: `${tzB}h Differenz`,
+      effectA: tzEffectA,
+      effectB: tzEffectB,
+      explanation: 'Großer Zeitzonenwechsel stört den Schlaf-Wach-Rhythmus. Ab 6h Differenz sinkt die Reaktionszeit messbar.',
+    })
+  }
+
+  // 8. Turnier-Erfahrung (Forrest et al. 2005)
+  const expA = teamA.worldCupTitles * 3 + teamA.worldCupAppearances
+  const expB = teamB.worldCupTitles * 3 + teamB.worldCupAppearances
+  const expDiff = expA - expB
+  const expEffect = expDiff / 60 * 0.03
+  factors.push({
+    category: 'experience',
+    label: 'WM-Erfahrung & Turnier-Mentalität',
+    source: 'Forrest et al. (2005) – Heritage Premium',
+    valueA: `${teamA.worldCupTitles} Titel, ${teamA.worldCupAppearances}× dabei`,
+    valueB: `${teamB.worldCupTitles} Titel, ${teamB.worldCupAppearances}× dabei`,
+    effectA: expEffect,
+    effectB: -expEffect,
+    explanation: 'Teams mit mehr WM-Titeln und Teilnahmen sind psychologisch besser auf Großturniere vorbereitet (Heritage Premium).',
+  })
+
+  // 9. Kader-Qualität: Attack vs Defense
+  const attackDiff = (teamA.attackRating - teamB.defenseRating) / 100
+  const attackEffect = attackDiff * 0.04
+  factors.push({
+    category: 'squad',
+    label: 'Angriff vs. Abwehr (Ratings)',
+    source: 'Maher (1982) – Attack/Defense Strength',
+    valueA: `Angriff ${teamA.attackRating} | Abwehr ${teamA.defenseRating}`,
+    valueB: `Angriff ${teamB.attackRating} | Abwehr ${teamB.defenseRating}`,
+    effectA: attackEffect,
+    effectB: -attackEffect,
+    explanation: 'Maher-Modell: Expected Goals aus Angriffsstärke des Teams gegen Defensivstärke des Gegners.',
+  })
+
+  // 10. Diaspora-Support
+  const diasA = hasDiasporaSupport(match.teamAId, match.venueId)
+  const diasB = hasDiasporaSupport(match.teamBId, match.venueId)
+  if (diasA || diasB) {
+    factors.push({
+      category: 'context',
+      label: 'Diaspora-Fanunterstützung',
+      source: 'Pollard (1986) – Crowd & Diaspora Effects',
+      valueA: diasA ? 'Starke Unterstützung ✓' : '–',
+      valueB: diasB ? 'Starke Unterstützung ✓' : '–',
+      effectA: diasA ? 0.02 : 0,
+      effectB: diasB ? 0.02 : 0,
+      explanation: 'Teams mit großer Diaspora am Spielort (z.B. Mexiko in LA) profitieren von lokaler Fanunterstützung.',
+    })
+  }
+
+  // Gesamtwahrscheinlichkeiten berechnen
+  const baseWinA = eloToWinProb(eloDiff)
+  const baseWinB = eloToWinProb(-eloDiff)
+  let winA = baseWinA + (isHostA ? 0.04 : 0) - (isHostB ? 0.02 : 0)
+  let winB = baseWinB + (isHostB ? 0.04 : 0) - (isHostA ? 0.02 : 0)
+  let draw = 1 - winA - winB
+  const total = winA + draw + winB
+  winA /= total; draw /= total; winB /= total
+
+  // Expected Goals
+  const baseXG = 1.35
+  const totalEffectA = factors.reduce((s, f) => s + f.effectA, 0)
+  const totalEffectB = factors.reduce((s, f) => s + f.effectB, 0)
+  const xgA = Math.max(0.3, Math.min(4, baseXG * (1 + totalEffectA)))
+  const xgB = Math.max(0.3, Math.min(4, baseXG * (1 + totalEffectB)))
+
+  // Bestes Ergebnis
+  let suggestedTip: '1' | 'X' | '2'
+  let maxProb: number
+  if (winA >= winB && winA >= draw) { suggestedTip = '1'; maxProb = winA }
+  else if (winB > winA && winB > draw) { suggestedTip = '2'; maxProb = winB }
+  else { suggestedTip = 'X'; maxProb = draw }
+
+  let confidence: 'very_high' | 'high' | 'medium' | 'low'
+  if (maxProb >= 0.65) confidence = 'very_high'
+  else if (maxProb >= 0.50) confidence = 'high'
+  else if (maxProb >= 0.38) confidence = 'medium'
+  else confidence = 'low'
+
+  return {
+    matchId: match.id, teamA, teamB,
+    venueId: match.venueId, venueName: venue.name, venueCity: venue.city,
+    winProbA: Math.round(winA * 1000) / 1000,
+    drawProb: Math.round(draw * 1000) / 1000,
+    winProbB: Math.round(winB * 1000) / 1000,
+    expectedGoalsA: Math.round(xgA * 100) / 100,
+    expectedGoalsB: Math.round(xgB * 100) / 100,
+    suggestedTip, confidence, factors,
+  }
+}
+
+export function analyzeAllMatches(): MatchAnalysis[] {
+  return GROUP_SCHEDULE.map(m => analyzeMatch(m))
+}
+
 // ─── Tournament Simulation ─────────────────────────────────────────────────────
 
 export interface TeamTournamentStats {
