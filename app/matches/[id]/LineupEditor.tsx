@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
-interface Player {
+export interface LineupPlayer {
   id: string
   name: string
   position: string | null
@@ -16,7 +17,7 @@ interface TeamData {
   id: string
   name: string
   flag: string
-  players: Player[]
+  players: LineupPlayer[]
 }
 
 const POS_ORDER = ['GK', 'DEF', 'MID', 'FWD']
@@ -26,7 +27,7 @@ function TeamLineup({ team, onToggle }: { team: TeamData; onToggle: (id: string,
   const byPos = POS_ORDER.reduce((acc, pos) => {
     acc[pos] = team.players.filter(p => p.position === pos)
     return acc
-  }, {} as Record<string, Player[]>)
+  }, {} as Record<string, LineupPlayer[]>)
 
   const startingCount = team.players.filter(p => p.is_in_starting_xi).length
 
@@ -41,36 +42,45 @@ function TeamLineup({ team, onToggle }: { team: TeamData; onToggle: (id: string,
           {startingCount}/11
         </span>
       </div>
-      <div className="space-y-2">
-        {POS_ORDER.map(pos => {
-          const group = byPos[pos] ?? []
-          if (group.length === 0) return null
-          return (
-            <div key={pos}>
-              <div className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1">{POS_LABELS[pos]}</div>
-              {group.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => onToggle(p.id, !!p.is_in_starting_xi)}
-                  className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors mb-0.5 text-left ${
-                    p.is_in_starting_xi
-                      ? 'bg-emerald-900/30 border border-emerald-700/50 text-emerald-300'
-                      : 'bg-gray-800/50 border border-transparent text-gray-400 hover:text-gray-200'
-                  }`}
-                >
-                  <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${
-                    p.is_in_starting_xi ? 'bg-emerald-500 border-emerald-500' : 'border-gray-600'
-                  }`}>
-                    {p.is_in_starting_xi && <span className="text-[8px] text-black font-bold">✓</span>}
-                  </span>
-                  <span className="text-gray-600 font-mono w-4 text-right">{p.jersey_number ?? '–'}</span>
-                  <span className="truncate">{p.name}</span>
-                </button>
-              ))}
-            </div>
-          )
-        })}
-      </div>
+      {team.players.length === 0 ? (
+        <div className="text-xs text-gray-600 italic">
+          Kein Kader eingetragen –{' '}
+          <Link href={`/teams/${team.id}`} className="text-gray-500 underline hover:text-gray-300 transition-colors">
+            Kader hinzufügen
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {POS_ORDER.map(pos => {
+            const group = byPos[pos] ?? []
+            if (group.length === 0) return null
+            return (
+              <div key={pos}>
+                <div className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1">{POS_LABELS[pos]}</div>
+                {group.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => onToggle(p.id, !!p.is_in_starting_xi)}
+                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors mb-0.5 text-left ${
+                      p.is_in_starting_xi
+                        ? 'bg-emerald-900/30 border border-emerald-700/50 text-emerald-300'
+                        : 'bg-gray-800/50 border border-transparent text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${
+                      p.is_in_starting_xi ? 'bg-emerald-500 border-emerald-500' : 'border-gray-600'
+                    }`}>
+                      {p.is_in_starting_xi && <span className="text-[8px] text-black font-bold">✓</span>}
+                    </span>
+                    <span className="text-gray-600 font-mono w-4 text-right">{p.jersey_number ?? '–'}</span>
+                    <span className="truncate">{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -79,7 +89,7 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
   const [playersA, setPlayersA] = useState(teamA.players)
   const [playersB, setPlayersB] = useState(teamB.players)
   const [saving, setSaving] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const router = useRouter()
 
   const toggle = useCallback(async (
@@ -116,8 +126,6 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
   const startA = playersA.filter(p => p.is_in_starting_xi).length
   const startB = playersB.filter(p => p.is_in_starting_xi).length
 
-  if (playersA.length === 0 && playersB.length === 0) return null
-
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
       <button
@@ -130,7 +138,7 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
             {teamA.flag} {startA}/11 · {teamB.flag} {startB}/11
           </span>
         </div>
-        <span className="text-gray-600 text-xs">{open ? '▲ Schließen' : '▼ Bearbeiten'}</span>
+        <span className="text-gray-600 text-xs">{open ? '▲ Einklappen' : '▼ Aufstellung eintragen'}</span>
       </button>
 
       {open && (

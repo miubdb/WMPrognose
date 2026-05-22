@@ -7,8 +7,25 @@ import { computeGroupStandings, computePressure } from '@/lib/standings'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { LineupEditor } from './LineupEditor'
+import type { LineupPlayer } from './LineupEditor'
 
 export const dynamic = 'force-dynamic'
+
+function topScorelines(xgA: number, xgB: number, n = 8): { i: number; j: number; p: number }[] {
+  const pmf = (lambda: number, k: number) => {
+    if (lambda <= 0) return k === 0 ? 1 : 0
+    let logP = k * Math.log(lambda) - lambda
+    for (let i = 1; i <= k; i++) logP -= Math.log(i)
+    return Math.exp(logP)
+  }
+  const scores: { i: number; j: number; p: number }[] = []
+  for (let i = 0; i <= 7; i++) {
+    for (let j = 0; j <= 7; j++) {
+      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) })
+    }
+  }
+  return scores.sort((a, b) => b.p - a.p).slice(0, n)
+}
 
 function fmtEffect(e: number): string {
   if (Math.abs(e) < 0.002) return '±0%'
@@ -203,7 +220,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
           </span>
         </div>
         <div className="text-center text-xs text-gray-500 mb-6">
-          {fmtDate(match.date)} · {berlinTime} MESZ · {venue?.city ?? match.venueId}
+          {fmtDate(match.date)} · {berlinTime} Uhr · {venue?.city ?? match.venueId}
         </div>
 
         {/* Teams */}
@@ -274,10 +291,28 @@ export default async function MatchDetailPage({ params }: { params: { id: string
         </div>
       )}
 
+      {/* Wahrscheinlichste Ergebnisse */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Wahrscheinlichste Ergebnisse</h2>
+        <div className="grid grid-cols-4 gap-2">
+          {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB).map(({ i, j, p }) => {
+            const winner = i > j ? 'A' : j > i ? 'B' : 'X'
+            const color = winner === 'A' ? 'border-emerald-800/60 bg-emerald-900/10' : winner === 'B' ? 'border-blue-800/60 bg-blue-900/10' : 'border-gray-700 bg-gray-800/30'
+            return (
+              <div key={`${i}-${j}`} className={`rounded-lg border ${color} p-2 text-center`}>
+                <div className="text-sm font-bold font-mono text-white">{i}:{j}</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">{Math.round(p * 100)}%</div>
+              </div>
+            )
+          })}
+        </div>
+        <p className="text-[10px] text-gray-700 mt-3">Poisson-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt</p>
+      </div>
+
       {/* Lineup Editor */}
       <LineupEditor
-        teamA={{ id: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, players: (squadA.data ?? []) as Parameters<typeof LineupEditor>[0]['teamA']['players'] }}
-        teamB={{ id: match.teamBId, name: analysis.teamB.name, flag: analysis.teamB.flag, players: (squadB.data ?? []) as Parameters<typeof LineupEditor>[0]['teamB']['players'] }}
+        teamA={{ id: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, players: (squadA.data ?? []) as LineupPlayer[] }}
+        teamB={{ id: match.teamBId, name: analysis.teamB.name, flag: analysis.teamB.flag, players: (squadB.data ?? []) as LineupPlayer[] }}
       />
 
       {/* Factor Breakdown */}

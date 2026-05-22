@@ -81,19 +81,36 @@ export async function POST() {
     return NextResponse.json({ error: 'No players in DB' }, { status: 400 })
   }
 
-  // 2. Fetch all FBref leagues in parallel
-  const leagueResults = await Promise.allSettled(
-    FBREF_LEAGUES.map(async (league) => {
+  // 2. Fetch all FBref leagues sequentially with delay to avoid 403
+  const leagueResults: PromiseSettledResult<{ league: string; stats: Map<string, { xg: number; xga: number; minutes: number; position: string }> }>[] = []
+  for (const league of FBREF_LEAGUES) {
+    try {
       const res = await fetch(league.url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research-bot/1.0)' },
-        signal: AbortSignal.timeout(15000),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Upgrade-Insecure-Requests': '1',
+          'Referer': 'https://fbref.com/',
+        },
+        signal: AbortSignal.timeout(30000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${league.name}`)
       const html = await res.text()
       const stats = parseFBrefStats(html)
-      return { league: league.name, stats }
-    })
-  )
+      leagueResults.push({ status: 'fulfilled', value: { league: league.name, stats } })
+    } catch (err) {
+      leagueResults.push({ status: 'rejected', reason: err })
+    }
+    // 2s delay between requests
+    await new Promise(r => setTimeout(r, 2000))
+  }
 
   // 3. Merge all league stats into one map (later league = overwrite, so Big5 has priority)
   const allStats = new Map<string, { xg: number; xga: number; minutes: number; position: string }>()

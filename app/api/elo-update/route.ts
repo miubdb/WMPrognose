@@ -20,33 +20,91 @@ const ELO_NAME_MAP: Record<string, string> = {
   tunisia: 'Tunisia', ivory_coast: "Côte d'Ivoire", mali: 'Mali', algeria: 'Algeria',
   new_zealand: 'New Zealand', scotland: 'Scotland', turkey: 'Türkiye', czech: 'Czech Republic',
   hungary: 'Hungary', venezuela: 'Venezuela', haiti: 'Haiti', cape_verde: 'Cape Verde',
-  curacao: 'Curaçao', dr_congo: 'DR Congo', panama: 'Panama', bosnia: 'Bosnia-Herzegovina',
+  curacao: 'Curaçao', congo_dr: 'DR Congo', panama: 'Panama', bosnia: 'Bosnia-Herzegovina',
   thailand: 'Thailand', paraguay: 'Paraguay',
+}
+
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Upgrade-Insecure-Requests': '1',
+}
+
+function parseElo(html: string): Record<string, number> {
+  const found: Record<string, number> = {}
+
+  // Strategy A: JSON in <script> tag
+  const jsonMatches = [...html.matchAll(/"name"\s*:\s*"([^"]+)"[^}]*"elo"\s*:\s*(\d{3,4})/g)]
+  if (jsonMatches.length >= 10) {
+    for (const m of jsonMatches) {
+      const elo = parseInt(m[2])
+      if (elo > 1000 && elo < 2500) found[m[1].trim()] = elo
+    }
+    if (Object.keys(found).length >= 10) return found
+  }
+
+  // Strategy B: Data array
+  Object.keys(found).forEach(k => delete found[k])
+  const dataMatches = [...html.matchAll(/\["([A-Za-z ]+)",\s*\d+,\s*(\d{3,4})/g)]
+  if (dataMatches.length >= 10) {
+    for (const m of dataMatches) {
+      const elo = parseInt(m[2])
+      if (elo > 1000 && elo < 2500) found[m[1].trim()] = elo
+    }
+    if (Object.keys(found).length >= 10) return found
+  }
+
+  // Strategy C: Table rows multi-line
+  Object.keys(found).forEach(k => delete found[k])
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g
+  const stripTags = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  for (const rowMatch of html.matchAll(rowRegex)) {
+    const rowText = stripTags(rowMatch[1])
+    const eloMatch = rowText.match(/([A-Za-zÀ-ÿ\s'()-]+)\D+(\b1[0-9]{3}\b|\b2[0-3][0-9]{2}\b)/)
+    if (eloMatch) {
+      const name = eloMatch[1].trim()
+      const elo = parseInt(eloMatch[2])
+      if (name && elo > 1000 && elo < 2500) found[name] = elo
+    }
+  }
+  if (Object.keys(found).length >= 10) return found
+
+  // Strategy D: Script data
+  Object.keys(found).forEach(k => delete found[k])
+  const scriptMatches = [...html.matchAll(/'([A-Za-z ]+)',\s*(\d{3,4})/g)]
+  for (const m of scriptMatches) {
+    const elo = parseInt(m[2])
+    if (elo > 1000 && elo < 2500) found[m[1].trim()] = elo
+  }
+  if (Object.keys(found).length >= 10) return found
+
+  return found
 }
 
 export async function POST() {
   try {
     const res = await fetch('https://eloratings.net/World', {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(10000),
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(15000),
     })
     const html = await res.text()
 
-    // Parse ELO values from HTML — eloratings.net embeds data as JS array or table
-    const found: Record<string, number> = {}
-
-    // Try table row pattern
-    const rows = html.matchAll(/<tr[^>]*>.*?<td[^>]*>([^<]+)<\/td>.*?<td[^>]*>(\d{3,4})<\/td>/gs)
-    for (const row of rows) {
-      const name = row[1].trim()
-      const elo = parseInt(row[2])
-      if (elo > 1000 && elo < 2500) found[name] = elo
-    }
+    const found = parseElo(html)
 
     if (Object.keys(found).length < 10) {
-      // Parsing failed — return error but don't crash
       return NextResponse.json(
-        { error: 'Parsing fehlgeschlagen – eloratings.net hat die Struktur geändert', found: Object.keys(found).length },
+        {
+          error: 'Alle Parse-Strategien fehlgeschlagen – eloratings.net hat die Struktur geändert',
+          found: Object.keys(found).length,
+          htmlSnippet: html.slice(0, 500),
+        },
         { status: 422 }
       )
     }

@@ -458,6 +458,14 @@ function buildReasoning(
   return parts.join('. ')
 }
 
+// ─── Restdays Helper ──────────────────────────────────────────────────────────
+
+function getLastMatchDate(teamId: string, currentMatchDate: string): string | null {
+  return GROUP_SCHEDULE
+    .filter(m => m.round === 'group' && m.date < currentMatchDate && (m.teamAId === teamId || m.teamBId === teamId))
+    .sort((a, b) => b.date.localeCompare(a.date))[0]?.date ?? null
+}
+
 // ─── Match Analysis (Faktor-Aufschlüsselung) ──────────────────────────────────
 
 export interface MatchFactor {
@@ -726,6 +734,27 @@ export function analyzeMatch(
       effectA: pressEffectA - pressEffectB * 0.5,
       effectB: pressEffectB - pressEffectA * 0.5,
       explanation: 'Teams die zwingend gewinnen müssen, spielen risikoreicher und erzielen statistisch mehr Tore — aber kassieren auch mehr. Teams die bereits qualifiziert sind, rotieren häufiger.',
+    })
+  }
+
+  // Spielrhythmus / Ruhetage
+  const lastA = getLastMatchDate(match.teamAId, match.date)
+  const lastB = getLastMatchDate(match.teamBId, match.date)
+  const daysA = lastA ? Math.floor((new Date(match.date).getTime() - new Date(lastA).getTime()) / 86400000) : 10
+  const daysB = lastB ? Math.floor((new Date(match.date).getTime() - new Date(lastB).getTime()) / 86400000) : 10
+  // Less than 4 days rest → fatigue penalty
+  const restEffectA = daysA < 4 ? -0.04 : daysA < 5 ? -0.02 : 0
+  const restEffectB = daysB < 4 ? -0.04 : daysB < 5 ? -0.02 : 0
+  if (restEffectA < 0 || restEffectB < 0) {
+    factors.push({
+      category: 'context',
+      label: 'Spielrhythmus / Erholung',
+      source: 'FIFA-Spielplan (eigene Berechnung)',
+      valueA: lastA ? `${daysA} Tage Pause` : 'Erstes Spiel',
+      valueB: lastB ? `${daysB} Tage Pause` : 'Erstes Spiel',
+      effectA: restEffectA,
+      effectB: restEffectB,
+      explanation: 'Weniger als 4 Tage Erholung seit dem letzten Gruppenspiel reduziert die körperliche Verfassung messbar (Studienlage: Drust et al. 2007).',
     })
   }
 

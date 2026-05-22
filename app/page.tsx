@@ -115,7 +115,7 @@ function MatchCard({
           <span>·</span>
           <span>{fmtDate(match.date)}</span>
           <span className="font-mono font-bold text-white">{berlinTime}</span>
-          <span className="text-gray-600">MESZ</span>
+          <span className="text-gray-500">Uhr</span>
         </div>
         <div className="flex items-center gap-2">
           {missingSquad && !result && (
