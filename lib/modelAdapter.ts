@@ -196,18 +196,16 @@ function generateTipForMatch(match: ScheduledMatch): TipSuggestion {
   const baseWinB = eloToWinProb(-eloDiff)
   const baseDraw = 1 - baseWinA - baseWinB
 
-  // Heimvorteil für Gastgeber
+  // Heimvorteil für Gastgeber — Poisson-basiert für Konsistenz
   const isHostA = ['usa', 'canada', 'mexico'].includes(match.teamAId)
   const isHostB = ['usa', 'canada', 'mexico'].includes(match.teamBId)
-  let winA = baseWinA + (isHostA ? 0.04 : 0) - (isHostB ? 0.02 : 0)
-  let winB = baseWinB + (isHostB ? 0.04 : 0) - (isHostA ? 0.02 : 0)
-  let draw = 1 - winA - winB
-
-  // Normalize
-  const total = winA + draw + winB
-  winA /= total
-  draw /= total
-  winB /= total
+  const hostAdj = (isHostA ? 0.04 : 0) - (isHostB ? 0.02 : 0)
+  const baseXgA = 1.35 * (1 + eloDiff / 400 * 0.15 + hostAdj)
+  const baseXgB = 1.35 * (1 - eloDiff / 400 * 0.15 - hostAdj)
+  const { winA, draw, winB } = poissonWinProbs(
+    Math.max(0.3, Math.min(4, baseXgA)),
+    Math.max(0.3, Math.min(4, baseXgB))
+  )
 
   // Bestes Ergebnis bestimmen
   let suggestedTip: '1' | 'X' | '2'
@@ -310,8 +308,55 @@ function inferHeatAdaptation(conf: string): number {
 // Bekannte Trainingslager: user stellt sie bereit. Confederation-Defaults = typische Camp-Region.
 
 const TEAM_BASE_CAMPS: Record<string, [number, number]> = {
-  // Lat, Lng — user kann weitere ergänzen
-  'germany': [36.1, -80.2],    // Winston-Salem, NC (Graylyn Estate)
+  // Lat, Lng — alle offiziellen Teamquartiere WM 2026 (user-verified)
+  'germany':      [36.1,  -80.2],  // Winston-Salem, NC
+  'england':      [39.1,  -94.6],  // Kansas City, MO
+  'france':       [42.4,  -71.1],  // Boston, MA
+  'spain':        [35.0,  -85.3],  // Chattanooga, TN
+  'portugal':     [25.9,  -80.2],  // Miami, FL
+  'netherlands':  [39.1,  -94.6],  // Kansas City, MO
+  'belgium':      [47.6, -122.3],  // Seattle, WA
+  'austria':      [34.4, -119.7],  // Santa Barbara, CA
+  'croatia':      [38.8,  -77.1],  // Alexandria, VA
+  'scotland':     [35.2,  -80.8],  // Charlotte, NC
+  'switzerland':  [32.7, -117.2],  // San Diego, CA
+  'norway':       [36.1,  -79.8],  // Greensboro, NC
+  'sweden':       [33.1,  -96.8],  // Frisco, TX
+  'czechia':      [32.6,  -97.1],  // Mansfield, TX
+  'bosnia':       [40.8, -111.9],  // Salt Lake City, UT
+  'turkey':       [33.4, -111.8],  // Mesa, AZ
+  'brazil':       [40.8,  -74.5],  // Morristown, NJ
+  'argentina':    [39.1,  -94.6],  // Kansas City, MO
+  'colombia':     [20.7, -103.4],  // Guadalajara, MX
+  'uruguay':      [20.6,  -87.1],  // Playa del Carmen, MX
+  'ecuador':      [39.9,  -82.9],  // Columbus, OH
+  'paraguay':     [37.3, -121.9],  // San Jose, CA
+  'usa':          [33.7, -117.8],  // Irvine, CA
+  'canada':       [49.3, -123.1],  // Vancouver, BC
+  'mexico':       [19.4,  -99.2],  // Mexiko-Stadt, MX
+  'panama':       [44.1,  -79.8],  // New Tecumseth, ON
+  'curacao':      [26.4,  -80.1],  // Boca Raton, FL
+  'morocco':      [40.7,  -74.6],  // Bernards Township, NJ
+  'senegal':      [40.5,  -74.5],  // New Brunswick, NJ
+  'egypt':        [47.7, -117.4],  // Spokane, WA
+  'ghana':        [41.8,  -71.4],  // Providence, RI
+  'ivory_coast':  [39.9,  -75.2],  // Philadelphia, PA
+  'tunisia':      [25.7, -100.3],  // Monterrey, MX
+  'algeria':      [38.9,  -95.2],  // Lawrence, KS
+  'cape_verde':   [27.9,  -82.5],  // Tampa, FL
+  'congo_dr':     [29.7,  -95.4],  // Houston, TX
+  'south_africa': [20.1,  -98.7],  // Pachuca, MX
+  'south_korea':  [20.7, -103.4],  // Guadalajara, MX
+  'japan':        [36.2,  -86.8],  // Nashville, TN
+  'australia':    [37.8, -122.3],  // Oakland, CA
+  'iran':         [32.2, -110.9],  // Tucson, AZ
+  'saudi_arabia': [30.3,  -97.7],  // Austin, TX
+  'qatar':        [34.4, -119.7],  // Santa Barbara, CA
+  'iraq':         [37.8,  -80.3],  // White Sulphur Springs, WV
+  'uzbekistan':   [33.8,  -84.4],  // Atlanta, GA (Atlanta United Training Center)
+  'jordan':       [45.5, -122.7],  // Portland, OR
+  'new_zealand':  [32.7, -117.2],  // San Diego, CA
+  'haiti':        [39.5,  -74.5],  // Galloway, NJ
 }
 
 // Konföderation → typische Camp-Region in Nordamerika
