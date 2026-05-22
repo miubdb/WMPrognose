@@ -15,7 +15,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
 
   const { data: players } = await supabase
     .from('players')
-    .select('*')
+    .select('id, name, position, jersey_number, age, club_team, market_value_m, rating, xg_per90, xga_per90')
     .eq('team_id', params.id)
     .order('position')
     .order('market_value_m', { ascending: false })
@@ -71,7 +71,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                   <span className="text-xs text-gray-600 ml-2">{group.length} Spieler</span>
                 </div>
                 <div className="divide-y divide-gray-800/60">
-                  {group.map((p: { id: string; jersey_number: number | null; name: string; age: number; club_team: string | null; market_value_m: number; rating: number }) => (
+                  {group.map((p: { id: string; jersey_number: number | null; name: string; age: number; club_team: string | null; market_value_m: number; rating: number; xg_per90: number | null; xga_per90: number | null }) => (
                     <div key={p.id} className="px-4 py-2.5 flex items-center gap-3">
                       <span className="text-xs text-gray-600 font-mono w-5 text-right">
                         {p.jersey_number ?? '–'}
@@ -84,6 +84,11 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                           ? `${p.market_value_m.toFixed(1)}M€`
                           : `${Math.round(p.market_value_m * 1000)}T€`}
                       </span>
+                      {(p.xg_per90 ?? 0) > 0 && (
+                        <span className="text-[10px] text-blue-400 font-mono hidden md:block" title="xG/90 Saison 2024/25">
+                          {p.xg_per90!.toFixed(2)} xG
+                        </span>
+                      )}
                       <DeleteButton playerId={p.id} />
                     </div>
                   ))}

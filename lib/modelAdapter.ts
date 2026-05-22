@@ -388,6 +388,8 @@ export interface MatchFactor {
 export interface SquadSummary {
   count: number
   totalMarketValueM: number
+  avgXgPer90Attack?: number    // avg xG/90 of FWD + MID players with data
+  avgXgaPer90Defense?: number  // avg xGA/90 of DEF + GK players with data
 }
 
 export interface TeamPressure {
@@ -480,6 +482,33 @@ export function analyzeMatch(
       ? 'Log-normalisierter Kader-Marktwert als Proxy für Spielerqualität. Teuerere Kader haben im Schnitt mehr Torchancen.'
       : 'Kaderdaten für mindestens ein Team fehlen – Faktor wird nicht in die Berechnung einbezogen.',
   })
+
+  // 2b. Kader-Saisonform / xG per 90 (FBref)
+  const hasFormA = (squadData?.[match.teamAId]?.avgXgPer90Attack ?? 0) > 0
+  const hasFormB = (squadData?.[match.teamBId]?.avgXgPer90Attack ?? 0) > 0
+
+  if (hasFormA || hasFormB) {
+    const xgA = squadData?.[match.teamAId]?.avgXgPer90Attack ?? 0
+    const xgB = squadData?.[match.teamBId]?.avgXgPer90Attack ?? 0
+    const defA = squadData?.[match.teamAId]?.avgXgaPer90Defense ?? 0
+    const defB = squadData?.[match.teamBId]?.avgXgaPer90Defense ?? 0
+
+    // Net effect: own attack quality vs opponent defense quality
+    const attackAdvA = hasFormA && hasFormB ? (xgA - xgB) * 4 : 0
+    const defAdvA = hasFormA && hasFormB ? (defB - defA) * 2 : 0  // lower xGA = better defense
+    const formEffectA = Math.max(-0.12, Math.min(0.12, attackAdvA + defAdvA))
+
+    factors.push({
+      category: 'squad',
+      label: 'Saisonform xG/90',
+      source: 'FBref.com – Klubsaison 2024/25',
+      valueA: hasFormA ? `${xgA.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
+      valueB: hasFormB ? `${xgB.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
+      effectA: formEffectA,
+      effectB: -formEffectA,
+      explanation: 'Durchschnittliche xG/90 der Angreifer und Mittelfeldspieler aus der Klubsaison 2024/25. Höherer Wert = statistisch mehr Torchancen. Quelle: FBref.com.',
+    })
+  }
 
   // 3. Heimvorteil (Pollard 1986)
   const isHostA = ['usa', 'canada', 'mexico'].includes(match.teamAId)

@@ -71,25 +71,37 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   // Fetch all data in parallel
   const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
-    supabase.from('players').select('market_value_m').eq('team_id', match.teamAId),
-    supabase.from('players').select('market_value_m').eq('team_id', match.teamBId),
+    supabase.from('players').select('market_value_m, position, xg_per90, xga_per90').eq('team_id', match.teamAId),
+    supabase.from('players').select('market_value_m, position, xg_per90, xga_per90').eq('team_id', match.teamBId),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
     supabase.from('team_elo_ratings').select('team_id, elo_rating'),
   ])
 
+  function buildSquadSummary(
+    players: Array<{ market_value_m: number | null; position: string | null; xg_per90: number | null; xga_per90: number | null }>
+  ): SquadSummary {
+    const summary: SquadSummary = {
+      count: players.length,
+      totalMarketValueM: players.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
+    }
+    const attackPlayers = players.filter(p => (p.position === 'FWD' || p.position === 'MID') && (p.xg_per90 ?? 0) > 0)
+    if (attackPlayers.length > 0) {
+      summary.avgXgPer90Attack = attackPlayers.reduce((s, p) => s + (p.xg_per90 ?? 0), 0) / attackPlayers.length
+    }
+    const defensePlayers = players.filter(p => (p.position === 'DEF' || p.position === 'GK') && (p.xga_per90 ?? 0) > 0)
+    if (defensePlayers.length > 0) {
+      summary.avgXgaPer90Defense = defensePlayers.reduce((s, p) => s + (p.xga_per90 ?? 0), 0) / defensePlayers.length
+    }
+    return summary
+  }
+
   const squadData: Record<string, SquadSummary> = {}
   if ((squadA.data?.length ?? 0) > 0) {
-    squadData[match.teamAId] = {
-      count: squadA.data!.length,
-      totalMarketValueM: squadA.data!.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
-    }
+    squadData[match.teamAId] = buildSquadSummary(squadA.data!)
   }
   if ((squadB.data?.length ?? 0) > 0) {
-    squadData[match.teamBId] = {
-      count: squadB.data!.length,
-      totalMarketValueM: squadB.data!.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
-    }
+    squadData[match.teamBId] = buildSquadSummary(squadB.data!)
   }
 
   // Build results map for standings
