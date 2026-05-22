@@ -47,33 +47,47 @@ const BROWSER_HEADERS = {
 
 /**
  * Parse ELO ratings from the Wikipedia "World Football Elo Ratings" page.
- * The page has a wikitable with columns: Rank | (flag) | Team | Points | ...
- * We look for table rows where a cell contains a 4-digit ELO number (1000–2300).
+ * The wikitable has columns: Rank | (flag) | Team | Points | Change
+ * We scan all <tr> rows for a cell containing the team name (in an <a> tag)
+ * and a cell containing a 4-digit ELO rating (1000–2400).
  */
 function parseWikipediaElo(html: string): Record<string, number> {
   const found: Record<string, number> = {}
 
-  // Extract all <tr> rows from the page
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
-  const stripHtml = (s: string) => s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#160;/g, ' ').replace(/&nbsp;/g, ' ').trim()
+  // Strip HTML tags and decode common entities
+  const stripHtml = (s: string) =>
+    s
+      .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, '')  // remove superscripts (change indicators)
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&#160;/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#8722;/g, '-')
+      .replace(/[+\-−]\d+\s*$/g, '')              // strip trailing +5 / −3 change numbers
+      .trim()
 
-  for (const rowMatch of html.matchAll(rowRegex)) {
-    const rowHtml = rowMatch[1]
+  // Split on <tr to find row boundaries (more reliable than greedy/lazy regex on large HTML)
+  const trParts = html.split(/<tr[\s>]/)
+  for (const trPart of trParts) {
+    // Get the content up to the closing </tr>
+    const endIdx = trPart.indexOf('</tr>')
+    const rowHtml = endIdx >= 0 ? trPart.slice(0, endIdx) : trPart
 
-    // Extract all <td> cells in this row
-    const cells: string[] = []
-    for (const tdMatch of rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)) {
-      cells.push(stripHtml(tdMatch[1]).trim())
+    // Extract all <td> and <th> cell content
+    const cellContents: string[] = []
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi
+    for (const cellMatch of rowHtml.matchAll(cellRegex)) {
+      cellContents.push(stripHtml(cellMatch[1]).trim())
     }
 
-    if (cells.length < 2) continue
+    if (cellContents.length < 2) continue
 
-    // Find a cell that looks like a 4-digit ELO (1000-2300)
     let eloValue = 0
     let nameCandidate = ''
 
-    for (const cell of cells) {
-      const numMatch = cell.match(/^(\d{4})$/)
+    for (const cell of cellContents) {
+      // Detect 4-digit ELO rating (1000-2400), possibly with decimals stripped
+      const numMatch = cell.match(/^(\d{4})(?:\.\d+)?$/)
       if (numMatch) {
         const n = parseInt(numMatch[1])
         if (n >= 1000 && n <= 2400) {
@@ -81,8 +95,16 @@ function parseWikipediaElo(html: string): Record<string, number> {
           continue
         }
       }
-      // Country name: letters, spaces, hyphens, apostrophes
-      if (/^[A-ZÀ-ÿ][A-Za-zÀ-ÿ\s'\-()]+$/.test(cell) && cell.length > 2 && cell.length < 50) {
+
+      // Country name: must start uppercase, contain only letters/spaces/hyphens/apostrophes/periods
+      // Length between 3 and 50 chars, must not be purely numeric
+      if (
+        cell.length >= 3 &&
+        cell.length <= 50 &&
+        /^[A-ZÀ-ÿ]/.test(cell) &&
+        /^[A-Za-zÀ-ÿ\s'.\-()]+$/.test(cell) &&
+        !/^\d+$/.test(cell)
+      ) {
         nameCandidate = cell
       }
     }

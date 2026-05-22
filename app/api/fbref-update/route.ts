@@ -6,15 +6,35 @@ const adminSupabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const FBREF_LEAGUES = [
-  { id: 'Big5',  url: 'https://fbref.com/en/comps/Big5/stats/players/Big-5-European-Leagues-Stats',  name: 'Big 5 Europe' },
-  { id: 'MLS',   url: 'https://fbref.com/en/comps/22/stats/players/Major-League-Soccer-Stats',         name: 'MLS' },
-  { id: 'JLEAG', url: 'https://fbref.com/en/comps/25/stats/players/J1-League-Stats',                   name: 'J1 League' },
-  { id: 'SPL',   url: 'https://fbref.com/en/comps/70/stats/players/Saudi-Pro-League-Stats',            name: 'Saudi Pro League' },
-  { id: 'ARG',   url: 'https://fbref.com/en/comps/21/stats/players/Primera-División-Stats',            name: 'Liga Argentina' },
-  { id: 'BRA',   url: 'https://fbref.com/en/comps/24/stats/players/Serie-A-Stats',                    name: 'Brasileirão' },
-  { id: 'MEX',   url: 'https://fbref.com/en/comps/31/stats/players/Liga-MX-Stats',                    name: 'Liga MX' },
+// Understat leagues for 2024/25 season
+const UNDERSTAT_LEAGUES = [
+  { id: 'EPL',        url: 'https://understat.com/league/EPL/2024',        name: 'Premier League' },
+  { id: 'La_liga',    url: 'https://understat.com/league/La_liga/2024',    name: 'La Liga' },
+  { id: 'Bundesliga', url: 'https://understat.com/league/Bundesliga/2024', name: 'Bundesliga' },
+  { id: 'Serie_A',    url: 'https://understat.com/league/Serie_A/2024',    name: 'Serie A' },
+  { id: 'Ligue_1',    url: 'https://understat.com/league/Ligue_1/2024',    name: 'Ligue 1' },
 ]
+
+interface UnderstatPlayer {
+  id: string
+  player_name: string
+  games: string
+  time: string       // minutes played
+  goals: string
+  xG: string         // expected goals (total)
+  assists: string
+  xA: string         // expected assists (total)
+  shots: string
+  key_passes: string
+  yellow_cards: string
+  red_cards: string
+  position: string
+  team_title: string
+  npg: string
+  npxG: string
+  xGChain: string
+  xGBuildup: string
+}
 
 function normalizeName(name: string): string {
   return name
@@ -26,46 +46,63 @@ function normalizeName(name: string): string {
     .replace(/\s+/g, ' ')
 }
 
-function parseFBrefStats(html: string): Map<string, { xg: number; xga: number; minutes: number; position: string }> {
+/**
+ * Parse the embedded playersData JSON from an understat league page.
+ * Understat embeds data as:
+ *   var playersData = JSON.parse('...')
+ * The inner string uses JSON with unicode escapes (\uXXXX) and escaped single quotes.
+ */
+function parseUnderstatPlayers(html: string): Map<string, { xg: number; xga: number; minutes: number; position: string }> {
   const players = new Map<string, { xg: number; xga: number; minutes: number; position: string }>()
 
-  // Each player is a <tr> row. Extract rows from the stats_standard table.
-  // Look for rows containing data-stat="player"
-  const rowRegex = /<tr[^>]*>[\s\S]*?<\/tr>/g
-  const rows = html.match(rowRegex) ?? []
+  // Match the playersData JSON.parse call - handle both single and double quote delimiters
+  const match = html.match(/var\s+playersData\s*=\s*JSON\.parse\('([\s\S]*?)'\)/)
+    ?? html.match(/var\s+playersData\s*=\s*JSON\.parse\("([\s\S]*?)"\)/)
 
-  for (const row of rows) {
-    // Skip header rows
-    if (row.includes('class="thead"') || row.includes('<th ')) continue
+  if (!match) {
+    console.warn('understat: playersData not found in page')
+    return players
+  }
 
-    // Extract player name
-    const nameMatch = row.match(/data-stat="player"[^>]*>(?:<a[^>]*>)?([^<]+)(?:<\/a>)?<\/td>/)
-    if (!nameMatch) continue
-    const name = nameMatch[1].trim()
-    if (!name || name === 'Player') continue
+  // Unescape the string: understat uses \' for single quotes inside the JSON string,
+  // and unicode escapes like Т for non-ASCII characters
+  let jsonStr = match[1]
+    .replace(/\\'/g, "'")      // unescape single quotes
+    .replace(/\\"/g, '"')      // unescape double quotes (if any)
 
-    // Extract position
-    const posMatch = row.match(/data-stat="position"[^>]*>([^<]*)<\/td>/)
-    const position = posMatch?.[1]?.trim() ?? ''
+  let rawPlayers: UnderstatPlayer[]
+  try {
+    rawPlayers = JSON.parse(jsonStr)
+  } catch (e) {
+    console.warn('understat: JSON.parse failed:', e)
+    return players
+  }
 
-    // Extract minutes
-    const minMatch = row.match(/data-stat="minutes"[^>]*>([0-9,]+)<\/td>/)
-    const minutes = parseInt((minMatch?.[1] ?? '0').replace(/,/g, '')) || 0
-    if (minutes < 90) continue  // Skip players with less than 90 min played
+  if (!Array.isArray(rawPlayers)) return players
 
-    // Extract xG (expected goals)
-    const xgMatch = row.match(/data-stat="xg"[^>]*>([\d.]+)<\/td>/)
-    const xg = parseFloat(xgMatch?.[1] ?? '0') || 0
+  for (const p of rawPlayers) {
+    const minutes = parseInt(p.time ?? '0') || 0
+    if (minutes < 90) continue   // skip players with < 90 min
 
-    // Extract xGA (expected goals against — for GK/DEF context, labeled xg_against or xga on FBref)
-    const xgaMatch = row.match(/data-stat="xg_against"[^>]*>([\d.]+)<\/td>/)
-    const xga = parseFloat(xgaMatch?.[1] ?? '0') || 0
+    const xg = parseFloat(p.xG ?? '0') || 0
+    // xA used as proxy for xGA (assists/creativity metric — stored in xga_per90 field)
+    const xa = parseFloat(p.xA ?? '0') || 0
 
-    // Compute per-90 values
     const xgPer90 = minutes > 0 ? (xg / minutes) * 90 : 0
-    const xgaPer90 = minutes > 0 ? (xga / minutes) * 90 : 0
+    const xaPer90 = minutes > 0 ? (xa / minutes) * 90 : 0
 
-    players.set(normalizeName(name), { xg: xgPer90, xga: xgaPer90, minutes, position })
+    const normalizedName = normalizeName(p.player_name ?? '')
+    if (!normalizedName) continue
+
+    // Keep first occurrence (EPL first, etc.) — earlier leagues win
+    if (!players.has(normalizedName)) {
+      players.set(normalizedName, {
+        xg: xgPer90,
+        xga: xaPer90,
+        minutes,
+        position: p.position ?? '',
+      })
+    }
   }
 
   return players
@@ -81,53 +118,40 @@ export async function POST() {
     return NextResponse.json({ error: 'No players in DB' }, { status: 400 })
   }
 
-  // 2. Fetch all FBref leagues sequentially with delay to avoid 403
-  const leagueResults: PromiseSettledResult<{ league: string; stats: Map<string, { xg: number; xga: number; minutes: number; position: string }> }>[] = []
-  for (const league of FBREF_LEAGUES) {
+  // 2. Fetch all understat leagues sequentially with delay to avoid rate limiting
+  const allStats = new Map<string, { xg: number; xga: number; minutes: number; position: string }>()
+  const leagueSummary: string[] = []
+
+  for (const league of UNDERSTAT_LEAGUES) {
     try {
       const res = await fetch(league.url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
           'Accept-Encoding': 'gzip, deflate, br',
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Upgrade-Insecure-Requests': '1',
-          'Referer': 'https://fbref.com/',
+          'Referer': 'https://understat.com/',
         },
         signal: AbortSignal.timeout(30000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${league.name}`)
       const html = await res.text()
-      const stats = parseFBrefStats(html)
-      leagueResults.push({ status: 'fulfilled', value: { league: league.name, stats } })
+      const stats = parseUnderstatPlayers(html)
+      leagueSummary.push(`${league.name}: ${stats.size} players`)
+
+      // Merge — first league (EPL) wins for duplicate players
+      for (const [name, data] of stats) {
+        if (!allStats.has(name)) allStats.set(name, data)
+      }
     } catch (err) {
-      leagueResults.push({ status: 'rejected', reason: err })
+      leagueSummary.push(`FAILED ${league.name}: ${err}`)
     }
     // 2s delay between requests
     await new Promise(r => setTimeout(r, 2000))
   }
 
-  // 3. Merge all league stats into one map (later league = overwrite, so Big5 has priority)
-  const allStats = new Map<string, { xg: number; xga: number; minutes: number; position: string }>()
-  const leagueSummary: string[] = []
-  for (const result of leagueResults) {
-    if (result.status === 'fulfilled') {
-      const { league, stats } = result.value
-      leagueSummary.push(`${league}: ${stats.size} players`)
-      for (const [name, data] of stats) {
-        if (!allStats.has(name)) allStats.set(name, data)  // Big5 (first) wins
-      }
-    } else {
-      leagueSummary.push(`FAILED: ${result.reason}`)
-    }
-  }
-
-  // 4. Match DB players to FBref stats by name
+  // 3. Match DB players to understat stats by normalized name
   const updates: { id: string; xg_per90: number; xga_per90: number }[] = []
   let matched = 0
   let unmatched = 0
@@ -136,7 +160,7 @@ export async function POST() {
     const normalized = normalizeName(player.name)
     let stats = allStats.get(normalized)
 
-    // Fuzzy: try last name match
+    // Fuzzy: try last name match if full name not found
     if (!stats) {
       const lastName = normalized.split(' ').slice(-1)[0]
       if (lastName && lastName.length > 3) {
@@ -150,9 +174,6 @@ export async function POST() {
     }
 
     if (stats) {
-      // For GK/DEF, xGA from FBref is more relevant
-      // For FWD/MID, xG is more relevant
-      // But we store both — the model will pick the right one
       updates.push({
         id: player.id,
         xg_per90: Math.round(stats.xg * 1000) / 1000,
@@ -164,7 +185,7 @@ export async function POST() {
     }
   }
 
-  // 5. Batch update Supabase
+  // 4. Batch update Supabase
   let dbUpdated = 0
   const batchSize = 50
   for (let i = 0; i < updates.length; i += batchSize) {
