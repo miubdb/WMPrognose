@@ -390,6 +390,13 @@ export interface SquadSummary {
   totalMarketValueM: number
 }
 
+export interface TeamPressure {
+  mustWin: boolean
+  canDraw: boolean
+  alreadyThrough: boolean
+  alreadyOut: boolean
+}
+
 export interface MatchAnalysis {
   matchId: string
   teamA: TeamBasic
@@ -407,9 +414,16 @@ export interface MatchAnalysis {
   factors: MatchFactor[]
   squadDataA: boolean
   squadDataB: boolean
+  pressureA?: TeamPressure
+  pressureB?: TeamPressure
 }
 
-export function analyzeMatch(match: ScheduledMatch, squadData?: Record<string, SquadSummary>): MatchAnalysis {
+export function analyzeMatch(
+  match: ScheduledMatch,
+  squadData?: Record<string, SquadSummary>,
+  pressure?: { A: TeamPressure; B: TeamPressure },
+  eloOverrides?: Record<string, number>
+): MatchAnalysis {
   const teamA = TEAM_BY_ID[match.teamAId]
   const teamB = TEAM_BY_ID[match.teamBId]
   const venue = VENUES[match.venueId] ?? VENUES['new_york']
@@ -428,15 +442,19 @@ export function analyzeMatch(match: ScheduledMatch, squadData?: Record<string, S
 
   const factors: MatchFactor[] = []
 
+  // Use override ELO if available, otherwise fall back to static
+  const eloA = eloOverrides?.[match.teamAId] ?? teamA.eloRating ?? 1500
+  const eloB = eloOverrides?.[match.teamBId] ?? teamB.eloRating ?? 1500
+
   // 1. ELO-Rating (Hvattum & Arntzen 2010)
-  const eloDiff = teamA.eloRating - teamB.eloRating
+  const eloDiff = eloA - eloB
   const eloEffectA = eloDiff / 400 * 0.15
   factors.push({
     category: 'elo',
     label: 'ELO-Rating',
     source: 'Hvattum & Arntzen (2010)',
-    valueA: String(teamA.eloRating),
-    valueB: String(teamB.eloRating),
+    valueA: String(eloA),
+    valueB: String(eloB),
     effectA: eloEffectA,
     effectB: -eloEffectA,
     explanation: 'Höheres ELO-Rating bedeutet statistisch mehr Expected Goals. Differenz von 400 Punkten entspricht ~15% mehr Torchancen.',
@@ -591,6 +609,24 @@ export function analyzeMatch(match: ScheduledMatch, squadData?: Record<string, S
     })
   }
 
+  // 11. Ausgangslage / Qualifikationsdruck
+  if (pressure) {
+    const pressEffectA = pressure.A.mustWin ? 0.05 : pressure.A.alreadyThrough ? -0.03 : 0
+    const pressEffectB = pressure.B.mustWin ? 0.05 : pressure.B.alreadyThrough ? -0.03 : 0
+    const labelA = pressure.A.alreadyOut ? 'Ausgeschieden' : pressure.A.alreadyThrough ? 'Schon qualifiziert' : pressure.A.mustWin ? 'Muss gewinnen' : 'Normaler Druck'
+    const labelB = pressure.B.alreadyOut ? 'Ausgeschieden' : pressure.B.alreadyThrough ? 'Schon qualifiziert' : pressure.B.mustWin ? 'Muss gewinnen' : 'Normaler Druck'
+    factors.push({
+      category: 'context',
+      label: 'Ausgangslage / Gruppendruck',
+      source: 'Gruppenstand (live)',
+      valueA: labelA,
+      valueB: labelB,
+      effectA: pressEffectA - pressEffectB * 0.5,
+      effectB: pressEffectB - pressEffectA * 0.5,
+      explanation: 'Teams die zwingend gewinnen müssen, spielen risikoreicher und erzielen statistisch mehr Tore — aber kassieren auch mehr. Teams die bereits qualifiziert sind, rotieren häufiger.',
+    })
+  }
+
   // Gesamtwahrscheinlichkeiten berechnen
   const baseWinA = eloToWinProb(eloDiff)
   const baseWinB = eloToWinProb(-eloDiff)
@@ -631,11 +667,16 @@ export function analyzeMatch(match: ScheduledMatch, squadData?: Record<string, S
     suggestedTip, confidence, factors,
     squadDataA: hasSquadA,
     squadDataB: hasSquadB,
+    pressureA: pressure?.A,
+    pressureB: pressure?.B,
   }
 }
 
-export function analyzeAllMatches(squadData?: Record<string, SquadSummary>): MatchAnalysis[] {
-  return GROUP_SCHEDULE.map(m => analyzeMatch(m, squadData))
+export function analyzeAllMatches(
+  squadData?: Record<string, SquadSummary>,
+  eloOverrides?: Record<string, number>
+): MatchAnalysis[] {
+  return GROUP_SCHEDULE.map(m => analyzeMatch(m, squadData, undefined, eloOverrides))
 }
 
 // ─── Tournament Simulation ─────────────────────────────────────────────────────

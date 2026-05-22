@@ -3,8 +3,11 @@ import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
 import { analyzeMatch, type MatchFactor, type SquadSummary } from '@/lib/modelAdapter'
+import { computeGroupStandings, computePressure } from '@/lib/standings'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+
+export const dynamic = 'force-dynamic'
 
 function fmtEffect(e: number): string {
   if (Math.abs(e) < 0.002) return '±0%'
@@ -66,10 +69,15 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   const match = GROUP_SCHEDULE.find(m => m.id === params.id)
   if (!match) notFound()
 
-  const [squadA, squadB] = await Promise.all([
+  // Fetch all data in parallel
+  const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
     supabase.from('players').select('market_value_m').eq('team_id', match.teamAId),
     supabase.from('players').select('market_value_m').eq('team_id', match.teamBId),
+    supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
+    supabase.from('match_results').select('match_id, goals_a, goals_b'),
+    supabase.from('team_elo_ratings').select('team_id, elo_rating'),
   ])
+
   const squadData: Record<string, SquadSummary> = {}
   if ((squadA.data?.length ?? 0) > 0) {
     squadData[match.teamAId] = {
@@ -84,9 +92,29 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     }
   }
 
-  const analysis = analyzeMatch(match, squadData)
+  // Build results map for standings
+  const allResults: Record<string, { goals_a: number; goals_b: number }> = {}
+  for (const r of allResultsRes.data ?? []) allResults[r.match_id] = { goals_a: r.goals_a, goals_b: r.goals_b }
+
+  // ELO overrides
+  const eloOverrides: Record<string, number> = {}
+  for (const r of eloRes.data ?? []) eloOverrides[r.team_id] = r.elo_rating
+
+  // Compute pressure (only for group matches)
+  const standings = computeGroupStandings(allResults)
+  const matchGroup = match.group ?? ''
+  const remainingMatchIds = GROUP_SCHEDULE
+    .filter(m => m.group === matchGroup && !allResults[m.id])
+    .map(m => m.id)
+
+  const pressureA = computePressure(match.teamAId, matchGroup, standings, remainingMatchIds, allResults)
+  const pressureB = computePressure(match.teamBId, matchGroup, standings, remainingMatchIds, allResults)
+
+  const analysis = analyzeMatch(match, squadData, { A: pressureA, B: pressureB }, eloOverrides)
   const venue = VENUES[match.venueId]
   const berlinTime = toBerlinTime(match.kickoffUTC)
+
+  const result = resultRes.data
 
   const pA = Math.round(analysis.winProbA * 100)
   const pD = Math.round(analysis.drawProb * 100)
@@ -110,12 +138,49 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     ? `${analysis.teamB.flag} ${analysis.teamB.name} gewinnt`
     : 'Unentschieden'
 
+  const resultWinner =
+    result && result.goals_a > result.goals_b
+      ? analysis.teamA
+      : result && result.goals_b > result.goals_a
+      ? analysis.teamB
+      : null
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Back */}
       <Link href="/" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
         ← Alle Spiele
       </Link>
+
+      {/* Actual result banner */}
+      {result && (
+        <div className="bg-gray-900 border border-emerald-800/50 rounded-2xl p-5 text-center">
+          <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">Endstand</div>
+          <div className="flex items-center justify-center gap-6">
+            <div className="text-right">
+              <div className="text-3xl mb-1">{analysis.teamA.flag}</div>
+              <div className={`font-bold ${resultWinner?.id === analysis.teamA.id ? 'text-white' : 'text-gray-500'}`}>
+                {analysis.teamA.name}
+              </div>
+            </div>
+            <div className="text-4xl font-bold font-mono text-white">
+              {result.goals_a} : {result.goals_b}
+            </div>
+            <div className="text-left">
+              <div className="text-3xl mb-1">{analysis.teamB.flag}</div>
+              <div className={`font-bold ${resultWinner?.id === analysis.teamB.id ? 'text-white' : 'text-gray-500'}`}>
+                {analysis.teamB.name}
+              </div>
+            </div>
+          </div>
+          {resultWinner && (
+            <div className="mt-3 text-sm text-emerald-400 font-medium">{resultWinner.name} gewinnt</div>
+          )}
+          {!resultWinner && result && (
+            <div className="mt-3 text-sm text-gray-500">Unentschieden</div>
+          )}
+        </div>
+      )}
 
       {/* Match Header */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
@@ -134,7 +199,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             <div className="text-5xl mb-2">{analysis.teamA.flag}</div>
             <div className="font-bold text-white">{analysis.teamA.name}</div>
             <div className="text-xs text-gray-500 mt-1">{analysis.teamA.confederation}</div>
-            <div className="text-xs text-gray-600">ELO {analysis.teamA.eloRating}</div>
+            <div className="text-xs text-gray-600">ELO {eloOverrides[match.teamAId] ?? analysis.teamA.eloRating}</div>
           </div>
           <div className="text-center">
             <div className="text-2xl text-gray-600 font-light">vs</div>
@@ -149,7 +214,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             <div className="text-5xl mb-2">{analysis.teamB.flag}</div>
             <div className="font-bold text-white">{analysis.teamB.name}</div>
             <div className="text-xs text-gray-500 mt-1">{analysis.teamB.confederation}</div>
-            <div className="text-xs text-gray-600">ELO {analysis.teamB.eloRating}</div>
+            <div className="text-xs text-gray-600">ELO {eloOverrides[match.teamBId] ?? analysis.teamB.eloRating}</div>
           </div>
         </div>
       </div>

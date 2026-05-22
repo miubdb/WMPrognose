@@ -1,16 +1,15 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
-import { TEAM_BY_ID } from '@/src/data/allTeams'
 import { VENUES } from '@/src/data/venues'
 import { analyzeAllMatches, type MatchAnalysis, type SquadSummary } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
-function ProbBar({ probA, probDraw, probB }: {
+function ProbBar({ probA, probDraw, probB, nameA, nameB }: {
   probA: number; probDraw: number; probB: number; nameA: string; nameB: string
 }) {
   const pA = Math.round(probA * 100)
@@ -32,10 +31,31 @@ function ProbBar({ probA, probDraw, probB }: {
   )
 }
 
-function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
+interface MatchResult {
+  goals_a: number
+  goals_b: number
+}
+
+function MatchCard({
+  analysis,
+  result,
+  onResultSaved,
+}: {
+  analysis: MatchAnalysis
+  result?: MatchResult
+  onResultSaved: (matchId: string, r: MatchResult) => void
+}) {
   const match = GROUP_SCHEDULE.find(m => m.id === analysis.matchId)!
   const berlinTime = toBerlinTime(match.kickoffUTC)
   const venue = VENUES[match.venueId]
+
+  const [showEntry, setShowEntry] = useState(false)
+  const [goalsA, setGoalsA] = useState('')
+  const [goalsB, setGoalsB] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const isPast = new Date(match.kickoffUTC) < new Date()
 
   const confLabel = {
     'very_high': { label: 'Sehr sicher', color: 'text-emerald-400' },
@@ -52,66 +72,210 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
 
   const missingSquad = !analysis.squadDataA || !analysis.squadDataB
 
+  async function saveResult() {
+    const gA = parseInt(goalsA)
+    const gB = parseInt(goalsB)
+    if (isNaN(gA) || isNaN(gB) || gA < 0 || gB < 0) {
+      setSaveError('Ungültige Eingabe')
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const res = await fetch(`/api/results/${match.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goals_a: gA, goals_b: gB }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setSaveError(d.error ?? 'Fehler')
+      } else {
+        onResultSaved(match.id, { goals_a: gA, goals_b: gB })
+        setShowEntry(false)
+      }
+    } catch (e) {
+      setSaveError(String(e))
+    }
+    setSaving(false)
+  }
+
+  const winner =
+    result && result.goals_a > result.goals_b
+      ? analysis.teamA
+      : result && result.goals_b > result.goals_a
+      ? analysis.teamB
+      : null
+
   return (
-    <Link href={`/matches/${match.id}`} className="block group">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-emerald-800 hover:bg-gray-900/80 transition-all">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="text-emerald-500 font-mono font-bold">Gr. {match.group}</span>
-            <span>·</span>
-            <span>{fmtDate(match.date)}</span>
-            <span className="font-mono font-bold text-white">{berlinTime}</span>
-            <span className="text-gray-600">MESZ</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {missingSquad && (
-              <span className="text-[10px] text-amber-500/80 bg-amber-900/20 px-1.5 py-0.5 rounded">kein Kader</span>
-            )}
-            <span className="text-xs text-gray-600">{venue?.city ?? match.venueId}</span>
-          </div>
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-emerald-800 hover:bg-gray-900/80 transition-all">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span className="text-emerald-500 font-mono font-bold">Gr. {match.group}</span>
+          <span>·</span>
+          <span>{fmtDate(match.date)}</span>
+          <span className="font-mono font-bold text-white">{berlinTime}</span>
+          <span className="text-gray-600">MESZ</span>
         </div>
-
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-3">
-          <div className="flex items-center gap-2 justify-end">
-            <span className="text-sm font-medium text-gray-200 text-right hidden sm:block truncate">
-              {analysis.teamA.name}
-              {!analysis.squadDataA && <span className="text-amber-500 ml-1">⚠</span>}
-            </span>
-            <span className="text-2xl">{analysis.teamA.flag}</span>
-          </div>
-          <div className="text-center">
-            <div className="text-xs text-gray-600 font-mono">vs</div>
-            <div className="text-xs text-gray-700 mt-0.5">
-              {analysis.expectedGoalsA.toFixed(1)} : {analysis.expectedGoalsB.toFixed(1)} xG
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{analysis.teamB.flag}</span>
-            <span className="text-sm font-medium text-gray-200 hidden sm:block truncate">
-              {!analysis.squadDataB && <span className="text-amber-500 mr-1">⚠</span>}
-              {analysis.teamB.name}
-            </span>
-          </div>
-        </div>
-
-        <ProbBar
-          probA={analysis.winProbA}
-          probDraw={analysis.drawProb}
-          probB={analysis.winProbB}
-          nameA={analysis.teamA.name}
-          nameB={analysis.teamB.name}
-        />
-
-        <div className="flex items-center justify-between mt-2">
-          <div className="text-xs text-gray-500">
-            Tipp: <span className="text-white font-medium">{tipLabel}</span>
-          </div>
-          <span className={`text-xs font-medium ${confLabel.color}`}>
-            {confLabel.label}
-          </span>
+        <div className="flex items-center gap-2">
+          {missingSquad && !result && (
+            <span className="text-[10px] text-amber-500/80 bg-amber-900/20 px-1.5 py-0.5 rounded">kein Kader</span>
+          )}
+          {result && (
+            <span className="text-[10px] text-emerald-500/80 bg-emerald-900/20 px-1.5 py-0.5 rounded font-bold">Endstand</span>
+          )}
+          <span className="text-xs text-gray-600">{venue?.city ?? match.venueId}</span>
         </div>
       </div>
-    </Link>
+
+      {result ? (
+        /* Completed match: show actual score */
+        <Link href={`/matches/${match.id}`} className="block group">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-3">
+            <div className="flex items-center gap-2 justify-end">
+              <span className={`text-sm font-medium text-right hidden sm:block truncate ${winner?.id === analysis.teamA.id ? 'text-white font-bold' : 'text-gray-400'}`}>
+                {analysis.teamA.name}
+              </span>
+              <span className="text-2xl">{analysis.teamA.flag}</span>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white font-mono">
+                {result.goals_a} – {result.goals_b}
+              </div>
+              {winner && (
+                <div className="text-[10px] text-emerald-400 mt-0.5">{winner.name} gewinnt</div>
+              )}
+              {!winner && (
+                <div className="text-[10px] text-gray-500 mt-0.5">Unentschieden</div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{analysis.teamB.flag}</span>
+              <span className={`text-sm font-medium hidden sm:block truncate ${winner?.id === analysis.teamB.id ? 'text-white font-bold' : 'text-gray-400'}`}>
+                {analysis.teamB.name}
+              </span>
+            </div>
+          </div>
+          {/* Show predicted probs small */}
+          <div className="opacity-50">
+            <ProbBar
+              probA={analysis.winProbA}
+              probDraw={analysis.drawProb}
+              probB={analysis.winProbB}
+              nameA={analysis.teamA.name}
+              nameB={analysis.teamB.name}
+            />
+            <div className="text-[10px] text-gray-600 mt-1 text-center">
+              Prognose: {Math.round(analysis.winProbA * 100)}% / {Math.round(analysis.drawProb * 100)}% / {Math.round(analysis.winProbB * 100)}%
+            </div>
+          </div>
+        </Link>
+      ) : (
+        /* Future match: show prediction */
+        <Link href={`/matches/${match.id}`} className="block group">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-3">
+            <div className="flex items-center gap-2 justify-end">
+              <span className="text-sm font-medium text-gray-200 text-right hidden sm:block truncate">
+                {analysis.teamA.name}
+                {!analysis.squadDataA && <span className="text-amber-500 ml-1">⚠</span>}
+              </span>
+              <span className="text-2xl">{analysis.teamA.flag}</span>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-600 font-mono">vs</div>
+              <div className="text-xs text-gray-700 mt-0.5">
+                {analysis.expectedGoalsA.toFixed(1)} : {analysis.expectedGoalsB.toFixed(1)} xG
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{analysis.teamB.flag}</span>
+              <span className="text-sm font-medium text-gray-200 hidden sm:block truncate">
+                {!analysis.squadDataB && <span className="text-amber-500 mr-1">⚠</span>}
+                {analysis.teamB.name}
+              </span>
+            </div>
+          </div>
+
+          <ProbBar
+            probA={analysis.winProbA}
+            probDraw={analysis.drawProb}
+            probB={analysis.winProbB}
+            nameA={analysis.teamA.name}
+            nameB={analysis.teamB.name}
+          />
+
+          <div className="flex items-center justify-between mt-2">
+            <div className="text-xs text-gray-500">
+              Tipp: <span className="text-white font-medium">{tipLabel}</span>
+            </div>
+            <span className={`text-xs font-medium ${confLabel.color}`}>
+              {confLabel.label}
+            </span>
+          </div>
+        </Link>
+      )}
+
+      {/* Result entry / correction */}
+      {isPast && (
+        <div className="mt-3 border-t border-gray-800/60 pt-2">
+          {!showEntry ? (
+            <button
+              onClick={() => {
+                if (result) {
+                  setGoalsA(String(result.goals_a))
+                  setGoalsB(String(result.goals_b))
+                } else {
+                  setGoalsA('')
+                  setGoalsB('')
+                }
+                setShowEntry(true)
+              }}
+              className="text-[11px] text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              {result ? '✎ Korrigieren' : 'Ergebnis eintragen'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">{analysis.teamA.flag}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  value={goalsA}
+                  onChange={e => setGoalsA(e.target.value)}
+                  className="w-10 bg-gray-800 border border-gray-700 rounded text-center text-sm text-white focus:border-emerald-600 focus:outline-none"
+                />
+                <span className="text-gray-600">:</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  value={goalsB}
+                  onChange={e => setGoalsB(e.target.value)}
+                  className="w-10 bg-gray-800 border border-gray-700 rounded text-center text-sm text-white focus:border-emerald-600 focus:outline-none"
+                />
+                <span className="text-xs text-gray-500">{analysis.teamB.flag}</span>
+              </div>
+              <button
+                onClick={saveResult}
+                disabled={saving}
+                className="px-2.5 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-gray-700 text-white text-xs rounded transition-colors"
+              >
+                {saving ? '...' : 'Speichern'}
+              </button>
+              <button
+                onClick={() => { setShowEntry(false); setSaveError(null) }}
+                className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+              >
+                Abbrechen
+              </button>
+              {saveError && <span className="text-xs text-red-400">{saveError}</span>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -119,16 +283,26 @@ export default function Dashboard() {
   const [activeGroup, setActiveGroup] = useState('Alle')
   const [matchday, setMatchday] = useState(0)
   const [squadData, setSquadData] = useState<Record<string, SquadSummary>>({})
+  const [eloOverrides, setEloOverrides] = useState<Record<string, number>>({})
+  const [results, setResults] = useState<Record<string, MatchResult>>({})
 
   useEffect(() => {
-    fetch('/api/squad-status')
+    fetch('/api/match-context')
       .then(r => r.json())
-      .then(setSquadData)
-      .catch(() => {/* silently ignore – squad factor will be disabled */})
+      .then(data => {
+        if (data.squadData) setSquadData(data.squadData)
+        if (data.eloOverrides) setEloOverrides(data.eloOverrides)
+        if (data.results) setResults(data.results)
+      })
+      .catch(() => {/* silently ignore */})
+  }, [])
+
+  const handleResultSaved = useCallback((matchId: string, r: MatchResult) => {
+    setResults(prev => ({ ...prev, [matchId]: r }))
   }, [])
 
   const analyses = useMemo(() => {
-    const all = analyzeAllMatches(squadData)
+    const all = analyzeAllMatches(squadData, eloOverrides)
     return all
       .filter(a => {
         const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
@@ -142,7 +316,7 @@ export default function Dashboard() {
         const d = ma.date.localeCompare(mb.date)
         return d !== 0 ? d : ma.kickoffUTC.localeCompare(mb.kickoffUTC)
       })
-  }, [activeGroup, matchday])
+  }, [activeGroup, matchday, squadData, eloOverrides])
 
   return (
     <div className="space-y-6">
@@ -191,7 +365,12 @@ export default function Dashboard() {
 
       <div className="space-y-2">
         {analyses.map(a => (
-          <MatchCard key={a.matchId} analysis={a} />
+          <MatchCard
+            key={a.matchId}
+            analysis={a}
+            result={results[a.matchId]}
+            onResultSaved={handleResultSaved}
+          />
         ))}
         {analyses.length === 0 && (
           <div className="text-center text-gray-600 py-16 bg-gray-900 border border-gray-800 rounded-xl text-sm">

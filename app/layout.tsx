@@ -18,6 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="flex items-center gap-6 text-sm text-gray-400">
               <Link href="/" className="hover:text-white transition-colors">Spiele</Link>
+              <Link href="/gruppen" className="hover:text-white transition-colors">Gruppen</Link>
+              <Link href="/turnierbaum" className="hover:text-white transition-colors">Turnierbaum</Link>
               <Link href="/teams" className="hover:text-white transition-colors">Teams</Link>
             </nav>
           </div>
