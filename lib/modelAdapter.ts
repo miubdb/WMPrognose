@@ -385,6 +385,11 @@ export interface MatchFactor {
   explanation: string
 }
 
+export interface SquadSummary {
+  count: number
+  totalMarketValueM: number
+}
+
 export interface MatchAnalysis {
   matchId: string
   teamA: TeamBasic
@@ -400,9 +405,11 @@ export interface MatchAnalysis {
   suggestedTip: '1' | 'X' | '2'
   confidence: 'very_high' | 'high' | 'medium' | 'low'
   factors: MatchFactor[]
+  squadDataA: boolean
+  squadDataB: boolean
 }
 
-export function analyzeMatch(match: ScheduledMatch): MatchAnalysis {
+export function analyzeMatch(match: ScheduledMatch, squadData?: Record<string, SquadSummary>): MatchAnalysis {
   const teamA = TEAM_BY_ID[match.teamAId]
   const teamB = TEAM_BY_ID[match.teamBId]
   const venue = VENUES[match.venueId] ?? VENUES['new_york']
@@ -415,6 +422,7 @@ export function analyzeMatch(match: ScheduledMatch): MatchAnalysis {
       winProbA: 0.33, drawProb: 0.34, winProbB: 0.33,
       expectedGoalsA: 1.3, expectedGoalsB: 1.3,
       suggestedTip: 'X', confidence: 'low', factors: [],
+      squadDataA: false, squadDataB: false,
     }
   }
 
@@ -435,19 +443,24 @@ export function analyzeMatch(match: ScheduledMatch): MatchAnalysis {
   })
 
   // 2. Kader-Marktwert (Peeters 2018)
-  const mvA = teamA.squadMarketValueM
-  const mvB = teamB.squadMarketValueM
-  const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
-  const mvEffectA = mvRatio * 0.06
+  const hasSquadA = (squadData?.[match.teamAId]?.count ?? 0) > 0
+  const hasSquadB = (squadData?.[match.teamBId]?.count ?? 0) > 0
+  const mvA = hasSquadA ? (squadData![match.teamAId].totalMarketValueM) : 0
+  const mvB = hasSquadB ? (squadData![match.teamBId].totalMarketValueM) : 0
+  const bothHaveSquad = hasSquadA && hasSquadB
+  const mvRatio = bothHaveSquad && mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
+  const mvEffectA = bothHaveSquad ? mvRatio * 0.06 : 0
   factors.push({
     category: 'squad',
     label: 'Kader-Marktwert',
     source: 'Peeters (2018) – Log-normalisierung',
-    valueA: `${Math.round(mvA)}M€`,
-    valueB: `${Math.round(mvB)}M€`,
+    valueA: hasSquadA ? `${Math.round(mvA)}M€` : 'Kein Kader',
+    valueB: hasSquadB ? `${Math.round(mvB)}M€` : 'Kein Kader',
     effectA: mvEffectA,
     effectB: -mvEffectA,
-    explanation: 'Log-normalisierter Kader-Marktwert als Proxy für Spielerqualität. Teuerere Kader haben im Schnitt mehr Torchancen.',
+    explanation: bothHaveSquad
+      ? 'Log-normalisierter Kader-Marktwert als Proxy für Spielerqualität. Teuerere Kader haben im Schnitt mehr Torchancen.'
+      : 'Kaderdaten für mindestens ein Team fehlen – Faktor wird nicht in die Berechnung einbezogen.',
   })
 
   // 3. Heimvorteil (Pollard 1986)
@@ -616,11 +629,13 @@ export function analyzeMatch(match: ScheduledMatch): MatchAnalysis {
     expectedGoalsA: Math.round(xgA * 100) / 100,
     expectedGoalsB: Math.round(xgB * 100) / 100,
     suggestedTip, confidence, factors,
+    squadDataA: hasSquadA,
+    squadDataB: hasSquadB,
   }
 }
 
-export function analyzeAllMatches(): MatchAnalysis[] {
-  return GROUP_SCHEDULE.map(m => analyzeMatch(m))
+export function analyzeAllMatches(squadData?: Record<string, SquadSummary>): MatchAnalysis[] {
+  return GROUP_SCHEDULE.map(m => analyzeMatch(m, squadData))
 }
 
 // ─── Tournament Simulation ─────────────────────────────────────────────────────

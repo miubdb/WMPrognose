@@ -2,8 +2,9 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
-import { analyzeMatch, type MatchFactor } from '@/lib/modelAdapter'
+import { analyzeMatch, type MatchFactor, type SquadSummary } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 function fmtEffect(e: number): string {
   if (Math.abs(e) < 0.002) return '±0%'
@@ -61,11 +62,29 @@ function FactorRow({ factor }: { factor: MatchFactor }) {
   )
 }
 
-export default function MatchDetailPage({ params }: { params: { id: string } }) {
+export default async function MatchDetailPage({ params }: { params: { id: string } }) {
   const match = GROUP_SCHEDULE.find(m => m.id === params.id)
   if (!match) notFound()
 
-  const analysis = analyzeMatch(match)
+  const [squadA, squadB] = await Promise.all([
+    supabase.from('players').select('market_value_m').eq('team_id', match.teamAId),
+    supabase.from('players').select('market_value_m').eq('team_id', match.teamBId),
+  ])
+  const squadData: Record<string, SquadSummary> = {}
+  if ((squadA.data?.length ?? 0) > 0) {
+    squadData[match.teamAId] = {
+      count: squadA.data!.length,
+      totalMarketValueM: squadA.data!.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
+    }
+  }
+  if ((squadB.data?.length ?? 0) > 0) {
+    squadData[match.teamBId] = {
+      count: squadB.data!.length,
+      totalMarketValueM: squadB.data!.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
+    }
+  }
+
+  const analysis = analyzeMatch(match, squadData)
   const venue = VENUES[match.venueId]
   const berlinTime = toBerlinTime(match.kickoffUTC)
 
@@ -169,6 +188,13 @@ export default function MatchDetailPage({ params }: { params: { id: string } }) 
           <span className={`text-xs font-medium ${confConfig.color}`}>{confConfig.label}</span>
         </div>
       </div>
+
+      {/* Missing squad data warning */}
+      {(!analysis.squadDataA || !analysis.squadDataB) && (
+        <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 text-xs text-amber-400">
+          <strong>Hinweis:</strong> Für{!analysis.squadDataA && !analysis.squadDataB ? ' beide Teams' : !analysis.squadDataA ? ` ${analysis.teamA.name}` : ` ${analysis.teamB.name}`} sind noch keine Kaderdaten hinterlegt. Der Kader-Marktwert-Faktor wird nicht berechnet.
+        </div>
+      )}
 
       {/* Factor Breakdown */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
 import { supabase } from '@/lib/supabase'
+import { DeleteButton } from './DeleteButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,13 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      {/* Too many players warning */}
+      {(players?.length ?? 0) > 26 && (
+        <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 text-sm text-amber-400">
+          ⚠ {players!.length} Spieler – der finale Kader hat 26 Plätze. Bitte entfernen bis 26 verbleiben.
+        </div>
+      )}
+
       {/* Squad */}
       {players && players.length > 0 ? (
         <div className="space-y-4">
@@ -76,6 +84,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                           ? `${p.market_value_m.toFixed(1)}M€`
                           : `${Math.round(p.market_value_m * 1000)}T€`}
                       </span>
+                      <DeleteButton playerId={p.id} />
                     </div>
                   ))}
                 </div>

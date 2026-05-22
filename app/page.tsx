@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
 import { VENUES } from '@/src/data/venues'
-import { analyzeAllMatches, type MatchAnalysis } from '@/lib/modelAdapter'
+import { analyzeAllMatches, type MatchAnalysis, type SquadSummary } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
@@ -50,6 +50,8 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
     ? `${analysis.teamB.flag} ${analysis.teamB.name}`
     : 'Unentschieden'
 
+  const missingSquad = !analysis.squadDataA || !analysis.squadDataB
+
   return (
     <Link href={`/matches/${match.id}`} className="block group">
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-emerald-800 hover:bg-gray-900/80 transition-all">
@@ -61,13 +63,19 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
             <span className="font-mono font-bold text-white">{berlinTime}</span>
             <span className="text-gray-600">MESZ</span>
           </div>
-          <span className="text-xs text-gray-600">{venue?.city ?? match.venueId}</span>
+          <div className="flex items-center gap-2">
+            {missingSquad && (
+              <span className="text-[10px] text-amber-500/80 bg-amber-900/20 px-1.5 py-0.5 rounded">kein Kader</span>
+            )}
+            <span className="text-xs text-gray-600">{venue?.city ?? match.venueId}</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-3">
           <div className="flex items-center gap-2 justify-end">
             <span className="text-sm font-medium text-gray-200 text-right hidden sm:block truncate">
               {analysis.teamA.name}
+              {!analysis.squadDataA && <span className="text-amber-500 ml-1">⚠</span>}
             </span>
             <span className="text-2xl">{analysis.teamA.flag}</span>
           </div>
@@ -80,6 +88,7 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
           <div className="flex items-center gap-2">
             <span className="text-2xl">{analysis.teamB.flag}</span>
             <span className="text-sm font-medium text-gray-200 hidden sm:block truncate">
+              {!analysis.squadDataB && <span className="text-amber-500 mr-1">⚠</span>}
               {analysis.teamB.name}
             </span>
           </div>
@@ -109,9 +118,17 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
 export default function Dashboard() {
   const [activeGroup, setActiveGroup] = useState('Alle')
   const [matchday, setMatchday] = useState(0)
+  const [squadData, setSquadData] = useState<Record<string, SquadSummary>>({})
+
+  useEffect(() => {
+    fetch('/api/squad-status')
+      .then(r => r.json())
+      .then(setSquadData)
+      .catch(() => {/* silently ignore – squad factor will be disabled */})
+  }, [])
 
   const analyses = useMemo(() => {
-    const all = analyzeAllMatches()
+    const all = analyzeAllMatches(squadData)
     return all
       .filter(a => {
         const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
