@@ -54,9 +54,42 @@ export function computeGroupStandings(
     else { tA.drawn++; tB.drawn++; tA.pts++; tB.pts++ }
   }
 
-  // Sort each group: pts desc, gd desc, gf desc
+  // Sort each group using official FIFA tiebreaker order:
+  // 1. Points  2. Overall GD  3. Overall GF
+  // 4. H2H Points  5. H2H GD  6. H2H GF  7. Lots
   for (const g of Object.keys(standings)) {
-    standings[g].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
+    standings[g].sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts
+      if (b.gd !== a.gd) return b.gd - a.gd
+      if (b.gf !== a.gf) return b.gf - a.gf
+
+      // Head-to-head among tied teams
+      const aTeam = a.teamId
+      const bTeam = b.teamId
+      let h2hPtsA = 0, h2hPtsB = 0, h2hGdA = 0, h2hGfA = 0, h2hGfB = 0
+      for (const m of GROUP_SCHEDULE) {
+        if (m.group !== g) continue
+        const r = results[m.id]
+        if (!r) continue
+        if (m.teamAId === aTeam && m.teamBId === bTeam) {
+          if (r.goals_a > r.goals_b) h2hPtsA += 3
+          else if (r.goals_a < r.goals_b) h2hPtsB += 3
+          else { h2hPtsA++; h2hPtsB++ }
+          h2hGdA += r.goals_a - r.goals_b
+          h2hGfA += r.goals_a; h2hGfB += r.goals_b
+        } else if (m.teamAId === bTeam && m.teamBId === aTeam) {
+          if (r.goals_a > r.goals_b) h2hPtsB += 3
+          else if (r.goals_a < r.goals_b) h2hPtsA += 3
+          else { h2hPtsA++; h2hPtsB++ }
+          h2hGdA += r.goals_b - r.goals_a
+          h2hGfA += r.goals_b; h2hGfB += r.goals_a
+        }
+      }
+      if (h2hPtsB !== h2hPtsA) return h2hPtsB - h2hPtsA
+      if (h2hGdA !== 0) return h2hGdA > 0 ? -1 : 1
+      if (h2hGfA !== h2hGfB) return h2hGfB - h2hGfA
+      return 0 // drawing of lots — maintain stable order
+    })
     // Mark qualified / eliminated (simplified — full logic needs best-3rd comparison)
     const gamesPerGroup = 6 // C(4,2)
     const resultsInGroup = GROUP_SCHEDULE.filter(m => m.group === g && results[m.id]).length
