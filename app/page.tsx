@@ -10,7 +10,7 @@ import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
-function ProbBar({ probA, probDraw, probB, nameA, nameB }: {
+function ProbBar({ probA, probDraw, probB }: {
   probA: number; probDraw: number; probB: number; nameA: string; nameB: string
 }) {
   const pA = Math.round(probA * 100)
@@ -53,7 +53,6 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
   return (
     <Link href={`/matches/${match.id}`} className="block group">
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-emerald-800 hover:bg-gray-900/80 transition-all">
-        {/* Meta */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="text-emerald-500 font-mono font-bold">Gr. {match.group}</span>
@@ -65,7 +64,6 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
           <span className="text-xs text-gray-600">{venue?.city ?? match.venueId}</span>
         </div>
 
-        {/* Teams */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-3">
           <div className="flex items-center gap-2 justify-end">
             <span className="text-sm font-medium text-gray-200 text-right hidden sm:block truncate">
@@ -87,7 +85,6 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
           </div>
         </div>
 
-        {/* Probability bar */}
         <ProbBar
           probA={analysis.winProbA}
           probDraw={analysis.drawProb}
@@ -96,7 +93,6 @@ function MatchCard({ analysis }: { analysis: MatchAnalysis }) {
           nameB={analysis.teamB.name}
         />
 
-        {/* Tip + Confidence */}
         <div className="flex items-center justify-between mt-2">
           <div className="text-xs text-gray-500">
             Tipp: <span className="text-white font-medium">{tipLabel}</span>
@@ -133,7 +129,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Spielprognosen</h1>
         <p className="text-gray-500 text-sm mt-1">
@@ -141,9 +136,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Filters */}
       <div className="space-y-2">
-        {/* Groups */}
         <div className="flex gap-1 flex-wrap">
           {GROUPS.map(g => (
             <button
@@ -160,7 +153,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Matchday */}
         <div className="flex gap-1">
           {[0, 1, 2, 3].map(d => (
             <button
@@ -178,10 +170,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Count */}
       <p className="text-xs text-gray-600">{analyses.length} Spiele · klicken für vollständige Analyse</p>
 
-      {/* Match list */}
       <div className="space-y-2">
         {analyses.map(a => (
           <MatchCard key={a.matchId} analysis={a} />
