@@ -111,6 +111,9 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     age: number | null; rating: number | null
   }
 
+  // Determine elo source for data quality scoring
+  const eloSourceForQuality = (eloRes.data?.length ?? 0) > 0 ? 'wikipedia-elo' : null
+
   function buildSquadSummary(players: PlayerRow[]): SquadSummary & { usingStartingXI: boolean } {
     const startingXI = players.filter(p => p.is_in_starting_xi === true)
     const effectivePlayers = startingXI.length >= 11 ? startingXI : players
@@ -147,6 +150,9 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     if (agedP.length > 0) {
       summary.avgAge = agedP.reduce((s, p) => s + (p.age ?? 0), 0) / agedP.length
     }
+
+    // Data quality score
+    summary.dataQuality = computeDataQuality(players, eloSourceForQuality)
 
     return summary
   }
@@ -352,6 +358,23 @@ export default async function MatchDetailPage({ params }: { params: { id: string
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* DataQuality Warnings */}
+      {[match.teamAId, match.teamBId].some(id => (squadData[id]?.dataQuality?.warnings?.length ?? 0) > 0) && (
+        <div className="space-y-1.5">
+          {[
+            { teamId: match.teamAId, flag: analysis.teamA.flag, name: analysis.teamA.name },
+            { teamId: match.teamBId, flag: analysis.teamB.flag, name: analysis.teamB.name },
+          ].flatMap(({ teamId, flag, name }) =>
+            (squadData[teamId]?.dataQuality?.warnings ?? []).map((w, i) => (
+              <div key={`${teamId}-${i}`} className="bg-yellow-900/10 border border-yellow-800/30 rounded-lg px-3 py-2 text-xs text-yellow-600 flex items-start gap-2">
+                <span className="shrink-0">{flag}</span>
+                <span><strong>{name}:</strong> {w}</span>
+              </div>
+            ))
+          )}
         </div>
       )}
 
