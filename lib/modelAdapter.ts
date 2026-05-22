@@ -482,8 +482,10 @@ export interface MatchFactor {
 export interface SquadSummary {
   count: number
   totalMarketValueM: number
-  avgXgPer90Attack?: number    // avg xG/90 of FWD + MID players with data
-  avgXgaPer90Defense?: number  // avg xGA/90 of DEF + GK players with data
+  avgXgPer90Attack?: number     // market-value-weighted xG/90 of FWD+MID starters
+  avgXgaPer90Defense?: number   // market-value-weighted xGA/90 of DEF+GK starters
+  avgRating?: number            // average player rating (1–100) of effective players
+  avgAge?: number               // average age of effective players
 }
 
 export interface TeamPressure {
@@ -602,6 +604,51 @@ export function analyzeMatch(
       effectB: -formEffectA,
       explanation: 'Durchschnittliche xG/90 der Angreifer und Mittelfeldspieler aus der Klubsaison 2024/25. Höherer Wert = statistisch mehr Torchancen. Quelle: FBref.com.',
     })
+  }
+
+  // 2c. Ø Spieler-Rating der Startelf
+  const avgRatingA = squadData?.[match.teamAId]?.avgRating
+  const avgRatingB = squadData?.[match.teamBId]?.avgRating
+  if (avgRatingA && avgRatingB) {
+    // Rating is 1–100 scale; a 10-point gap → ~4% xG difference
+    const ratingDiff = (avgRatingA - avgRatingB) / 10
+    const ratingEffect = Math.max(-0.10, Math.min(0.10, ratingDiff * 0.04))
+    factors.push({
+      category: 'squad',
+      label: 'Ø Spieler-Rating Startelf',
+      source: 'Transfermarkt – Marktwert → Rating (1–100)',
+      valueA: `Ø ${avgRatingA.toFixed(1)}`,
+      valueB: `Ø ${avgRatingB.toFixed(1)}`,
+      effectA: ratingEffect,
+      effectB: -ratingEffect,
+      explanation: 'Durchschnittliches individuelles Spieler-Rating der Startelf (aus Marktwert abgeleitet, Skala 1–100). Gibt die individuelle Klasse jedes Startelf-Spielers an.',
+    })
+  }
+
+  // 2d. Altersstruktur der Startelf
+  const avgAgeA = squadData?.[match.teamAId]?.avgAge
+  const avgAgeB = squadData?.[match.teamBId]?.avgAge
+  if (avgAgeA && avgAgeB) {
+    // Optimal WM age: 25–28. Too young (<24) = less experience; too old (>30) = fatigue
+    const ageScore = (age: number) =>
+      age < 24 ? -(24 - age) * 0.012
+      : age > 29 ? -(age - 29) * 0.008
+      : 0
+    const ageEffectA = ageScore(avgAgeA)
+    const ageEffectB = ageScore(avgAgeB)
+    const netEffect = ageEffectA - ageEffectB
+    if (Math.abs(netEffect) > 0.005 || Math.abs(ageEffectA) > 0.005 || Math.abs(ageEffectB) > 0.005) {
+      factors.push({
+        category: 'squad',
+        label: 'Altersstruktur Startelf',
+        source: 'Empirische Studienlage – WM-Peakformkurve 25–28 J.',
+        valueA: `Ø ${avgAgeA.toFixed(1)} Jahre`,
+        valueB: `Ø ${avgAgeB.toFixed(1)} Jahre`,
+        effectA: ageEffectA - ageEffectB * 0.3,
+        effectB: ageEffectB - ageEffectA * 0.3,
+        explanation: 'Teams mit Startelf-Durchschnittsalter 25–28 Jahre sind bei WM-Turnieren am leistungsfähigsten. Zu jung (<24) = fehlende Großturnier-Erfahrung; zu alt (>30) = erhöhte Verletzungsanfälligkeit.',
+      })
+    }
   }
 
   // 3. Heimvorteil (Pollard 1986)

@@ -89,17 +89,21 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   // Fetch all data in parallel
   const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
     supabase.from('team_elo_ratings').select('team_id, elo_rating'),
   ])
 
-  type PlayerRow = { market_value_m: number | null; position: string | null; xg_per90: number | null; xga_per90: number | null; is_in_starting_xi: boolean | null }
+  type PlayerRow = {
+    market_value_m: number | null; position: string | null
+    xg_per90: number | null; xga_per90: number | null
+    is_in_starting_xi: boolean | null
+    age: number | null; rating: number | null
+  }
 
   function buildSquadSummary(players: PlayerRow[]): SquadSummary & { usingStartingXI: boolean } {
-    // If starting XI is set for this team (>= 11 players marked), use only those players
     const startingXI = players.filter(p => p.is_in_starting_xi === true)
     const effectivePlayers = startingXI.length >= 11 ? startingXI : players
     const usingStartingXI = startingXI.length >= 11
@@ -109,14 +113,33 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       totalMarketValueM: effectivePlayers.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
       usingStartingXI,
     }
-    const attackPlayers = effectivePlayers.filter(p => (p.position === 'FWD' || p.position === 'MID') && (p.xg_per90 ?? 0) > 0)
-    if (attackPlayers.length > 0) {
-      summary.avgXgPer90Attack = attackPlayers.reduce((s, p) => s + (p.xg_per90 ?? 0), 0) / attackPlayers.length
+
+    // xG attack: market-value-weighted average so a star striker counts more
+    const attackP = effectivePlayers.filter(p => (p.position === 'FWD' || p.position === 'MID') && (p.xg_per90 ?? 0) > 0)
+    if (attackP.length > 0) {
+      const totalMv = attackP.reduce((s, p) => s + Math.max(p.market_value_m ?? 1, 1), 0)
+      summary.avgXgPer90Attack = attackP.reduce((s, p) => s + (p.xg_per90 ?? 0) * Math.max(p.market_value_m ?? 1, 1), 0) / totalMv
     }
-    const defensePlayers = effectivePlayers.filter(p => (p.position === 'DEF' || p.position === 'GK') && (p.xga_per90 ?? 0) > 0)
-    if (defensePlayers.length > 0) {
-      summary.avgXgaPer90Defense = defensePlayers.reduce((s, p) => s + (p.xga_per90 ?? 0), 0) / defensePlayers.length
+
+    // xGA defense: market-value-weighted
+    const defP = effectivePlayers.filter(p => (p.position === 'DEF' || p.position === 'GK') && (p.xga_per90 ?? 0) > 0)
+    if (defP.length > 0) {
+      const totalMv = defP.reduce((s, p) => s + Math.max(p.market_value_m ?? 1, 1), 0)
+      summary.avgXgaPer90Defense = defP.reduce((s, p) => s + (p.xga_per90 ?? 0) * Math.max(p.market_value_m ?? 1, 1), 0) / totalMv
     }
+
+    // Average player rating (1–100) of effective players
+    const ratedP = effectivePlayers.filter(p => (p.rating ?? 0) > 0)
+    if (ratedP.length > 0) {
+      summary.avgRating = ratedP.reduce((s, p) => s + (p.rating ?? 0), 0) / ratedP.length
+    }
+
+    // Average age
+    const agedP = effectivePlayers.filter(p => (p.age ?? 0) > 0)
+    if (agedP.length > 0) {
+      summary.avgAge = agedP.reduce((s, p) => s + (p.age ?? 0), 0) / agedP.length
+    }
+
     return summary
   }
 

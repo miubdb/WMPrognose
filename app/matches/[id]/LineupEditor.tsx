@@ -89,6 +89,7 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
   const [playersA, setPlayersA] = useState(teamA.players)
   const [playersB, setPlayersB] = useState(teamB.players)
   const [saving, setSaving] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(true)
   const router = useRouter()
 
@@ -98,29 +99,36 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
     isTeamA: boolean
   ) => {
     const next = !current
+    const applyUpdate = (ps: LineupPlayer[]) =>
+      ps.map(p => p.id === id ? { ...p, is_in_starting_xi: next } : p)
+    const revertUpdate = (ps: LineupPlayer[]) =>
+      ps.map(p => p.id === id ? { ...p, is_in_starting_xi: current } : p)
+
     // Optimistic update
-    if (isTeamA) {
-      setPlayersA(ps => ps.map(p => p.id === id ? { ...p, is_in_starting_xi: next } : p))
-    } else {
-      setPlayersB(ps => ps.map(p => p.id === id ? { ...p, is_in_starting_xi: next } : p))
-    }
+    if (isTeamA) setPlayersA(applyUpdate)
+    else setPlayersB(applyUpdate)
+
     setSaving(id)
+    setError(null)
     try {
-      await fetch(`/api/players/${id}`, {
+      const res = await fetch(`/api/players/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_in_starting_xi: next }),
       })
-      router.refresh()
-    } catch (_) {
-      // revert on error
-      if (isTeamA) {
-        setPlayersA(ps => ps.map(p => p.id === id ? { ...p, is_in_starting_xi: current } : p))
-      } else {
-        setPlayersB(ps => ps.map(p => p.id === id ? { ...p, is_in_starting_xi: current } : p))
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? `Fehler ${res.status}`)
       }
+      router.refresh()
+    } catch (err) {
+      // Revert optimistic update on any error
+      if (isTeamA) setPlayersA(revertUpdate)
+      else setPlayersB(revertUpdate)
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSaving(null)
     }
-    setSaving(null)
   }, [router])
 
   const startA = playersA.filter(p => p.is_in_starting_xi).length
@@ -146,8 +154,11 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
           <p className="text-xs text-gray-600 mb-4">
             Spieler anklicken zum Markieren als Startelf (11 pro Team). Wird für alle Spiele des Teams gespeichert bis zur nächsten Änderung.
           </p>
-          {saving && (
-            <div className="text-xs text-gray-500 mb-2">Speichere...</div>
+          {saving && <div className="text-xs text-gray-500 mb-2">Speichere…</div>}
+          {error && (
+            <div className="text-xs text-red-400 bg-red-900/20 border border-red-800/40 rounded px-2 py-1 mb-2">
+              Fehler beim Speichern: {error}
+            </div>
           )}
           <div className="flex gap-6">
             <TeamLineup
