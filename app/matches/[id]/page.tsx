@@ -96,18 +96,24 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     supabase.from('team_elo_ratings').select('team_id, elo_rating'),
   ])
 
-  function buildSquadSummary(
-    players: Array<{ market_value_m: number | null; position: string | null; xg_per90: number | null; xga_per90: number | null }>
-  ): SquadSummary {
-    const summary: SquadSummary = {
-      count: players.length,
-      totalMarketValueM: players.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
+  type PlayerRow = { market_value_m: number | null; position: string | null; xg_per90: number | null; xga_per90: number | null; is_in_starting_xi: boolean | null }
+
+  function buildSquadSummary(players: PlayerRow[]): SquadSummary & { usingStartingXI: boolean } {
+    // If starting XI is set for this team (>= 11 players marked), use only those players
+    const startingXI = players.filter(p => p.is_in_starting_xi === true)
+    const effectivePlayers = startingXI.length >= 11 ? startingXI : players
+    const usingStartingXI = startingXI.length >= 11
+
+    const summary: SquadSummary & { usingStartingXI: boolean } = {
+      count: effectivePlayers.length,
+      totalMarketValueM: effectivePlayers.reduce((s, p) => s + (p.market_value_m ?? 0), 0),
+      usingStartingXI,
     }
-    const attackPlayers = players.filter(p => (p.position === 'FWD' || p.position === 'MID') && (p.xg_per90 ?? 0) > 0)
+    const attackPlayers = effectivePlayers.filter(p => (p.position === 'FWD' || p.position === 'MID') && (p.xg_per90 ?? 0) > 0)
     if (attackPlayers.length > 0) {
       summary.avgXgPer90Attack = attackPlayers.reduce((s, p) => s + (p.xg_per90 ?? 0), 0) / attackPlayers.length
     }
-    const defensePlayers = players.filter(p => (p.position === 'DEF' || p.position === 'GK') && (p.xga_per90 ?? 0) > 0)
+    const defensePlayers = effectivePlayers.filter(p => (p.position === 'DEF' || p.position === 'GK') && (p.xga_per90 ?? 0) > 0)
     if (defensePlayers.length > 0) {
       summary.avgXgaPer90Defense = defensePlayers.reduce((s, p) => s + (p.xga_per90 ?? 0), 0) / defensePlayers.length
     }
@@ -115,11 +121,16 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   }
 
   const squadData: Record<string, SquadSummary> = {}
+  const lineupStatus: Record<string, boolean> = {}
   if ((squadA.data?.length ?? 0) > 0) {
-    squadData[match.teamAId] = buildSquadSummary(squadA.data!)
+    const s = buildSquadSummary(squadA.data as PlayerRow[])
+    lineupStatus[match.teamAId] = s.usingStartingXI
+    squadData[match.teamAId] = s
   }
   if ((squadB.data?.length ?? 0) > 0) {
-    squadData[match.teamBId] = buildSquadSummary(squadB.data!)
+    const s = buildSquadSummary(squadB.data as PlayerRow[])
+    lineupStatus[match.teamBId] = s.usingStartingXI
+    squadData[match.teamBId] = s
   }
 
   // Build results map for standings
@@ -288,6 +299,28 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       {(!analysis.squadDataA || !analysis.squadDataB) && (
         <div className="bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 text-xs text-amber-400">
           <strong>Hinweis:</strong> Für{!analysis.squadDataA && !analysis.squadDataB ? ' beide Teams' : !analysis.squadDataA ? ` ${analysis.teamA.name}` : ` ${analysis.teamB.name}`} sind noch keine Kaderdaten hinterlegt. Der Kader-Marktwert-Faktor wird nicht berechnet.
+        </div>
+      )}
+
+      {/* Lineup status — shows whether model uses starting XI or full squad */}
+      {(analysis.squadDataA || analysis.squadDataB) && (
+        <div className="flex items-center gap-3 text-xs">
+          {[
+            { teamId: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, hasSquad: analysis.squadDataA },
+            { teamId: match.teamBId, name: analysis.teamB.name, flag: analysis.teamB.flag, hasSquad: analysis.squadDataB },
+          ].map(({ teamId, name, flag, hasSquad }) => {
+            const usingXI = lineupStatus[teamId]
+            return (
+              <div key={teamId} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${
+                usingXI ? 'border-emerald-700/40 bg-emerald-900/15 text-emerald-400' : hasSquad ? 'border-gray-700 bg-gray-800/40 text-gray-500' : 'border-gray-800 bg-gray-900 text-gray-700'
+              }`}>
+                <span>{flag}</span>
+                <span className="font-medium">{name}</span>
+                <span className="opacity-70">·</span>
+                <span>{usingXI ? 'Startelf ✓ (fließt ein)' : hasSquad ? 'Gesamtkader (keine Startelf)' : 'Kein Kader'}</span>
+              </div>
+            )
+          })}
         </div>
       )}
 

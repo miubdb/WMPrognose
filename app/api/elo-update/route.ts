@@ -25,6 +25,22 @@ const ELO_NAME_MAP: Record<string, string> = {
   thailand: 'Thailand', paraguay: 'Paraguay',
 }
 
+// Fallback ELO ratings for WM 2026 teams — used when Wikipedia doesn't list a team.
+// Values based on eloratings.net data, April 2025. Update manually as needed.
+const ELO_FALLBACK: Record<string, number> = {
+  argentina: 2057, spain: 2048, france: 2025, brazil: 2013, england: 1987,
+  portugal: 1970, netherlands: 1961, germany: 1944, belgium: 1898, croatia: 1882,
+  switzerland: 1875, denmark: 1853, austria: 1780, turkey: 1762, ukraine: 1770,
+  serbia: 1778, morocco: 1796, senegal: 1775, ivory_coast: 1728, nigeria: 1714,
+  japan: 1758, south_korea: 1740, iran: 1720, australia: 1706, saudi_arabia: 1688,
+  usa: 1750, mexico: 1748, canada: 1714, ecuador: 1718, colombia: 1732,
+  uruguay: 1722, chile: 1688, venezuela: 1648, paraguay: 1652,
+  egypt: 1677, ghana: 1694, cameroon: 1700, algeria: 1670, mali: 1674,
+  tunisia: 1658, cape_verde: 1625, congo_dr: 1652, sweden: 1740, poland: 1748,
+  czech: 1742, hungary: 1718, scotland: 1736, new_zealand: 1638, qatar: 1677,
+  panama: 1644, haiti: 1598, curacao: 1582, bosnia: 1700, thailand: 1582,
+}
+
 // Also maintain alternate name variants for fuzzy matching
 const ELO_ALTERNATE_NAMES: Record<string, string[]> = {
   south_korea: ['Korea Republic', 'Korea, Republic of', 'Republic of Korea'],
@@ -209,8 +225,19 @@ export async function POST() {
           source: 'wikipedia-elo',
           updated_at: new Date().toISOString(),
         })
+      } else if (ELO_FALLBACK[team.id]) {
+        // Use hardcoded fallback for teams not found on Wikipedia
+        updates.push({
+          team_id: team.id,
+          elo_rating: ELO_FALLBACK[team.id],
+          source: 'fallback-apr2025',
+          updated_at: new Date().toISOString(),
+        })
       }
     }
+
+    const fromWiki = updates.filter(u => u.source === 'wikipedia-elo').length
+    const fromFallback = updates.filter(u => u.source === 'fallback-apr2025').length
 
     if (updates.length > 0) {
       await adminSupabase.from('team_elo_ratings').upsert(updates, { onConflict: 'team_id' })
@@ -219,8 +246,10 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       updated: updates.length,
+      fromWikipedia: fromWiki,
+      fromFallback,
       parsed: Object.keys(found).length,
-      source: 'Wikipedia World Football Elo Ratings',
+      source: 'Wikipedia World Football Elo Ratings + hardcoded fallbacks',
     })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })

@@ -55,27 +55,31 @@ function normalizeName(name: string): string {
 function parseUnderstatPlayers(html: string): Map<string, { xg: number; xga: number; minutes: number; position: string }> {
   const players = new Map<string, { xg: number; xga: number; minutes: number; position: string }>()
 
-  // Match the playersData JSON.parse call - handle both single and double quote delimiters
-  const match = html.match(/var\s+playersData\s*=\s*JSON\.parse\('([\s\S]*?)'\)/)
-    ?? html.match(/var\s+playersData\s*=\s*JSON\.parse\("([\s\S]*?)"\)/)
+  // Match the playersData JSON.parse call.
+  // Understat embeds: var playersData = JSON.parse('...')
+  // The inner string uses \' for escaped single quotes and \uXXXX for unicode.
+  // We must match the full string without stopping at the first unescaped quote.
+  // Pattern: ((?:[^'\\]|\\.)*)  — matches non-quote-non-backslash chars OR backslash+any
+  const match = html.match(/var\s+playersData\s*=\s*JSON\.parse\('((?:[^'\\]|\\.)*)'\s*\)/)
+    ?? html.match(/var\s+playersData\s*=\s*JSON\.parse\("((?:[^"\\]|\\.)*)"\s*\)/)
 
   if (!match) {
-    console.warn('understat: playersData not found in page')
     return players
   }
 
-  // Unescape the string: understat uses \' for single quotes inside the JSON string,
-  // and unicode escapes like Т for non-ASCII characters
-  let jsonStr = match[1]
-    .replace(/\\'/g, "'")      // unescape single quotes
-    .replace(/\\"/g, '"')      // unescape double quotes (if any)
+  // Unescape the JS string content: \' → ', \\ → \, \uXXXX stays (JSON.parse handles it)
+  let jsonStr = match[1].replace(/\\'/g, "'")
 
   let rawPlayers: UnderstatPlayer[]
   try {
     rawPlayers = JSON.parse(jsonStr)
   } catch (e) {
-    console.warn('understat: JSON.parse failed:', e)
-    return players
+    // Try the raw string without unescaping (some versions don't need it)
+    try {
+      rawPlayers = JSON.parse(match[1])
+    } catch {
+      return players
+    }
   }
 
   if (!Array.isArray(rawPlayers)) return players
@@ -137,8 +141,9 @@ export async function POST() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${league.name}`)
       const html = await res.text()
+      const hasPlayersData = html.includes('playersData')
       const stats = parseUnderstatPlayers(html)
-      leagueSummary.push(`${league.name}: ${stats.size} players`)
+      leagueSummary.push(`${league.name}: ${stats.size} players${!hasPlayersData ? ' [playersData not found in HTML]' : ''}`)
 
       // Merge — first league (EPL) wins for duplicate players
       for (const [name, data] of stats) {
