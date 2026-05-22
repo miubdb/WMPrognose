@@ -6,6 +6,7 @@ import { analyzeMatch, type MatchFactor, type SquadSummary } from '@/lib/modelAd
 import { computeGroupStandings, computePressure } from '@/lib/standings'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { LineupEditor } from './LineupEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,8 +72,8 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   // Fetch all data in parallel
   const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
-    supabase.from('players').select('market_value_m, position, xg_per90, xga_per90').eq('team_id', match.teamAId),
-    supabase.from('players').select('market_value_m, position, xg_per90, xga_per90').eq('team_id', match.teamBId),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
     supabase.from('team_elo_ratings').select('team_id, elo_rating'),
@@ -272,6 +273,12 @@ export default async function MatchDetailPage({ params }: { params: { id: string
           <strong>Hinweis:</strong> Für{!analysis.squadDataA && !analysis.squadDataB ? ' beide Teams' : !analysis.squadDataA ? ` ${analysis.teamA.name}` : ` ${analysis.teamB.name}`} sind noch keine Kaderdaten hinterlegt. Der Kader-Marktwert-Faktor wird nicht berechnet.
         </div>
       )}
+
+      {/* Lineup Editor */}
+      <LineupEditor
+        teamA={{ id: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, players: (squadA.data ?? []) as Parameters<typeof LineupEditor>[0]['teamA']['players'] }}
+        teamB={{ id: match.teamBId, name: analysis.teamB.name, flag: analysis.teamB.flag, players: (squadB.data ?? []) as Parameters<typeof LineupEditor>[0]['teamB']['players'] }}
+      />
 
       {/* Factor Breakdown */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">

@@ -122,10 +122,10 @@ export async function getMatchPrediction(
     teamBRestDays: 6,
     teamAIsHostNation: ['usa', 'canada', 'mexico'].includes(input.teamAId),
     teamBIsHostNation: ['usa', 'canada', 'mexico'].includes(input.teamBId),
-    teamATravelDistanceKm: estimateTravelDistance(teamABasic.confederation, input.venueId),
-    teamBTravelDistanceKm: estimateTravelDistance(teamBBasic.confederation, input.venueId),
-    teamATimezoneShiftHours: estimateTimezoneShift(teamABasic.confederation),
-    teamBTimezoneShiftHours: estimateTimezoneShift(teamBBasic.confederation),
+    teamATravelDistanceKm: travelDistanceInNA(input.teamAId, teamABasic.confederation, input.venueId),
+    teamBTravelDistanceKm: travelDistanceInNA(input.teamBId, teamBBasic.confederation, input.venueId),
+    teamATimezoneShiftHours: 0,
+    teamBTimezoneShiftHours: 0,
     teamADiasporaSupport: hasDiasporaSupport(input.teamAId, input.venueId),
     teamBDiasporaSupport: hasDiasporaSupport(input.teamBId, input.venueId),
     ...input.matchContext,
@@ -305,33 +305,74 @@ function inferHeatAdaptation(conf: string): number {
   }
 }
 
-function estimateTravelDistance(conf: string, venueId: string): number {
-  const isNorthAmerica = ['mexico_city', 'guadalajara', 'monterrey', 'miami', 'houston',
-    'dallas', 'new_york', 'los_angeles', 'toronto', 'vancouver'].includes(venueId)
+// ─── Intra-WM Travel (Nordamerika) ────────────────────────────────────────────
+// Teams reisen WÄHREND des Turniers zwischen ihrem Trainingscamp in NA und dem Spielort.
+// Bekannte Trainingslager: user stellt sie bereit. Confederation-Defaults = typische Camp-Region.
 
-  if (isNorthAmerica) {
-    switch (conf) {
-      case 'CONCACAF': return 800
-      case 'CONMEBOL': return 7500
-      case 'UEFA': return 7200
-      case 'CAF': return 9500
-      case 'AFC': return 11000
-      case 'OFC': return 12500
-    }
-  }
-  return 5000
+const TEAM_BASE_CAMPS: Record<string, [number, number]> = {
+  // Lat, Lng — user kann weitere ergänzen
+  'germany': [36.1, -80.2],    // Winston-Salem, NC (Graylyn Estate)
 }
 
-function estimateTimezoneShift(conf: string): number {
-  switch (conf) {
-    case 'UEFA': return -6
-    case 'CAF': return -6
-    case 'CONMEBOL': return -1
-    case 'CONCACAF': return 0
-    case 'AFC': return -14
-    case 'OFC': return -17
-    default: return -5
+// Konföderation → typische Camp-Region in Nordamerika
+const CONF_DEFAULT_CAMP: Record<string, [number, number]> = {
+  'UEFA':     [38.5,  -77.0],  // East Coast USA (häufige Wahl EU-Teams)
+  'CAF':      [38.5,  -77.0],  // East Coast USA
+  'CONMEBOL': [25.5,  -80.0],  // South Florida (Nähe zu Südamerika)
+  'CONCACAF': [29.0,  -98.0],  // Texas / Südliche USA
+  'AFC':      [37.5, -122.0],  // West Coast USA
+  'OFC':      [37.5, -122.0],  // West Coast USA
+}
+
+// Venue-Koordinaten (Lat, Lng)
+const VENUE_COORDS: Record<string, [number, number]> = {
+  dallas:       [32.7,  -97.1],
+  miami:        [25.9,  -80.2],
+  los_angeles:  [33.9, -118.3],
+  houston:      [29.7,  -95.4],
+  new_york:     [40.8,  -74.1],
+  toronto:      [43.6,  -79.4],
+  vancouver:    [49.3, -123.1],
+  mexico_city:  [19.4,  -99.2],
+  guadalajara:  [20.7, -103.4],
+  monterrey:    [25.7, -100.3],
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function travelDistanceInNA(teamId: string, conf: string, venueId: string): number {
+  const camp = TEAM_BASE_CAMPS[teamId] ?? CONF_DEFAULT_CAMP[conf] ?? [38.5, -77.0]
+  const venue = VENUE_COORDS[venueId]
+  if (!venue) return 1000
+  return haversineKm(camp[0], camp[1], venue[0], venue[1])
+}
+
+// Poisson-basierte Wahrscheinlichkeiten aus Expected Goals
+function poissonWinProbs(lambdaA: number, lambdaB: number): { winA: number; draw: number; winB: number } {
+  const MAX = 10
+  const pmf = (lambda: number, k: number): number => {
+    if (lambda <= 0) return k === 0 ? 1 : 0
+    let logP = k * Math.log(lambda) - lambda
+    for (let i = 1; i <= k; i++) logP -= Math.log(i)
+    return Math.exp(logP)
   }
+  let winA = 0, draw = 0, winB = 0
+  for (let i = 0; i <= MAX; i++) {
+    for (let j = 0; j <= MAX; j++) {
+      const p = pmf(lambdaA, i) * pmf(lambdaB, j)
+      if (i > j) winA += p
+      else if (i === j) draw += p
+      else winB += p
+    }
+  }
+  const total = winA + draw + winB
+  return { winA: winA / total, draw: draw / total, winB: winB / total }
 }
 
 function hasDiasporaSupport(teamId: string, venueId: string): boolean {
@@ -558,39 +599,26 @@ export function analyzeMatch(
     })
   }
 
-  // 6. Reisedistanz (Reilly et al. 2007)
-  const travelA = estimateTravelDistance(teamA.confederation, match.venueId)
-  const travelB = estimateTravelDistance(teamB.confederation, match.venueId)
-  const travelEffectA = travelA > 5000 ? -Math.min((travelA - 5000) / 10000 * 0.06, 0.05) : 0
-  const travelEffectB = travelB > 5000 ? -Math.min((travelB - 5000) / 10000 * 0.06, 0.05) : 0
+  // 6. Reisedistanz innerhalb Nordamerikas (Reilly et al. 2007)
+  // Teams reisen während des Turniers vom Trainingscamp (in NA) zum Spielort.
+  // Fernreise vom Heimatland → bereits vor Turnierstart abgeschlossen.
+  const travelA = travelDistanceInNA(match.teamAId, teamA.confederation, match.venueId)
+  const travelB = travelDistanceInNA(match.teamBId, teamB.confederation, match.venueId)
+  const knownCampA = match.teamAId in TEAM_BASE_CAMPS
+  const knownCampB = match.teamBId in TEAM_BASE_CAMPS
+  // Signifikante Ermüdung ab 1500 km innerhalb NA (z.B. East Coast → West Coast)
+  const travelEffectA = travelA > 1500 ? -Math.min((travelA - 1500) / 5000 * 0.04, 0.04) : 0
+  const travelEffectB = travelB > 1500 ? -Math.min((travelB - 1500) / 5000 * 0.04, 0.04) : 0
   factors.push({
     category: 'context',
-    label: 'Reisedistanz',
+    label: 'Reisedistanz (Camp → Spielort)',
     source: 'Reilly et al. (2007) – Travel Fatigue',
-    valueA: `~${Math.round(travelA / 100) * 100} km`,
-    valueB: `~${Math.round(travelB / 100) * 100} km`,
+    valueA: `~${Math.round(travelA / 50) * 50} km${knownCampA ? '' : ' (Schätzung)'}`,
+    valueB: `~${Math.round(travelB / 50) * 50} km${knownCampB ? '' : ' (Schätzung)'}`,
     effectA: travelEffectA,
     effectB: travelEffectB,
-    explanation: 'Lange Reisen (>5000 km) verursachen Jet-Lag und Erschöpfung, die Expected Goals reduzieren.',
+    explanation: 'Abstand vom Trainingscamp in Nordamerika zum Spielort. Über 1500 km sinkt die Regeneration messbar. ⚠ Trainingscamp-Standorte ohne bekannte Daten sind Schätzwerte — bitte Standorte mitteilen.',
   })
-
-  // 7. Zeitzonen-Shift (Reilly et al. 2007)
-  const tzA = Math.abs(estimateTimezoneShift(teamA.confederation))
-  const tzB = Math.abs(estimateTimezoneShift(teamB.confederation))
-  const tzEffectA = tzA > 6 ? -Math.min((tzA - 6) / 12 * 0.04, 0.04) : 0
-  const tzEffectB = tzB > 6 ? -Math.min((tzB - 6) / 12 * 0.04, 0.04) : 0
-  if (tzEffectA < -0.005 || tzEffectB < -0.005) {
-    factors.push({
-      category: 'context',
-      label: 'Zeitzonenwechsel',
-      source: 'Reilly et al. (2007) – Circadian Rhythm Disruption',
-      valueA: `${tzA}h Differenz`,
-      valueB: `${tzB}h Differenz`,
-      effectA: tzEffectA,
-      effectB: tzEffectB,
-      explanation: 'Großer Zeitzonenwechsel stört den Schlaf-Wach-Rhythmus. Ab 6h Differenz sinkt die Reaktionszeit messbar.',
-    })
-  }
 
   // 8. Turnier-Erfahrung (Forrest et al. 2005)
   const expA = teamA.worldCupTitles * 3 + teamA.worldCupAppearances
@@ -656,21 +684,15 @@ export function analyzeMatch(
     })
   }
 
-  // Gesamtwahrscheinlichkeiten berechnen
-  const baseWinA = eloToWinProb(eloDiff)
-  const baseWinB = eloToWinProb(-eloDiff)
-  let winA = baseWinA + (isHostA ? 0.04 : 0) - (isHostB ? 0.02 : 0)
-  let winB = baseWinB + (isHostB ? 0.04 : 0) - (isHostA ? 0.02 : 0)
-  let draw = 1 - winA - winB
-  const total = winA + draw + winB
-  winA /= total; draw /= total; winB /= total
-
-  // Expected Goals
+  // Expected Goals aus allen Faktoren (Poisson-Modell)
   const baseXG = 1.35
   const totalEffectA = factors.reduce((s, f) => s + f.effectA, 0)
   const totalEffectB = factors.reduce((s, f) => s + f.effectB, 0)
   const xgA = Math.max(0.3, Math.min(4, baseXG * (1 + totalEffectA)))
   const xgB = Math.max(0.3, Math.min(4, baseXG * (1 + totalEffectB)))
+
+  // Wahrscheinlichkeiten aus Poisson(xgA, xgB) — konsistent mit xG-Modell (Maher 1982)
+  const { winA, draw, winB } = poissonWinProbs(xgA, xgB)
 
   // Bestes Ergebnis
   let suggestedTip: '1' | 'X' | '2'
