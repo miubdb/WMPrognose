@@ -101,7 +101,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
-    supabase.from('team_elo_ratings').select('team_id, elo_rating'),
+    supabase.from('team_elo_ratings').select('team_id, elo_rating, source'),
   ])
 
   type PlayerRow = {
@@ -112,7 +112,10 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   }
 
   // Determine elo source for data quality scoring
-  const eloSourceForQuality = (eloRes.data?.length ?? 0) > 0 ? 'wikipedia-elo' : null
+  // Use the actual source field from the DB if available; fall back to 'fallback-apr2025' when ELO exists but no source is set
+  const eloRows = eloRes.data ?? []
+  const firstEloSource = eloRows.length > 0 ? (eloRows[0] as { team_id: string; elo_rating: number; source?: string | null }).source ?? 'fallback-apr2025' : null
+  const eloSourceForQuality: string | null = eloRows.length > 0 ? firstEloSource : null
 
   function buildSquadSummary(players: PlayerRow[]): SquadSummary & { usingStartingXI: boolean } {
     const startingXI = players.filter(p => p.is_in_starting_xi === true)
@@ -358,6 +361,54 @@ export default async function MatchDetailPage({ params }: { params: { id: string
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* DataQuality Score Bars */}
+      {(analysis.dataQualityA || analysis.dataQualityB) && (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Datenqualität</h2>
+          {[
+            { team: analysis.teamA, dq: analysis.dataQualityA },
+            { team: analysis.teamB, dq: analysis.dataQualityB },
+          ].map(({ team, dq }) => {
+            if (!dq) return null
+            const pct = Math.round(dq.overall * 100)
+            const filledBars = Math.round(dq.overall * 10)
+            const bar = '█'.repeat(filledBars) + '░'.repeat(10 - filledBars)
+            const barColor = pct >= 70 ? 'text-emerald-400' : pct >= 50 ? 'text-yellow-400' : 'text-rose-400'
+            return (
+              <div key={team.id} className="space-y-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <span>{team.flag}</span>
+                  <span className="font-medium text-gray-200">{team.name}</span>
+                  <span className={`font-mono text-xs ${barColor}`}>[{bar}]</span>
+                  <span className={`text-xs font-bold ${barColor}`}>{pct}% Datenqualität</span>
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] pl-6">
+                  <span className={dq.lineupSet ? 'text-emerald-400' : 'text-yellow-500'}>
+                    {dq.lineupSet ? '✓ Startelf eingetragen' : '⚠ Keine Startelf'}
+                  </span>
+                  <span className={dq.eloFreshness >= 0.7 ? 'text-emerald-400' : dq.eloFreshness >= 0.5 ? 'text-yellow-500' : 'text-rose-400'}>
+                    {dq.eloFreshness >= 0.7 ? '✓ ELO aktuell' : dq.eloFreshness >= 0.5 ? '⚠ ELO Fallback' : '⚠ Kein ELO'}
+                  </span>
+                  <span className={dq.xgCoverage >= 0.5 ? 'text-emerald-400' : dq.xgCoverage >= 0.2 ? 'text-yellow-500' : 'text-rose-400'}>
+                    {dq.xgCoverage >= 0.5 ? '✓ xG verfügbar' : dq.xgCoverage > 0 ? `⚠ Nur ${Math.round(dq.xgCoverage * 100)}% xG-Coverage` : '⚠ Keine xG-Daten'}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Regression warning */}
+          {analysis.regressionWeight > 0.2 && (
+            <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg px-3 py-2 text-xs text-amber-400 flex items-start gap-2 mt-2">
+              <span className="shrink-0">⚠</span>
+              <span>
+                Wahrscheinlichkeiten zur Mitte geglättet (Datenqualität: {Math.round((1 - analysis.regressionWeight) * 100)}%) — Ergebnis unsicher
+              </span>
+            </div>
+          )}
         </div>
       )}
 

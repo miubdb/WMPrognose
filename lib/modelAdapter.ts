@@ -527,6 +527,10 @@ export interface MatchAnalysis {
   squadDataB: boolean
   pressureA?: TeamPressure
   pressureB?: TeamPressure
+  // Phase 2: DataQuality + Regression zur Mitte
+  dataQualityA: DataQualityScore | null
+  dataQualityB: DataQualityScore | null
+  regressionWeight: number  // 0..1: 0=keine Regression, 1=volle Regression (33/33/33)
 }
 
 export function analyzeMatch(
@@ -548,6 +552,7 @@ export function analyzeMatch(
       expectedGoalsA: 1.3, expectedGoalsB: 1.3,
       suggestedTip: 'X', confidence: 'low', factors: [],
       squadDataA: false, squadDataB: false,
+      dataQualityA: null, dataQualityB: null, regressionWeight: 1,
     }
   }
 
@@ -900,7 +905,18 @@ export function analyzeMatch(
   // NEU: Dixon-Coles Score-Matrix (ersetzt interne poissonWinProbs)
   const rawMatrix = computeScorelineMatrix(xgA, xgB)
   const correctedMatrix = applyDixonColesCorrection(rawMatrix, xgA, xgB)
-  const { winA, draw, winB } = aggregateOutcomeProbabilities(correctedMatrix)
+  const { winA: rawWinA, draw: rawDraw, winB: rawWinB } = aggregateOutcomeProbabilities(correctedMatrix)
+
+  // Phase 2: Regression zur Mitte basierend auf kombinierter Datenqualität
+  const qualityA = squadData?.[match.teamAId]?.dataQuality?.overall ?? 0.3
+  const qualityB = squadData?.[match.teamBId]?.dataQuality?.overall ?? 0.3
+  const combinedQuality = Math.min(qualityA, qualityB)
+  // quality=1.0 → keine Regression; quality=0.0 → vollständige Regression (33/33/33)
+  const regressionWeight = 1 - combinedQuality
+  const uniform = 1 / 3
+  const winA = rawWinA * (1 - regressionWeight) + uniform * regressionWeight
+  const draw = rawDraw * (1 - regressionWeight) + uniform * regressionWeight
+  const winB = rawWinB * (1 - regressionWeight) + uniform * regressionWeight
 
   // Bestes Ergebnis
   let suggestedTip: '1' | 'X' | '2'
@@ -928,6 +944,9 @@ export function analyzeMatch(
     squadDataB: hasSquadB,
     pressureA: pressure?.A,
     pressureB: pressure?.B,
+    dataQualityA: squadData?.[match.teamAId]?.dataQuality ?? null,
+    dataQualityB: squadData?.[match.teamBId]?.dataQuality ?? null,
+    regressionWeight: Math.round(regressionWeight * 100) / 100,
   }
 }
 
