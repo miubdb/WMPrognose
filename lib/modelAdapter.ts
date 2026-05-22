@@ -309,6 +309,18 @@ function inferHeatAdaptation(conf: string): number {
   }
 }
 
+// Teams die regelmäßig auf signifikanter Höhe spielen — kein Akklimatisierungs-Nachteil
+const HIGH_ALTITUDE_NATIONS = new Set([
+  'mexico',     // Mexico City 2240m, Monterrey 540m
+  'colombia',   // Bogotá 2600m, Medellín 1495m
+  'ecuador',    // Quito 2850m
+  'peru',       // Lima 154m aber Auswärtsspiele in Anden
+  'bolivia',    // La Paz 3600m
+  'chile',      // Santiago 567m, Andespiele
+  'venezuela',  // Caracas 900m
+  'usa',        // Denver 1609m
+])
+
 // ─── Intra-WM Travel (Nordamerika) ────────────────────────────────────────────
 // Teams reisen WÄHREND des Turniers zwischen ihrem Trainingscamp in NA und dem Spielort.
 // Bekannte Trainingslager: user stellt sie bereit. Confederation-Defaults = typische Camp-Region.
@@ -537,7 +549,8 @@ export function analyzeMatch(
   match: ScheduledMatch,
   squadData?: Record<string, SquadSummary>,
   pressure?: { A: TeamPressure; B: TeamPressure },
-  eloOverrides?: Record<string, number>
+  eloOverrides?: Record<string, number>,
+  eloSources?: Record<string, string>
 ): MatchAnalysis {
   const teamA = TEAM_BY_ID[match.teamAId]
   const teamB = TEAM_BY_ID[match.teamBId]
@@ -561,7 +574,15 @@ export function analyzeMatch(
   // Use override ELO if available, otherwise fall back to static
   const eloA = eloOverrides?.[match.teamAId] ?? teamA.eloRating ?? 1500
   const eloB = eloOverrides?.[match.teamBId] ?? teamB.eloRating ?? 1500
-  const eloSource = eloOverrides?.[match.teamAId] != null ? 'wikipedia-elo' : 'fallback-apr2025'
+  // Real source from DB (passed via eloSources) takes priority over heuristic
+  const eloSrcA = eloSources?.[match.teamAId] ?? (eloOverrides?.[match.teamAId] != null ? 'unknown' : null)
+  const eloSrcB = eloSources?.[match.teamBId] ?? (eloOverrides?.[match.teamBId] != null ? 'unknown' : null)
+  const eloSrc = eloSrcA ?? eloSrcB ?? null
+  const eloConfidence = eloSrc === 'wikipedia-elo' ? 0.85
+    : eloSrc === 'manual-text' ? 0.65
+    : eloSrc === 'fallback-apr2025' ? 0.55
+    : eloSrc === 'unknown' ? 0.60
+    : 0.40  // static allTeams default
 
   // 1. ELO-Rating (Hvattum & Arntzen 2010)
   const eloDiff = eloA - eloB
@@ -576,7 +597,7 @@ export function analyzeMatch(
     logEffectB: -eloLogEffectA,
     effectA: logEffectToLinear(eloLogEffectA),
     effectB: logEffectToLinear(-eloLogEffectA),
-    confidence: eloSource === 'wikipedia-elo' ? 0.85 : 0.55,
+    confidence: eloConfidence,
     isCalibrated: false,
     explanation: 'Höheres ELO-Rating bedeutet statistisch mehr Expected Goals. Differenz von 400 Punkten entspricht ~15% mehr Torchancen.',
   })
@@ -719,23 +740,28 @@ export function analyzeMatch(
   const altitude = venue.altitudeMeters
   const heatAdaptA = inferHeatAdaptation(teamA.confederation)
   const heatAdaptB = inferHeatAdaptation(teamB.confederation)
-  // log-scale: penalty per 1000m over 1500m for non-acclimatized teams
+  // Teams aus Hochlagen-Nationen haben keinen Akklimatisierungs-Nachteil bei Höhenspielen
+  const altAccA = HIGH_ALTITUDE_NATIONS.has(match.teamAId) ? 1.0 : 0.0
+  const altAccB = HIGH_ALTITUDE_NATIONS.has(match.teamBId) ? 1.0 : 0.0
   const altLogPenaltyBase = altitude > 1500 ? MODEL_WEIGHTS.altitude * (altitude - 1500) / 1000 : 0
-  const altLogA = clampLogEffect(altLogPenaltyBase * (1 - heatAdaptA * 0.3), 0.12)
-  const altLogB = clampLogEffect(altLogPenaltyBase * (1 - heatAdaptB * 0.3), 0.12)
+  // penalty scaled by: (1 − altitude_acclimatization) * (1 − heat_adaptation * 0.3)
+  const altLogA = clampLogEffect(altLogPenaltyBase * (1 - altAccA) * (1 - heatAdaptA * 0.3), 0.12)
+  const altLogB = clampLogEffect(altLogPenaltyBase * (1 - altAccB) * (1 - heatAdaptB * 0.3), 0.12)
+  const altValueA = altAccA > 0 ? `Heimvorteil Höhe (gewohnt)` : `Gewohnt ~200m`
+  const altValueB = altAccB > 0 ? `Heimvorteil Höhe (gewohnt)` : `Gewohnt ~200m`
   factors.push({
     category: 'context',
     label: 'Spielort-Höhe',
     source: 'McSharry (2007) – Altitude & Performance',
-    valueA: `Gewohnt ~200m`,
-    valueB: `Gewohnt ~200m`,
+    valueA: altValueA,
+    valueB: altValueB,
     logEffectA: altLogA,
     logEffectB: altLogB,
     effectA: logEffectToLinear(altLogA),
     effectB: logEffectToLinear(altLogB),
     confidence: 0.70,
     isCalibrated: false,
-    explanation: `Höhe ${altitude}m. Ab 1500m sinkt die Sauerstoffversorgung – nicht akklimatisierte Teams haben weniger Ausdauer und erzielen weniger Tore.`,
+    explanation: `Höhe ${altitude}m. Ab 1500m sinkt Sauerstoffversorgung für nicht akklimatisierte Teams. Teams aus Hochlagen-Nationen (Mexiko, Kolumbien, Ecuador etc.) haben keinen Nachteil.`,
   })
 
   // 5. Hitze/WBGT (Mohr et al. 2012)
@@ -805,23 +831,25 @@ export function analyzeMatch(
     explanation: 'Teams mit mehr WM-Titeln und Teilnahmen sind psychologisch besser auf Großturniere vorbereitet (Heritage Premium).',
   })
 
-  // 9. Kader-Qualität: Attack vs Defense
-  // attackDiff is already scaled to [0,1] via /100; MODEL_WEIGHTS.attackDefense = 0.03 per unit
-  const attackDiff = (teamA.attackRating - teamB.defenseRating) / 100
-  const attackLogEffectA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiff)
+  // 9. Kader-Qualität: Attack vs Defense (Maher 1982)
+  // Each team's xG independently: teamX.attack vs teamY.defense — not mirrored
+  const attackDiffA = (teamA.attackRating - teamB.defenseRating) / 100
+  const attackDiffB = (teamB.attackRating - teamA.defenseRating) / 100
+  const attackLogEffectA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffA)
+  const attackLogEffectB = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffB)
   factors.push({
     category: 'squad',
     label: 'Angriff vs. Abwehr (Ratings)',
     source: 'Maher (1982) – Attack/Defense Strength',
-    valueA: `Angriff ${teamA.attackRating} | Abwehr ${teamA.defenseRating}`,
-    valueB: `Angriff ${teamB.attackRating} | Abwehr ${teamB.defenseRating}`,
+    valueA: `Angriff ${teamA.attackRating} vs. Abwehr ${teamB.defenseRating}`,
+    valueB: `Angriff ${teamB.attackRating} vs. Abwehr ${teamA.defenseRating}`,
     logEffectA: attackLogEffectA,
-    logEffectB: -attackLogEffectA,
+    logEffectB: attackLogEffectB,
     effectA: logEffectToLinear(attackLogEffectA),
-    effectB: logEffectToLinear(-attackLogEffectA),
+    effectB: logEffectToLinear(attackLogEffectB),
     confidence: 0.50,
     isCalibrated: false,
-    explanation: 'Maher-Modell: Expected Goals aus Angriffsstärke des Teams gegen Defensivstärke des Gegners.',
+    explanation: 'Maher-Modell: Expected Goals aus Angriffsstärke gegen Defensivstärke des Gegners — für jedes Team unabhängig berechnet.',
   })
 
   // 10. Diaspora-Support
@@ -952,9 +980,10 @@ export function analyzeMatch(
 
 export function analyzeAllMatches(
   squadData?: Record<string, SquadSummary>,
-  eloOverrides?: Record<string, number>
+  eloOverrides?: Record<string, number>,
+  eloSources?: Record<string, string>
 ): MatchAnalysis[] {
-  return GROUP_SCHEDULE.map(m => analyzeMatch(m, squadData, undefined, eloOverrides))
+  return GROUP_SCHEDULE.map(m => analyzeMatch(m, squadData, undefined, eloOverrides, eloSources))
 }
 
 // ─── Tournament Simulation ─────────────────────────────────────────────────────

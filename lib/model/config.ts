@@ -14,7 +14,8 @@ export const MODEL_WEIGHTS = {
   travel: -0.0000085,    // pro km über 1500km innerhalb NA
   altitude: -0.055,      // pro 1000m über 1500m (für nicht akklimatisierte Teams)
   heat: -0.018,          // pro WBGT-Grad über 28°C (für schlecht adaptierte Teams)
-  attackDefense: 0.03,   // pro Differenz-Einheit (attackRating - defenseRating_opponent) / 100
+  attackDefense: 0.25,   // pro Differenz-Einheit (attackRating - defenseRating_opponent) / 100
+                          // 15-Punkte-Vorteil → ~3.7%, 30 Punkte → ~7.8%, max clamp 0.18
   pressure: {
     mustWin: 0.049,      // ln(1.05)
     alreadyThrough: -0.030, // ln(0.97)

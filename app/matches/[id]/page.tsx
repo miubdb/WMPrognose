@@ -177,9 +177,15 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   const allResults: Record<string, { goals_a: number; goals_b: number }> = {}
   for (const r of allResultsRes.data ?? []) allResults[r.match_id] = { goals_a: r.goals_a, goals_b: r.goals_b }
 
-  // ELO overrides
+  // ELO overrides + sources
   const eloOverrides: Record<string, number> = {}
-  for (const r of eloRes.data ?? []) eloOverrides[r.team_id] = r.elo_rating
+  const eloSources: Record<string, string> = {}
+  for (const r of eloRes.data ?? []) {
+    eloOverrides[r.team_id] = r.elo_rating
+    if ((r as { source?: string | null }).source) {
+      eloSources[r.team_id] = (r as { source?: string | null }).source!
+    }
+  }
 
   // Compute pressure (only for group matches)
   const standings = computeGroupStandings(allResults)
@@ -191,7 +197,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   const pressureA = computePressure(match.teamAId, matchGroup, standings, remainingMatchIds, allResults)
   const pressureB = computePressure(match.teamBId, matchGroup, standings, remainingMatchIds, allResults)
 
-  const analysis = analyzeMatch(match, squadData, { A: pressureA, B: pressureB }, eloOverrides)
+  const analysis = analyzeMatch(match, squadData, { A: pressureA, B: pressureB }, eloOverrides, eloSources)
   const venue = VENUES[match.venueId]
   const berlinTime = toBerlinTime(match.kickoffUTC)
 
