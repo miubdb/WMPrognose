@@ -1,6 +1,7 @@
 /**
  * Model Adapter – verbindet die Next.js-App mit dem TypeScript-Prognosemodell
  * Wrapper für src/model/* Funktionen
+ * Phase 1: log-lambda + Dixon-Coles + modular model structure
  */
 
 import { TeamData, TEAMS } from '@/src/data/teams'
@@ -10,6 +11,11 @@ import { Player } from '@/src/data/players'
 import { MatchContext } from '@/src/data/matches'
 import { predictMatch, MatchPredictionResult } from '@/src/model/predictMatch'
 import { GROUP_SCHEDULE, ScheduledMatch } from '@/src/data/schedule'
+import { computeScorelineMatrix } from '@/src/model/poisson'
+import { applyDixonColesCorrection, aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
+import { MODEL_WEIGHTS, MODEL_META } from '@/lib/model/config'
+import { clampLogEffect, logEffectToLinear, computeLambda } from '@/lib/model/logLambda'
+import type { DataQualityScore } from '@/lib/model/types'
 
 // ─── TeamData Builder ──────────────────────────────────────────────────────────
 
@@ -474,8 +480,14 @@ export interface MatchFactor {
   source: string
   valueA: string
   valueB: string
-  effectA: number   // multiplier delta for team A xG, e.g. +0.05 = +5%
+  effectA: number   // linear % effect for UI display (derived from logEffectA)
   effectB: number
+  // NEU: Beitrag zu log(lambda) — mathematisch korrekte Darstellung
+  logEffectA: number
+  logEffectB: number
+  // Datenqualität & Kalibrierung
+  confidence: number    // 0..1: wie verlässlich sind die Eingabedaten für diesen Faktor?
+  isCalibrated: boolean // wurde dieser Koeffizient gegen historische Daten validiert?
   explanation: string
 }
 
@@ -486,6 +498,7 @@ export interface SquadSummary {
   avgXgaPer90Defense?: number   // market-value-weighted xGA/90 of DEF+GK starters
   avgRating?: number            // average player rating (1–100) of effective players
   avgAge?: number               // average age of effective players
+  dataQuality?: DataQualityScore // Datenqualitäts-Score (optional, Phase 1)
 }
 
 export interface TeamPressure {
@@ -543,18 +556,23 @@ export function analyzeMatch(
   // Use override ELO if available, otherwise fall back to static
   const eloA = eloOverrides?.[match.teamAId] ?? teamA.eloRating ?? 1500
   const eloB = eloOverrides?.[match.teamBId] ?? teamB.eloRating ?? 1500
+  const eloSource = eloOverrides?.[match.teamAId] != null ? 'wikipedia-elo' : 'fallback-apr2025'
 
   // 1. ELO-Rating (Hvattum & Arntzen 2010)
   const eloDiff = eloA - eloB
-  const eloEffectA = eloDiff / 400 * 0.15
+  const eloLogEffectA = clampLogEffect(MODEL_WEIGHTS.elo * eloDiff)
   factors.push({
     category: 'elo',
     label: 'ELO-Rating',
     source: 'Hvattum & Arntzen (2010)',
     valueA: String(eloA),
     valueB: String(eloB),
-    effectA: eloEffectA,
-    effectB: -eloEffectA,
+    logEffectA: eloLogEffectA,
+    logEffectB: -eloLogEffectA,
+    effectA: logEffectToLinear(eloLogEffectA),
+    effectB: logEffectToLinear(-eloLogEffectA),
+    confidence: eloSource === 'wikipedia-elo' ? 0.85 : 0.55,
+    isCalibrated: false,
     explanation: 'Höheres ELO-Rating bedeutet statistisch mehr Expected Goals. Differenz von 400 Punkten entspricht ~15% mehr Torchancen.',
   })
 
@@ -565,15 +583,19 @@ export function analyzeMatch(
   const mvB = hasSquadB ? (squadData![match.teamBId].totalMarketValueM) : 0
   const bothHaveSquad = hasSquadA && hasSquadB
   const mvRatio = bothHaveSquad && mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
-  const mvEffectA = bothHaveSquad ? mvRatio * 0.06 : 0
+  const mvLogEffectA = bothHaveSquad ? clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio) : 0
   factors.push({
     category: 'squad',
     label: 'Kader-Marktwert',
     source: 'Peeters (2018) – Log-normalisierung',
     valueA: hasSquadA ? `${Math.round(mvA)}M€` : 'Kein Kader',
     valueB: hasSquadB ? `${Math.round(mvB)}M€` : 'Kein Kader',
-    effectA: mvEffectA,
-    effectB: -mvEffectA,
+    logEffectA: mvLogEffectA,
+    logEffectB: -mvLogEffectA,
+    effectA: logEffectToLinear(mvLogEffectA),
+    effectB: logEffectToLinear(-mvLogEffectA),
+    confidence: bothHaveSquad ? 0.80 : 0.0,
+    isCalibrated: false,
     explanation: bothHaveSquad
       ? 'Log-normalisierter Kader-Marktwert als Proxy für Spielerqualität. Teuerere Kader haben im Schnitt mehr Torchancen.'
       : 'Kaderdaten für mindestens ein Team fehlen – Faktor wird nicht in die Berechnung einbezogen.',
@@ -584,44 +606,52 @@ export function analyzeMatch(
   const hasFormB = (squadData?.[match.teamBId]?.avgXgPer90Attack ?? 0) > 0
 
   if (hasFormA || hasFormB) {
-    const xgA = squadData?.[match.teamAId]?.avgXgPer90Attack ?? 0
-    const xgB = squadData?.[match.teamBId]?.avgXgPer90Attack ?? 0
+    const xgAttackA = squadData?.[match.teamAId]?.avgXgPer90Attack ?? 0
+    const xgAttackB = squadData?.[match.teamBId]?.avgXgPer90Attack ?? 0
     const defA = squadData?.[match.teamAId]?.avgXgaPer90Defense ?? 0
     const defB = squadData?.[match.teamBId]?.avgXgaPer90Defense ?? 0
 
-    // Net effect: own attack quality vs opponent defense quality
-    const attackAdvA = hasFormA && hasFormB ? (xgA - xgB) * 4 : 0
-    const defAdvA = hasFormA && hasFormB ? (defB - defA) * 2 : 0  // lower xGA = better defense
-    const formEffectA = Math.max(-0.12, Math.min(0.12, attackAdvA + defAdvA))
+    // Net effect in log-space: own attack quality vs opponent defense quality
+    const attackLogDiff = hasFormA && hasFormB ? (xgAttackA - xgAttackB) * MODEL_WEIGHTS.xgAttack : 0
+    const defLogDiff = hasFormA && hasFormB ? (defB - defA) * MODEL_WEIGHTS.xgDefense : 0  // lower xGA = better defense
+    const formLogEffectA = clampLogEffect(attackLogDiff + defLogDiff)
 
     factors.push({
       category: 'squad',
       label: 'Saisonform xG/90',
       source: 'FBref.com – Klubsaison 2024/25',
-      valueA: hasFormA ? `${xgA.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
-      valueB: hasFormB ? `${xgB.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
-      effectA: formEffectA,
-      effectB: -formEffectA,
+      valueA: hasFormA ? `${xgAttackA.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
+      valueB: hasFormB ? `${xgAttackB.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
+      logEffectA: formLogEffectA,
+      logEffectB: -formLogEffectA,
+      effectA: logEffectToLinear(formLogEffectA),
+      effectB: logEffectToLinear(-formLogEffectA),
+      confidence: (hasFormA && hasFormB) ? 0.75 : 0.0,
+      isCalibrated: false,
       explanation: 'Durchschnittliche xG/90 der Angreifer und Mittelfeldspieler aus der Klubsaison 2024/25. Höherer Wert = statistisch mehr Torchancen. Quelle: FBref.com.',
     })
   }
 
   // 2c. Ø Spieler-Rating der Startelf
+  // Gewicht stark reduziert (0.004) da Rating aus Marktwert abgeleitet → Doppelzählung vermeiden
   const avgRatingA = squadData?.[match.teamAId]?.avgRating
   const avgRatingB = squadData?.[match.teamBId]?.avgRating
   if (avgRatingA && avgRatingB) {
-    // Rating is 1–100 scale; a 10-point gap → ~4% xG difference
-    const ratingDiff = (avgRatingA - avgRatingB) / 10
-    const ratingEffect = Math.max(-0.10, Math.min(0.10, ratingDiff * 0.04))
+    const ratingDiff = avgRatingA - avgRatingB
+    const ratingLogEffectA = clampLogEffect(MODEL_WEIGHTS.avgRating * ratingDiff, 0.10)
     factors.push({
       category: 'squad',
       label: 'Ø Spieler-Rating Startelf',
       source: 'Transfermarkt – Marktwert → Rating (1–100)',
       valueA: `Ø ${avgRatingA.toFixed(1)}`,
       valueB: `Ø ${avgRatingB.toFixed(1)}`,
-      effectA: ratingEffect,
-      effectB: -ratingEffect,
-      explanation: 'Durchschnittliches individuelles Spieler-Rating der Startelf (aus Marktwert abgeleitet, Skala 1–100). Gibt die individuelle Klasse jedes Startelf-Spielers an.',
+      logEffectA: ratingLogEffectA,
+      logEffectB: -ratingLogEffectA,
+      effectA: logEffectToLinear(ratingLogEffectA),
+      effectB: logEffectToLinear(-ratingLogEffectA),
+      confidence: 0.50,
+      isCalibrated: false,
+      explanation: 'Durchschnittliches individuelles Spieler-Rating der Startelf (aus Marktwert abgeleitet, Skala 1–100). Rating aus Marktwert — nur marginaler Differenzierungseffekt (reduziertes Gewicht wegen Doppelzählung mit Marktwert-Faktor).',
     })
   }
 
@@ -629,23 +659,30 @@ export function analyzeMatch(
   const avgAgeA = squadData?.[match.teamAId]?.avgAge
   const avgAgeB = squadData?.[match.teamBId]?.avgAge
   if (avgAgeA && avgAgeB) {
-    // Optimal WM age: 25–28. Too young (<24) = less experience; too old (>30) = fatigue
-    const ageScore = (age: number) =>
-      age < 24 ? -(24 - age) * 0.012
-      : age > 29 ? -(age - 29) * 0.008
+    // Optimal WM age: 25–28. Too young (<24) = less experience; too old (>29) = fatigue
+    const ageLogScore = (age: number) =>
+      age < 24 ? -(24 - age) * MODEL_WEIGHTS.avgAge.youngPenaltyPerYear
+      : age > 29 ? -(age - 29) * MODEL_WEIGHTS.avgAge.oldPenaltyPerYear
       : 0
-    const ageEffectA = ageScore(avgAgeA)
-    const ageEffectB = ageScore(avgAgeB)
-    const netEffect = ageEffectA - ageEffectB
-    if (Math.abs(netEffect) > 0.005 || Math.abs(ageEffectA) > 0.005 || Math.abs(ageEffectB) > 0.005) {
+    const ageLogA = ageLogScore(avgAgeA)
+    const ageLogB = ageLogScore(avgAgeB)
+    // Net log-effect for team A relative to team B
+    const netAgeLogA = clampLogEffect(ageLogA - ageLogB * 0.3, 0.10)
+    const netAgeLogB = clampLogEffect(ageLogB - ageLogA * 0.3, 0.10)
+    const netEffect = netAgeLogA - netAgeLogB
+    if (Math.abs(netEffect) > 0.005 || Math.abs(ageLogA) > 0.005 || Math.abs(ageLogB) > 0.005) {
       factors.push({
         category: 'squad',
         label: 'Altersstruktur Startelf',
         source: 'Empirische Studienlage – WM-Peakformkurve 25–28 J.',
         valueA: `Ø ${avgAgeA.toFixed(1)} Jahre`,
         valueB: `Ø ${avgAgeB.toFixed(1)} Jahre`,
-        effectA: ageEffectA - ageEffectB * 0.3,
-        effectB: ageEffectB - ageEffectA * 0.3,
+        logEffectA: netAgeLogA,
+        logEffectB: netAgeLogB,
+        effectA: logEffectToLinear(netAgeLogA),
+        effectB: logEffectToLinear(netAgeLogB),
+        confidence: 0.65,
+        isCalibrated: false,
         explanation: 'Teams mit Startelf-Durchschnittsalter 25–28 Jahre sind bei WM-Turnieren am leistungsfähigsten. Zu jung (<24) = fehlende Großturnier-Erfahrung; zu alt (>30) = erhöhte Verletzungsanfälligkeit.',
       })
     }
@@ -655,46 +692,65 @@ export function analyzeMatch(
   const isHostA = ['usa', 'canada', 'mexico'].includes(match.teamAId)
   const isHostB = ['usa', 'canada', 'mexico'].includes(match.teamBId)
   if (isHostA || isHostB) {
+    const hostLogA = isHostA ? MODEL_WEIGHTS.host : 0
+    const hostLogB = isHostB ? MODEL_WEIGHTS.host : 0
     factors.push({
       category: 'context',
       label: 'Gastgeberland-Heimvorteil',
       source: 'Pollard (1986) – Home Advantage',
       valueA: isHostA ? 'Gastgeber ✓' : '–',
       valueB: isHostB ? 'Gastgeber ✓' : '–',
-      effectA: isHostA ? 0.04 : isHostB ? -0.02 : 0,
-      effectB: isHostB ? 0.04 : isHostA ? -0.02 : 0,
+      logEffectA: hostLogA,
+      logEffectB: hostLogB,
+      effectA: logEffectToLinear(hostLogA),
+      effectB: logEffectToLinear(hostLogB),
+      confidence: 0.75,
+      isCalibrated: false,
       explanation: 'Gastgebernationen (USA, Mexiko, Kanada) profitieren von Heimvorteil durch bekannte Umgebung, Fans und Atmosphäre (+4%).',
     })
   }
 
   // 4. Spielort-Höhe (McSharry 2007)
   const altitude = venue.altitudeMeters
-  const altPenalty = altitude > 1500 ? Math.min((altitude - 1500) / 1000 * 0.06, 0.12) : 0
   const heatAdaptA = inferHeatAdaptation(teamA.confederation)
   const heatAdaptB = inferHeatAdaptation(teamB.confederation)
+  // log-scale: penalty per 1000m over 1500m for non-acclimatized teams
+  const altLogPenaltyBase = altitude > 1500 ? MODEL_WEIGHTS.altitude * (altitude - 1500) / 1000 : 0
+  const altLogA = clampLogEffect(altLogPenaltyBase * (1 - heatAdaptA * 0.3), 0.12)
+  const altLogB = clampLogEffect(altLogPenaltyBase * (1 - heatAdaptB * 0.3), 0.12)
   factors.push({
     category: 'context',
     label: 'Spielort-Höhe',
     source: 'McSharry (2007) – Altitude & Performance',
     valueA: `Gewohnt ~200m`,
     valueB: `Gewohnt ~200m`,
-    effectA: -(altPenalty * (1 - heatAdaptA * 0.3)),
-    effectB: -(altPenalty * (1 - heatAdaptB * 0.3)),
+    logEffectA: altLogA,
+    logEffectB: altLogB,
+    effectA: logEffectToLinear(altLogA),
+    effectB: logEffectToLinear(altLogB),
+    confidence: 0.70,
+    isCalibrated: false,
     explanation: `Höhe ${altitude}m. Ab 1500m sinkt die Sauerstoffversorgung – nicht akklimatisierte Teams haben weniger Ausdauer und erzielen weniger Tore.`,
   })
 
   // 5. Hitze/WBGT (Mohr et al. 2012)
   const wbgt = venue.estimatedWBGT
-  const heatPenalty = wbgt > 28 ? Math.min((wbgt - 28) * 0.02, 0.08) : 0
-  if (heatPenalty > 0.005) {
+  const heatLogBase = wbgt > 28 ? MODEL_WEIGHTS.heat * (wbgt - 28) : 0
+  if (Math.abs(heatLogBase) > 0.005) {
+    const heatLogA = clampLogEffect(heatLogBase * (1 - heatAdaptA), 0.08)
+    const heatLogB = clampLogEffect(heatLogBase * (1 - heatAdaptB), 0.08)
     factors.push({
       category: 'context',
       label: 'Hitze-Belastung (WBGT)',
       source: 'Mohr et al. (2012) – WBGT & Physical Performance',
       valueA: teamA.confederation === 'CAF' || teamA.confederation === 'AFC' ? 'Gut adaptiert' : 'Wenig adaptiert',
       valueB: teamB.confederation === 'CAF' || teamB.confederation === 'AFC' ? 'Gut adaptiert' : 'Wenig adaptiert',
-      effectA: -(heatPenalty * (1 - heatAdaptA)),
-      effectB: -(heatPenalty * (1 - heatAdaptB)),
+      logEffectA: heatLogA,
+      logEffectB: heatLogB,
+      effectA: logEffectToLinear(heatLogA),
+      effectB: logEffectToLinear(heatLogB),
+      confidence: 0.65,
+      isCalibrated: false,
       explanation: `WBGT ${wbgt}°C. Hitzebelastung über 28°C reduziert physische Leistung. Teams aus heißen Klimazonen sind besser adaptiert.`,
     })
   }
@@ -706,17 +762,21 @@ export function analyzeMatch(
   const travelB = travelDistanceInNA(match.teamBId, teamB.confederation, match.venueId)
   const knownCampA = match.teamAId in TEAM_BASE_CAMPS
   const knownCampB = match.teamBId in TEAM_BASE_CAMPS
-  // Signifikante Ermüdung ab 1500 km innerhalb NA (z.B. East Coast → West Coast)
-  const travelEffectA = travelA > 1500 ? -Math.min((travelA - 1500) / 5000 * 0.04, 0.04) : 0
-  const travelEffectB = travelB > 1500 ? -Math.min((travelB - 1500) / 5000 * 0.04, 0.04) : 0
+  // Signifikante Ermüdung ab 1500 km innerhalb NA (log-scale)
+  const travelLogA = travelA > 1500 ? clampLogEffect(MODEL_WEIGHTS.travel * (travelA - 1500), 0.04) : 0
+  const travelLogB = travelB > 1500 ? clampLogEffect(MODEL_WEIGHTS.travel * (travelB - 1500), 0.04) : 0
   factors.push({
     category: 'context',
     label: 'Reisedistanz (Camp → Spielort)',
     source: 'Reilly et al. (2007) – Travel Fatigue',
     valueA: `~${Math.round(travelA / 50) * 50} km${knownCampA ? '' : ' (Schätzung)'}`,
     valueB: `~${Math.round(travelB / 50) * 50} km${knownCampB ? '' : ' (Schätzung)'}`,
-    effectA: travelEffectA,
-    effectB: travelEffectB,
+    logEffectA: travelLogA,
+    logEffectB: travelLogB,
+    effectA: logEffectToLinear(travelLogA),
+    effectB: logEffectToLinear(travelLogB),
+    confidence: knownCampA && knownCampB ? 0.70 : 0.40,
+    isCalibrated: false,
     explanation: 'Abstand vom Trainingscamp in Nordamerika zum Spielort. Über 1500 km sinkt die Regeneration messbar. ⚠ Trainingscamp-Standorte ohne bekannte Daten sind Schätzwerte — bitte Standorte mitteilen.',
   })
 
@@ -724,29 +784,37 @@ export function analyzeMatch(
   const expA = teamA.worldCupTitles * 3 + teamA.worldCupAppearances
   const expB = teamB.worldCupTitles * 3 + teamB.worldCupAppearances
   const expDiff = expA - expB
-  const expEffect = expDiff / 60 * 0.03
+  const expLogEffectA = clampLogEffect(MODEL_WEIGHTS.experience * expDiff)
   factors.push({
     category: 'experience',
     label: 'WM-Erfahrung & Turnier-Mentalität',
     source: 'Forrest et al. (2005) – Heritage Premium',
     valueA: `${teamA.worldCupTitles} Titel, ${teamA.worldCupAppearances}× dabei`,
     valueB: `${teamB.worldCupTitles} Titel, ${teamB.worldCupAppearances}× dabei`,
-    effectA: expEffect,
-    effectB: -expEffect,
+    logEffectA: expLogEffectA,
+    logEffectB: -expLogEffectA,
+    effectA: logEffectToLinear(expLogEffectA),
+    effectB: logEffectToLinear(-expLogEffectA),
+    confidence: 0.60,
+    isCalibrated: false,
     explanation: 'Teams mit mehr WM-Titeln und Teilnahmen sind psychologisch besser auf Großturniere vorbereitet (Heritage Premium).',
   })
 
   // 9. Kader-Qualität: Attack vs Defense
   const attackDiff = (teamA.attackRating - teamB.defenseRating) / 100
-  const attackEffect = attackDiff * 0.04
+  const attackLogEffectA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiff / 0.01)
   factors.push({
     category: 'squad',
     label: 'Angriff vs. Abwehr (Ratings)',
     source: 'Maher (1982) – Attack/Defense Strength',
     valueA: `Angriff ${teamA.attackRating} | Abwehr ${teamA.defenseRating}`,
     valueB: `Angriff ${teamB.attackRating} | Abwehr ${teamB.defenseRating}`,
-    effectA: attackEffect,
-    effectB: -attackEffect,
+    logEffectA: attackLogEffectA,
+    logEffectB: -attackLogEffectA,
+    effectA: logEffectToLinear(attackLogEffectA),
+    effectB: logEffectToLinear(-attackLogEffectA),
+    confidence: 0.50,
+    isCalibrated: false,
     explanation: 'Maher-Modell: Expected Goals aus Angriffsstärke des Teams gegen Defensivstärke des Gegners.',
   })
 
@@ -754,32 +822,45 @@ export function analyzeMatch(
   const diasA = hasDiasporaSupport(match.teamAId, match.venueId)
   const diasB = hasDiasporaSupport(match.teamBId, match.venueId)
   if (diasA || diasB) {
+    const diasLogA = diasA ? MODEL_WEIGHTS.diaspora : 0
+    const diasLogB = diasB ? MODEL_WEIGHTS.diaspora : 0
     factors.push({
       category: 'context',
       label: 'Diaspora-Fanunterstützung',
       source: 'Pollard (1986) – Crowd & Diaspora Effects',
       valueA: diasA ? 'Starke Unterstützung ✓' : '–',
       valueB: diasB ? 'Starke Unterstützung ✓' : '–',
-      effectA: diasA ? 0.02 : 0,
-      effectB: diasB ? 0.02 : 0,
+      logEffectA: diasLogA,
+      logEffectB: diasLogB,
+      effectA: logEffectToLinear(diasLogA),
+      effectB: logEffectToLinear(diasLogB),
+      confidence: 0.60,
+      isCalibrated: false,
       explanation: 'Teams mit großer Diaspora am Spielort (z.B. Mexiko in LA) profitieren von lokaler Fanunterstützung.',
     })
   }
 
   // 11. Ausgangslage / Qualifikationsdruck
   if (pressure) {
-    const pressEffectA = pressure.A.mustWin ? 0.05 : pressure.A.alreadyThrough ? -0.03 : 0
-    const pressEffectB = pressure.B.mustWin ? 0.05 : pressure.B.alreadyThrough ? -0.03 : 0
+    const pressLogA = pressure.A.mustWin ? MODEL_WEIGHTS.pressure.mustWin : pressure.A.alreadyThrough ? MODEL_WEIGHTS.pressure.alreadyThrough : 0
+    const pressLogB = pressure.B.mustWin ? MODEL_WEIGHTS.pressure.mustWin : pressure.B.alreadyThrough ? MODEL_WEIGHTS.pressure.alreadyThrough : 0
     const labelA = pressure.A.alreadyOut ? 'Ausgeschieden' : pressure.A.alreadyThrough ? 'Schon qualifiziert' : pressure.A.mustWin ? 'Muss gewinnen' : 'Normaler Druck'
     const labelB = pressure.B.alreadyOut ? 'Ausgeschieden' : pressure.B.alreadyThrough ? 'Schon qualifiziert' : pressure.B.mustWin ? 'Muss gewinnen' : 'Normaler Druck'
+    // Net relative effect: own pressure advantage minus half of opponent's
+    const netPressLogA = clampLogEffect(pressLogA - pressLogB * 0.5)
+    const netPressLogB = clampLogEffect(pressLogB - pressLogA * 0.5)
     factors.push({
       category: 'context',
       label: 'Ausgangslage / Gruppendruck',
       source: 'Gruppenstand (live)',
       valueA: labelA,
       valueB: labelB,
-      effectA: pressEffectA - pressEffectB * 0.5,
-      effectB: pressEffectB - pressEffectA * 0.5,
+      logEffectA: netPressLogA,
+      logEffectB: netPressLogB,
+      effectA: logEffectToLinear(netPressLogA),
+      effectB: logEffectToLinear(netPressLogB),
+      confidence: 0.65,
+      isCalibrated: false,
       explanation: 'Teams die zwingend gewinnen müssen, spielen risikoreicher und erzielen statistisch mehr Tore — aber kassieren auch mehr. Teams die bereits qualifiziert sind, rotieren häufiger.',
     })
   }
@@ -789,31 +870,36 @@ export function analyzeMatch(
   const lastB = getLastMatchDate(match.teamBId, match.date)
   const daysA = lastA ? Math.floor((new Date(match.date).getTime() - new Date(lastA).getTime()) / 86400000) : 10
   const daysB = lastB ? Math.floor((new Date(match.date).getTime() - new Date(lastB).getTime()) / 86400000) : 10
-  // Less than 4 days rest → fatigue penalty
-  const restEffectA = daysA < 4 ? -0.04 : daysA < 5 ? -0.02 : 0
-  const restEffectB = daysB < 4 ? -0.04 : daysB < 5 ? -0.02 : 0
-  if (restEffectA < 0 || restEffectB < 0) {
+  // Less than 4 days rest → fatigue penalty (log-scale)
+  const restLogA = daysA < 4 ? MODEL_WEIGHTS.restDays.under4 : daysA < 5 ? MODEL_WEIGHTS.restDays.under5 : 0
+  const restLogB = daysB < 4 ? MODEL_WEIGHTS.restDays.under4 : daysB < 5 ? MODEL_WEIGHTS.restDays.under5 : 0
+  if (restLogA < 0 || restLogB < 0) {
     factors.push({
       category: 'context',
       label: 'Spielrhythmus / Erholung',
       source: 'FIFA-Spielplan (eigene Berechnung)',
       valueA: lastA ? `${daysA} Tage Pause` : 'Erstes Spiel',
       valueB: lastB ? `${daysB} Tage Pause` : 'Erstes Spiel',
-      effectA: restEffectA,
-      effectB: restEffectB,
+      logEffectA: restLogA,
+      logEffectB: restLogB,
+      effectA: logEffectToLinear(restLogA),
+      effectB: logEffectToLinear(restLogB),
+      confidence: 0.75,
+      isCalibrated: false,
       explanation: 'Weniger als 4 Tage Erholung seit dem letzten Gruppenspiel reduziert die körperliche Verfassung messbar (Studienlage: Drust et al. 2007).',
     })
   }
 
-  // Expected Goals aus allen Faktoren (Poisson-Modell)
-  const baseXG = 1.35
-  const totalEffectA = factors.reduce((s, f) => s + f.effectA, 0)
-  const totalEffectB = factors.reduce((s, f) => s + f.effectB, 0)
-  const xgA = Math.max(0.3, Math.min(4, baseXG * (1 + totalEffectA)))
-  const xgB = Math.max(0.3, Math.min(4, baseXG * (1 + totalEffectB)))
+  // NEU: log-lambda Berechnung (Phase 1 — mathematisch korrekt)
+  const logEffectsA = factors.map(f => f.logEffectA)
+  const logEffectsB = factors.map(f => f.logEffectB)
+  const xgA = computeLambda(MODEL_META.baseGoalRate, logEffectsA)
+  const xgB = computeLambda(MODEL_META.baseGoalRate, logEffectsB)
 
-  // Wahrscheinlichkeiten aus Poisson(xgA, xgB) — konsistent mit xG-Modell (Maher 1982)
-  const { winA, draw, winB } = poissonWinProbs(xgA, xgB)
+  // NEU: Dixon-Coles Score-Matrix (ersetzt interne poissonWinProbs)
+  const rawMatrix = computeScorelineMatrix(xgA, xgB)
+  const correctedMatrix = applyDixonColesCorrection(rawMatrix, xgA, xgB)
+  const { winA, draw, winB } = aggregateOutcomeProbabilities(correctedMatrix)
 
   // Bestes Ergebnis
   let suggestedTip: '1' | 'X' | '2'

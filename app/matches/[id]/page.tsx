@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
 import { analyzeMatch, type MatchFactor, type SquadSummary } from '@/lib/modelAdapter'
+import { computeDataQuality } from '@/lib/model/dataQuality'
 import { computeGroupStandings, computePressure } from '@/lib/standings'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -49,6 +50,8 @@ function FactorRow({ factor }: { factor: MatchFactor }) {
     experience: 'bg-emerald-900/40 text-emerald-400',
   }[factor.category]
 
+  const lowConfidence = factor.confidence != null && factor.confidence < 0.6
+
   return (
     <div className="border-b border-gray-800/60 last:border-0">
       {/* Factor header */}
@@ -59,6 +62,11 @@ function FactorRow({ factor }: { factor: MatchFactor }) {
               {factor.category.toUpperCase()}
             </span>
             <span className="text-sm font-medium text-gray-200">{factor.label}</span>
+            {lowConfidence && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-900/40 text-yellow-500 font-medium" title="Geringe Datenqualität für diesen Faktor">
+                ~{Math.round((factor.confidence ?? 0) * 100)}% Konfidenz
+              </span>
+            )}
           </div>
           <div className="text-[10px] text-gray-600 font-mono">{factor.source}</div>
         </div>
@@ -373,8 +381,13 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
       {/* Factor Breakdown */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-800 bg-gray-800/40 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Faktor-Aufschlüsselung</h2>
+        <div className="px-4 py-3 border-b border-gray-800 bg-gray-800/40 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold">Faktor-Aufschlüsselung</h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-400 font-medium border border-violet-800/40">
+              Tor-Modell: Dixon-Coles · Low-Score-Korrektur aktiv
+            </span>
+          </div>
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <span>Effekt auf xG:</span>
             <div className="flex items-center gap-3">
