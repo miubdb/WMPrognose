@@ -1,8 +1,9 @@
 // Alle Gewichte sind log-scale (additive Beiträge zu log(lambda))
 // Kalibrierbar gegen historische WM-Daten (Phase 3)
 export const MODEL_WEIGHTS = {
-  elo: 0.0004,          // pro ELO-Punkt Differenz → log(lambda)-Beitrag
-                         // Hvattum & Arntzen 2010: 400-Punkte = ~15% xG → ln(1.15)/400 ≈ 0.00035
+  elo: 0.0006,          // pro ELO-Punkt Differenz → log(lambda)-Beitrag
+                         // Hvattum & Arntzen 2010: 400-Punkte = ~15% xG; leicht erhöht für WM-Qualitätsspanne
+                         // clampLogEffect(..., 0.25) = max ±28% xG-Effekt bei >417 ELO-Punkte
   marketValueLog: 0.05,  // pro log10(mvA/mvB) Einheit → log(lambda)-Beitrag
                          // Peeters 2018: ein 10x-Marktwertunterschied → ~12% xG
   xgAttack: 3.0,         // pro Einheit avgXgPer90Attack-Differenz → log(lambda)-Beitrag
@@ -34,7 +35,7 @@ export const MODEL_WEIGHTS = {
 
 export const MODEL_META = {
   version: '2.0.0-phase1',
-  baseGoalRate: 1.35,       // WM-Durchschnitt: leicht höher als Liga (mehr Angriff)
+  baseGoalRate: 1.40,       // WM-Durchschnitt: leicht erhöht für bessere Differenzierung (WM 2022: 2.69/Spiel)
   dixonColesRho: 0.08,      // kalibriert: 0.08 für internationale Spiele (weniger Low-Score als Liga)
   maxGoals: 10,             // Score-Matrix 0..10
   logLambdaMin: Math.log(0.3),

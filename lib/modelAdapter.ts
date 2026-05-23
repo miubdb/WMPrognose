@@ -586,7 +586,7 @@ export function analyzeMatch(
 
   // 1. ELO-Rating (Hvattum & Arntzen 2010)
   const eloDiff = eloA - eloB
-  const eloLogEffectA = clampLogEffect(MODEL_WEIGHTS.elo * eloDiff)
+  const eloLogEffectA = clampLogEffect(MODEL_WEIGHTS.elo * eloDiff, 0.25)
   factors.push({
     category: 'elo',
     label: 'ELO-Rating',
@@ -603,28 +603,29 @@ export function analyzeMatch(
   })
 
   // 2. Kader-Marktwert (Peeters 2018)
+  // Fallback auf allTeams.squadMarketValueM wenn keine DB-Kaderdaten vorhanden
   const hasSquadA = (squadData?.[match.teamAId]?.count ?? 0) > 0
   const hasSquadB = (squadData?.[match.teamBId]?.count ?? 0) > 0
-  const mvA = hasSquadA ? (squadData![match.teamAId].totalMarketValueM) : 0
-  const mvB = hasSquadB ? (squadData![match.teamBId].totalMarketValueM) : 0
-  const bothHaveSquad = hasSquadA && hasSquadB
-  const mvRatio = bothHaveSquad && mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
-  const mvLogEffectA = bothHaveSquad ? clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio) : 0
+  const mvA = hasSquadA ? squadData![match.teamAId].totalMarketValueM : (teamA.squadMarketValueM ?? 0)
+  const mvB = hasSquadB ? squadData![match.teamBId].totalMarketValueM : (teamB.squadMarketValueM ?? 0)
+  const mvConfidence = hasSquadA && hasSquadB ? 0.80 : hasSquadA || hasSquadB ? 0.55 : 0.40
+  const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
+  const mvLogEffectA = clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio)
   factors.push({
     category: 'squad',
     label: 'Kader-Marktwert',
     source: 'Peeters (2018) – Log-normalisierung',
-    valueA: hasSquadA ? `${Math.round(mvA)}M€` : 'Kein Kader',
-    valueB: hasSquadB ? `${Math.round(mvB)}M€` : 'Kein Kader',
+    valueA: `${Math.round(mvA)}M€${hasSquadA ? '' : ' (Schätzung)'}`,
+    valueB: `${Math.round(mvB)}M€${hasSquadB ? '' : ' (Schätzung)'}`,
     logEffectA: mvLogEffectA,
     logEffectB: -mvLogEffectA,
     effectA: logEffectToLinear(mvLogEffectA),
     effectB: logEffectToLinear(-mvLogEffectA),
-    confidence: bothHaveSquad ? 0.80 : 0.0,
+    confidence: mvConfidence,
     isCalibrated: false,
-    explanation: bothHaveSquad
+    explanation: hasSquadA && hasSquadB
       ? 'Log-normalisierter Kader-Marktwert als Proxy für Spielerqualität. Teuerere Kader haben im Schnitt mehr Torchancen.'
-      : 'Kaderdaten für mindestens ein Team fehlen – Faktor wird nicht in die Berechnung einbezogen.',
+      : 'Marktwert-Schätzung aus Verbandsdaten (kein vollständiger Kader eingetragen).',
   })
 
   // 2b. Kader-Saisonform / xG per 90 (FBref)
@@ -936,10 +937,13 @@ export function analyzeMatch(
   const { winA: rawWinA, draw: rawDraw, winB: rawWinB } = aggregateOutcomeProbabilities(correctedMatrix)
 
   // Phase 2: Regression zur Mitte basierend auf kombinierter Datenqualität
+  // ELO ist immer verfügbar (allTeams-Fallback) → floor bei 0.72 verhindert dass fehlende
+  // Kaderdaten das ELO-Signal vollständig zunichte machen
   const qualityA = squadData?.[match.teamAId]?.dataQuality?.overall ?? 0.3
   const qualityB = squadData?.[match.teamBId]?.dataQuality?.overall ?? 0.3
-  const combinedQuality = Math.min(qualityA, qualityB)
-  // quality=1.0 → keine Regression; quality=0.0 → vollständige Regression (33/33/33)
+  const ELO_QUALITY_FLOOR = 0.72  // ELO allein liefert ~72% Konfidenz; max. Regression = 28%
+  const combinedQuality = Math.max(ELO_QUALITY_FLOOR, Math.min(qualityA, qualityB))
+  // quality=1.0 → keine Regression; quality=0.72 → 28% Regression (max ohne Kaderdaten)
   const regressionWeight = 1 - combinedQuality
   const uniform = 1 / 3
   const winA = rawWinA * (1 - regressionWeight) + uniform * regressionWeight
