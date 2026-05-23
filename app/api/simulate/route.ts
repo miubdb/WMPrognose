@@ -20,10 +20,11 @@ export async function POST(request: NextRequest) {
         const supabase = createClient(supabaseUrl, supabaseKey)
         const { data: eloData } = await supabase
           .from('team_elo_ratings')
-          .select('team_id, elo_rating')
+          .select('team_id, elo_rating, elo_delta_1y')
 
         for (const row of eloData ?? []) {
-          eloRatings[row.team_id] = row.elo_rating
+          const delta = (row as { elo_delta_1y?: number | null }).elo_delta_1y ?? 0
+          eloRatings[row.team_id] = row.elo_rating + Math.round(delta * 0.2)
         }
       }
     } catch {

@@ -5,7 +5,7 @@ import type { SquadSummary } from '@/lib/modelAdapter'
 export async function GET() {
   const [squadRes, eloRes, resultsRes] = await Promise.all([
     supabase.from('players').select('team_id, market_value_m, position, xg_per90, xga_per90'),
-    supabase.from('team_elo_ratings').select('team_id, elo_rating'),
+    supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y'),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
   ])
 
@@ -45,7 +45,10 @@ export async function GET() {
   }
 
   const eloOverrides: Record<string, number> = {}
-  for (const row of eloRes.data ?? []) eloOverrides[row.team_id] = row.elo_rating
+  for (const row of eloRes.data ?? []) {
+    const delta = (row as { elo_delta_1y?: number | null }).elo_delta_1y ?? 0
+    eloOverrides[row.team_id] = row.elo_rating + Math.round(delta * 0.2)
+  }
 
   const results: Record<string, { goals_a: number; goals_b: number }> = {}
   for (const row of resultsRes.data ?? []) results[row.match_id] = { goals_a: row.goals_a, goals_b: row.goals_b }

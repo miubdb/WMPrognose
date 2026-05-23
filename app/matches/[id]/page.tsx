@@ -101,7 +101,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
-    supabase.from('team_elo_ratings').select('team_id, elo_rating, source'),
+    supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
   ])
 
   type PlayerRow = {
@@ -181,7 +181,8 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   const eloOverrides: Record<string, number> = {}
   const eloSources: Record<string, string> = {}
   for (const r of eloRes.data ?? []) {
-    eloOverrides[r.team_id] = r.elo_rating
+    const delta = (r as { elo_delta_1y?: number | null }).elo_delta_1y ?? 0
+    eloOverrides[r.team_id] = r.elo_rating + Math.round(delta * 0.2)
     if ((r as { source?: string | null }).source) {
       eloSources[r.team_id] = (r as { source?: string | null }).source!
     }
