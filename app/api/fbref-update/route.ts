@@ -6,13 +6,13 @@ const adminSupabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Understat leagues for 2024/25 season
+// Understat leagues for 2025/26 season (start year = 2025)
 const UNDERSTAT_LEAGUES = [
-  { id: 'EPL',        url: 'https://understat.com/league/EPL/2024',        name: 'Premier League' },
-  { id: 'La_liga',    url: 'https://understat.com/league/La_liga/2024',    name: 'La Liga' },
-  { id: 'Bundesliga', url: 'https://understat.com/league/Bundesliga/2024', name: 'Bundesliga' },
-  { id: 'Serie_A',    url: 'https://understat.com/league/Serie_A/2024',    name: 'Serie A' },
-  { id: 'Ligue_1',    url: 'https://understat.com/league/Ligue_1/2024',    name: 'Ligue 1' },
+  { id: 'EPL',        url: 'https://understat.com/league/EPL/2025',        name: 'Premier League' },
+  { id: 'La_liga',    url: 'https://understat.com/league/La_liga/2025',    name: 'La Liga' },
+  { id: 'Bundesliga', url: 'https://understat.com/league/Bundesliga/2025', name: 'Bundesliga' },
+  { id: 'Serie_A',    url: 'https://understat.com/league/Serie_A/2025',    name: 'Serie A' },
+  { id: 'Ligue_1',    url: 'https://understat.com/league/Ligue_1/2025',    name: 'Ligue 1' },
 ]
 
 interface UnderstatPlayer {
@@ -139,11 +139,15 @@ export async function POST() {
         },
         signal: AbortSignal.timeout(30000),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${league.name}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status} (${res.statusText}) für ${league.name} — Cloudflare blockiert möglicherweise Server-Requests`)
       const html = await res.text()
       const hasPlayersData = html.includes('playersData')
       const stats = parseUnderstatPlayers(html)
-      leagueSummary.push(`${league.name}: ${stats.size} players${!hasPlayersData ? ' [playersData not found in HTML]' : ''}`)
+      leagueSummary.push(
+        hasPlayersData
+          ? `${league.name}: ${stats.size} Spieler`
+          : `${league.name}: playersData nicht gefunden (HTML ${html.length} Bytes) — Seite blockiert oder Struktur geändert`
+      )
 
       // Merge — first league (EPL) wins for duplicate players
       for (const [name, data] of stats) {

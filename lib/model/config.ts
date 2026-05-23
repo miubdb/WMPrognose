@@ -17,6 +17,8 @@ export const MODEL_WEIGHTS = {
   heat: -0.018,          // pro WBGT-Grad über 28°C (für schlecht adaptierte Teams)
   attackDefense: 0.25,   // pro Differenz-Einheit (attackRating - defenseRating_opponent) / 100
                           // 15-Punkte-Vorteil → ~3.7%, 30 Punkte → ~7.8%, max clamp 0.18
+  setPiece: 0.20,        // pro Differenz-Einheit setPieceRating / 100
+                          // 20-Punkte-Vorteil → ~4%, Quelle: ~28% aller Tore aus Standards
   pressure: {
     mustWin: 0.049,      // ln(1.05)
     alreadyThrough: -0.030, // ln(0.97)

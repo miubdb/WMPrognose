@@ -853,6 +853,29 @@ export function analyzeMatch(
     explanation: 'Maher-Modell: Expected Goals aus Angriffsstärke gegen Defensivstärke des Gegners — für jedes Team unabhängig berechnet.',
   })
 
+  // 9b. Standards / Set-Pieces (~28% aller WM-Tore)
+  {
+    const spDiff = (teamA.setPieceRating - teamB.setPieceRating) / 100
+    const spLogA = clampLogEffect(MODEL_WEIGHTS.setPiece * spDiff, 0.10)
+    const spLogB = clampLogEffect(-MODEL_WEIGHTS.setPiece * spDiff, 0.10)
+    if (Math.abs(spDiff) > 0.05) {
+      factors.push({
+        category: 'squad',
+        label: 'Standards & Set-Pieces',
+        source: 'Set-Piece-Rating (allTeams)',
+        valueA: `Set-Piece-Rating ${teamA.setPieceRating}`,
+        valueB: `Set-Piece-Rating ${teamB.setPieceRating}`,
+        logEffectA: spLogA,
+        logEffectB: spLogB,
+        effectA: logEffectToLinear(spLogA),
+        effectB: logEffectToLinear(spLogB),
+        confidence: 0.55,
+        isCalibrated: false,
+        explanation: `Ca. 28% aller Tore entstehen aus Standards. Teams mit höherem Set-Piece-Rating (Freistöße, Ecken, Einwürfe) erzielen statistisch mehr Tore aus ruhenden Bällen.`,
+      })
+    }
+  }
+
   // 10. Diaspora-Support
   const diasA = hasDiasporaSupport(match.teamAId, match.venueId)
   const diasB = hasDiasporaSupport(match.teamBId, match.venueId)
