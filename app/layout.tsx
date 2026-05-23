@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/tournament" className="hover:text-white transition-colors text-emerald-400/80">Turnierrechner</Link>
               <Link href="/simulation" className="hover:text-white transition-colors text-violet-400/80">WM-Simulation</Link>
               <Link href="/teams" className="hover:text-white transition-colors">Teams</Link>
+              <Link href="/calibrate" className="hover:text-white transition-colors text-cyan-400/80">Kalibrierung</Link>
               <Link href="/admin" className="hover:text-white transition-colors text-amber-500/80">Admin</Link>
             </nav>
           </div>
