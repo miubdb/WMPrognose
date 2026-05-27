@@ -28,10 +28,11 @@ export function computeDataQuality(
 
   const lineupSet = startingXI.length >= 11
 
-  // ELO-Frische: fallback-Apr2025 = 0.5, wikipedia = 0.8, kein Wert = 0.3
-  const eloFreshness = eloSource === 'wikipedia-elo' ? 0.85
-    : eloSource === 'fallback-apr2025' ? 0.55
+  // ELO-Frische: eloratings.net = 0.90, wikipedia = 0.85, manual = 0.65, fallback = 0.55, unbekannt = 0.30
+  const eloFreshness = eloSource?.startsWith('eloratings.net') ? 0.90
+    : eloSource === 'wikipedia-elo' ? 0.85
     : eloSource === 'manual-text' ? 0.65
+    : eloSource === 'fallback-apr2025' ? 0.55
     : 0.30
 
   const overall = completeness * 0.3 + xgCoverage * 0.3 + eloFreshness * 0.2 + (lineupSet ? 0.2 : 0.0)
@@ -40,7 +41,7 @@ export function computeDataQuality(
   if (!lineupSet) warnings.push('Startelf noch nicht eingetragen — Gesamtkader wird verwendet')
   if (xgCoverage < 0.3) warnings.push(`Nur ${Math.round(xgCoverage * 100)}% der Spieler haben xG-Daten`)
   if (xgCoverage === 0) warnings.push('Keine xG-Statistiken — Saisonform-Faktor entfällt')
-  if (eloFreshness < 0.6) warnings.push('ELO-Ratings nicht frisch — Fallback-Werte vom April 2025')
+  if (eloFreshness < 0.6) warnings.push('ELO-Ratings veraltet oder nicht vorhanden')
 
   return { completeness, xgCoverage, eloFreshness, lineupSet, overall, warnings }
 }
