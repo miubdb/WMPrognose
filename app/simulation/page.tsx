@@ -178,8 +178,8 @@ export default function SimulationPage() {
                   <th className="px-3 py-3 text-left w-8">#</th>
                   <th className="px-3 py-3 text-left">Team</th>
                   <th className="px-3 py-3 text-center">Gr.</th>
-                  <th className="px-3 py-3 text-left min-w-[120px]">Gruppe ✓</th>
-                  <th className="px-3 py-3 text-left min-w-[120px]">R32 ✓</th>
+                  <th className="px-3 py-3 text-left min-w-[120px]">Gruppe weiter</th>
+                  <th className="px-3 py-3 text-left min-w-[120px]">Achtelfinale</th>
                   <th className="px-3 py-3 text-left min-w-[120px]">Viertelfinale</th>
                   <th className="px-3 py-3 text-left min-w-[120px]">Halbfinale</th>
                   <th className="px-3 py-3 text-left min-w-[120px]">Finale</th>

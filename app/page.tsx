@@ -9,6 +9,20 @@ import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function fmtDateHeader(dateStr: string): string {
+  const today = todayStr()
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  if (dateStr === today) return 'Heute'
+  if (dateStr === tomorrow) return 'Morgen'
+  const [, mm, dd] = dateStr.split('-')
+  const weekday = new Date(dateStr).toLocaleDateString('de-DE', { weekday: 'short' })
+  return `${weekday}, ${dd}.${mm}.`
+}
+
 function ProbBar({ probA, probDraw, probB, nameA, nameB }: {
   probA: number; probDraw: number; probB: number; nameA: string; nameB: string
 }) {
@@ -55,7 +69,8 @@ function MatchCard({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const isPast = new Date(match.kickoffUTC) < new Date()
+  const kickoff = new Date(`${match.date}T${match.kickoffUTC}:00Z`)
+  const isPast = kickoff.getTime() + 110 * 60 * 1000 < Date.now() // ~110 min nach Anpfiff
 
   const confLabel = {
     'very_high': { label: 'Sehr sicher', color: 'text-emerald-400' },
@@ -282,6 +297,7 @@ function MatchCard({
 export default function Dashboard() {
   const [activeGroup, setActiveGroup] = useState('Alle')
   const [matchday, setMatchday] = useState(0)
+  const [filterDate, setFilterDate] = useState<string | null>(null)
   const [squadData, setSquadData] = useState<Record<string, SquadSummary>>({})
   const [eloOverrides, setEloOverrides] = useState<Record<string, number>>({})
   const [results, setResults] = useState<Record<string, MatchResult>>({})
@@ -308,6 +324,7 @@ export default function Dashboard() {
         const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
         if (activeGroup !== 'Alle' && match.group !== activeGroup) return false
         if (matchday !== 0 && match.matchday !== matchday) return false
+        if (filterDate && match.date !== filterDate) return false
         return true
       })
       .sort((a, b) => {
@@ -316,7 +333,19 @@ export default function Dashboard() {
         const d = ma.date.localeCompare(mb.date)
         return d !== 0 ? d : ma.kickoffUTC.localeCompare(mb.kickoffUTC)
       })
-  }, [activeGroup, matchday, squadData, eloOverrides])
+  }, [activeGroup, matchday, filterDate, squadData, eloOverrides])
+
+  // Group by date for display
+  const byDate = useMemo(() => {
+    const map: { date: string; items: typeof analyses }[] = []
+    for (const a of analyses) {
+      const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
+      const last = map[map.length - 1]
+      if (last?.date === match.date) last.items.push(a)
+      else map.push({ date: match.date, items: [a] })
+    }
+    return map
+  }, [analyses])
 
   return (
     <div className="space-y-6">
@@ -329,12 +358,22 @@ export default function Dashboard() {
 
       <div className="space-y-2">
         <div className="flex gap-1 flex-wrap">
+          <button
+            onClick={() => { setFilterDate(todayStr()); setMatchday(0); setActiveGroup('Alle') }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+              filterDate === todayStr()
+                ? 'bg-yellow-500 text-black'
+                : 'bg-gray-800 text-yellow-500/70 hover:text-yellow-400'
+            }`}
+          >
+            Heute
+          </button>
           {GROUPS.map(g => (
             <button
               key={g}
-              onClick={() => setActiveGroup(g)}
+              onClick={() => { setActiveGroup(g); setFilterDate(null) }}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                activeGroup === g
+                activeGroup === g && !filterDate
                   ? 'bg-emerald-500 text-black'
                   : 'bg-gray-800 text-gray-400 hover:text-white'
               }`}
@@ -348,9 +387,9 @@ export default function Dashboard() {
           {[0, 1, 2, 3].map(d => (
             <button
               key={d}
-              onClick={() => setMatchday(d)}
+              onClick={() => { setMatchday(d); setFilterDate(null) }}
               className={`px-3 py-1 rounded-lg text-xs transition-colors ${
-                matchday === d
+                matchday === d && !filterDate
                   ? 'bg-gray-700 text-white'
                   : 'bg-gray-800 text-gray-500 hover:text-white'
               }`}
@@ -363,14 +402,28 @@ export default function Dashboard() {
 
       <p className="text-xs text-gray-600">{analyses.length} Spiele · klicken für vollständige Analyse</p>
 
-      <div className="space-y-2">
-        {analyses.map(a => (
-          <MatchCard
-            key={a.matchId}
-            analysis={a}
-            result={results[a.matchId]}
-            onResultSaved={handleResultSaved}
-          />
+      <div className="space-y-4">
+        {byDate.map(({ date, items }) => (
+          <div key={date}>
+            <div className={`text-xs font-semibold uppercase tracking-wider mb-2 ${
+              date === todayStr() ? 'text-yellow-400' : 'text-gray-600'
+            }`}>
+              {fmtDateHeader(date)}
+              <span className="text-gray-700 font-normal normal-case tracking-normal ml-2">
+                {items.length} Spiel{items.length !== 1 ? 'e' : ''}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {items.map(a => (
+                <MatchCard
+                  key={a.matchId}
+                  analysis={a}
+                  result={results[a.matchId]}
+                  onResultSaved={handleResultSaved}
+                />
+              ))}
+            </div>
+          </div>
         ))}
         {analyses.length === 0 && (
           <div className="text-center text-gray-600 py-16 bg-gray-900 border border-gray-800 rounded-xl text-sm">
