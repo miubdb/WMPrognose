@@ -82,12 +82,12 @@ export const COACH_CONFIG = {
 } as const
 
 export const MODEL_META = {
-  version: '2.1.0-calibrated',
+  version: '2.2.0-calibrated',
   baseGoalRate: 1.50,       // Kalibriert: WM 2022 Grid Search Optimum (vorher 1.40)
-  dixonColesRho: 0.12,      // Kalibriert: Grid Search Optimum gegen WM 2022 (vorher 0.08)
+  dixonColesRho: 0.04,      // Kalibriert: Grid Search Optimum gegen WM 2022 (vorher 0.12) — RPS 0.2011 vs 0.2014
   maxGoals: 10,             // Score-Matrix 0..10
   logLambdaMin: Math.log(0.3),
   logLambdaMax: Math.log(4.0),
   calibrated: true,
-  calibrationDataset: 'WM 2022 Gruppenphase — RPS-optimal (Grid Search 210 Kombinationen)',
+  calibrationDataset: 'WM 2022 Gruppenphase — RPS-optimal (Grid Search 210 Kombinationen, inkl. Motivation/Rotation)',
 } as const
