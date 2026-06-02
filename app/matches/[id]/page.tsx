@@ -7,25 +7,42 @@ import { computeDataQuality } from '@/lib/model/dataQuality'
 import { computeGroupStandings, computePressure } from '@/lib/standings'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { MODEL_META } from '@/lib/model/config'
 import { LineupEditor } from './LineupEditor'
 import type { LineupPlayer } from './LineupEditor'
 
 export const dynamic = 'force-dynamic'
 
-function topScorelines(xgA: number, xgB: number, n = 8): { i: number; j: number; p: number }[] {
+function topScorelines(xgA: number, xgB: number, rho: number, n = 8): { i: number; j: number; p: number }[] {
   const pmf = (lambda: number, k: number) => {
     if (lambda <= 0) return k === 0 ? 1 : 0
     let logP = k * Math.log(lambda) - lambda
     for (let i = 1; i <= k; i++) logP -= Math.log(i)
     return Math.exp(logP)
   }
+  const dcFactor = (i: number, j: number) => {
+    if (i === 0 && j === 0) return 1 - rho * xgA * xgB
+    if (i === 0 && j === 1) return 1 + rho * xgA
+    if (i === 1 && j === 0) return 1 + rho * xgB
+    if (i === 1 && j === 1) return 1 - rho
+    return 1
+  }
   const scores: { i: number; j: number; p: number }[] = []
   for (let i = 0; i <= 7; i++) {
     for (let j = 0; j <= 7; j++) {
-      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) })
+      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dcFactor(i, j) })
     }
   }
-  return scores.sort((a, b) => b.p - a.p).slice(0, n)
+  // Outcome-priority: predicted winner's scores first, draws second, underdog's scores last
+  const favorA = xgA >= xgB
+  const outcomeRank = (i: number, j: number) => {
+    if (i > j) return favorA ? 0 : 2
+    if (i === j) return 1
+    return favorA ? 2 : 0
+  }
+  return scores
+    .sort((a, b) => outcomeRank(a.i, a.j) - outcomeRank(b.i, b.j) || b.p - a.p)
+    .slice(0, n)
 }
 
 function fmtEffect(e: number): string {
@@ -440,7 +457,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Wahrscheinlichste Ergebnisse</h2>
         <div className="grid grid-cols-4 gap-2">
-          {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB).map(({ i, j, p }) => {
+          {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho).map(({ i, j, p }) => {
             const winner = i > j ? 'A' : j > i ? 'B' : 'X'
             const color = winner === 'A' ? 'border-emerald-800/60 bg-emerald-900/10' : winner === 'B' ? 'border-blue-800/60 bg-blue-900/10' : 'border-gray-700 bg-gray-800/30'
             return (
@@ -451,7 +468,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             )
           })}
         </div>
-        <p className="text-[10px] text-gray-700 mt-3">Poisson-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt</p>
+        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt</p>
       </div>
 
       {/* Lineup Editor */}
