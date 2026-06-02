@@ -5,7 +5,7 @@ import { computeScorelineMatrix } from '@/src/model/poisson'
 import { applyDixonColesCorrection, aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
 import { computeLambda, clampLogEffect } from '@/lib/model/logLambda'
 import { MODEL_WEIGHTS, MODEL_META } from '@/lib/model/config'
-import { computeTournamentHeritage } from '@/lib/model/coachScore'
+import { corePredict, type MatchMotivation } from '@/lib/model/corePredict'
 
 // Name-zu-ID Mapping für historische Daten
 // null = nicht bei WM 2026 → Fallback auf historische ELO-Werte aus Match-Record
@@ -91,54 +91,25 @@ function resolveTeam(
 }
 
 /**
- * Berechnet [winA, draw, winB] für ein historisches Match
- * wahlweise mit vollem Modell oder als reines ELO-Baseline.
+ * Berechnet [winA, draw, winB] — nutzt die unified corePredict Funktion.
+ * eloOnlyMode für ELO-Baseline: nur ELO, keine weiteren Features.
  */
 function predictForTeams(
   teamA: TeamBasic,
   teamB: TeamBasic,
+  motivation: MatchMotivation = {},
   eloOnlyMode = false
 ): [number, number, number] {
-  const eloA = teamA.eloRating ?? 1500
-  const eloB = teamB.eloRating ?? 1500
-  const eloDiff = eloA - eloB
-  const eloLogA = clampLogEffect(MODEL_WEIGHTS.elo * eloDiff, 0.25)
-
-  let xgA: number
-  let xgB: number
-
   if (eloOnlyMode) {
-    // Nur ELO-Signal, keine weiteren Features
-    xgA = computeLambda(MODEL_META.baseGoalRate, [eloLogA])
-    xgB = computeLambda(MODEL_META.baseGoalRate, [-eloLogA])
-  } else {
-    const mvA = teamA.squadMarketValueM ?? 200
-    const mvB = teamB.squadMarketValueM ?? 200
-    const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
-    const mvLogA = clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio)
-
-    const expA = teamA.worldCupTitles * 3 + teamA.worldCupAppearances
-    const expB = teamB.worldCupTitles * 3 + teamB.worldCupAppearances
-    const expLogA = clampLogEffect(MODEL_WEIGHTS.experience * (expA - expB))
-
-    // Absolute heritage bonus per team (independent of opponent)
-    const heritageLogA = computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
-    const heritageLogB = computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
-
-    const attackDiffA = (teamA.attackRating - teamB.defenseRating) / 100
-    const attackDiffB = (teamB.attackRating - teamA.defenseRating) / 100
-    const attackLogA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffA)
-    const attackLogB = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffB)
-
-    xgA = computeLambda(MODEL_META.baseGoalRate, [eloLogA, mvLogA, expLogA, heritageLogA, attackLogA])
-    xgB = computeLambda(MODEL_META.baseGoalRate, [-eloLogA, -mvLogA, -expLogA, heritageLogB, attackLogB])
+    const eloLogA = clampLogEffect(MODEL_WEIGHTS.elo * ((teamA.eloRating ?? 1500) - (teamB.eloRating ?? 1500)), 0.25)
+    const xgA = computeLambda(MODEL_META.baseGoalRate, [eloLogA])
+    const xgB = computeLambda(MODEL_META.baseGoalRate, [-eloLogA])
+    const rawMatrix = computeScorelineMatrix(xgA, xgB)
+    const dcMatrix = applyDixonColesCorrection(rawMatrix, xgA, xgB)
+    const { winA, draw, winB } = aggregateOutcomeProbabilities(dcMatrix)
+    return [winA, draw, winB]
   }
-
-  const rawMatrix = computeScorelineMatrix(xgA, xgB)
-  const dcMatrix = applyDixonColesCorrection(rawMatrix, xgA, xgB)
-  const { winA, draw, winB } = aggregateOutcomeProbabilities(dcMatrix)
-
-  return [winA, draw, winB]
+  return corePredict(teamA, teamB, motivation)
 }
 
 export interface EvaluationResult {
@@ -184,10 +155,17 @@ export function evaluateModel(matches: HistoricalMatch[] = HISTORICAL_MATCHES): 
     const teamB = resolveTeam(m.awayTeam, m.awayElo)
     if (!teamA || !teamB) continue
 
-    // Full model prediction
-    const [predWin, predDraw, predLoss] = predictForTeams(teamA, teamB, false)
-    // ELO-only baseline
-    const [eloWin, eloDraw, eloLoss] = predictForTeams(teamA, teamB, true)
+    // Motivation context from match data
+    const motivation: MatchMotivation = {
+      alreadyThroughA: m.alreadyThroughHome ?? false,
+      alreadyThroughB: m.alreadyThroughAway ?? false,
+      mustWinA: m.mustWinHome ?? false,
+      mustWinB: m.mustWinAway ?? false,
+    }
+    // Full model prediction (with motivation)
+    const [predWin, predDraw, predLoss] = predictForTeams(teamA, teamB, motivation, false)
+    // ELO-only baseline (no motivation)
+    const [eloWin, eloDraw, eloLoss] = predictForTeams(teamA, teamB, {}, true)
 
     // For KO matches with penalties: if it went to penalties, treat as draw for 90-min outcome
     const effectiveHomeGoals = m.homeGoals

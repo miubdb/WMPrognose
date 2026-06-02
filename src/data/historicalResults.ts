@@ -9,6 +9,11 @@ export interface HistoricalMatch {
   group?: string      // 'A'..'H' for group phase
   homeElo?: number    // historical ELO at tournament start
   awayElo?: number
+  // Motivation / Rotation context (only set for known cases)
+  alreadyThroughHome?: boolean  // home team already qualified → resting key players
+  alreadyThroughAway?: boolean  // away team already qualified → resting key players
+  mustWinHome?: boolean          // home team must win to advance
+  mustWinAway?: boolean          // away team must win to advance
 }
 
 export const HISTORICAL_MATCHES: HistoricalMatch[] = [
@@ -40,7 +45,7 @@ export const HISTORICAL_MATCHES: HistoricalMatch[] = [
   { homeTeam: 'Tunisia',     awayTeam: 'Australia',   homeGoals: 0, awayGoals: 1, tournament: 'WM2022', phase: 'group', group: 'D', homeElo: 1815, awayElo: 1769 },
   { homeTeam: 'France',      awayTeam: 'Denmark',     homeGoals: 2, awayGoals: 1, tournament: 'WM2022', phase: 'group', group: 'D', homeElo: 2003, awayElo: 1943 },
   { homeTeam: 'Australia',   awayTeam: 'Denmark',     homeGoals: 1, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'D', homeElo: 1769, awayElo: 1943 },
-  { homeTeam: 'Tunisia',     awayTeam: 'France',      homeGoals: 1, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'D', homeElo: 1815, awayElo: 2003 },
+  { homeTeam: 'Tunisia',     awayTeam: 'France',      homeGoals: 1, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'D', homeElo: 1815, awayElo: 2003, alreadyThroughAway: true },
   // Gruppe E: Spain, Germany, Japan, Costa Rica
   { homeTeam: 'Spain',       awayTeam: 'Costa Rica',  homeGoals: 7, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'E', homeElo: 1964, awayElo: 1712 },
   { homeTeam: 'Germany',     awayTeam: 'Japan',       homeGoals: 1, awayGoals: 2, tournament: 'WM2022', phase: 'group', group: 'E', homeElo: 1955, awayElo: 1820 },
@@ -60,7 +65,7 @@ export const HISTORICAL_MATCHES: HistoricalMatch[] = [
   { homeTeam: 'Brazil',      awayTeam: 'Serbia',      homeGoals: 2, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'G', homeElo: 2162, awayElo: 1857 },
   { homeTeam: 'Cameroon',    awayTeam: 'Serbia',      homeGoals: 3, awayGoals: 3, tournament: 'WM2022', phase: 'group', group: 'G', homeElo: 1700, awayElo: 1857 },
   { homeTeam: 'Brazil',      awayTeam: 'Switzerland', homeGoals: 1, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'G', homeElo: 2162, awayElo: 1895 },
-  { homeTeam: 'Cameroon',    awayTeam: 'Brazil',      homeGoals: 1, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'G', homeElo: 1700, awayElo: 2162 },
+  { homeTeam: 'Cameroon',    awayTeam: 'Brazil',      homeGoals: 1, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'G', homeElo: 1700, awayElo: 2162, alreadyThroughAway: true },
   { homeTeam: 'Serbia',      awayTeam: 'Switzerland', homeGoals: 2, awayGoals: 3, tournament: 'WM2022', phase: 'group', group: 'G', homeElo: 1857, awayElo: 1895 },
   // Gruppe H: Uruguay, South Korea, Portugal, Ghana
   { homeTeam: 'Uruguay',     awayTeam: 'South Korea', homeGoals: 0, awayGoals: 0, tournament: 'WM2022', phase: 'group', group: 'H', homeElo: 1934, awayElo: 1729 },

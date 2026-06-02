@@ -19,6 +19,7 @@ import type { DataQualityScore } from '@/lib/model/types'
 import { computeTournamentHeritage } from '@/lib/model/coachScore'
 import { computeSquadRating, type SquadPlayer } from '@/lib/model/squadRating'
 import { computePenaltyWinProbability, defaultPenaltySkills } from '@/lib/model/penaltyShootout'
+import { MOTIVATION_WEIGHTS } from '@/lib/model/corePredict'
 
 // ─── TeamData Builder ──────────────────────────────────────────────────────────
 
@@ -912,28 +913,40 @@ export function analyzeMatch(
     })
   }
 
-  // 11. Ausgangslage / Qualifikationsdruck
+  // 11. Ausgangslage / Motivation / Rotation
   if (pressure) {
-    const pressLogA = pressure.A.mustWin ? MODEL_WEIGHTS.pressure.mustWin : pressure.A.alreadyThrough ? MODEL_WEIGHTS.pressure.alreadyThrough : 0
-    const pressLogB = pressure.B.mustWin ? MODEL_WEIGHTS.pressure.mustWin : pressure.B.alreadyThrough ? MODEL_WEIGHTS.pressure.alreadyThrough : 0
-    const labelA = pressure.A.alreadyOut ? 'Ausgeschieden' : pressure.A.alreadyThrough ? 'Schon qualifiziert' : pressure.A.mustWin ? 'Muss gewinnen' : 'Normaler Druck'
-    const labelB = pressure.B.alreadyOut ? 'Ausgeschieden' : pressure.B.alreadyThrough ? 'Schon qualifiziert' : pressure.B.mustWin ? 'Muss gewinnen' : 'Normaler Druck'
-    // Net relative effect: own pressure advantage minus half of opponent's
-    const netPressLogA = clampLogEffect(pressLogA - pressLogB * 0.5)
-    const netPressLogB = clampLogEffect(pressLogB - pressLogA * 0.5)
+    // Rotation: already qualified → -10% xG (resting key players)
+    // Must win: aggressive play → +5% xG
+    // Already out: nothing to lose → +3% xG
+    const motivLogA = pressure.A.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
+      : pressure.A.mustWin ? MOTIVATION_WEIGHTS.mustWin
+      : pressure.A.alreadyOut ? MOTIVATION_WEIGHTS.alreadyOut
+      : 0
+    const motivLogB = pressure.B.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
+      : pressure.B.mustWin ? MOTIVATION_WEIGHTS.mustWin
+      : pressure.B.alreadyOut ? MOTIVATION_WEIGHTS.alreadyOut
+      : 0
+    const labelA = pressure.A.alreadyOut ? 'Ausgeschieden'
+      : pressure.A.alreadyThrough ? 'Qualifiziert — Rotation wahrscheinlich'
+      : pressure.A.mustWin ? 'Muss gewinnen'
+      : 'Normaler Druck'
+    const labelB = pressure.B.alreadyOut ? 'Ausgeschieden'
+      : pressure.B.alreadyThrough ? 'Qualifiziert — Rotation wahrscheinlich'
+      : pressure.B.mustWin ? 'Muss gewinnen'
+      : 'Normaler Druck'
     factors.push({
       category: 'context',
-      label: 'Ausgangslage / Gruppendruck',
+      label: 'Ausgangslage / Motivation / Rotation',
       source: 'Gruppenstand (live)',
       valueA: labelA,
       valueB: labelB,
-      logEffectA: netPressLogA,
-      logEffectB: netPressLogB,
-      effectA: logEffectToLinear(netPressLogA),
-      effectB: logEffectToLinear(netPressLogB),
-      confidence: 0.65,
+      logEffectA: motivLogA,
+      logEffectB: motivLogB,
+      effectA: logEffectToLinear(motivLogA),
+      effectB: logEffectToLinear(motivLogB),
+      confidence: 0.70,
       isCalibrated: false,
-      explanation: 'Teams die zwingend gewinnen müssen, spielen risikoreicher und erzielen statistisch mehr Tore — aber kassieren auch mehr. Teams die bereits qualifiziert sind, rotieren häufiger.',
+      explanation: 'Bereits qualifizierte Teams schonen Stammspieler (Rotation: −10% xG). Teams die gewinnen müssen, spielen aggressiver (+5%). Teams ohne Chance spielen offener (+3%).',
     })
   }
 

@@ -8,12 +8,9 @@
 
 import { HISTORICAL_MATCHES } from '@/src/data/historicalResults'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
-import { computeScorelineMatrix } from '@/src/model/poisson'
-import { aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
 import { rps, logLoss, brierScore, RANDOM_RPS } from '@/lib/model/evaluation'
-import { clampLogEffect } from '@/lib/model/logLambda'
 import { MODEL_META, MODEL_WEIGHTS } from '@/lib/model/config'
-import { computeTournamentHeritage } from '@/lib/model/coachScore'
+import { corePredict, type CoreTeamData, type MatchMotivation } from '@/lib/model/corePredict'
 
 // ─── Name-zu-ID Mapping (aus evaluateModel.ts) ────────────────────────────────
 
@@ -72,110 +69,12 @@ export interface CalibrationSummary {
   top10: CalibrationResult[]
 }
 
-// ─── Dixon-Coles Korrekturfunktion mit überschreibbarem rho ──────────────────
-
-function dixonColesFactor(
-  goalsA: number,
-  goalsB: number,
-  lambdaA: number,
-  lambdaB: number,
-  rho: number
-): number {
-  if (goalsA === 0 && goalsB === 0) return 1 - rho * lambdaA * lambdaB
-  if (goalsA === 0 && goalsB === 1) return 1 + rho * lambdaA
-  if (goalsA === 1 && goalsB === 0) return 1 + rho * lambdaB
-  if (goalsA === 1 && goalsB === 1) return 1 - rho
-  return 1.0
-}
-
-function applyDixonColesCorrectionWithRho(
-  matrix: { goalsA: number; goalsB: number; probability: number }[][],
-  lambdaA: number,
-  lambdaB: number,
-  rho: number
-): { goalsA: number; goalsB: number; probability: number }[][] {
-  const corrected: { goalsA: number; goalsB: number; probability: number }[][] = []
-  let totalProb = 0
-
-  for (let a = 0; a < matrix.length; a++) {
-    corrected[a] = []
-    for (let b = 0; b < matrix[a].length; b++) {
-      const factor = dixonColesFactor(a, b, lambdaA, lambdaB, rho)
-      const newProb = matrix[a][b].probability * factor
-      corrected[a][b] = { goalsA: a, goalsB: b, probability: newProb }
-      totalProb += newProb
-    }
-  }
-
-  if (totalProb > 0) {
-    for (let a = 0; a < corrected.length; a++) {
-      for (let b = 0; b < corrected[a].length; b++) {
-        corrected[a][b].probability /= totalProb
-      }
-    }
-  }
-
-  return corrected
-}
-
-// ─── Schnelle Prognose-Funktion mit überschreibbaren Parametern ───────────────
-
-const LOG_LAMBDA_MIN = Math.log(0.3)
-const LOG_LAMBDA_MAX = Math.log(4.0)
-
-function quickPredict(
-  eloDiffAminusB: number,
-  mvRatio: number,       // log10(mvA/mvB)
-  expDiff: number,       // expA - expB (titles*3 + appearances)
-  heritageLogA: number,  // absolute heritage bonus for team A
-  heritageLogB: number,  // absolute heritage bonus for team B
-  attackDiffA: number,   // (attackA - defB) / 100
-  attackDiffB: number,   // (attackB - defA) / 100
-  baseGoalRate: number,
-  eloWeight: number,
-  rho: number
-): { winA: number; draw: number; winB: number } {
-  // ELO-Effekt (mit überschriebenem Gewicht)
-  const eloLogA = clampLogEffect(eloWeight * eloDiffAminusB, 0.25)
-
-  // Marktwert-Effekt (fixes Gewicht aus MODEL_WEIGHTS)
-  const mvLogA = clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio)
-
-  // Erfahrungs-Effekt (relatives Differenz-Signal)
-  const expLogA = clampLogEffect(MODEL_WEIGHTS.experience * expDiff)
-
-  // Angriff vs. Abwehr (fixes Gewicht)
-  const attackLogA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffA)
-  const attackLogB = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffB)
-
-  // log(lambda) berechnen — heritage ist absolut pro Team
-  const logLambdaA = Math.log(baseGoalRate) + eloLogA + mvLogA + expLogA + heritageLogA + attackLogA
-  const logLambdaB = Math.log(baseGoalRate) + (-eloLogA) + (-mvLogA) + (-expLogA) + heritageLogB + attackLogB
-
-  const xgA = Math.exp(Math.max(LOG_LAMBDA_MIN, Math.min(LOG_LAMBDA_MAX, logLambdaA)))
-  const xgB = Math.exp(Math.max(LOG_LAMBDA_MIN, Math.min(LOG_LAMBDA_MAX, logLambdaB)))
-
-  // Poisson Score-Matrix
-  const rawMatrix = computeScorelineMatrix(xgA, xgB)
-
-  // Dixon-Coles mit überschriebenem rho
-  const correctedMatrix = applyDixonColesCorrectionWithRho(rawMatrix, xgA, xgB, rho)
-
-  return aggregateOutcomeProbabilities(correctedMatrix)
-}
-
 // ─── Vorberechnete Match-Daten aus historischen Ergebnissen ──────────────────
 
 interface PreparedMatch {
-  homeId: string
-  awayId: string
-  eloDiff: number     // homeElo - awayElo
-  mvRatio: number     // log10(mvHome / mvAway)
-  expDiff: number
-  heritageLogA: number  // absolute heritage bonus for home team
-  heritageLogB: number  // absolute heritage bonus for away team
-  attackDiffA: number // (homeAttack - awayDefense) / 100
-  attackDiffB: number // (awayAttack - homeDefense) / 100
+  teamA: CoreTeamData
+  teamB: CoreTeamData
+  motivation: MatchMotivation
   outcome: 'W' | 'D' | 'L'
   observed: [number, number, number]
 }
@@ -192,28 +91,20 @@ function prepareMatches(): PreparedMatch[] {
     const awayTeam = TEAM_BY_ID[awayId]
     if (!homeTeam || !awayTeam) continue
 
-    const eloA = homeTeam.eloRating ?? 1500
-    const eloB = awayTeam.eloRating ?? 1500
-    const mvA = homeTeam.squadMarketValueM ?? 200
-    const mvB = awayTeam.squadMarketValueM ?? 200
-    const expA = homeTeam.worldCupTitles * 3 + homeTeam.worldCupAppearances
-    const expB = awayTeam.worldCupTitles * 3 + awayTeam.worldCupAppearances
-
     const outcome: 'W' | 'D' | 'L' =
       m.homeGoals > m.awayGoals ? 'W' : m.homeGoals === m.awayGoals ? 'D' : 'L'
     const observed: [number, number, number] =
       outcome === 'W' ? [1, 0, 0] : outcome === 'D' ? [0, 1, 0] : [0, 0, 1]
 
     result.push({
-      homeId,
-      awayId,
-      eloDiff: eloA - eloB,
-      mvRatio: mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0,
-      expDiff: expA - expB,
-      heritageLogA: computeTournamentHeritage(homeTeam.worldCupTitles, homeTeam.worldCupAppearances),
-      heritageLogB: computeTournamentHeritage(awayTeam.worldCupTitles, awayTeam.worldCupAppearances),
-      attackDiffA: (homeTeam.attackRating - awayTeam.defenseRating) / 100,
-      attackDiffB: (awayTeam.attackRating - homeTeam.defenseRating) / 100,
+      teamA: homeTeam,
+      teamB: awayTeam,
+      motivation: {
+        alreadyThroughA: m.alreadyThroughHome ?? false,
+        alreadyThroughB: m.alreadyThroughAway ?? false,
+        mustWinA: m.mustWinHome ?? false,
+        mustWinB: m.mustWinAway ?? false,
+      },
       outcome,
       observed,
     })
@@ -235,12 +126,7 @@ function evaluateParams(
   let totalBrier = 0
 
   for (const m of matches) {
-    const { winA, draw, winB } = quickPredict(
-      m.eloDiff, m.mvRatio, m.expDiff,
-      m.heritageLogA, m.heritageLogB,
-      m.attackDiffA, m.attackDiffB,
-      baseGoalRate, eloWeight, rho
-    )
+    const [winA, draw, winB] = corePredict(m.teamA, m.teamB, m.motivation, {}, { baseGoalRate, eloWeight, rho })
 
     const predicted: [number, number, number] = [winA, draw, winB]
     totalRPS += rps(predicted, m.observed)
