@@ -82,7 +82,7 @@ interface PreparedMatch {
 function prepareMatches(): PreparedMatch[] {
   const result: PreparedMatch[] = []
 
-  for (const m of HISTORICAL_MATCHES) {
+  for (const m of HISTORICAL_MATCHES.filter(m => m.tournament === 'WM2022')) {
     const homeId = NAME_TO_ID[m.homeTeam]
     const awayId = NAME_TO_ID[m.awayTeam]
     if (!homeId || !awayId) continue

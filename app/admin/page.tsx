@@ -4,32 +4,16 @@ import { useState } from 'react'
 import type { EvaluationResult } from '@/lib/evaluateModel'
 
 export default function AdminPage() {
-  // ELO auto-scrape
-  const [eloStatus, setEloStatus] = useState<string | null>(null)
-  const [eloLoading, setEloLoading] = useState(false)
-
-  // ELO manual
   const [eloManualText, setEloManualText] = useState('')
   const [eloManualStatus, setEloManualStatus] = useState<string | null>(null)
   const [eloManualLoading, setEloManualLoading] = useState(false)
 
-  // xG scrape
   const [xgStatus, setXgStatus] = useState<string | null>(null)
   const [xgLoading, setXgLoading] = useState(false)
 
-  // Evaluation
   const [evalLoading, setEvalLoading] = useState(false)
   const [evalResult, setEvalResult] = useState<EvaluationResult | null>(null)
   const [evalError, setEvalError] = useState<string | null>(null)
-
-  async function updateElo() {
-    setEloLoading(true); setEloStatus(null)
-    try {
-      const res = await fetch('/api/elo-update', { method: 'POST' })
-      setEloStatus(JSON.stringify(await res.json(), null, 2))
-    } catch (e) { setEloStatus(String(e)) }
-    setEloLoading(false)
-  }
 
   async function loadFallbackElo() {
     setEloManualLoading(true); setEloManualStatus(null)
@@ -39,8 +23,7 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'fallback' }),
       })
-      const data = await res.json()
-      setEloManualStatus(JSON.stringify(data, null, 2))
+      setEloManualStatus(JSON.stringify(await res.json(), null, 2))
     } catch (e) { setEloManualStatus(String(e)) }
     setEloManualLoading(false)
   }
@@ -87,50 +70,44 @@ export default function AdminPage() {
         <div>
           <h2 className="font-semibold text-gray-200">ELO-Ratings</h2>
           <p className="text-xs text-gray-500 mt-1">
-            ELO-Ratings bestimmen die Ausgangsstärke jedes Teams im Modell (Hvattum &amp; Arntzen 2010).
+            Täglich aktualisieren (z.B. jeden Morgen um 9 Uhr). Einfach die aktuellen ELO-Werte
+            als Text einfügen — ein Team pro Zeile, Format: <code className="bg-gray-800 px-1 rounded">Land 1234</code>
           </p>
         </div>
 
-        {/* Auto-scrape */}
-        <div className="space-y-2 border border-gray-800 rounded-lg p-3">
-          <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">Automatisch (Wikipedia)</div>
-          <p className="text-xs text-gray-600">Versucht, aktuelle ELO-Ratings von Wikipedia abzurufen. Kann fehlschlagen wenn die Seite blockiert.</p>
-          <button onClick={updateElo} disabled={eloLoading}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-gray-700 text-white text-sm rounded-lg transition-colors">
-            {eloLoading ? 'Lade...' : 'ELO von Wikipedia laden'}
-          </button>
-          {eloStatus && <pre className="text-xs text-gray-400 bg-gray-800 rounded p-3 overflow-auto max-h-40">{eloStatus}</pre>}
-        </div>
+        <div className="space-y-3">
+          <div className="text-xs text-gray-500 space-y-1">
+            <div>Akzeptierte Formate (auch CSV-Komma oder Tabulator):</div>
+            <div className="font-mono bg-gray-800 rounded p-2 text-gray-400 space-y-0.5">
+              <div>Deutschland 1944</div>
+              <div>France,2025</div>
+              <div>ARG	2057</div>
+            </div>
+            <div className="text-gray-600">Deutsche und englische Ländernamen sowie Kürzel (GER, FRA, ARG …) werden erkannt.</div>
+          </div>
 
-        {/* Manual / fallback */}
-        <div className="space-y-2 border border-gray-700 rounded-lg p-3">
-          <div className="text-xs font-medium text-gray-300 uppercase tracking-wider">Manuell / Offline-Fallback</div>
+          <textarea
+            value={eloManualText}
+            onChange={e => setEloManualText(e.target.value)}
+            placeholder={'Deutschland 1944\nFrankreich 2025\nArgentinien 2057\n...'}
+            rows={10}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-200 font-mono placeholder-gray-700 focus:outline-none focus:border-gray-500"
+          />
 
-          <button onClick={loadFallbackElo} disabled={eloManualLoading}
-            className="px-4 py-2 bg-amber-700 hover:bg-amber-600 disabled:bg-gray-700 text-white text-sm rounded-lg transition-colors">
-            {eloManualLoading ? 'Speichere...' : '📥 Offline-Werte laden (April 2025)'}
-          </button>
-          <p className="text-xs text-gray-600">
-            Lädt vorberechnete ELO-Werte für alle 48 WM-Teams direkt in die Datenbank — kein Internet nötig.
-            Werte basieren auf eloratings.net, Stand April 2025.
-          </p>
-
-          <div className="pt-2 border-t border-gray-800 space-y-2">
-            <div className="text-xs text-gray-500">Oder eigene Werte einfügen — ein Team pro Zeile, Format: <code className="bg-gray-800 px-1 rounded">Land 1234</code></div>
-            <textarea
-              value={eloManualText}
-              onChange={e => setEloManualText(e.target.value)}
-              placeholder={'Deutschland 1944\nFrankreich 2025\nArgentinien 2057\n...'}
-              rows={8}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-200 font-mono placeholder-gray-700 focus:outline-none focus:border-gray-500"
-            />
+          <div className="flex gap-2">
             <button onClick={saveManualElo} disabled={eloManualLoading || !eloManualText.trim()}
               className="px-4 py-2 bg-blue-700 hover:bg-blue-600 disabled:bg-gray-700 text-white text-sm rounded-lg transition-colors">
-              {eloManualLoading ? 'Speichere...' : 'Manuell gespeicherte ELO-Werte übernehmen'}
+              {eloManualLoading ? 'Speichere...' : 'ELO-Werte speichern'}
+            </button>
+            <button onClick={loadFallbackElo} disabled={eloManualLoading}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700 text-gray-300 text-sm rounded-lg transition-colors">
+              {eloManualLoading ? '...' : 'Offline-Werte (Apr 2025)'}
             </button>
           </div>
 
-          {eloManualStatus && <pre className="text-xs text-gray-400 bg-gray-800 rounded p-3 overflow-auto max-h-40">{eloManualStatus}</pre>}
+          {eloManualStatus && (
+            <pre className="text-xs text-gray-400 bg-gray-800 rounded p-3 overflow-auto max-h-40">{eloManualStatus}</pre>
+          )}
         </div>
       </div>
 
@@ -158,19 +135,18 @@ export default function AdminPage() {
         <div>
           <h2 className="font-semibold text-gray-200">Modell-Evaluation</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Testet das Modell gegen alle 48 Gruppenspiele der WM 2022 und berechnet RPS, Log Loss und Brier Score.
+            Testet das Modell gegen historische WM-Spiele (2014, 2018, 2022) und berechnet RPS, Log Loss und Brier Score.
           </p>
         </div>
         <button onClick={runEvaluation} disabled={evalLoading}
           className="px-4 py-2 bg-violet-700 hover:bg-violet-600 disabled:bg-gray-700 text-white text-sm rounded-lg transition-colors">
-          {evalLoading ? 'Berechne...' : 'Modell gegen WM 2022 testen'}
+          {evalLoading ? 'Berechne...' : 'Modell gegen WM 2014–2022 testen'}
         </button>
         {evalError && (
           <div className="text-xs text-red-400 bg-gray-800 rounded p-3">{evalError}</div>
         )}
         {evalResult && (
           <div className="space-y-4">
-            {/* Metriken */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-gray-800 rounded-lg p-3 space-y-1">
                 <div className="text-xs text-gray-500">RPS</div>
@@ -192,11 +168,11 @@ export default function AdminPage() {
               <span className={`font-medium ${evalResult.skillScore >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 Skill Score: {evalResult.skillScore >= 0 ? '+' : ''}{(evalResult.skillScore * 100).toFixed(1)}%
               </span>
+              <span className="text-gray-500">ELO-only: <span className="text-gray-400">{evalResult.eloOnlyRPS.toFixed(3)}</span></span>
             </div>
 
-            {/* Schlechteste 5 Vorhersagen */}
             <div>
-              <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Schlechteste 5 Vorhersagen (hoher RPS)</div>
+              <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Schlechteste 5 Vorhersagen</div>
               <div className="overflow-auto">
                 <table className="w-full text-xs text-gray-400">
                   <thead>
@@ -237,7 +213,7 @@ export default function AdminPage() {
       {/* Info */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-xs text-gray-600 space-y-1">
         <div className="font-medium text-gray-500">Hinweis: Datenquellen</div>
-        <div>• ELO-Ratings: Wikipedia (automatisch) oder manuell (Offline-Werte / eigene Eingabe)</div>
+        <div>• ELO-Ratings: Täglich manuell eintragen (z.B. eloratings.net CSV)</div>
         <div>• xG-Statistiken: understat.com (Big 5 europäische Ligen, Saison 2024/25)</div>
         <div>• Kaderdaten &amp; Marktwerte: Manuell über die Team-Seiten eingeben</div>
       </div>

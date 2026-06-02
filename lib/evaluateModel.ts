@@ -42,6 +42,23 @@ const NAME_TO_ID: Record<string, string | null> = {
   'Saudi Arabia': 'saudi_arabia',
   'Costa Rica': null,      // nicht bei WM 2026
   'Wales': null,           // nicht bei WM 2026
+  // WM 2018 zusätzliche Teams
+  'Russia': null,          // nicht bei WM 2026
+  'Egypt': 'egypt',
+  'Peru': null,            // nicht bei WM 2026
+  'Iceland': null,         // nicht bei WM 2026
+  'Nigeria': 'nigeria',
+  'Sweden': 'sweden',
+  'Colombia': 'colombia',
+  'Panama': 'panama',
+  // WM 2014 zusätzliche Teams
+  'Italy': null,           // nicht bei WM 2026
+  'Chile': 'chile',
+  'Greece': null,          // nicht bei WM 2026
+  'Ivory Coast': 'ivory_coast',
+  'Honduras': null,        // nicht bei WM 2026
+  'Bosnia': 'bosnia',
+  'Algeria': 'algeria',
 }
 
 /**
