@@ -5,7 +5,7 @@ import type { SquadSummary } from '@/lib/modelAdapter'
 export async function GET() {
   const [squadRes, eloRes, resultsRes] = await Promise.all([
     supabase.from('players').select('team_id, market_value_m, position, xg_per90, xga_per90'),
-    supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y'),
+    supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
   ])
 
@@ -46,8 +46,11 @@ export async function GET() {
 
   const eloOverrides: Record<string, number> = {}
   for (const row of eloRes.data ?? []) {
-    const delta = (row as { elo_delta_1y?: number | null }).elo_delta_1y ?? 0
-    eloOverrides[row.team_id] = row.elo_rating + Math.round(delta * 0.2)
+    // Bei Live-Turnier-ELO keinen Form-Bonus addieren — das ELO spiegelt bereits reale Ergebnisse wider
+    const formBonus = row.source === 'tournament-result'
+      ? 0
+      : Math.round(((row as { elo_delta_1y?: number | null }).elo_delta_1y ?? 0) * 0.2)
+    eloOverrides[row.team_id] = row.elo_rating + formBonus
   }
 
   const results: Record<string, { goals_a: number; goals_b: number }> = {}
