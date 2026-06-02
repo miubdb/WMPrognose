@@ -35,6 +35,52 @@ export const MODEL_WEIGHTS = {
   },
 } as const
 
+export const SQUAD_RATING_CONFIG = {
+  peakAgeMin: 25,
+  peakAgeMax: 29,
+  youngPenaltyPerYear: 0.015,   // log-penalty per year below 25
+  oldPenaltyPerYear: 0.010,     // log-penalty per year above 29
+  maxAgePenalty: 0.08,
+  // market-value normalization for GK score: €50M = score 100
+  gkNormValueM: 50,
+} as const
+
+export const CONTEXT_CONFIG = {
+  altitudeThresholdM: 1500,
+  altitudePer1000m: -0.055,
+  maxAltitudeEffect: 0.12,
+  wbgtThreshold: 28,
+  wbgtPerDegree: -0.018,
+  maxHeatEffect: 0.08,
+  travelThresholdKm: 1500,
+  travelPerKm: -0.0000085,
+  maxTravelEffect: 0.04,
+  restUnder4Days: -0.041,
+  restUnder5Days: -0.020,
+  hostBonus: 0.039,
+  diasporaBonus: 0.020,
+} as const
+
+export const PENALTY_CONFIG = {
+  base: 0.50,
+  skillMax: 0.08,          // max ±8% deviation from base due to skill
+  clampMin: 0.42,
+  clampMax: 0.58,
+  gkWeight: 0.40,
+  takerWeight: 0.35,
+  experienceWeight: 0.25,
+} as const
+
+export const COACH_CONFIG = {
+  tenureOptimalMin: 2,
+  tenureOptimalMax: 4,
+  tenurePenaltyNew: -0.010,    // per year below 1 year
+  tenurePenaltyStale: -0.005,  // per year above 6 years
+  tournamentExpBonus: 0.008,   // per major tournament
+  heritageMax: 0.030,
+  maxCoachEffect: 0.050,
+} as const
+
 export const MODEL_META = {
   version: '2.1.0-calibrated',
   baseGoalRate: 1.50,       // Kalibriert: WM 2022 Grid Search Optimum (vorher 1.40)

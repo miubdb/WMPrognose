@@ -1,3 +1,80 @@
+// ─── Squad Rating ─────────────────────────────────────────────────────────────
+
+export interface SquadRating {
+  attackValue: number | null        // market-value-weighted avg xG/90 of FWD+MID (null = no data)
+  midfieldValue: number             // attack/defense balance of MID (-1=defensive, +1=offensive)
+  defenseValue: number | null       // market-value-weighted avg xGA/90 of DEF+GK (lower = better)
+  goalkeeperValue: number           // GK quality score 0..100
+  peakAgeScore: PeakAgeScore
+  totalMarketValueM: number
+  playerCount: number
+  starterCount: number
+}
+
+export interface PeakAgeScore {
+  avgAge: number
+  logPenalty: number   // log-lambda penalty (≤0)
+  label: string
+}
+
+// ─── Context Modifiers ────────────────────────────────────────────────────────
+
+export interface VenueContext {
+  altitudeMeters: number
+  estimatedWBGT: number
+  expectedTemperatureC: number
+  expectedHumidity: number         // 0..1
+  crowdAdvantageTeamId?: string
+}
+
+export interface TeamContext {
+  isHostNation: boolean
+  diasporaCrowdSupport: boolean
+  homeRegion: 'europe' | 'south_america' | 'north_america' | 'africa' | 'asia' | 'oceania'
+  accustomedAltitudeM: number
+  heatAdaptation: number           // 0..1
+  travelDistanceKm: number
+  restDays: number
+}
+
+export interface ContextModifiers {
+  altitudeLog: number
+  heatLog: number
+  travelLog: number
+  restLog: number
+  homeLog: number
+  diasporaLog: number
+  totalLog: number
+}
+
+// ─── Penalty Shootout ─────────────────────────────────────────────────────────
+
+export interface PenaltySkills {
+  goalkeeperSkill: number           // 0..100
+  penaltyTakerQuality: number       // 0..100
+  tournamentExperience: number      // 0..100
+}
+
+// ─── Coach & Heritage ─────────────────────────────────────────────────────────
+
+export interface CoachData {
+  name: string
+  tenureYears: number
+  majorTournamentExperience: number
+  knockoutExperience: number
+  tacticalStability: number         // 0..100
+}
+
+export interface CoachScore {
+  tenureLog: number
+  experienceLog: number
+  stabilityLog: number
+  totalLog: number
+  label: string
+}
+
+// ─── Model Factor ─────────────────────────────────────────────────────────────
+
 export interface ModelFactor {
   key: string
   label: string
