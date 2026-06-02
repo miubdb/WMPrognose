@@ -13,6 +13,7 @@ import { aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
 import { rps, logLoss, brierScore, RANDOM_RPS } from '@/lib/model/evaluation'
 import { clampLogEffect } from '@/lib/model/logLambda'
 import { MODEL_META, MODEL_WEIGHTS } from '@/lib/model/config'
+import { computeTournamentHeritage } from '@/lib/model/coachScore'
 
 // ─── Name-zu-ID Mapping (aus evaluateModel.ts) ────────────────────────────────
 
@@ -126,6 +127,8 @@ function quickPredict(
   eloDiffAminusB: number,
   mvRatio: number,       // log10(mvA/mvB)
   expDiff: number,       // expA - expB (titles*3 + appearances)
+  heritageLogA: number,  // absolute heritage bonus for team A
+  heritageLogB: number,  // absolute heritage bonus for team B
   attackDiffA: number,   // (attackA - defB) / 100
   attackDiffB: number,   // (attackB - defA) / 100
   baseGoalRate: number,
@@ -138,16 +141,16 @@ function quickPredict(
   // Marktwert-Effekt (fixes Gewicht aus MODEL_WEIGHTS)
   const mvLogA = clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio)
 
-  // Erfahrungs-Effekt (fixes Gewicht)
+  // Erfahrungs-Effekt (relatives Differenz-Signal)
   const expLogA = clampLogEffect(MODEL_WEIGHTS.experience * expDiff)
 
   // Angriff vs. Abwehr (fixes Gewicht)
   const attackLogA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffA)
   const attackLogB = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffB)
 
-  // log(lambda) berechnen
-  const logLambdaA = Math.log(baseGoalRate) + eloLogA + mvLogA + expLogA + attackLogA
-  const logLambdaB = Math.log(baseGoalRate) + (-eloLogA) + (-mvLogA) + (-expLogA) + attackLogB
+  // log(lambda) berechnen — heritage ist absolut pro Team
+  const logLambdaA = Math.log(baseGoalRate) + eloLogA + mvLogA + expLogA + heritageLogA + attackLogA
+  const logLambdaB = Math.log(baseGoalRate) + (-eloLogA) + (-mvLogA) + (-expLogA) + heritageLogB + attackLogB
 
   const xgA = Math.exp(Math.max(LOG_LAMBDA_MIN, Math.min(LOG_LAMBDA_MAX, logLambdaA)))
   const xgB = Math.exp(Math.max(LOG_LAMBDA_MIN, Math.min(LOG_LAMBDA_MAX, logLambdaB)))
@@ -169,6 +172,8 @@ interface PreparedMatch {
   eloDiff: number     // homeElo - awayElo
   mvRatio: number     // log10(mvHome / mvAway)
   expDiff: number
+  heritageLogA: number  // absolute heritage bonus for home team
+  heritageLogB: number  // absolute heritage bonus for away team
   attackDiffA: number // (homeAttack - awayDefense) / 100
   attackDiffB: number // (awayAttack - homeDefense) / 100
   outcome: 'W' | 'D' | 'L'
@@ -205,6 +210,8 @@ function prepareMatches(): PreparedMatch[] {
       eloDiff: eloA - eloB,
       mvRatio: mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0,
       expDiff: expA - expB,
+      heritageLogA: computeTournamentHeritage(homeTeam.worldCupTitles, homeTeam.worldCupAppearances),
+      heritageLogB: computeTournamentHeritage(awayTeam.worldCupTitles, awayTeam.worldCupAppearances),
       attackDiffA: (homeTeam.attackRating - awayTeam.defenseRating) / 100,
       attackDiffB: (awayTeam.attackRating - homeTeam.defenseRating) / 100,
       outcome,
@@ -230,6 +237,7 @@ function evaluateParams(
   for (const m of matches) {
     const { winA, draw, winB } = quickPredict(
       m.eloDiff, m.mvRatio, m.expDiff,
+      m.heritageLogA, m.heritageLogB,
       m.attackDiffA, m.attackDiffB,
       baseGoalRate, eloWeight, rho
     )

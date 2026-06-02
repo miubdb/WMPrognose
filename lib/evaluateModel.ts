@@ -5,6 +5,7 @@ import { computeScorelineMatrix } from '@/src/model/poisson'
 import { applyDixonColesCorrection, aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
 import { computeLambda, clampLogEffect } from '@/lib/model/logLambda'
 import { MODEL_WEIGHTS, MODEL_META } from '@/lib/model/config'
+import { computeTournamentHeritage } from '@/lib/model/coachScore'
 
 // Name-zu-ID Mapping für historische Daten
 // null = nicht bei WM 2026 → Fallback auf historische ELO-Werte aus Match-Record
@@ -120,13 +121,17 @@ function predictForTeams(
     const expB = teamB.worldCupTitles * 3 + teamB.worldCupAppearances
     const expLogA = clampLogEffect(MODEL_WEIGHTS.experience * (expA - expB))
 
+    // Absolute heritage bonus per team (independent of opponent)
+    const heritageLogA = computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
+    const heritageLogB = computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
+
     const attackDiffA = (teamA.attackRating - teamB.defenseRating) / 100
     const attackDiffB = (teamB.attackRating - teamA.defenseRating) / 100
     const attackLogA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffA)
     const attackLogB = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffB)
 
-    xgA = computeLambda(MODEL_META.baseGoalRate, [eloLogA, mvLogA, expLogA, attackLogA])
-    xgB = computeLambda(MODEL_META.baseGoalRate, [-eloLogA, -mvLogA, -expLogA, attackLogB])
+    xgA = computeLambda(MODEL_META.baseGoalRate, [eloLogA, mvLogA, expLogA, heritageLogA, attackLogA])
+    xgB = computeLambda(MODEL_META.baseGoalRate, [-eloLogA, -mvLogA, -expLogA, heritageLogB, attackLogB])
   }
 
   const rawMatrix = computeScorelineMatrix(xgA, xgB)
