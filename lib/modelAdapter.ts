@@ -16,6 +16,9 @@ import { applyDixonColesCorrection, aggregateOutcomeProbabilities } from '@/src/
 import { MODEL_WEIGHTS, MODEL_META } from '@/lib/model/config'
 import { clampLogEffect, logEffectToLinear, computeLambda } from '@/lib/model/logLambda'
 import type { DataQualityScore } from '@/lib/model/types'
+import { computeTournamentHeritage } from '@/lib/model/coachScore'
+import { computeSquadRating, type SquadPlayer } from '@/lib/model/squadRating'
+import { computePenaltyWinProbability, defaultPenaltySkills } from '@/lib/model/penaltyShootout'
 
 // ─── TeamData Builder ──────────────────────────────────────────────────────────
 
@@ -76,22 +79,33 @@ export function buildTeamDataFromSquad(team: TeamBasic, players: Player[]): Team
 
   if (players.length === 0) return base
 
-  // Durchschnittswerte aus Spielern ableiten
-  const starters = players.filter(p => p.isInStartingXI)
-  const avgAge = starters.length > 0
-    ? starters.reduce((s, p) => s + p.age, 0) / starters.length
-    : base.squadAvgAge
+  // Convert Player[] → SquadPlayer[] for computeSquadRating
+  const squadPlayers: SquadPlayer[] = players.map(p => ({
+    position: p.position,
+    marketValueM: p.marketValueM,
+    xgPer90: p.xGPer90 ?? null,
+    xgaPer90: p.xGAPer90 ?? null,
+    age: p.age,
+    isInStartingXI: p.isInStartingXI,
+  }))
 
-  const totalValue = players.reduce((s, p) => s + p.marketValueM, 0)
+  const rating = computeSquadRating(squadPlayers)
 
-  const fwdPlayers = players.filter(p => p.position === 'FWD')
-  const xgFor = fwdPlayers.length > 0
-    ? fwdPlayers.reduce((s, p) => s + (p.xGPer90 ?? 0.15), 0) / fwdPlayers.length * 1.5
+  // xG from market-value-weighted attack data; fall back to base estimate if insufficient data
+  const xgFor = rating.attackValue !== null
+    ? Math.min(3.5, rating.attackValue * 4.5)  // xG/90 → full-match xG scale
     : base.recentXGFor
+
+  const starters = players.filter(p => p.isInStartingXI)
+  const avgAge = rating.starterCount >= 8
+    ? rating.peakAgeScore.avgAge
+    : starters.length > 0
+      ? starters.reduce((s, p) => s + p.age, 0) / starters.length
+      : base.squadAvgAge
 
   return {
     ...base,
-    squadMarketValueM: totalValue || base.squadMarketValueM,
+    squadMarketValueM: rating.totalMarketValueM || base.squadMarketValueM,
     squadAvgAge: avgAge,
     keyPlayersAvgAge: avgAge,
     recentXGFor: xgFor,
@@ -948,6 +962,31 @@ export function analyzeMatch(
     })
   }
 
+  // Turnier-Erbe: absoluter Qualitätsbonus pro Team (unabhängig vom Gegner)
+  // computeTournamentHeritage: Titel×3 + Teilnahmen×0.3 → max 0.030 log-Effekt
+  // Ergänzt den relativen Erfahrungs-Differenz-Faktor um eine absolute Komponente
+  {
+    const heritageLogA = computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
+    const heritageLogB = computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
+    // Only add factor if at least one team has non-trivial heritage (>0.003)
+    if (heritageLogA > 0.003 || heritageLogB > 0.003) {
+      factors.push({
+        category: 'experience',
+        label: 'Turnier-Erbe (absolute Qualität)',
+        source: 'Forrest et al. (2005) – Heritage Premium',
+        valueA: `${teamA.worldCupTitles}× Weltmeister, ${teamA.worldCupAppearances}× dabei`,
+        valueB: `${teamB.worldCupTitles}× Weltmeister, ${teamB.worldCupAppearances}× dabei`,
+        logEffectA: heritageLogA,
+        logEffectB: heritageLogB,
+        effectA: logEffectToLinear(heritageLogA),
+        effectB: logEffectToLinear(heritageLogB),
+        confidence: 0.55,
+        isCalibrated: false,
+        explanation: 'Absoluter xG-Bonus für Teams mit WM-Titeln und -Teilnahmen — unabhängig vom Gegner. Ergänzt den relativen Erfahrungs-Faktor um eine "DNA-unter-Druck"-Komponente (max +3%).',
+      })
+    }
+  }
+
   // NEU: log-lambda Berechnung (Phase 1 — mathematisch korrekt)
   const logEffectsA = factors.map(f => f.logEffectA)
   const logEffectsB = factors.map(f => f.logEffectB)
@@ -1163,9 +1202,11 @@ function simulateKOMatch(teamA: TeamBasic, teamB: TeamBasic): string {
   const { goalsA, goalsB } = simulateMatchScore(teamA, teamB)
   if (goalsA > goalsB) return teamA.id
   if (goalsB > goalsA) return teamB.id
-  // Elfmeter: ELO-basiert
-  const probA = 0.5 + (teamA.eloRating - teamB.eloRating) / 4000
-  return Math.random() < probA ? teamA.id : teamB.id
+  // Elfmeter: GK-Qualität + Angriff + Turnier-Erfahrung
+  const skillsA = defaultPenaltySkills(teamA.goalkeeperRating, teamA.attackRating, teamA.worldCupAppearances)
+  const skillsB = defaultPenaltySkills(teamB.goalkeeperRating, teamB.attackRating, teamB.worldCupAppearances)
+  const { winProbabilityA } = computePenaltyWinProbability(skillsA, skillsB)
+  return Math.random() < winProbabilityA ? teamA.id : teamB.id
 }
 
 function poissonRandom(lambda: number): number {
