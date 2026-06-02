@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export interface LineupPlayer {
@@ -148,11 +149,13 @@ function TeamLineup({
 // ── Main editor ───────────────────────────────────────────────────────────────
 
 export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamData }) {
+  const router = useRouter()
   const [playersA, setPlayersA] = useState(teamA.players)
   const [playersB, setPlayersB] = useState(teamB.players)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   const toggle = useCallback(async (id: string, current: boolean, isTeamA: boolean) => {
     const next = !current
@@ -178,15 +181,18 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
         const data = await res.json().catch(() => ({})) as { error?: string }
         throw new Error(data.error ?? `Fehler ${res.status}`)
       }
-      // No router.refresh() — optimistic state IS the truth
+      // Refresh server component so win probabilities re-calculate with new starting XI
+      setRefreshing(true)
+      router.refresh()
     } catch (err) {
       if (isTeamA) setPlayersA(revert)
       else setPlayersB(revert)
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSavingId(null)
+      setRefreshing(false)
     }
-  }, [])
+  }, [router])
 
   const startA = playersA.filter(p => p.is_in_starting_xi).length
   const startB = playersB.filter(p => p.is_in_starting_xi).length
@@ -202,6 +208,9 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
           <span className="text-xs text-gray-500">
             {teamA.flag} {startA}/11 · {teamB.flag} {startB}/11
           </span>
+          {refreshing && (
+            <span className="text-xs text-emerald-500 animate-pulse">Prognose wird aktualisiert…</span>
+          )}
         </div>
         <span className="text-gray-600 text-xs">{open ? '▲ Einklappen' : '▼ Aufstellung eintragen'}</span>
       </button>

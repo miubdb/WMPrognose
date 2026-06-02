@@ -367,26 +367,34 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       )}
 
       {/* Lineup status — shows whether model uses starting XI or full squad */}
-      {(analysis.squadDataA || analysis.squadDataB) && (
-        <div className="flex items-center gap-3 text-xs">
-          {[
-            { teamId: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, hasSquad: analysis.squadDataA },
-            { teamId: match.teamBId, name: analysis.teamB.name, flag: analysis.teamB.flag, hasSquad: analysis.squadDataB },
-          ].map(({ teamId, name, flag, hasSquad }) => {
-            const usingXI = lineupStatus[teamId]
-            return (
-              <div key={teamId} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${
-                usingXI ? 'border-emerald-700/40 bg-emerald-900/15 text-emerald-400' : hasSquad ? 'border-gray-700 bg-gray-800/40 text-gray-500' : 'border-gray-800 bg-gray-900 text-gray-700'
-              }`}>
-                <span>{flag}</span>
-                <span className="font-medium">{name}</span>
-                <span className="opacity-70">·</span>
-                <span>{usingXI ? 'Startelf ✓ (fließt ein)' : hasSquad ? 'Gesamtkader (keine Startelf)' : 'Kein Kader'}</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      <div className="flex items-center gap-3 text-xs flex-wrap">
+        {[
+          { teamId: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, hasSquad: analysis.squadDataA },
+          { teamId: match.teamBId, name: analysis.teamB.name, flag: analysis.teamB.flag, hasSquad: analysis.squadDataB },
+        ].map(({ teamId, name, flag, hasSquad }) => {
+          const usingXI = lineupStatus[teamId]
+          return (
+            <div key={teamId} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${
+              usingXI ? 'border-emerald-700/40 bg-emerald-900/15 text-emerald-400'
+              : hasSquad ? 'border-gray-700 bg-gray-800/40 text-gray-500'
+              : 'border-amber-900/40 bg-amber-900/10 text-amber-600'
+            }`}>
+              <span>{flag}</span>
+              <span className="font-medium">{name}</span>
+              <span className="opacity-70">·</span>
+              {usingXI ? (
+                <span>Startelf ✓ (fließt ein)</span>
+              ) : hasSquad ? (
+                <span>Gesamtkader (keine Startelf eingetragen)</span>
+              ) : (
+                <Link href={`/teams/${teamId}`} className="underline hover:text-amber-400 transition-colors">
+                  Kein Kader → hier hinzufügen
+                </Link>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       {/* DataQuality Score Bars */}
       {(analysis.dataQualityA || analysis.dataQualityB) && (
@@ -468,8 +476,79 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             )
           })}
         </div>
-        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt</p>
+        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt · Sortiert: Favorit zuerst</p>
       </div>
+
+      {/* Modell-Erklärung */}
+      <details className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <summary className="px-5 py-3 cursor-pointer text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 transition-colors list-none flex items-center justify-between">
+          <span>Wie wird die Prognose berechnet?</span>
+          <span className="text-gray-700">▼</span>
+        </summary>
+        <div className="px-5 pb-5 pt-2 space-y-4 text-xs text-gray-400">
+          <div className="space-y-2">
+            <div className="font-semibold text-gray-300">1. Basis-xG (Expected Goals)</div>
+            <div className="bg-gray-800 rounded-lg p-3 font-mono text-gray-400 text-[11px]">
+              Basis-xG = {MODEL_META.baseGoalRate} Tore/Spiel (kalibriert gegen WM 2022)
+            </div>
+            <p className="text-gray-500">Jedes Team startet mit dem gleichen Wert. Alle Faktoren (ELO, Marktwert, Aufstellung etc.) multiplizieren diesen Wert in Log-Skala.</p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="font-semibold text-gray-300">2. Faktoren in Log-Skala</div>
+            <div className="bg-gray-800 rounded-lg p-3 font-mono text-[11px] space-y-1">
+              <div className="text-gray-500">log(xG_A) = log({MODEL_META.baseGoalRate})</div>
+              {analysis.factors.filter(f => Math.abs(f.logEffectA) > 0.001).map((f, i) => (
+                <div key={i} className={f.logEffectA > 0 ? 'text-emerald-400' : f.logEffectA < 0 ? 'text-rose-400' : 'text-gray-600'}>
+                  {f.logEffectA >= 0 ? '+' : ''}{f.logEffectA.toFixed(3)} ({f.label})
+                </div>
+              ))}
+              <div className="border-t border-gray-700 pt-1 text-white">
+                = log({analysis.expectedGoalsA.toFixed(2)}) → <span className="text-emerald-400">{analysis.expectedGoalsA.toFixed(2)} xG für {analysis.teamA.flag}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="font-semibold text-gray-300">3. Poisson-Verteilung + Dixon-Coles-Korrektur</div>
+            <p className="text-gray-500">
+              Aus den xG-Werten ({analysis.expectedGoalsA.toFixed(2)} für {analysis.teamA.flag}, {analysis.expectedGoalsB.toFixed(2)} für {analysis.teamB.flag}) wird jedes mögliche Ergebnis 0:0 bis 10:10 per Poisson-Formel berechnet.
+              Dixon-Coles (ρ={MODEL_META.dixonColesRho}) korrigiert niedrig-Ergebnisse: senkt P(1:1), erhöht P(1:0) und P(0:1) leicht — mathematisch realistischer.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="font-semibold text-gray-300">4. Outcome-Wahrscheinlichkeiten</div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-gray-800 rounded p-2 text-center">
+                <div className="text-emerald-400 font-bold">{Math.round(analysis.winProbA * 100)}%</div>
+                <div className="text-gray-600 text-[10px]">{analysis.teamA.flag} Sieg</div>
+                <div className="text-gray-700 text-[10px]">= Σ P(i&gt;j)</div>
+              </div>
+              <div className="bg-gray-800 rounded p-2 text-center">
+                <div className="text-gray-300 font-bold">{Math.round(analysis.drawProb * 100)}%</div>
+                <div className="text-gray-600 text-[10px]">Unentschieden</div>
+                <div className="text-gray-700 text-[10px]">= Σ P(i=j)</div>
+              </div>
+              <div className="bg-gray-800 rounded p-2 text-center">
+                <div className="text-blue-400 font-bold">{Math.round(analysis.winProbB * 100)}%</div>
+                <div className="text-gray-600 text-[10px]">{analysis.teamB.flag} Sieg</div>
+                <div className="text-gray-700 text-[10px]">= Σ P(i&lt;j)</div>
+              </div>
+            </div>
+            {analysis.regressionWeight > 0.05 && (
+              <p className="text-amber-600 text-[11px]">
+                ⚠ Regression zur Mitte: {Math.round(analysis.regressionWeight * 100)}% werden zur 33/33/33-Gleichverteilung gemischt (Datenqualität {Math.round((1 - analysis.regressionWeight) * 100)}%).
+                Mehr Spielerdaten eintragen → stärkeres Signal.
+              </p>
+            )}
+          </div>
+
+          <div className="text-[11px] text-gray-600 border-t border-gray-800 pt-3">
+            Modell v{MODEL_META.version} · Kalibriert gegen WM 2022 Gruppenphase (Grid Search, 210 Kombinationen) · RPS-Skill-Score ~27%
+          </div>
+        </div>
+      </details>
 
       {/* Lineup Editor */}
       <LineupEditor

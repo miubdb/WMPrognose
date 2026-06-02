@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import type { SquadSummary } from '@/lib/modelAdapter'
-import { GROUP_SCHEDULE } from '@/src/data/schedule'
-import { TEAM_BY_ID } from '@/src/data/allTeams'
-
-// ELO-Bonus für das letzte Turnierergebnis (vorläufig, bis CSV-Import den echten Wert liefert)
-const FORM_BONUS_ELO = 30
 
 export async function GET() {
   const [squadRes, eloRes, resultsRes] = await Promise.all([
@@ -43,46 +38,18 @@ export async function GET() {
       squadData[tid].avgXgaPer90Defense = xgaDefenseSums[tid].sum / xgaDefenseSums[tid].count
   }
 
-  // Basis-ELO aus Supabase (z.B. täglicher CSV-Import), plus Form-Trend-Bonus
+  // ELO aus Supabase (täglicher CSV-Import) + langfristiger Trend-Bonus (20% von elo_delta_1y)
+  // Kein temporärer Form-Bonus: der tagesaktuelle ELO-Import enthält Spielergebnisse bereits
   const eloOverrides: Record<string, number> = {}
   for (const row of eloRes.data ?? []) {
     const delta = (row as { elo_delta_1y?: number | null }).elo_delta_1y ?? 0
     eloOverrides[row.team_id] = row.elo_rating + Math.round(delta * 0.2)
   }
 
-  // Ergebnisse aus Supabase
-  const resultMap: Record<string, { goals_a: number; goals_b: number }> = {}
-  for (const row of resultsRes.data ?? []) {
-    resultMap[row.match_id] = { goals_a: row.goals_a, goals_b: row.goals_b }
-  }
-
-  // Form-Bonus: letztes Turnierergebnis pro Team → ±30 ELO-Punkte
-  // (vorläufiger Effekt bis der tägliche CSV-Import das echte ELO liefert)
-  const teamLastResult: Record<string, 'W' | 'D' | 'L'> = {}
-  const playedMatches = GROUP_SCHEDULE
-    .filter(m => resultMap[m.id])
-    .sort((a, b) => b.date.localeCompare(a.date) || b.kickoffUTC.localeCompare(a.kickoffUTC))
-
-  for (const m of playedMatches) {
-    const r = resultMap[m.id]
-    if (!teamLastResult[m.teamAId]) {
-      teamLastResult[m.teamAId] = r.goals_a > r.goals_b ? 'W' : r.goals_a === r.goals_b ? 'D' : 'L'
-    }
-    if (!teamLastResult[m.teamBId]) {
-      teamLastResult[m.teamBId] = r.goals_a < r.goals_b ? 'W' : r.goals_a === r.goals_b ? 'D' : 'L'
-    }
-  }
-
-  for (const [teamId, lastResult] of Object.entries(teamLastResult)) {
-    const bonus = lastResult === 'W' ? FORM_BONUS_ELO : lastResult === 'L' ? -FORM_BONUS_ELO : 0
-    if (bonus !== 0) {
-      const base = eloOverrides[teamId] ?? (TEAM_BY_ID[teamId]?.eloRating ?? 1500)
-      eloOverrides[teamId] = base + bonus
-    }
-  }
-
   const results: Record<string, { goals_a: number; goals_b: number }> = {}
-  for (const [matchId, r] of Object.entries(resultMap)) results[matchId] = r
+  for (const row of resultsRes.data ?? []) {
+    results[row.match_id] = { goals_a: row.goals_a, goals_b: row.goals_b }
+  }
 
   return NextResponse.json({ squadData, eloOverrides, results })
 }
