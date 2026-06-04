@@ -101,5 +101,7 @@ export interface DataQualityScore {
   eloFreshness: number      // 0..1: Aktualität der ELO-Ratings
   lineupSet: boolean        // Startelf eingetragen?
   overall: number           // Gewichteter Gesamtscore 0..1
+  score: number             // 0–100 ganzzahlig (für Anzeige: "87/100")
+  badge: 'Hoch' | 'Mittel' | 'Niedrig'
   warnings: string[]        // Erklärungen für niedrige Scores
 }

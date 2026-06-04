@@ -237,6 +237,15 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     (a, b) => catOrder.indexOf(a.category) - catOrder.indexOf(b.category)
   )
 
+  // Top-3 Faktoren: sortiert nach absolutem Gesamt-Log-Effekt
+  const topFactors = [...analysis.factors]
+    .filter(f => Math.abs(f.logEffectA) + Math.abs(f.logEffectB) > 0.003)
+    .sort((a, b) => (Math.abs(b.logEffectA) + Math.abs(b.logEffectB)) - (Math.abs(a.logEffectA) + Math.abs(a.logEffectB)))
+    .slice(0, 3)
+
+  // Konfidenz-Bandbreite (basierend auf Datenqualität + Matchenge)
+  const confRange = { very_high: 3, high: 5, medium: 9, low: 13 }[analysis.confidence]
+
   const tipLabel = analysis.suggestedTip === '1'
     ? `${analysis.teamA.flag} ${analysis.teamA.name} gewinnt`
     : analysis.suggestedTip === '2'
@@ -331,14 +340,17 @@ export default async function MatchDetailPage({ params }: { params: { id: string
           <div className={`rounded-xl p-4 text-center ${pA > pD && pA > pB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
             <div className="text-2xl font-bold text-white">{pA}%</div>
             <div className="text-xs text-gray-400 mt-1">{analysis.teamA.flag} Sieg</div>
+            <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pA - confRange)}–{Math.min(100, pA + confRange)}%</div>
           </div>
           <div className={`rounded-xl p-4 text-center ${pD > pA && pD > pB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
             <div className="text-2xl font-bold text-white">{pD}%</div>
             <div className="text-xs text-gray-400 mt-1">Unentschieden</div>
+            <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pD - confRange)}–{Math.min(100, pD + confRange)}%</div>
           </div>
           <div className={`rounded-xl p-4 text-center ${pB > pA && pB > pD ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
             <div className="text-2xl font-bold text-white">{pB}%</div>
             <div className="text-xs text-gray-400 mt-1">{analysis.teamB.flag} Sieg</div>
+            <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pB - confRange)}–{Math.min(100, pB + confRange)}%</div>
           </div>
         </div>
 
@@ -358,6 +370,44 @@ export default async function MatchDetailPage({ params }: { params: { id: string
           <span className={`text-xs font-medium ${confConfig.color}`}>{confConfig.label}</span>
         </div>
       </div>
+
+      {/* Top-Einflussfaktoren */}
+      {topFactors.length > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            Top-Einflussfaktoren
+          </h2>
+          <div className="space-y-2">
+            {topFactors.map(f => {
+              const aEffect = Math.round(f.effectA * 100)
+              const bEffect = Math.round(f.effectB * 100)
+              const aColor = aEffect > 0 ? 'text-emerald-400' : aEffect < 0 ? 'text-rose-400' : 'text-gray-600'
+              const bColor = bEffect > 0 ? 'text-emerald-400' : bEffect < 0 ? 'text-rose-400' : 'text-gray-600'
+              return (
+                <div key={f.label} className="flex items-center gap-3 py-2 border-b border-gray-800/50 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm text-gray-200 font-medium">{f.label}</span>
+                  </div>
+                  <div className="flex items-center gap-4 flex-shrink-0 text-sm font-mono">
+                    <span className="flex items-center gap-1">
+                      <span className="text-gray-600">{analysis.teamA.flag}</span>
+                      <span className={`font-bold ${aColor}`}>{aEffect > 0 ? '+' : ''}{aEffect}%</span>
+                    </span>
+                    <span className="text-gray-700">·</span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-gray-600">{analysis.teamB.flag}</span>
+                      <span className={`font-bold ${bColor}`}>{bEffect > 0 ? '+' : ''}{bEffect}%</span>
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-[10px] text-gray-700 mt-3">
+            Prozent = Beitrag zum xG-Wert. Positiv = mehr erwartete Tore. Sortiert nach Gesamteinfluss.
+          </p>
+        </div>
+      )}
 
       {/* Missing squad data warning */}
       {(!analysis.squadDataA || !analysis.squadDataB) && (
@@ -405,27 +455,31 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             { team: analysis.teamB, dq: analysis.dataQualityB },
           ].map(({ team, dq }) => {
             if (!dq) return null
-            const pct = Math.round(dq.overall * 100)
-            const filledBars = Math.round(dq.overall * 10)
-            const bar = '█'.repeat(filledBars) + '░'.repeat(10 - filledBars)
-            const barColor = pct >= 70 ? 'text-emerald-400' : pct >= 50 ? 'text-yellow-400' : 'text-rose-400'
+            const badgeStyle = {
+              Hoch:    'bg-emerald-900/40 text-emerald-400 border-emerald-800/50',
+              Mittel:  'bg-yellow-900/40 text-yellow-400 border-yellow-800/50',
+              Niedrig: 'bg-rose-900/40 text-rose-400 border-rose-800/50',
+            }[dq.badge ?? (dq.overall >= 0.7 ? 'Hoch' : dq.overall >= 0.45 ? 'Mittel' : 'Niedrig')]
+            const score = dq.score ?? Math.round(dq.overall * 100)
+            const badge = dq.badge ?? (score >= 70 ? 'Hoch' : score >= 45 ? 'Mittel' : 'Niedrig')
             return (
               <div key={team.id} className="space-y-1">
-                <div className="flex items-center gap-2 text-sm">
-                  <span>{team.flag}</span>
-                  <span className="font-medium text-gray-200">{team.name}</span>
-                  <span className={`font-mono text-xs ${barColor}`}>[{bar}]</span>
-                  <span className={`text-xs font-bold ${barColor}`}>{pct}% Datenqualität</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-base">{team.flag}</span>
+                  <span className="text-sm font-medium text-gray-200">{team.name}</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${badgeStyle}`}>
+                    {score}/100 · {badge}
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] pl-6">
                   <span className={dq.lineupSet ? 'text-emerald-400' : 'text-yellow-500'}>
-                    {dq.lineupSet ? '✓ Startelf eingetragen' : '⚠ Keine Startelf'}
+                    {dq.lineupSet ? '✓ Startelf' : '⚠ Keine Startelf'}
                   </span>
                   <span className={dq.eloFreshness >= 0.7 ? 'text-emerald-400' : dq.eloFreshness >= 0.5 ? 'text-yellow-500' : 'text-rose-400'}>
-                    {dq.eloFreshness >= 0.7 ? '✓ ELO aktuell' : dq.eloFreshness >= 0.5 ? '⚠ ELO Fallback' : '⚠ Kein ELO'}
+                    {dq.eloFreshness >= 0.7 ? '✓ ELO aktuell' : dq.eloFreshness >= 0.5 ? '⚠ ELO Fallback' : '✗ Kein ELO'}
                   </span>
                   <span className={dq.xgCoverage >= 0.5 ? 'text-emerald-400' : dq.xgCoverage >= 0.2 ? 'text-yellow-500' : 'text-rose-400'}>
-                    {dq.xgCoverage >= 0.5 ? '✓ xG verfügbar' : dq.xgCoverage > 0 ? `⚠ Nur ${Math.round(dq.xgCoverage * 100)}% xG-Coverage` : '⚠ Keine xG-Daten'}
+                    {dq.xgCoverage >= 0.5 ? `✓ xG ${Math.round(dq.xgCoverage * 100)}%` : dq.xgCoverage > 0 ? `⚠ xG nur ${Math.round(dq.xgCoverage * 100)}%` : '✗ Kein xG'}
                   </span>
                 </div>
               </div>
