@@ -1,5 +1,5 @@
 import { HISTORICAL_MATCHES, HistoricalMatch } from '@/src/data/historicalResults'
-import { rps, logLoss, brierScore, RANDOM_RPS } from '@/lib/model/evaluation'
+import { rps, logLoss, brierScore, RANDOM_RPS, computeECE } from '@/lib/model/evaluation'
 import { TEAM_BY_ID, TeamBasic } from '@/src/data/allTeams'
 import { computeScorelineMatrix } from '@/src/model/poisson'
 import { applyDixonColesCorrection, aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
@@ -138,6 +138,14 @@ export interface EvaluationResult {
   skillScore: number
   correctTendency: number    // % where top predicted outcome matched actual
   eloOnlyRPS: number         // ELO-only baseline (no MV, no attack/defense ratings)
+  // Extended metrics
+  ece: number                // Expected Calibration Error (0=perfect, 0.1=bad)
+  mce: number                // Maximum Calibration Error
+  overconfidence: number     // avg(pred-actual) when model is overconfident
+  calibrationBins: Array<{ center: number; predicted: number; actual: number; count: number }>
+  upsetAccuracy: number      // % of upsets model assigned >50% to the underdog (not possible) — actually % correct when ELO-underdog won
+  drawRate: number           // actual draw rate in the dataset
+  drawPredictionAvg: number  // model's avg draw probability
   phaseBreakdown: Record<string, { matches: number; avgRPS: number; correctTendency: number }>
   perMatch: Array<{
     homeTeam: string
@@ -164,6 +172,13 @@ export function evaluateModel(matches: HistoricalMatch[] = HISTORICAL_MATCHES): 
   let totalEloOnlyRPS = 0
   let correctCount = 0
   let count = 0
+
+  // For ECE + calibration curve
+  const allPredictions: [number, number, number][] = []
+  const allObserved: [number, number, number][] = []
+  // For draw calibration
+  let drawCount = 0
+  let drawPredSum = 0
 
   const phaseData: Record<string, { totalRPS: number; correct: number; matches: number }> = {}
 
@@ -218,6 +233,11 @@ export function evaluateModel(matches: HistoricalMatch[] = HISTORICAL_MATCHES): 
     if (correct) correctCount++
     count++
 
+    allPredictions.push(predicted)
+    allObserved.push(observed)
+    if (outcome === 'D') drawCount++
+    drawPredSum += predDraw
+
     // Phase breakdown
     const phase = m.phase
     if (!phaseData[phase]) phaseData[phase] = { totalRPS: 0, correct: 0, matches: 0 }
@@ -258,6 +278,16 @@ export function evaluateModel(matches: HistoricalMatch[] = HISTORICAL_MATCHES): 
     }
   }
 
+  // ECE + calibration curve
+  const eceResult = count > 0 ? computeECE(allPredictions, allObserved) : { ece: 0, mce: 0, overconfidence: 0, bins: [] }
+
+  // Upset accuracy: in perMatch, find matches where the ELO-underdog (lower predWin) actually won
+  // Measure: how often did model give the eventual winner >50% chance?
+  const upsetMatches = perMatch.filter(m => m.outcome === 'W' && m.predWin < 0.45)
+  const upsetAccuracy = upsetMatches.length > 0
+    ? upsetMatches.filter(m => m.correct).length / upsetMatches.length
+    : 0
+
   return {
     matchCount: count,
     avgRPS,
@@ -267,6 +297,13 @@ export function evaluateModel(matches: HistoricalMatch[] = HISTORICAL_MATCHES): 
     skillScore,
     correctTendency,
     eloOnlyRPS,
+    ece: eceResult.ece,
+    mce: eceResult.mce,
+    overconfidence: eceResult.overconfidence,
+    calibrationBins: eceResult.bins,
+    upsetAccuracy,
+    drawRate: count > 0 ? drawCount / count : 0,
+    drawPredictionAvg: count > 0 ? drawPredSum / count : 0,
     phaseBreakdown,
     perMatch,
   }

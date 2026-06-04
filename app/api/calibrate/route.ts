@@ -1,37 +1,31 @@
 import { NextResponse } from 'next/server'
-import { runGridSearch } from '@/lib/calibration'
+import { runGridSearch, runWalkForwardCalibration } from '@/lib/calibration'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * GET /api/calibrate
- *
- * Führt einen Grid Search über 210 Parameterkombinationen durch
- * (baseGoalRate × eloWeight × dixonColesRho) und gibt die besten
- * Konfigurationen zurück.
- *
- * Optimierungsmetrik: RPS (Ranked Probability Score, minimieren)
- * Datenbasis: WM 2022 Gruppenspiele (nur Teams in WM 2026)
- */
-export async function GET() {
-  try {
-    const summary = runGridSearch()
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const mode = searchParams.get('mode') ?? 'grid'
 
+  try {
+    if (mode === 'walkforward') {
+      const result = runWalkForwardCalibration()
+      return NextResponse.json({ ok: true, result })
+    }
+
+    const summary = runGridSearch()
     return NextResponse.json({
       ok: true,
       summary,
       meta: {
-        gridSize: 7 * 6 * 5,  // 210 Kombinationen
+        gridSize: 7 * 6 * 5,
         matchesEvaluated: summary.best.matchesEvaluated,
         optimizationMetric: 'RPS (minimiert)',
         dataset: 'WM 2022 Gruppenphase (Teams in WM 2026)',
       },
     })
   } catch (err) {
-    console.error('[calibrate] Grid Search fehlgeschlagen:', err)
-    return NextResponse.json(
-      { ok: false, error: String(err) },
-      { status: 500 }
-    )
+    console.error('[calibrate] fehlgeschlagen:', err)
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
 }

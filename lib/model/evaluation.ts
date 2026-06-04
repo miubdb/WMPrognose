@@ -45,3 +45,65 @@ export function brierScore(
 
 // Referenz-RPS für Gleichverteilung (Baseline)
 export const RANDOM_RPS = rps([1/3, 1/3, 1/3], [1, 0, 0])  // = 0.333
+
+// ─── Calibration / ECE ───────────────────────────────────────────────────────
+
+export interface CalibrationBin {
+  center: number      // bin midpoint (0.05, 0.15, ..., 0.95)
+  predicted: number   // average predicted probability in this bin
+  actual: number      // fraction of outcomes that occurred
+  count: number       // number of data points in this bin
+}
+
+export interface ECEResult {
+  ece: number                  // Expected Calibration Error (weighted avg |pred - actual|)
+  mce: number                  // Maximum Calibration Error
+  overconfidence: number       // avg(pred - actual) when pred > actual (positive = overconfident)
+  bins: CalibrationBin[]
+}
+
+/**
+ * Computes ECE + reliability diagram from a set of 3-way predictions.
+ * Flattens all 3 outcomes (W/D/L) into binary pairs for maximum data efficiency.
+ */
+export function computeECE(
+  predictions: [number, number, number][],
+  outcomes: [number, number, number][],
+  nBins = 10
+): ECEResult {
+  const binWidth = 1 / nBins
+  const bins: { sumPred: number; sumAct: number; count: number }[] = Array.from({ length: nBins }, () => ({ sumPred: 0, sumAct: 0, count: 0 }))
+
+  // Flatten: each prediction triplet yields 3 (p, o) pairs
+  for (let i = 0; i < predictions.length; i++) {
+    for (let k = 0; k < 3; k++) {
+      const p = predictions[i][k]
+      const o = outcomes[i][k]
+      const binIdx = Math.min(nBins - 1, Math.floor(p / binWidth))
+      bins[binIdx].sumPred += p
+      bins[binIdx].sumAct += o
+      bins[binIdx].count++
+    }
+  }
+
+  const totalPoints = predictions.length * 3
+  let ece = 0
+  let mce = 0
+  let overconfSum = 0
+  let overconfCount = 0
+
+  const calibBins: CalibrationBin[] = []
+  for (let i = 0; i < nBins; i++) {
+    if (bins[i].count === 0) continue
+    const center = (i + 0.5) * binWidth
+    const predicted = bins[i].sumPred / bins[i].count
+    const actual = bins[i].sumAct / bins[i].count
+    const err = Math.abs(predicted - actual)
+    ece += (bins[i].count / totalPoints) * err
+    mce = Math.max(mce, err)
+    if (predicted > actual) { overconfSum += predicted - actual; overconfCount++ }
+    calibBins.push({ center, predicted, actual, count: bins[i].count })
+  }
+
+  return { ece, mce, overconfidence: overconfCount > 0 ? overconfSum / overconfCount : 0, bins: calibBins }
+}
