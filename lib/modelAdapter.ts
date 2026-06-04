@@ -827,24 +827,21 @@ export function analyzeMatch(
     explanation: 'Abstand vom Trainingscamp in Nordamerika zum Spielort. Über 1500 km sinkt die Regeneration messbar. ⚠ Trainingscamp-Standorte ohne bekannte Daten sind Schätzwerte — bitte Standorte mitteilen.',
   })
 
-  // 8. Turnier-Erfahrung (Forrest et al. 2005)
-  const expA = teamA.worldCupTitles * 3 + teamA.worldCupAppearances
-  const expB = teamB.worldCupTitles * 3 + teamB.worldCupAppearances
-  const expDiff = expA - expB
-  const expLogEffectA = clampLogEffect(MODEL_WEIGHTS.experience * expDiff)
+  // 8. Turnier-Erfahrung — consolidated into heritageLogA/B in corePredict (no separate expDiff factor)
+  // expLogA was removed to fix double-counting with heritageLogA/B (both functions of titles + appearances)
   factors.push({
     category: 'experience',
     label: 'WM-Erfahrung & Turnier-Mentalität',
-    source: 'Forrest et al. (2005) – Heritage Premium',
+    source: 'Konsolidiert in Heritage-Faktor (Doppelzählung entfernt)',
     valueA: `${teamA.worldCupTitles} Titel, ${teamA.worldCupAppearances}× dabei`,
     valueB: `${teamB.worldCupTitles} Titel, ${teamB.worldCupAppearances}× dabei`,
-    logEffectA: expLogEffectA,
-    logEffectB: -expLogEffectA,
-    effectA: logEffectToLinear(expLogEffectA),
-    effectB: logEffectToLinear(-expLogEffectA),
+    logEffectA: 0,
+    logEffectB: 0,
+    effectA: 0,
+    effectB: 0,
     confidence: 0.60,
-    isCalibrated: false,
-    explanation: 'Teams mit mehr WM-Titeln und Teilnahmen sind psychologisch besser auf Großturniere vorbereitet (Heritage Premium).',
+    isCalibrated: true,
+    explanation: 'WM-Erfahrung fließt über den Heritage-Faktor ein (heritageLogA/B). Separate expLogA-Komponente wurde entfernt, um Doppelzählung zu vermeiden.',
   })
 
   // 9. Kader-Qualität: Attack vs Defense (Maher 1982)

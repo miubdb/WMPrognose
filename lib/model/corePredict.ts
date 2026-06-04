@@ -61,11 +61,12 @@ export interface MatchVenueContext {
   restDaysB?: number
 }
 
-/** Override model params — used by calibration grid search */
+/** Override model params — used by calibration grid search and model lab */
 export interface CorePredictParams {
   baseGoalRate?: number
   eloWeight?: number
   rho?: number
+  useManualRatings?: boolean  // default true; set false for clean historical backtests
 }
 
 /** Full result including xG values — used by simulation for Poisson sampling */
@@ -135,22 +136,29 @@ function computeXG(
   const eloB = teamB.eloRating ?? 1500
   const eloLogA = clampLogEffect(eloWeight * (eloA - eloB), 0.25)
 
+  const useManualRatings = params.useManualRatings !== false  // default true
+
   const mvA = teamA.squadMarketValueM ?? 200
   const mvB = teamB.squadMarketValueM ?? 200
   const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
   const mvLogA = clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio)
 
-  const expDiff = (teamA.worldCupTitles * 3 + teamA.worldCupAppearances)
-                - (teamB.worldCupTitles * 3 + teamB.worldCupAppearances)
-  const expLogA = clampLogEffect(MODEL_WEIGHTS.experience * expDiff)
-
+  // CONSOLIDATED TOURNAMENT HERITAGE:
+  // Previously: separate expLogA (differential) + heritageLogA/B (absolute) → double-counted.
+  // Fix: only heritageLogA/B (absolute per-team). Cap at ±3% effective xG per team.
+  // Removed: MODEL_WEIGHTS.experience * expDiff (was redundant with heritage)
   const heritageLogA = computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
   const heritageLogB = computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
 
-  const attackLogA = clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamA.attackRating - teamB.defenseRating) / 100)
-  const attackLogB = clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamB.attackRating - teamA.defenseRating) / 100)
+  // Manual editorial ratings — disabled in historical backtest modes
+  const attackLogA = useManualRatings
+    ? clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamA.attackRating - teamB.defenseRating) / 100)
+    : 0
+  const attackLogB = useManualRatings
+    ? clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamB.attackRating - teamA.defenseRating) / 100)
+    : 0
 
-  const spLogA = (teamA.setPieceRating !== undefined && teamB.setPieceRating !== undefined)
+  const spLogA = useManualRatings && teamA.setPieceRating !== undefined && teamB.setPieceRating !== undefined
     ? clampLogEffect(MODEL_WEIGHTS.setPiece * (teamA.setPieceRating - teamB.setPieceRating) / 100, 0.10)
     : 0
 
@@ -193,11 +201,11 @@ function computeXG(
     : 0
 
   const xgA = computeLambda(baseGoalRate, [
-    eloLogA, mvLogA, expLogA, heritageLogA, attackLogA, spLogA,
+    eloLogA, mvLogA, heritageLogA, attackLogA, spLogA,
     hostLogA, diasLogA, altLogA, heatLogA, travelLogA, restLogA, motivLogA,
   ])
   const xgB = computeLambda(baseGoalRate, [
-    -eloLogA, -mvLogA, -expLogA, heritageLogB, attackLogB, -spLogA,
+    -eloLogA, -mvLogA, heritageLogB, attackLogB, -spLogA,
     hostLogB, diasLogB, altLogB, heatLogB, travelLogB, restLogB, motivLogB,
   ])
 

@@ -11,7 +11,7 @@ export const MODEL_WEIGHTS = {
   xgDefense: 1.5,        // pro Einheit avgXgaPer90Defense-Differenz
   host: 0.039,           // ln(1.04) ≈ 0.039 für Gastgebervorteil
   diaspora: 0.020,       // ln(1.02) ≈ 0.020 für Diaspora-Support
-  experience: 0.0005,    // pro WM-Erfahrungs-Punkte-Differenz (titles×3 + appearances)
+  // experience removed — was redundant with heritageLogA/B (double-counting fix)
   travel: -0.0000085,    // pro km über 1500km innerhalb NA
   altitude: -0.055,      // pro 1000m über 1500m (für nicht akklimatisierte Teams)
   heat: -0.018,          // pro WBGT-Grad über 28°C (für schlecht adaptierte Teams)

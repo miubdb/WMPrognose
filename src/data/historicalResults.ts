@@ -4,7 +4,7 @@ export interface HistoricalMatch {
   homeGoals: number
   awayGoals: number
   penaltyWinner?: 'home' | 'away'
-  tournament: 'WM2022' | 'WM2018' | 'WM2014'
+  tournament: 'WM2022' | 'WM2018' | 'WM2014' | 'EURO2024'
   phase: 'group' | 'round16' | 'quarter' | 'semi' | 'final' | 'third'
   group?: string      // 'A'..'H' for group phase
   homeElo?: number    // historical ELO at tournament start
@@ -285,3 +285,10 @@ export const HISTORICAL_MATCHES: HistoricalMatch[] = [
   // WM 2014 Finale
   { homeTeam: 'Germany',      awayTeam: 'Argentina',    homeGoals: 1, awayGoals: 0, tournament: 'WM2014', phase: 'final', homeElo: 1962, awayElo: 2008 },
 ]
+
+// Re-export EURO 2024 separately so it can be combined as needed
+export { EURO2024_MATCHES } from './historicalResultsEURO2024'
+
+// Combined export including EURO 2024
+import { EURO2024_MATCHES as _EURO2024 } from './historicalResultsEURO2024'
+export const ALL_HISTORICAL_MATCHES: HistoricalMatch[] = [...HISTORICAL_MATCHES, ..._EURO2024]
