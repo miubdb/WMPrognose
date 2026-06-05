@@ -21,8 +21,7 @@ export async function PATCH(
     if (Object.keys(teamFields).length > 0) {
       const { error } = await sb
         .from('wm2026_teams')
-        .update({ ...teamFields, updated_at: new Date().toISOString() })
-        .eq('team_id', teamId)
+        .upsert({ team_id: teamId, ...teamFields, updated_at: new Date().toISOString() }, { onConflict: 'team_id' })
       if (error) errors.push(`wm2026_teams: ${error.message}`)
     }
 

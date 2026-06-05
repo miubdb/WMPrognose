@@ -23,7 +23,7 @@ interface WM2026Team {
   starter_mv_m: number | null
 }
 
-interface TeamStats { total: number; missingElo: number; teamsWithZeroMv: number; unverified: number }
+interface TeamStats { total: number; missingElo: number; teamsWithoutSquad: number; teamsWithZeroMv: number; unverified: number }
 
 interface HistQualRow {
   tournamentId: string; label: string; teamCount: number
@@ -35,7 +35,7 @@ interface HistQualRow {
 interface ModelResult { rps?: number; ece?: number; recommendation?: string; error?: string; raw?: unknown }
 
 type Tab = 'daten' | 'qualität' | 'modell' | 'live'
-type Filter = 'alle' | 'fehlend_mv' | 'fehlend_elo' | 'ungeprüft'
+type Filter = 'alle' | 'fehlend_mv' | 'fehlend_elo' | 'kein_kader' | 'ungeprüft'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +57,17 @@ function Light({ ok, label }: { ok: boolean; label: string }) {
 
 // ─── Status Panel ─────────────────────────────────────────────────────────────
 
+function Stat({ label, value, total, ok }: { label: string; value: number; total?: number; ok: boolean }) {
+  return (
+    <div className={`flex items-center justify-between rounded-lg px-3 py-2 border ${ok ? 'border-gray-800 bg-gray-900/40' : 'border-amber-800/50 bg-amber-950/20'}`}>
+      <span className={`text-xs ${ok ? 'text-gray-400' : 'text-amber-300'}`}>{label}</span>
+      <span className={`text-xs font-mono font-bold ${ok ? 'text-emerald-400' : 'text-amber-400'}`}>
+        {total !== undefined ? `${total - value} / ${total}` : value === 0 ? '✓' : value}
+      </span>
+    </div>
+  )
+}
+
 function StatusPanel({ stats, histLoaded, lastBacktest }: {
   stats: TeamStats | null
   histLoaded: boolean
@@ -64,31 +75,37 @@ function StatusPanel({ stats, histLoaded, lastBacktest }: {
 }) {
   if (!stats) return <div className="text-gray-600 text-sm animate-pulse">Lade Status…</div>
 
-  const eloOk = stats.missingElo       === 0
-  const mvOk  = stats.teamsWithZeroMv  === 0
-  const verOk = stats.unverified       === 0
+  const eloOk    = stats.missingElo        === 0
+  const squadOk  = stats.teamsWithoutSquad === 0
+  const mvOk     = stats.teamsWithZeroMv   === 0
+  const verOk    = stats.unverified        === 0
+  const allOk    = eloOk && squadOk && mvOk
 
   let nextStep = ''
-  if (!eloOk) nextStep = `${stats.missingElo} Teams haben keine ELO-Werte. Bitte zuerst ELO aktualisieren.`
-  else if (!mvOk) nextStep = `${stats.teamsWithZeroMv} Teams haben Spieler ohne Marktwert. Spieler-Daten prüfen.`
+  if (!eloOk)   nextStep = `${stats.missingElo} Teams ohne ELO-Werte. Bitte ELO aktualisieren.`
+  else if (!squadOk) nextStep = `${stats.teamsWithoutSquad} Teams ohne Kader in der DB. Spielerdaten importieren.`
+  else if (!mvOk) nextStep = `${stats.teamsWithZeroMv} Teams haben Spieler mit 0-Marktwert. Spieler prüfen.`
   else if (!verOk) nextStep = `${stats.unverified} Teams noch ungeprüft. Als geprüft bestätigen.`
   else nextStep = 'Alle Daten vollständig. Backtest oder Parametersuche starten.'
 
   return (
-    <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-        <Light ok={eloOk}   label={eloOk  ? 'ELO vollständig' : `ELO: ${stats.missingElo} fehlen`} />
-        <Light ok={mvOk}    label={mvOk   ? 'Spieler-MW vollständig' : `${stats.teamsWithZeroMv} Teams mit 0-MW-Spielern`} />
-        <Light ok={verOk}   label={verOk  ? 'Alle geprüft' : `${stats.unverified} ungeprüft`} />
-        <Light ok={histLoaded} label={histLoaded ? 'Hist. Snapshots geladen' : 'Hist. Daten laden…'} />
-        <Light ok={!!lastBacktest} label={lastBacktest ? `Backtest: ${lastBacktest}` : 'Backtest: ausstehend'} />
+    <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5 space-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <Stat label="Aktive WM-Teams"        value={stats.total}              total={48}         ok={stats.total === 48} />
+        <Stat label="Teams ohne ELO"         value={stats.missingElo}                            ok={eloOk} />
+        <Stat label="Teams ohne Kader"       value={stats.teamsWithoutSquad}                     ok={squadOk} />
+        <Stat label="Teams mit 0-MW-Spielern" value={stats.teamsWithZeroMv}                     ok={mvOk} />
       </div>
       <div className={`text-xs rounded-lg px-4 py-2.5 border ${
-        !eloOk || !mvOk ? 'bg-amber-950/40 border-amber-800/50 text-amber-300'
+        !eloOk || !squadOk || !mvOk ? 'bg-amber-950/40 border-amber-800/50 text-amber-300'
         : verOk ? 'bg-emerald-950/40 border-emerald-800/50 text-emerald-300'
         : 'bg-gray-800/60 border-gray-700 text-gray-300'
       }`}>
         <span className="font-semibold">Nächster Schritt: </span>{nextStep}
+      </div>
+      <div className="flex gap-4 text-[10px] text-gray-600">
+        <span><Light ok={histLoaded} label={histLoaded ? 'Hist. Snapshots geladen' : 'Hist. Daten noch nicht geladen'} /></span>
+        <span><Light ok={!!lastBacktest} label={lastBacktest ? `Letzter Backtest: ${lastBacktest}` : 'Backtest: ausstehend'} /></span>
       </div>
     </div>
   )
@@ -242,6 +259,7 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
   const filtered = teams.filter(t => {
     if (filter === 'fehlend_mv')  return t.zero_mv_count > 0
     if (filter === 'fehlend_elo') return !t.elo_rating
+    if (filter === 'kein_kader')  return t.player_count === 0
     if (filter === 'ungeprüft')   return !t.verified
     return true
   })
@@ -272,10 +290,10 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
   }
 
   const FILTERS: { key: Filter; label: string; count?: number }[] = [
-    { key: 'alle',        label: 'Alle Teams',      count: teams.length },
-    { key: 'fehlend_mv',  label: '0-MW-Spieler',    count: stats?.teamsWithZeroMv ?? 0 },
+    { key: 'alle',        label: 'Alle 48 Teams',   count: teams.length },
     { key: 'fehlend_elo', label: 'Fehlende ELO',    count: stats?.missingElo ?? 0 },
-    { key: 'ungeprüft',   label: 'Ungeprüft',       count: stats?.unverified ?? 0 },
+    { key: 'kein_kader',  label: 'Kein Kader',      count: stats?.teamsWithoutSquad ?? 0 },
+    { key: 'fehlend_mv',  label: '0-MW-Spieler',    count: stats?.teamsWithZeroMv ?? 0 },
   ]
 
   return (
@@ -503,7 +521,7 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
   const [paramsLoading, setParamsLoading]     = useState(false)
   const [qualResult, setQualResult]           = useState<string | null>(null)
 
-  const missingData = stats && (stats.missingElo > 0 || stats.teamsWithZeroMv > 0)
+  const missingData = stats && (stats.missingElo > 0 || stats.teamsWithoutSquad > 0 || stats.teamsWithZeroMv > 0)
 
   async function runBacktest() {
     setBacktestLoading(true)
@@ -539,10 +557,12 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
   function checkQuality() {
     if (!stats) return
     const issues = []
-    if (stats.missingElo > 0)      issues.push(`${stats.missingElo} Teams ohne ELO`)
-    if (stats.teamsWithZeroMv > 0) issues.push(`${stats.teamsWithZeroMv} Teams mit 0-MW-Spielern`)
-    if (stats.unverified > 0)      issues.push(`${stats.unverified} Teams ungeprüft`)
-    setQualResult(issues.length === 0 ? '✓ Alle Daten vorhanden und vollständig.' : `Offene Punkte: ${issues.join(' · ')}`)
+    if (stats.total !== 48)             issues.push(`Nur ${stats.total} Teams geladen (erwartet 48)`)
+    if (stats.missingElo > 0)          issues.push(`${stats.missingElo} Teams ohne ELO`)
+    if (stats.teamsWithoutSquad > 0)   issues.push(`${stats.teamsWithoutSquad} Teams ohne Kader`)
+    if (stats.teamsWithZeroMv > 0)     issues.push(`${stats.teamsWithZeroMv} Teams mit 0-MW-Spielern`)
+    if (stats.unverified > 0)          issues.push(`${stats.unverified} Teams ungeprüft`)
+    setQualResult(issues.length === 0 ? '✓ Alle 48 WM-Teams vollständig und bereit.' : `Offene Punkte: ${issues.join(' · ')}`)
   }
 
   return (
@@ -584,7 +604,11 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
           <div className="text-xs text-gray-500 uppercase tracking-wider">3. Parametersuche starten</div>
           <p className="text-xs text-gray-400">
             {missingData
-              ? `Deaktiviert: Daten unvollständig (${stats!.missingElo > 0 ? `${stats!.missingElo} ELO fehlend` : ''}${stats!.teamsWithZeroMv > 0 ? `${stats!.missingElo > 0 ? ', ' : ''}${stats!.teamsWithZeroMv} Teams mit 0-MW` : ''}).`
+              ? `Deaktiviert: Daten unvollständig (${[
+                  stats!.missingElo > 0 ? `${stats!.missingElo} ELO fehlend` : '',
+                  stats!.teamsWithoutSquad > 0 ? `${stats!.teamsWithoutSquad} ohne Kader` : '',
+                  stats!.teamsWithZeroMv > 0 ? `${stats!.teamsWithZeroMv} Teams mit 0-MW` : '',
+                ].filter(Boolean).join(', ')}).`
               : 'Grid Search (450 Kombinationen) + Walk-Forward + Bootstrap. ~60s.'}
           </p>
           <button onClick={runParamSearch} disabled={paramsLoading || !!missingData}

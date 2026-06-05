@@ -1,57 +1,25 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { WM2026_MARKET_VALUES } from '@/src/data/wm2026MarketValues'
+import { GROUP_SCHEDULE } from '@/src/data/schedule'
+import { TEAM_BY_ID } from '@/src/data/allTeams'
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const NAME_TO_ID: Record<string, string> = {
-  'Germany': 'germany', 'France': 'france', 'Spain': 'spain', 'England': 'england',
-  'Portugal': 'portugal', 'Netherlands': 'netherlands', 'Belgium': 'belgium',
-  'Italy': 'italy', 'Switzerland': 'switzerland', 'Denmark': 'denmark',
-  'Croatia': 'croatia', 'Austria': 'austria', 'Serbia': 'serbia',
-  'Türkiye': 'turkey', 'Scotland': 'scotland', 'Hungary': 'hungary',
-  'Brazil': 'brazil', 'Argentina': 'argentina', 'Colombia': 'colombia',
-  'Uruguay': 'uruguay', 'Ecuador': 'ecuador', 'Paraguay': 'paraguay',
-  'USA': 'usa', 'Mexico': 'mexico', 'Canada': 'canada',
-  'Honduras': 'honduras', 'Costa Rica': 'costa_rica', 'Panama': 'panama',
-  'Morocco': 'morocco', 'Senegal': 'senegal', 'Nigeria': 'nigeria',
-  'Egypt': 'egypt', 'Ivory Coast': 'ivory_coast', 'Mali': 'mali',
-  'South Africa': 'south_africa', 'Cameroon': 'cameroon', 'Algeria': 'algeria',
-  'Japan': 'japan', 'South Korea': 'south_korea', 'Saudi Arabia': 'saudi_arabia',
-  'Iran': 'iran', 'Australia': 'australia', 'Qatar': 'qatar',
-  'Jordan': 'jordan', 'Uzbekistan': 'uzbekistan', 'New Zealand': 'new_zealand',
-}
-
-async function seedFromStatic() {
-  const rows = WM2026_MARKET_VALUES.map(t => ({
-    team_id:            NAME_TO_ID[t.teamName] ?? t.teamName.toLowerCase().replace(/\s+/g, '_'),
-    team_name:          t.teamName,
-    confederation:      t.confederation,
-    market_value_m:     t.marketValueM,
-    market_value_source: t.source,
-    market_value_date:  t.snapshotDate,
-    verified:           t.manuallyVerified,
-    notes:              t.notes ?? null,
-  }))
-  await sb.from('wm2026_teams').upsert(rows, { onConflict: 'team_id' })
-}
+// Source of truth: exactly the 48 teams in the group stage schedule
+export const ACTIVE_WM_TEAM_IDS: string[] = [
+  ...new Set(GROUP_SCHEDULE.flatMap(m => [m.teamAId, m.teamBId])),
+].sort()
 
 export async function GET() {
   try {
-    // Auto-seed if empty
-    const { count } = await sb.from('wm2026_teams').select('*', { count: 'exact', head: true })
-    if ((count ?? 0) === 0) await seedFromStatic()
-
-    const [teamsRes, eloRes, playersRes] = await Promise.all([
-      sb.from('wm2026_teams').select('*').order('confederation').order('team_name'),
-      sb.from('team_elo_ratings').select('team_id, elo_rating, source, updated_at, elo_delta_1y'),
+    const [playersRes, eloRes, wm2026Res] = await Promise.all([
       sb.from('players').select('team_id, market_value_m, is_in_starting_xi'),
+      sb.from('team_elo_ratings').select('team_id, elo_rating, source, updated_at, elo_delta_1y'),
+      sb.from('wm2026_teams').select('team_id, verified, notes').in('team_id', ACTIVE_WM_TEAM_IDS),
     ])
-
-    if (teamsRes.error) throw teamsRes.error
 
     // Aggregate squad stats per team from players table
     const squadStats = new Map<string, {
@@ -64,6 +32,7 @@ export async function GET() {
     }>()
 
     for (const p of (playersRes.data ?? [])) {
+      if (!ACTIVE_WM_TEAM_IDS.includes(p.team_id)) continue
       const s = squadStats.get(p.team_id) ?? {
         playerCount: 0, playersWithMv: 0, zeroMvCount: 0,
         totalMvM: 0, starterCount: 0, starterMvM: 0,
@@ -76,34 +45,45 @@ export async function GET() {
       squadStats.set(p.team_id, s)
     }
 
-    const eloMap = new Map((eloRes.data ?? []).map(e => [e.team_id, e]))
+    const eloMap  = new Map((eloRes.data  ?? []).map(e => [e.team_id, e]))
+    const wm2026Map = new Map((wm2026Res.data ?? []).map(w => [w.team_id, w]))
 
-    const teams = (teamsRes.data ?? []).map(t => {
-      const elo  = eloMap.get(t.team_id)
-      const sq   = squadStats.get(t.team_id)
+    // Build response for exactly the 48 schedule teams
+    const teams = ACTIVE_WM_TEAM_IDS.map(teamId => {
+      const meta  = TEAM_BY_ID[teamId]
+      const elo   = eloMap.get(teamId)
+      const wm    = wm2026Map.get(teamId)
+      const sq    = squadStats.get(teamId)
       return {
-        ...t,
-        elo_rating:      elo?.elo_rating ?? null,
-        elo_source:      elo?.source ?? null,
-        elo_updated:     elo?.updated_at ?? null,
+        team_id:         teamId,
+        team_name:       meta?.name       ?? teamId,
+        confederation:   meta?.confederation ?? 'UEFA',
+        group:           meta?.group       ?? '?',
+        verified:        wm?.verified      ?? false,
+        notes:           wm?.notes         ?? null,
+        elo_rating:      elo?.elo_rating   ?? null,
+        elo_source:      elo?.source       ?? null,
+        elo_updated:     elo?.updated_at   ?? null,
         elo_delta_1y:    elo?.elo_delta_1y ?? 0,
         player_count:    sq?.playerCount   ?? 0,
         players_with_mv: sq?.playersWithMv ?? 0,
         zero_mv_count:   sq?.zeroMvCount   ?? 0,
-        total_mv_m:      sq ? Math.round(sq.totalMvM * 10) / 10 : null,
+        total_mv_m:      sq ? Math.round(sq.totalMvM  * 10) / 10 : null,
         starter_count:   sq?.starterCount  ?? 0,
         starter_mv_m:    sq ? Math.round(sq.starterMvM * 10) / 10 : null,
       }
-    })
+    }).sort((a, b) => a.confederation.localeCompare(b.confederation) || a.team_name.localeCompare(b.team_name))
 
-    const missingElo      = teams.filter(t => !t.elo_rating).length
-    const teamsWithZeroMv = teams.filter(t => t.zero_mv_count > 0).length
-    const unverified      = teams.filter(t => !t.verified).length
+    const missingElo       = teams.filter(t => !t.elo_rating).length
+    const teamsWithoutSquad = teams.filter(t => t.player_count === 0).length
+    const teamsWithZeroMv  = teams.filter(t => t.zero_mv_count > 0).length
+    const unverified       = teams.filter(t => !t.verified).length
 
     return NextResponse.json({
       ok: true,
       teams,
-      stats: { total: teams.length, missingElo, teamsWithZeroMv, unverified },
+      activeCount: ACTIVE_WM_TEAM_IDS.length,
+      stats: { total: teams.length, missingElo, teamsWithoutSquad, teamsWithZeroMv, unverified },
     })
   } catch (err) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
@@ -112,14 +92,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}))
-  if (body.action === 'seed') {
-    await seedFromStatic()
-    return NextResponse.json({ ok: true, action: 'seeded' })
-  }
-  if (body.action === 'reset') {
-    await sb.from('wm2026_teams').delete().neq('team_id', '__never__')
-    await seedFromStatic()
-    return NextResponse.json({ ok: true, action: 'reset' })
+  if (body.action === 'reset-verified') {
+    await sb.from('wm2026_teams').update({ verified: false }).in('team_id', ACTIVE_WM_TEAM_IDS)
+    return NextResponse.json({ ok: true, action: 'reset-verified' })
   }
   return NextResponse.json({ ok: false, error: 'Unknown action' }, { status: 400 })
 }
