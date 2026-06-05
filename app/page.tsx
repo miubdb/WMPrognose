@@ -102,8 +102,6 @@ function MatchCard({
     ? `${analysis.teamB.flag} ${analysis.teamB.name}`
     : 'Unentschieden'
 
-  const missingSquad = !analysis.squadDataA || !analysis.squadDataB
-
   async function saveResult() {
     const gA = parseInt(goalsA)
     const gB = parseInt(goalsB)
@@ -150,9 +148,6 @@ function MatchCard({
           <span className="text-gray-500">Uhr</span>
         </div>
         <div className="flex items-center gap-2">
-          {missingSquad && !result && (
-            <span className="text-[10px] text-amber-500/80 bg-amber-900/20 px-1.5 py-0.5 rounded">kein Kader</span>
-          )}
           {result && (
             <span className="text-[10px] text-emerald-500/80 bg-emerald-900/20 px-1.5 py-0.5 rounded font-bold">Endstand</span>
           )}
@@ -209,7 +204,6 @@ function MatchCard({
             <div className="flex items-center gap-2 justify-end">
               <span className="text-sm font-medium text-gray-200 text-right hidden sm:block truncate">
                 {analysis.teamA.name}
-                {!analysis.squadDataA && <span className="text-amber-500 ml-1">⚠</span>}
               </span>
               <span className="text-2xl">{analysis.teamA.flag}</span>
             </div>
@@ -219,7 +213,6 @@ function MatchCard({
             <div className="flex items-center gap-2">
               <span className="text-2xl">{analysis.teamB.flag}</span>
               <span className="text-sm font-medium text-gray-200 hidden sm:block truncate">
-                {!analysis.squadDataB && <span className="text-amber-500 mr-1">⚠</span>}
                 {analysis.teamB.name}
               </span>
             </div>
