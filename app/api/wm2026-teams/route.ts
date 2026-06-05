@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
+import { ACTIVE_WM_TEAM_IDS } from '@/src/data/activeWmTeams'
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-// Source of truth: exactly the 48 teams in the group stage schedule
-export const ACTIVE_WM_TEAM_IDS: string[] = [
-  ...new Set(GROUP_SCHEDULE.flatMap(m => [m.teamAId, m.teamBId])),
-].sort()
 
 export async function GET() {
   try {
