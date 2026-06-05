@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { TEAM_BY_ID } from '@/src/data/allTeams'
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,9 +20,17 @@ export async function PATCH(
     const errors: string[] = []
 
     if (Object.keys(teamFields).length > 0) {
+      // Include NOT NULL columns so upsert succeeds even when the row doesn't exist yet
+      const meta = TEAM_BY_ID[teamId]
       const { error } = await sb
         .from('wm2026_teams')
-        .upsert({ team_id: teamId, ...teamFields, updated_at: new Date().toISOString() }, { onConflict: 'team_id' })
+        .upsert({
+          team_id:       teamId,
+          team_name:     meta?.name          ?? teamId,
+          confederation: meta?.confederation ?? 'UEFA',
+          ...teamFields,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'team_id' })
       if (error) errors.push(`wm2026_teams: ${error.message}`)
     }
 

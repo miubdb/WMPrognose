@@ -26,10 +26,16 @@ interface WM2026Team {
 interface TeamStats { total: number; missingElo: number; teamsWithoutSquad: number; teamsWithZeroMv: number; unverified: number }
 
 interface HistQualRow {
-  tournamentId: string; label: string; teamCount: number
-  realMvCount: number; estimatedCount: number; missingCount: number
+  tournamentId: string; label: string; expectedTeamCount: number; teamCount: number
+  realMvCount: number; estimatedCount: number; missingCount: number; fallbackCount: number
   overallQuality: 'gut' | 'mittel' | 'schlecht'
   missingTeams: string[]; estimatedTeams: string[]
+}
+
+interface CalibrationInfo {
+  recommendedMode: string
+  reliableTournaments: string[]
+  note: string
 }
 
 interface ModelResult { rps?: number; ece?: number; recommendation?: string; error?: string; raw?: unknown }
@@ -91,7 +97,7 @@ function StatusPanel({ stats, histLoaded, lastBacktest }: {
   return (
     <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5 space-y-3">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Stat label="Aktive WM-Teams"        value={stats.total}              total={48}         ok={stats.total === 48} />
+        <Stat label="Aktive WM-Teams"        value={48 - stats.total}         total={48}         ok={stats.total === 48} />
         <Stat label="Teams ohne ELO"         value={stats.missingElo}                            ok={eloOk} />
         <Stat label="Teams ohne Kader"       value={stats.teamsWithoutSquad}                     ok={squadOk} />
         <Stat label="Teams mit 0-MW-Spielern" value={stats.teamsWithZeroMv}                     ok={mvOk} />
@@ -251,10 +257,13 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
 }) {
   const [filter, setFilter] = useState<Filter>('alle')
   const [saving, setSaving] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkResult, setBulkResult] = useState<string | null>(null)
+  const [bulkVerifyLoading, setBulkVerifyLoading] = useState(false)
+  const [bulkVerifyResult, setBulkVerifyResult] = useState<string | null>(null)
 
   const filtered = teams.filter(t => {
     if (filter === 'fehlend_mv')  return t.zero_mv_count > 0
@@ -266,13 +275,39 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
 
   async function handleSave(teamId: string, fields: Record<string, unknown>) {
     setSaving(teamId)
-    await fetch(`/api/wm2026-teams/${teamId}`, {
+    setSaveError(null)
+    const res = await fetch(`/api/wm2026-teams/${teamId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(fields),
     })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setSaveError(`Speichern fehlgeschlagen: ${data.error ?? data.errors?.join(', ') ?? res.status}`)
+    }
     setSaving(null)
     onRefresh()
+  }
+
+  async function handleBulkVerify() {
+    const eligible = teams.filter(
+      t => t.player_count > 0 && t.zero_mv_count === 0 && t.elo_rating !== null && !t.verified
+    )
+    if (eligible.length === 0) {
+      setBulkVerifyResult('Alle vollständigen Teams sind bereits geprüft.')
+      return
+    }
+    setBulkVerifyLoading(true)
+    setBulkVerifyResult(null)
+    const res = await fetch('/api/wm2026-teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'bulk-verify', teamIds: eligible.map(t => t.team_id) }),
+    })
+    const data = await res.json()
+    setBulkVerifyResult(data.ok ? `✓ ${data.updated} Teams als geprüft markiert` : `Fehler: ${data.error}`)
+    setBulkVerifyLoading(false)
+    if (data.ok) onRefresh()
   }
 
   async function runBulkElo() {
@@ -311,7 +346,11 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          <button onClick={handleBulkVerify} disabled={bulkVerifyLoading}
+            className="text-xs px-3 py-1 bg-emerald-800 hover:bg-emerald-700 disabled:opacity-50 text-emerald-200 rounded-lg transition-colors">
+            {bulkVerifyLoading ? '…' : 'Alle vollständigen Teams geprüft markieren'}
+          </button>
           <button onClick={() => setBulkOpen(b => !b)}
             className="text-xs px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg transition-colors">
             ELO-Import
@@ -322,6 +361,16 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
           </button>
         </div>
       </div>
+
+      {/* Bulk verify / save feedback */}
+      {(bulkVerifyResult || saveError) && (
+        <div className="flex flex-wrap gap-3">
+          {bulkVerifyResult && (
+            <span className={`text-xs ${bulkVerifyResult.startsWith('✓') ? 'text-emerald-400' : 'text-red-400'}`}>{bulkVerifyResult}</span>
+          )}
+          {saveError && <span className="text-xs text-red-400">{saveError}</span>}
+        </div>
+      )}
 
       {/* Bulk ELO import */}
       {bulkOpen && (
@@ -395,31 +444,59 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
 
 function HistoricalQualityTab() {
   const [data, setData] = useState<HistQualRow[] | null>(null)
+  const [calibration, setCalibration] = useState<CalibrationInfo | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/historical-quality')
       .then(r => r.json())
-      .then(d => d.ok && setData(d.summary))
+      .then(d => {
+        if (d.ok) {
+          setData(d.summary)
+          setCalibration(d.calibration)
+        }
+      })
   }, [])
 
   if (!data) return <div className="text-gray-600 text-sm animate-pulse">Lade Datenqualität…</div>
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-gray-500">
-        Historische Snapshots werden für methodisch saubere Backtests genutzt. ELO kommt aus Match-Records.
-        Fehlende Marktwerte werden durch den Fallback-Wert (200M) ersetzt.
-      </p>
+    <div className="space-y-4">
+      {/* Calibration recommendation banner */}
+      {calibration && (
+        <div className="bg-indigo-950/40 border border-indigo-800/50 rounded-xl px-4 py-3 space-y-1.5">
+          <div className="text-xs font-semibold text-indigo-300">
+            Für finale Parametersuche empfohlen:{' '}
+            <span className="font-mono text-indigo-200">{calibration.recommendedMode}</span>
+          </div>
+          <div className="text-[11px] text-indigo-400/80">
+            Enthält: {calibration.reliableTournaments.join(', ')} — vollständig abgedeckt, Transfermarkt-Archivqualität
+          </div>
+          <div className="text-[11px] text-gray-500">{calibration.note}</div>
+        </div>
+      )}
+
+      {/* WC2014 warning */}
+      {data.find(r => r.tournamentId === 'WC2014') && (() => {
+        const wc14 = data.find(r => r.tournamentId === 'WC2014')!
+        return wc14.estimatedCount === wc14.teamCount ? (
+          <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl px-4 py-2.5 text-[11px] text-amber-400">
+            WM 2014 nicht für finale Marktwert-Kalibrierung geeignet: {wc14.estimatedCount}/{wc14.teamCount} Werte geschätzt — nur in <span className="font-mono">allSnapshots</span> verwenden
+          </div>
+        ) : null
+      })()}
+
       <div className="overflow-x-auto rounded-xl border border-gray-800">
         <table className="w-full text-left">
           <thead className="bg-gray-900/80 text-[10px] text-gray-500 uppercase tracking-wider">
             <tr>
               <th className="px-3 py-2.5">Turnier</th>
-              <th className="px-3 py-2.5 text-right">Teams</th>
+              <th className="px-3 py-2.5 text-right">Teilnehmer</th>
+              <th className="px-3 py-2.5 text-right">Snapshots</th>
               <th className="px-3 py-2.5 text-right">Echte MW</th>
               <th className="px-3 py-2.5 text-right">Geschätzt</th>
               <th className="px-3 py-2.5 text-right">Fehlend</th>
+              <th className="px-3 py-2.5 text-right">Fallbacks</th>
               <th className="px-3 py-2.5">Qualität</th>
               <th className="px-3 py-2.5"></th>
             </tr>
@@ -429,11 +506,17 @@ function HistoricalQualityTab() {
               <>
                 <tr key={row.tournamentId} className="border-t border-gray-800 hover:bg-gray-800/30">
                   <td className="px-3 py-2.5 text-sm font-medium text-white">{row.label}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-400">{row.teamCount}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-400">{row.realMvCount}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-yellow-400">{row.estimatedCount}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-500">{row.expectedTeamCount}</td>
+                  <td className={`px-3 py-2.5 text-right font-mono text-xs ${row.teamCount < row.expectedTeamCount ? 'text-amber-400' : 'text-gray-400'}`}>
+                    {row.teamCount}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-400">{row.realMvCount > 0 ? row.realMvCount : '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-yellow-400">{row.estimatedCount > 0 ? row.estimatedCount : '—'}</td>
                   <td className={`px-3 py-2.5 text-right font-mono text-xs ${row.missingCount > 0 ? 'text-red-400' : 'text-gray-600'}`}>
                     {row.missingCount > 0 ? row.missingCount : '—'}
+                  </td>
+                  <td className={`px-3 py-2.5 text-right font-mono text-xs ${row.fallbackCount > 0 ? 'text-red-400 font-bold' : 'text-gray-600'}`}>
+                    {row.fallbackCount > 0 ? `${row.fallbackCount} × 200M` : '—'}
                   </td>
                   <td className="px-3 py-2.5"><QBadge q={row.overallQuality} /></td>
                   <td className="px-3 py-2.5">
@@ -447,17 +530,23 @@ function HistoricalQualityTab() {
                 </tr>
                 {expanded === row.tournamentId && (
                   <tr key={`${row.tournamentId}-detail`} className="border-t border-gray-800/50">
-                    <td colSpan={7} className="px-4 py-3 bg-gray-900/40">
+                    <td colSpan={9} className="px-4 py-3 bg-gray-900/40">
                       {row.estimatedTeams.length > 0 && (
                         <div className="mb-2">
-                          <span className="text-[10px] text-yellow-500 font-semibold uppercase mr-2">Geschätzt:</span>
+                          <span className="text-[10px] text-yellow-500 font-semibold uppercase mr-2">Geschätzt ({row.estimatedTeams.length}):</span>
                           <span className="text-[10px] text-gray-400">{row.estimatedTeams.join(', ')}</span>
                         </div>
                       )}
                       {row.missingTeams.length > 0 && (
                         <div>
-                          <span className="text-[10px] text-red-500 font-semibold uppercase mr-2">Fehlend (Fallback 200M):</span>
+                          <span className="text-[10px] text-red-500 font-semibold uppercase mr-2">Kein Marktwert:</span>
                           <span className="text-[10px] text-gray-400">{row.missingTeams.join(', ')}</span>
+                        </div>
+                      )}
+                      {row.fallbackCount > 0 && (
+                        <div className="mt-1">
+                          <span className="text-[10px] text-red-500 font-semibold uppercase mr-2">Fallback 200M verwendet:</span>
+                          <span className="text-[10px] text-gray-400">{row.fallbackCount} Teams ohne Snapshot</span>
                         </div>
                       )}
                     </td>
@@ -469,9 +558,9 @@ function HistoricalQualityTab() {
         </table>
       </div>
       <div className="text-xs text-gray-600 space-y-1">
-        <div><span className="text-emerald-400">Echte MW</span> — direkt aus Archivquelle entnommen</div>
-        <div><span className="text-yellow-400">Geschätzt</span> — Näherungswert, nicht manuell verifiziert</div>
-        <div><span className="text-red-400">Fehlend</span> — kein Wert vorhanden, Modell verwendet 200M als Fallback</div>
+        <div><span className="text-emerald-400">Echte MW</span> — direkt aus verifizierter Archivquelle</div>
+        <div><span className="text-yellow-400">Geschätzt</span> — Transfermarkt-Schätzung, nicht manuell verifiziert</div>
+        <div><span className="text-red-400">Fallbacks</span> — kein Snapshot vorhanden, Modell würde 200M verwenden</div>
       </div>
     </div>
   )

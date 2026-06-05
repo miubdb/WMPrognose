@@ -70,9 +70,29 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}))
+
   if (body.action === 'reset-verified') {
     await sb.from('wm2026_teams').update({ verified: false }).in('team_id', ACTIVE_WM_TEAM_IDS)
     return NextResponse.json({ ok: true, action: 'reset-verified' })
   }
+
+  if (body.action === 'bulk-verify') {
+    const teamIds: string[] = body.teamIds ?? []
+    if (teamIds.length === 0) return NextResponse.json({ ok: true, updated: 0 })
+    const rows = teamIds.map(id => {
+      const meta = TEAM_BY_ID[id]
+      return {
+        team_id:       id,
+        team_name:     meta?.name          ?? id,
+        confederation: meta?.confederation ?? 'UEFA',
+        verified:      true,
+        updated_at:    new Date().toISOString(),
+      }
+    })
+    const { error } = await sb.from('wm2026_teams').upsert(rows, { onConflict: 'team_id' })
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true, action: 'bulk-verify', updated: rows.length })
+  }
+
   return NextResponse.json({ ok: false, error: 'Unknown action' }, { status: 400 })
 }
