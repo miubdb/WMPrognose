@@ -196,6 +196,7 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
 
   const startA = playersA.filter(p => p.is_in_starting_xi).length
   const startB = playersB.filter(p => p.is_in_starting_xi).length
+  const lineupComplete = startA === 11 && startB === 11
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
@@ -214,6 +215,17 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
         </div>
         <span className="text-gray-600 text-xs">{open ? '▲ Einklappen' : '▼ Aufstellung eintragen'}</span>
       </button>
+
+      {!lineupComplete && (startA > 0 || startB > 0) && (
+        <div className="border-t border-amber-800/30 bg-amber-900/10 px-4 py-2 text-xs text-amber-400 flex items-center gap-2">
+          <span>⚠</span>
+          <span>
+            Startelf unvollständig — Prognose basiert auf Kaderwerten
+            {startA !== 11 && ` (${teamA.name}: ${startA}/11)`}
+            {startB !== 11 && ` (${teamB.name}: ${startB}/11)`}
+          </span>
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-gray-800 p-4">
