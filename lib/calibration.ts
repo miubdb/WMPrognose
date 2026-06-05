@@ -6,9 +6,9 @@
  * Datenbasis: WM 2022 Gruppenspiele (nur Teams die auch in WM 2026 sind)
  */
 
-import { HISTORICAL_MATCHES, type HistoricalMatch } from '@/src/data/historicalResults'
+import { HISTORICAL_MATCHES, ALL_HISTORICAL_MATCHES, type HistoricalMatch } from '@/src/data/historicalResults'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
-import { rps, logLoss, brierScore, RANDOM_RPS } from '@/lib/model/evaluation'
+import { rps, logLoss, brierScore, RANDOM_RPS, computeDatasetBaselineRPS } from '@/lib/model/evaluation'
 import { MODEL_META, MODEL_WEIGHTS } from '@/lib/model/config'
 import { corePredict, type CoreTeamData, type MatchMotivation } from '@/lib/model/corePredict'
 
@@ -332,65 +332,64 @@ function gridSearchOnMatches(matches: PreparedMatch[]): { best: { baseGoalRate: 
  * Walk-forward (expanding window) validation:
  *   Fold 1: Train on WM2014 → Test on WM2018
  *   Fold 2: Train on WM2014 + WM2018 → Test on WM2022
+ *   Fold 3: Train on WM2014 + WM2018 + WM2022 → Test on EURO2024
  *
- * Avoids using WM2022 for both calibration and evaluation.
- * OOS RPS significantly above in-sample RPS = overfitting signal.
+ * All folds use historical ELO only (no WM2026 data, no manual ratings).
+ * OOS RPS significantly above in-sample RPS signals overfitting.
+ *
+ * Note: Fold 3 crosses format boundaries (WM → EURO). Treat with caution.
  */
 export function runWalkForwardCalibration(): WalkForwardResult {
-  const wm2014 = HISTORICAL_MATCHES.filter(m => m.tournament === 'WM2014')
-  const wm2018 = HISTORICAL_MATCHES.filter(m => m.tournament === 'WM2018')
-  const wm2022 = HISTORICAL_MATCHES.filter(m => m.tournament === 'WM2022')
+  const wm2014  = ALL_HISTORICAL_MATCHES.filter(m => m.tournament === 'WM2014')
+  const wm2018  = ALL_HISTORICAL_MATCHES.filter(m => m.tournament === 'WM2018')
+  const wm2022  = ALL_HISTORICAL_MATCHES.filter(m => m.tournament === 'WM2022')
+  const euro24  = ALL_HISTORICAL_MATCHES.filter(m => m.tournament === 'EURO2024')
 
   const folds: WalkForwardFold[] = []
 
-  // Fold 1: Train WM2014 → Test WM2018
-  const train1 = prepareMatchesFromList(wm2014)
-  const test1  = prepareMatchesFromList(wm2018)
-  if (train1.length > 0 && test1.length > 0) {
-    const { best: p1, trainRPS: tr1 } = gridSearchOnMatches(train1)
-    const oos1 = evaluateParams(test1, p1.baseGoalRate, p1.eloWeight, p1.rho)
+  function makeFold(
+    trainMatches: HistoricalMatch[],
+    testMatches: HistoricalMatch[],
+    trainTournaments: string[],
+    testTournament: string
+  ) {
+    const train = prepareMatchesFromList(trainMatches)
+    const test  = prepareMatchesFromList(testMatches)
+    if (train.length === 0 || test.length === 0) return
+
+    const { best: p, trainRPS: tr } = gridSearchOnMatches(train)
+    const oos = evaluateParams(test, p.baseGoalRate, p.eloWeight, p.rho)
+
+    // Compute dynamic baseline for this test set
+    const testObserved: [number, number, number][] = testMatches.map(m =>
+      m.homeGoals > m.awayGoals ? [1,0,0] : m.homeGoals === m.awayGoals ? [0,1,0] : [0,0,1]
+    )
+    const dynamicBaseline = computeDatasetBaselineRPS(testObserved)
+
     folds.push({
-      trainTournaments: ['WM2014'],
-      testTournament: 'WM2018',
-      trainMatches: train1.length,
-      testMatches: test1.length,
-      bestParams: { baseGoalRate: p1.baseGoalRate, eloWeight: p1.eloWeight, dixonColesRho: p1.rho },
-      trainRPS: tr1,
-      testRPS: oos1.rps,
-      testLogLoss: oos1.logLoss,
-      testBrier: oos1.brier,
-      baselineRPS: RANDOM_RPS,
-      skillScore: RANDOM_RPS > 0 ? (RANDOM_RPS - oos1.rps) / RANDOM_RPS * 100 : 0,
-      overfit: oos1.rps - tr1,
+      trainTournaments,
+      testTournament,
+      trainMatches: train.length,
+      testMatches:  test.length,
+      bestParams:   { baseGoalRate: p.baseGoalRate, eloWeight: p.eloWeight, dixonColesRho: p.rho },
+      trainRPS:     tr,
+      testRPS:      oos.rps,
+      testLogLoss:  oos.logLoss,
+      testBrier:    oos.brier,
+      baselineRPS:  dynamicBaseline,
+      skillScore:   dynamicBaseline > 0 ? (dynamicBaseline - oos.rps) / dynamicBaseline * 100 : 0,
+      overfit:      oos.rps - tr,
     })
   }
 
-  // Fold 2: Train WM2014+WM2018 → Test WM2022
-  const train2 = prepareMatchesFromList([...wm2014, ...wm2018])
-  const test2  = prepareMatchesFromList(wm2022)
-  if (train2.length > 0 && test2.length > 0) {
-    const { best: p2, trainRPS: tr2 } = gridSearchOnMatches(train2)
-    const oos2 = evaluateParams(test2, p2.baseGoalRate, p2.eloWeight, p2.rho)
-    folds.push({
-      trainTournaments: ['WM2014', 'WM2018'],
-      testTournament: 'WM2022',
-      trainMatches: train2.length,
-      testMatches: test2.length,
-      bestParams: { baseGoalRate: p2.baseGoalRate, eloWeight: p2.eloWeight, dixonColesRho: p2.rho },
-      trainRPS: tr2,
-      testRPS: oos2.rps,
-      testLogLoss: oos2.logLoss,
-      testBrier: oos2.brier,
-      baselineRPS: RANDOM_RPS,
-      skillScore: RANDOM_RPS > 0 ? (RANDOM_RPS - oos2.rps) / RANDOM_RPS * 100 : 0,
-      overfit: oos2.rps - tr2,
-    })
-  }
+  makeFold(wm2014,                          wm2018,  ['WM2014'],                   'WM2018')
+  makeFold([...wm2014, ...wm2018],          wm2022,  ['WM2014', 'WM2018'],         'WM2022')
+  makeFold([...wm2014, ...wm2018, ...wm2022], euro24, ['WM2014', 'WM2018', 'WM2022'], 'EURO2024')
 
-  const avgOosRPS = folds.length > 0 ? folds.reduce((s, f) => s + f.testRPS, 0) / folds.length : 0
-  const avgTrainRPS = folds.length > 0 ? folds.reduce((s, f) => s + f.trainRPS, 0) / folds.length : 0
+  const avgOosRPS       = folds.length > 0 ? folds.reduce((s, f) => s + f.testRPS,    0) / folds.length : 0
+  const avgTrainRPS     = folds.length > 0 ? folds.reduce((s, f) => s + f.trainRPS,   0) / folds.length : 0
   const avgOosSkillScore = folds.length > 0 ? folds.reduce((s, f) => s + f.skillScore, 0) / folds.length : 0
-  const avgOverfit = folds.length > 0 ? folds.reduce((s, f) => s + f.overfit, 0) / folds.length : 0
+  const avgOverfit      = folds.length > 0 ? folds.reduce((s, f) => s + f.overfit,    0) / folds.length : 0
   const conclusion: WalkForwardResult['conclusion'] = avgOverfit > 0.02 ? 'overfit' : avgOverfit > 0.005 ? 'mild_overfit' : 'ok'
 
   return { folds, avgOosRPS, avgTrainRPS, avgOosSkillScore, conclusion }

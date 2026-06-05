@@ -1,25 +1,26 @@
-import { HISTORICAL_MATCHES, type HistoricalMatch } from '@/src/data/historicalResults'
-import { rps, logLoss, brierScore, RANDOM_RPS, computeECE } from '@/lib/model/evaluation'
-import { TEAM_BY_ID, type TeamBasic } from '@/src/data/allTeams'
-import { computeScorelineMatrix } from '@/src/model/poisson'
-import { applyDixonColesCorrection, aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
-import { computeLambda, clampLogEffect } from '@/lib/model/logLambda'
-import { MODEL_WEIGHTS, MODEL_META } from '@/lib/model/config'
+import { HISTORICAL_MATCHES, ALL_HISTORICAL_MATCHES, type HistoricalMatch } from '@/src/data/historicalResults'
+import {
+  rps, logLoss, brierScore, RANDOM_RPS, computeECE, computeDatasetBaselineRPS,
+} from '@/lib/model/evaluation'
+import { TEAM_BY_ID } from '@/src/data/allTeams'
 import { corePredict, type CoreTeamData, type MatchMotivation } from '@/lib/model/corePredict'
 import { getHistoricalSnapshot, type TournamentId } from '@/src/data/historicalSnapshots'
 
 // ─── Evaluation Mode ─────────────────────────────────────────────────────────
 
 /**
- * eloOnly:          Nur historisches ELO aus Match-Records. Kein MV, keine Ratings.
- *                   → Sauberster Backtest. Ehrliche Untergrenze.
+ * eloOnly:
+ *   Only historical ELO from match records. No MV, no heritage, no motivation.
+ *   Cleanest possible baseline — what ELO alone can explain.
  *
- * historicalFull:   ELO + historische Snapshots (MV-Schätzungen, Turnierhistorie).
- *                   Keine manuellen Ratings (attackRating etc.). Kein Data Leakage.
- *                   → Realistischer sauberer Backtest.
+ * historicalFull:
+ *   ELO + historical snapshots (MV estimates, WC heritage). No manual ratings.
+ *   No motivation (could bias eloOnly comparison if applied inconsistently).
+ *   Clean backtest without data leakage.
  *
- * currentLeakage:   Aktuelle WM2026-Teamdaten für historische Spiele.
- *                   → Status Quo. Nur als Vergleich, mit Leakage-Warnung!
+ * currentLeakage:
+ *   Current WM2026 team data for historical matches. Full model including
+ *   manual ratings and motivation. STATUS QUO — for comparison only, with warning.
  */
 export type EvalMode = 'eloOnly' | 'historicalFull' | 'currentLeakage'
 
@@ -46,9 +47,7 @@ export const PRESET_ENSEMBLES: EnsembleConfig[] = [
 
 // ─── Name-zu-ID Mapping ───────────────────────────────────────────────────────
 
-// null = nicht bei WM 2026 → Fallback auf historische ELO-Werte
 const NAME_TO_ID: Record<string, string | null> = {
-  // WM-Teams
   'Germany': 'germany', 'France': 'france', 'Spain': 'spain', 'Brazil': 'brazil',
   'Argentina': 'argentina', 'England': 'england', 'Portugal': 'portugal',
   'Netherlands': 'netherlands', 'Belgium': 'belgium', 'Croatia': 'croatia',
@@ -59,19 +58,14 @@ const NAME_TO_ID: Record<string, string | null> = {
   'Tunisia': 'tunisia', 'Ecuador': 'ecuador', 'Poland': null, 'Serbia': null,
   'Iran': 'iran', 'Qatar': 'qatar', 'Saudi Arabia': 'saudi_arabia',
   'Costa Rica': null, 'Wales': null,
-  // WM 2018 extra
   'Russia': null, 'Egypt': 'egypt', 'Peru': null, 'Iceland': null,
   'Nigeria': 'nigeria', 'Sweden': 'sweden', 'Colombia': 'colombia', 'Panama': 'panama',
-  // WM 2014 extra
   'Italy': null, 'Chile': 'chile', 'Greece': null, 'Ivory Coast': 'ivory_coast',
   'Honduras': null, 'Bosnia': 'bosnia', 'Algeria': 'algeria',
-  // EURO 2024 extra
   'Austria': 'austria', 'Turkey': 'turkey', 'Georgia': 'georgia',
   'Albania': null, 'Slovakia': null, 'Slovenia': null, 'Romania': null,
   'Ukraine': null, 'Hungary': null, 'Czech Republic': null, 'Scotland': null,
 }
-
-// ─── Tournament ID mapping ────────────────────────────────────────────────────
 
 function matchTournamentToSnapshotId(tournament: HistoricalMatch['tournament']): TournamentId {
   switch (tournament) {
@@ -91,45 +85,31 @@ function makeEloOnlyTeam(elo: number): CoreTeamData {
   }
 }
 
-/**
- * Resolves a historical team to CoreTeamData based on evaluation mode.
- *
- * eloOnly:         Always uses historical ELO from match record. No squad data.
- * historicalFull:  Uses historical ELO + HistoricalTeamSnapshot (MV, experience).
- *                  Manual ratings (attack/defense/setPiece) are NOT used (set neutral).
- * currentLeakage:  Uses current TEAM_BY_ID data if team is at WM2026 (← data leakage).
- */
 function resolveTeamForMode(
   teamName: string,
   historicalElo: number | undefined,
   tournament: HistoricalMatch['tournament'],
   mode: EvalMode
 ): CoreTeamData | null {
-  const snapshotTournament = matchTournamentToSnapshotId(tournament)
-
   if (mode === 'eloOnly') {
     if (!historicalElo) return null
     return makeEloOnlyTeam(historicalElo)
   }
 
   if (mode === 'historicalFull') {
-    const elo = historicalElo
-    if (!elo) return null
-    const snap = getHistoricalSnapshot(teamName, snapshotTournament)
+    if (!historicalElo) return null
+    const snap = getHistoricalSnapshot(teamName, matchTournamentToSnapshotId(tournament))
     return {
-      eloRating: elo,
+      eloRating: historicalElo,
       squadMarketValueM: snap?.marketValueM ?? 200,
-      worldCupTitles: snap?.worldCupTitles ?? 0,
+      worldCupTitles:    snap?.worldCupTitles ?? 0,
       worldCupAppearances: snap?.worldCupAppearances ?? 5,
-      // Manual ratings NOT available historically → neutral values
-      attackRating: 70,
-      defenseRating: 70,
-      setPieceRating: 70,
+      attackRating: 70, defenseRating: 70, setPieceRating: 70,
       confederation: 'UEFA',
     }
   }
 
-  // currentLeakage: existing behavior (uses current WM2026 data → DATA LEAKAGE for historical matches)
+  // currentLeakage: use current WM2026 data where available
   const id = NAME_TO_ID[teamName]
   if (id === undefined) return null
   if (id !== null) {
@@ -140,13 +120,28 @@ function resolveTeamForMode(
   return null
 }
 
-// ─── ELO-only prediction (for ensemble baseline) ─────────────────────────────
+// ─── Params per mode ─────────────────────────────────────────────────────────
 
-function predictEloOnly(elo: number): CoreTeamData {
-  return makeEloOnlyTeam(elo)
+function paramsForMode(mode: EvalMode) {
+  if (mode === 'eloOnly')        return { useManualRatings: false, useMarketValue: false, useHeritage: false }
+  if (mode === 'historicalFull') return { useManualRatings: false, useMarketValue: true,  useHeritage: true  }
+  return { useManualRatings: true,  useMarketValue: true,  useHeritage: true  }
 }
 
 // ─── Result Types ─────────────────────────────────────────────────────────────
+
+export interface TournamentStats {
+  matches: number
+  avgRPS: number
+  avgLogLoss: number
+  avgBrier: number
+  ece: number
+  correctTendency: number
+  drawRate: number
+  drawPredAvg: number
+  skillScore: number    // vs this tournament's own uniform baseline
+  baselineRPS: number
+}
 
 export interface EnsembleResult {
   config: EnsembleConfig
@@ -167,7 +162,7 @@ export interface EvaluationResult {
   avgRPS: number
   avgLogLoss: number
   avgBrier: number
-  baselineRPS: number
+  baselineRPS: number    // true dataset-specific uniform predictor baseline
   skillScore: number
   correctTendency: number
   eloOnlyRPS: number
@@ -179,22 +174,15 @@ export interface EvaluationResult {
   drawRate: number
   drawPredictionAvg: number
   phaseBreakdown: Record<string, { matches: number; avgRPS: number; correctTendency: number }>
+  tournamentBreakdown: Record<string, TournamentStats>
+  // Per-match RPS pairs for bootstrap: [modelRps, eloOnlyRps]
+  rpsPairs: Array<[number, number]>
   ensembleComparison?: EnsembleResult[]
   perMatch: Array<{
-    homeTeam: string
-    awayTeam: string
-    homeGoals: number
-    awayGoals: number
-    predWin: number
-    predDraw: number
-    predLoss: number
-    rps: number
-    outcome: 'W' | 'D' | 'L'
-    phase: string
-    group?: string
-    predicted: '1' | 'X' | '2'
-    correct: boolean
-    tournament: string
+    homeTeam: string; awayTeam: string; homeGoals: number; awayGoals: number
+    predWin: number; predDraw: number; predLoss: number
+    rps: number; outcome: 'W' | 'D' | 'L'; phase: string; group?: string
+    predicted: '1' | 'X' | '2'; correct: boolean; tournament: string
   }>
 }
 
@@ -205,52 +193,63 @@ export function evaluateModel(
   mode: EvalMode = 'currentLeakage',
   runEnsemble = false
 ): EvaluationResult {
+  const modeParams = paramsForMode(mode)
+  // eloOnly params: pure ELO signal — no motivation, no MV, no heritage
+  const eloParams  = { useManualRatings: false, useMarketValue: false, useHeritage: false }
+
   const perMatch: EvaluationResult['perMatch'] = []
   let totalRPS = 0, totalLogLoss = 0, totalBrier = 0, totalEloOnlyRPS = 0
   let correctCount = 0, count = 0
 
   const allPredictions: [number, number, number][] = []
-  const allObserved: [number, number, number][] = []
+  const allObserved:   [number, number, number][] = []
   let drawCount = 0, drawPredSum = 0
 
-  // For ensemble evaluation: collect per-match ELO-only and full-model predictions
-  const matchEloProbs: [number, number, number][] = []
+  const matchEloProbs:  [number, number, number][] = []
   const matchFullProbs: [number, number, number][] = []
-  const matchObserved: [number, number, number][] = []
+  const matchObserved:  [number, number, number][] = []
+  const rpsPairs: Array<[number, number]> = []
 
   const phaseData: Record<string, { totalRPS: number; correct: number; matches: number }> = {}
+
+  // Per-tournament accumulators
+  type TournamentAcc = {
+    totalRPS: number; totalLL: number; totalBrier: number
+    correct: number; matches: number; drawCount: number; drawPredSum: number
+    preds: [number, number, number][]; obs: [number, number, number][]
+  }
+  const tournamentData: Record<string, TournamentAcc> = {}
 
   for (const m of matches) {
     const teamA = resolveTeamForMode(m.homeTeam, m.homeElo, m.tournament, mode)
     const teamB = resolveTeamForMode(m.awayTeam, m.awayElo, m.tournament, mode)
     if (!teamA || !teamB) continue
 
-    // ELO-only baseline (for comparison and ensemble)
+    // ELO-only baseline team (always uses historical ELO, no motivation)
     const eloTeamA = m.homeElo ? makeEloOnlyTeam(m.homeElo) : teamA
     const eloTeamB = m.awayElo ? makeEloOnlyTeam(m.awayElo) : teamB
 
-    const motivation: MatchMotivation = {
+    // Motivation only in currentLeakage mode (historical modes are mode-consistent)
+    const motivation: MatchMotivation = mode === 'currentLeakage' ? {
       alreadyThroughA: m.alreadyThroughHome ?? false,
       alreadyThroughB: m.alreadyThroughAway ?? false,
       mustWinA: m.mustWinHome ?? false,
       mustWinB: m.mustWinAway ?? false,
-    }
+    } : {}
 
-    // useManualRatings only in currentLeakage mode
-    const useManualRatings = mode === 'currentLeakage'
-
-    const [predWin, predDraw, predLoss] = corePredict(teamA, teamB, motivation, {}, { useManualRatings })
-    const [eloWin, eloDraw, eloLoss]   = corePredict(eloTeamA, eloTeamB, {}, {}, { useManualRatings: false })
+    const [predWin, predDraw, predLoss] = corePredict(teamA, teamB, motivation, {}, modeParams)
+    // ELO-only baseline: no motivation, no MV, no heritage — pure ELO signal
+    const [eloWin, eloDraw, eloLoss]   = corePredict(eloTeamA, eloTeamB, {}, {}, eloParams)
 
     const outcome: 'W' | 'D' | 'L' =
       m.homeGoals > m.awayGoals ? 'W' : m.homeGoals === m.awayGoals ? 'D' : 'L'
     const observed: [number, number, number] =
       outcome === 'W' ? [1, 0, 0] : outcome === 'D' ? [0, 1, 0] : [0, 0, 1]
     const predicted: [number, number, number] = [predWin, predDraw, predLoss]
-    const eloOnly: [number, number, number]   = [eloWin, eloDraw, eloLoss]
+    const eloOnly:   [number, number, number] = [eloWin, eloDraw, eloLoss]
 
     const matchRPS     = rps(predicted, observed)
-    const matchEloRPS  = rps(eloOnly, observed)
+    const matchEloRPS  = rps(eloOnly,   observed)
     const matchLogLoss = logLoss(predicted, observed)
     const matchBrier   = brierScore(predicted, observed)
 
@@ -277,12 +276,30 @@ export function evaluateModel(
     matchEloProbs.push(eloOnly)
     matchFullProbs.push(predicted)
     matchObserved.push(observed)
+    rpsPairs.push([matchRPS, matchEloRPS])
 
+    // Phase breakdown
     const phase = m.phase
     if (!phaseData[phase]) phaseData[phase] = { totalRPS: 0, correct: 0, matches: 0 }
     phaseData[phase].totalRPS += matchRPS
     phaseData[phase].matches++
     if (correct) phaseData[phase].correct++
+
+    // Tournament breakdown
+    const tourn = m.tournament
+    if (!tournamentData[tourn]) tournamentData[tourn] = {
+      totalRPS: 0, totalLL: 0, totalBrier: 0, correct: 0, matches: 0,
+      drawCount: 0, drawPredSum: 0, preds: [], obs: [],
+    }
+    tournamentData[tourn].totalRPS   += matchRPS
+    tournamentData[tourn].totalLL    += matchLogLoss
+    tournamentData[tourn].totalBrier += matchBrier
+    tournamentData[tourn].matches++
+    if (correct) tournamentData[tourn].correct++
+    if (outcome === 'D') tournamentData[tourn].drawCount++
+    tournamentData[tourn].drawPredSum += predDraw
+    tournamentData[tourn].preds.push(predicted)
+    tournamentData[tourn].obs.push(observed)
 
     perMatch.push({
       homeTeam: m.homeTeam, awayTeam: m.awayTeam,
@@ -298,7 +315,10 @@ export function evaluateModel(
   const avgLogLoss  = count > 0 ? totalLogLoss / count : 0
   const avgBrier    = count > 0 ? totalBrier / count : 0
   const eloOnlyRPS  = count > 0 ? totalEloOnlyRPS / count : 0
-  const skillScore  = RANDOM_RPS > 0 ? (RANDOM_RPS - avgRPS) / RANDOM_RPS : 0
+
+  // Dynamic baseline: uniform predictor on this specific dataset
+  const baselineRPS = computeDatasetBaselineRPS(allObserved)
+  const skillScore  = baselineRPS > 0 ? (baselineRPS - avgRPS) / baselineRPS : 0
   const correctTendency = count > 0 ? correctCount / count : 0
 
   const phaseBreakdown: EvaluationResult['phaseBreakdown'] = {}
@@ -310,10 +330,33 @@ export function evaluateModel(
     }
   }
 
-  const eceResult = count > 0 ? computeECE(allPredictions, allObserved) : { ece: 0, mce: 0, overconfidence: 0, bins: [] }
+  const tournamentBreakdown: EvaluationResult['tournamentBreakdown'] = {}
+  for (const [tourn, data] of Object.entries(tournamentData)) {
+    const n = data.matches
+    const tBaseline = computeDatasetBaselineRPS(data.obs)
+    const tRPS = n > 0 ? data.totalRPS / n : 0
+    const tEce = n > 0 ? computeECE(data.preds, data.obs) : { ece: 0 }
+    tournamentBreakdown[tourn] = {
+      matches:          n,
+      avgRPS:           tRPS,
+      avgLogLoss:       n > 0 ? data.totalLL    / n : 0,
+      avgBrier:         n > 0 ? data.totalBrier / n : 0,
+      ece:              tEce.ece,
+      correctTendency:  n > 0 ? data.correct    / n : 0,
+      drawRate:         n > 0 ? data.drawCount  / n : 0,
+      drawPredAvg:      n > 0 ? data.drawPredSum/ n : 0,
+      skillScore:       tBaseline > 0 ? (tBaseline - tRPS) / tBaseline : 0,
+      baselineRPS:      tBaseline,
+    }
+  }
 
-  const upsetMatches = perMatch.filter(m => m.outcome === 'W' && m.predWin < 0.45)
-  const upsetAccuracy = upsetMatches.length > 0 ? upsetMatches.filter(m => m.correct).length / upsetMatches.length : 0
+  const eceResult = count > 0
+    ? computeECE(allPredictions, allObserved)
+    : { ece: 0, mce: 0, overconfidence: 0, bins: [] }
+
+  const upsetMatches = perMatch.filter(m => m.outcome !== 'W' && m.predWin >= 0.55)
+  const upsetCorrect = upsetMatches.filter(m => m.correct).length
+  const upsetAccuracy = upsetMatches.length > 0 ? upsetCorrect / upsetMatches.length : 0
 
   // ─── Ensemble Comparison ──────────────────────────────────────────────────
 
@@ -332,9 +375,8 @@ export function evaluateModel(
         const ensL = wElo * eL + wFull * fL + wUniform / 3
         const ens: [number, number, number] = [ensW, ensD, ensL]
         const obs = matchObserved[i]
-        const r = rps(ens, obs)
-        ensRPS += r
-        ensLL += logLoss(ens, obs)
+        ensRPS   += rps(ens, obs)
+        ensLL    += logLoss(ens, obs)
         ensBrier += brierScore(ens, obs)
         ensDrawPred += ensD
         const maxP = Math.max(ensW, ensD, ensL)
@@ -348,17 +390,16 @@ export function evaluateModel(
       const ensEce = computeECE(ensPreds, matchObserved)
       return {
         config: cfg,
-        rps: ensRPS / n,
-        logLoss: ensLL / n,
-        brier: ensBrier / n,
-        ece: ensEce.ece,
-        skillScore: RANDOM_RPS > 0 ? (RANDOM_RPS - ensRPS / n) / RANDOM_RPS : 0,
+        rps:            ensRPS / n,
+        logLoss:        ensLL  / n,
+        brier:          ensBrier / n,
+        ece:            ensEce.ece,
+        skillScore:     baselineRPS > 0 ? (baselineRPS - ensRPS / n) / baselineRPS : 0,
         correctTendency: ensCorrect / n,
-        drawRate: drawCount / n,
-        drawPredAvg: ensDrawPred / n,
+        drawRate:        drawCount  / n,
+        drawPredAvg:     ensDrawPred / n,
       }
     })
-    // Sort by RPS ascending (better = lower)
     ensembleComparison.sort((a, b) => a.rps - b.rps)
   }
 
@@ -366,14 +407,17 @@ export function evaluateModel(
     mode,
     leakageWarning: mode === 'currentLeakage',
     matchCount: count,
-    avgRPS, avgLogLoss, avgBrier, baselineRPS: RANDOM_RPS,
+    avgRPS, avgLogLoss, avgBrier,
+    baselineRPS,
     skillScore, correctTendency, eloOnlyRPS,
     ece: eceResult.ece, mce: eceResult.mce, overconfidence: eceResult.overconfidence,
     calibrationBins: eceResult.bins,
     upsetAccuracy,
-    drawRate: count > 0 ? drawCount / count : 0,
+    drawRate:          count > 0 ? drawCount / count : 0,
     drawPredictionAvg: count > 0 ? drawPredSum / count : 0,
     phaseBreakdown,
+    tournamentBreakdown,
+    rpsPairs,
     ensembleComparison,
     perMatch,
   }

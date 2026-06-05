@@ -43,8 +43,25 @@ export function brierScore(
   ) / 3
 }
 
-// Referenz-RPS für Gleichverteilung (Baseline)
-export const RANDOM_RPS = rps([1/3, 1/3, 1/3], [1, 0, 0])  // = 0.333
+// Static constant kept for backwards compat — BIASED: computed vs homeWin only → 5/18 ≈ 0.2778
+// The true expected RPS of a uniform predictor depends on the actual outcome distribution.
+// Use computeDatasetBaselineRPS() for accurate per-dataset baselines.
+export const RANDOM_RPS = rps([1/3, 1/3, 1/3], [1, 0, 0])  // 5/18 ≈ 0.2778
+
+/**
+ * Computes the true uniform-predictor RPS baseline for a given set of observed outcomes.
+ *
+ * A uniform predictor assigns [1/3, 1/3, 1/3] to every match.
+ * The expected RPS depends on the actual outcome distribution:
+ *   - all homeWins → 5/18 ≈ 0.2778
+ *   - all draws    → 1/9  ≈ 0.1111
+ *   - equal mix   → 2/9  ≈ 0.2222
+ */
+export function computeDatasetBaselineRPS(observed: [number, number, number][]): number {
+  if (observed.length === 0) return RANDOM_RPS
+  const uniform: [number, number, number] = [1 / 3, 1 / 3, 1 / 3]
+  return observed.reduce((sum, o) => sum + rps(uniform, o), 0) / observed.length
+}
 
 // ─── Calibration / ECE ───────────────────────────────────────────────────────
 

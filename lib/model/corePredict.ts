@@ -66,8 +66,17 @@ export interface CorePredictParams {
   baseGoalRate?: number
   eloWeight?: number
   rho?: number
-  useManualRatings?: boolean  // default true; set false for clean historical backtests
+  // Factor flags for ablation and eval modes
+  useManualRatings?: boolean  // attack/defense/setPiece ratings (default true)
+  useMarketValue?: boolean    // squad market value factor (default true)
+  useHeritage?: boolean       // tournament heritage factor (default true)
+  // Caps sum of non-validated experimental factors per team (log-space).
+  // 0.08 ≈ max ~8% xG effect from all experimental factors combined.
+  experimentalOverlayMax?: number  // default: no cap (undefined)
 }
+
+/** Validated core factors: ELO, MarketValue, Heritage, DixonColes */
+export const EXPERIMENTAL_OVERLAY_MAX_LOG_EFFECT = 0.08
 
 /** Full result including xG values — used by simulation for Poisson sampling */
 export interface CorePredictFull {
@@ -136,19 +145,23 @@ function computeXG(
   const eloB = teamB.eloRating ?? 1500
   const eloLogA = clampLogEffect(eloWeight * (eloA - eloB), 0.25)
 
-  const useManualRatings = params.useManualRatings !== false  // default true
+  const useManualRatings = params.useManualRatings !== false    // default true
+  const useMarketValue   = params.useMarketValue   !== false    // default true
+  const useHeritage      = params.useHeritage      !== false    // default true
 
+  // Market value (validated in clean backtest when historical snapshots available)
   const mvA = teamA.squadMarketValueM ?? 200
   const mvB = teamB.squadMarketValueM ?? 200
   const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
-  const mvLogA = clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio)
+  const mvLogA = useMarketValue ? clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio) : 0
 
-  // CONSOLIDATED TOURNAMENT HERITAGE:
-  // Previously: separate expLogA (differential) + heritageLogA/B (absolute) → double-counted.
-  // Fix: only heritageLogA/B (absolute per-team). Cap at ±3% effective xG per team.
-  // Removed: MODEL_WEIGHTS.experience * expDiff (was redundant with heritage)
-  const heritageLogA = computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
-  const heritageLogB = computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
+  // Tournament heritage (absolute per-team — not differential, no double-count)
+  const heritageLogA = useHeritage
+    ? computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
+    : 0
+  const heritageLogB = useHeritage
+    ? computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
+    : 0
 
   // Manual editorial ratings — disabled in historical backtest modes
   const attackLogA = useManualRatings
@@ -162,6 +175,7 @@ function computeXG(
     ? clampLogEffect(MODEL_WEIGHTS.setPiece * (teamA.setPieceRating - teamB.setPieceRating) / 100, 0.10)
     : 0
 
+  // Context factors (experimental — not historically validated, no historical data available)
   const hostLogA = venue.hostA    ? MODEL_WEIGHTS.host    : 0
   const hostLogB = venue.hostB    ? MODEL_WEIGHTS.host    : 0
   const diasLogA = venue.diasporaA ? MODEL_WEIGHTS.diaspora : 0
@@ -200,14 +214,19 @@ function computeXG(
     : motivation.alreadyOutB ? MOTIVATION_WEIGHTS.alreadyOut
     : 0
 
-  const xgA = computeLambda(baseGoalRate, [
-    eloLogA, mvLogA, heritageLogA, attackLogA, spLogA,
-    hostLogA, diasLogA, altLogA, heatLogA, travelLogA, restLogA, motivLogA,
-  ])
-  const xgB = computeLambda(baseGoalRate, [
-    -eloLogA, -mvLogA, heritageLogB, attackLogB, -spLogA,
-    hostLogB, diasLogB, altLogB, heatLogB, travelLogB, restLogB, motivLogB,
-  ])
+  // Sum experimental (non-validated) factors per team, then optionally cap them.
+  // spLogA is a differential factor: +spLogA for A, -spLogA for B.
+  let rawExpA = attackLogA + spLogA  + hostLogA + diasLogA + altLogA + heatLogA + travelLogA + restLogA + motivLogA
+  let rawExpB = attackLogB - spLogA  + hostLogB + diasLogB + altLogB + heatLogB + travelLogB + restLogB + motivLogB
+
+  const expMax = params.experimentalOverlayMax
+  if (expMax !== undefined) {
+    rawExpA = Math.max(-expMax, Math.min(expMax, rawExpA))
+    rawExpB = Math.max(-expMax, Math.min(expMax, rawExpB))
+  }
+
+  const xgA = computeLambda(baseGoalRate, [eloLogA, mvLogA, heritageLogA, rawExpA])
+  const xgB = computeLambda(baseGoalRate, [-eloLogA, -mvLogA, heritageLogB, rawExpB])
 
   return { xgA, xgB }
 }
