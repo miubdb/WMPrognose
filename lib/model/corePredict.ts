@@ -74,8 +74,11 @@ export interface CorePredictParams {
   marketValueWeight?: number  // override MODEL_WEIGHTS.marketValueLog (default: config value)
   heritageScale?: number      // multiplier on computed heritage log-effect (0.0=off, 1.0=full, default 1.0)
   // Caps sum of non-validated experimental factors per team (log-space).
-  // 0.08 ≈ max ~8% xG effect from all experimental factors combined.
-  experimentalOverlayMax?: number  // default: no cap (undefined)
+  // 0.08 ≈ max ~8% xG effect from all experimental factors combined (default).
+  experimentalOverlayMax?: number  // default: EXPERIMENTAL_OVERLAY_MAX_LOG_EFFECT (0.08)
+  // Cap for lineup-based log effects (attack/defense/setPiece manual ratings).
+  // 0.06 ≈ max ~6% xG shift from starting XI composition.
+  lineupMaxLogEffect?: number  // default: 0.06
 }
 
 /** Validated core factors: ELO, MarketValue, Heritage, DixonColes */
@@ -159,9 +162,8 @@ function computeXG(
   const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
   const mvLogA = useMarketValue ? clampLogEffect(mvWeight * mvRatio) : 0
 
-  // Tournament heritage — scale overridable (0.0=off, 1.0=full, default 1.0)
-  // Cap at ±1% xG (≈0.01 log) recommended for robustness
-  const hScale = params.heritageScale ?? 1.0
+  // Tournament heritage — disabled by default (heritageScale=0): not confirmed in OOS evaluation
+  const hScale = params.heritageScale ?? 0
   const heritageLogA = useHeritage
     ? computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances) * hScale
     : 0
@@ -170,15 +172,16 @@ function computeXG(
     : 0
 
   // Manual editorial ratings — disabled in historical backtest modes
+  const lineupCap = params.lineupMaxLogEffect ?? 0.06
   const attackLogA = useManualRatings
-    ? clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamA.attackRating - teamB.defenseRating) / 100)
+    ? clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamA.attackRating - teamB.defenseRating) / 100, lineupCap)
     : 0
   const attackLogB = useManualRatings
-    ? clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamB.attackRating - teamA.defenseRating) / 100)
+    ? clampLogEffect(MODEL_WEIGHTS.attackDefense * (teamB.attackRating - teamA.defenseRating) / 100, lineupCap)
     : 0
 
   const spLogA = useManualRatings && teamA.setPieceRating !== undefined && teamB.setPieceRating !== undefined
-    ? clampLogEffect(MODEL_WEIGHTS.setPiece * (teamA.setPieceRating - teamB.setPieceRating) / 100, 0.10)
+    ? clampLogEffect(MODEL_WEIGHTS.setPiece * (teamA.setPieceRating - teamB.setPieceRating) / 100, lineupCap)
     : 0
 
   // Context factors (experimental — not historically validated, no historical data available)
@@ -225,11 +228,9 @@ function computeXG(
   let rawExpA = attackLogA + spLogA  + hostLogA + diasLogA + altLogA + heatLogA + travelLogA + restLogA + motivLogA
   let rawExpB = attackLogB - spLogA  + hostLogB + diasLogB + altLogB + heatLogB + travelLogB + restLogB + motivLogB
 
-  const expMax = params.experimentalOverlayMax
-  if (expMax !== undefined) {
-    rawExpA = Math.max(-expMax, Math.min(expMax, rawExpA))
-    rawExpB = Math.max(-expMax, Math.min(expMax, rawExpB))
-  }
+  const expMax = params.experimentalOverlayMax ?? EXPERIMENTAL_OVERLAY_MAX_LOG_EFFECT
+  rawExpA = Math.max(-expMax, Math.min(expMax, rawExpA))
+  rawExpB = Math.max(-expMax, Math.min(expMax, rawExpB))
 
   const xgA = computeLambda(baseGoalRate, [eloLogA, mvLogA, heritageLogA, rawExpA])
   const xgB = computeLambda(baseGoalRate, [-eloLogA, -mvLogA, heritageLogB, rawExpB])

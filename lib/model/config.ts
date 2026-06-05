@@ -4,8 +4,8 @@ export const MODEL_WEIGHTS = {
   elo: 0.0008,          // pro ELO-Punkt Differenz → log(lambda)-Beitrag
                          // Kalibriert via Grid Search gegen WM 2022 Gruppenphase (RPS-optimal)
                          // 400-Punkte-Diff → +37% xG-Effekt (vorher 0.0006 → +27%)
-  marketValueLog: 0.05,  // pro log10(mvA/mvB) Einheit → log(lambda)-Beitrag
-                         // Peeters 2018: ein 10x-Marktwertunterschied → ~12% xG
+  marketValueLog: 0.25,  // pro log10(mvA/mvB) Einheit → log(lambda)-Beitrag
+                         // Kalibriert: Walk-Forward OOS-RPS optimal (konservativ), v3.2
   xgAttack: 3.0,         // pro Einheit avgXgPer90Attack-Differenz → log(lambda)-Beitrag
                          // maximal ±0.12 bei Diff von 0.04 xG/90
   xgDefense: 1.5,        // pro Einheit avgXgaPer90Defense-Differenz
@@ -82,12 +82,12 @@ export const COACH_CONFIG = {
 } as const
 
 export const MODEL_META = {
-  version: '2.2.0-calibrated',
-  baseGoalRate: 1.50,       // Kalibriert: WM 2022 Grid Search Optimum (vorher 1.40)
-  dixonColesRho: 0.04,      // Kalibriert: Grid Search Optimum gegen WM 2022 (vorher 0.12) — RPS 0.2011 vs 0.2014
+  version: 'v3.2-final-candidate',
+  baseGoalRate: 1.50,
+  dixonColesRho: 0,         // Nicht signifikant in Walk-Forward OOS (Δ<0.0005 RPS) — entfernt
   maxGoals: 10,             // Score-Matrix 0..10
   logLambdaMin: Math.log(0.3),
   logLambdaMax: Math.log(4.0),
   calibrated: true,
-  calibrationDataset: 'WM 2022 Gruppenphase — RPS-optimal (Grid Search 210 Kombinationen, inkl. Motivation/Rotation)',
+  calibrationDataset: 'WM2014+2018+2022+EURO2024 Walk-Forward OOS — konservative MV-Gewichtswahl (0.25)',
 } as const

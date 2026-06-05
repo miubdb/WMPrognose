@@ -6,6 +6,7 @@ import {
   sweepRho,
   combinedGridSearch,
   walkForwardEval,
+  evalParamSet,
   bootstrapTopConfigs,
   recommendRobustConfig,
   checkBoundary,
@@ -114,6 +115,39 @@ export async function GET(request: Request) {
         })),
         current: result.current,
         walkForward: walkForwardResults,
+      })
+    }
+
+    if (mode === 'mvFocus') {
+      // Focused MV weight test: heritageScale=0, rho=0, vary MV only
+      // Conservative selection: smallest weight within 0.001 OOS-RPS of best
+      const mvCandidates = [0.10, 0.15, 0.20, 0.25, 0.30]
+      const results = mvCandidates.map(mv => {
+        const p: ParamPoint = { marketValueWeight: mv, heritageScale: 0, rho: 0 }
+        const inSample = evalParamSet(matchset, p)
+        const wf = walkForwardEval(p)
+        const foldRPS = wf.folds.map(f => f.testRPS)
+        const mean = foldRPS.reduce((s, v) => s + v, 0) / foldRPS.length
+        const std  = Math.sqrt(foldRPS.reduce((s, v) => s + (v - mean) ** 2, 0) / foldRPS.length)
+        return { marketValueWeight: mv, heritageScale: 0, rho: 0, inSampleRPS: inSample.rps, oosRPS: wf.avgTestRPS, avgOverfit: wf.avgOverfit, stabilityStd: std, conclusion: wf.conclusion, folds: wf.folds }
+      })
+
+      const eloOnly = evalParamSet(matchset, { marketValueWeight: 0, heritageScale: 0, rho: 0 })
+      const wfEloOnly = walkForwardEval({ marketValueWeight: 0, heritageScale: 0, rho: 0 })
+
+      // Conservative selection
+      const sorted = [...results].sort((a, b) => a.oosRPS - b.oosRPS)
+      const bestOOS = sorted[0].oosRPS
+      const nearlyEqual = sorted.filter(r => r.oosRPS - bestOOS < 0.001)
+      nearlyEqual.sort((a, b) => a.marketValueWeight - b.marketValueWeight)
+      const conservative = nearlyEqual[0]
+
+      return NextResponse.json({
+        ok: true, mode, calibMode, matchCount: matchset.length,
+        eloBaseline: { oosRPS: wfEloOnly.avgTestRPS, inSampleRPS: eloOnly.rps },
+        results,
+        conservative,
+        recommendation: `marketValueLog=${conservative.marketValueWeight.toFixed(2)}, heritageScale=0, rho=0. OOS-RPS=${conservative.oosRPS.toFixed(4)}, Overfit-Δ=${conservative.avgOverfit.toFixed(4)}.`,
       })
     }
 
