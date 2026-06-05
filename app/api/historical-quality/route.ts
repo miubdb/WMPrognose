@@ -48,20 +48,21 @@ export async function GET() {
     }
   })
 
-  // reliableRecent = tournaments fully covered with medium+ quality
-  const reliableTournaments = summary.filter(
+  // recentEstimated = tournaments fully covered with medium+ quality
+  const recentEstimatedTournaments = summary.filter(
     s => s.teamCount >= s.expectedTeamCount && s.overallQuality !== 'schlecht'
   ).map(s => s.label)
 
-  const recommendedMode = reliableTournaments.length >= 2 ? 'reliableRecent' : 'allSnapshots'
+  const recommendedMode = recentEstimatedTournaments.length >= 2 ? 'recentEstimated' : 'allSnapshots'
 
   return NextResponse.json({
     ok: true,
     summary,
     calibration: {
       recommendedMode,
-      reliableTournaments,
-      note: 'verifiedOnly ist derzeit leer — keine vollständig verifizierten Archivdaten verfügbar.',
+      recentEstimatedTournaments,
+      note: 'Alle Marktwerte sind Schätzungen (Transfermarkt-Archiv) — nicht manuell verifiziert. verifiedOnly ist leer.',
+      dataQualityWarning: 'Parameterempfehlung basiert auf historischen Marktwert-Schätzungen. Vorläufig nutzbar, aber nicht final validiert.',
     },
   })
 }

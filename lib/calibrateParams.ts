@@ -65,16 +65,34 @@ export interface CalibratedConfig {
   rho: number
   inSampleRPS: number
   oosRPS: number
+  avgOverfit: number
   bootstrap: BootstrapResult
   recommendation: string
   version: string
+  boundaryWarning: BoundaryCheck
+  stabilityStd: number  // std dev of per-fold OOS RPS (lower = more stable)
 }
 
 // ─── Sweep grids ─────────────────────────────────────────────────────────────
 
-export const MV_WEIGHTS     = [0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.10]
-export const HERITAGE_SCALES = [0.00, 0.25, 0.50, 0.75, 1.00]
+export const MV_WEIGHTS      = [0.00, 0.02, 0.04, 0.06, 0.08, 0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.25, 0.30]
+export const HERITAGE_SCALES = [0.00, 0.25, 0.50, 0.75, 1.00, 1.25, 1.50, 2.00]
 export const RHO_VALUES      = [0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10]
+
+export interface BoundaryCheck {
+  mv: boolean; heritage: boolean; rho: boolean; any: boolean; warnings: string[]
+}
+
+export function checkBoundary(p: ParamPoint): BoundaryCheck {
+  const mv       = p.marketValueWeight >= MV_WEIGHTS[MV_WEIGHTS.length - 1] || p.marketValueWeight <= MV_WEIGHTS[0]
+  const heritage = p.heritageScale >= HERITAGE_SCALES[HERITAGE_SCALES.length - 1] || p.heritageScale <= HERITAGE_SCALES[0]
+  const rho      = p.rho >= RHO_VALUES[RHO_VALUES.length - 1] || p.rho <= RHO_VALUES[0]
+  const warnings: string[] = []
+  if (mv)       warnings.push(`marketValueWeight=${p.marketValueWeight} liegt am Rand [${MV_WEIGHTS[0]}–${MV_WEIGHTS[MV_WEIGHTS.length-1]}]`)
+  if (heritage) warnings.push(`heritageScale=${p.heritageScale} liegt am Rand [${HERITAGE_SCALES[0]}–${HERITAGE_SCALES[HERITAGE_SCALES.length-1]}]`)
+  if (rho)      warnings.push(`rho=${p.rho} liegt am Rand [${RHO_VALUES[0]}–${RHO_VALUES[RHO_VALUES.length-1]}]`)
+  return { mv, heritage, rho, any: mv || heritage || rho, warnings }
+}
 
 // ─── Team resolution (historical ELO + snapshot) ─────────────────────────────
 
@@ -368,29 +386,49 @@ export function recommendRobustConfig(
   matches: HistoricalMatch[],
   topConfigs: ParamEvalResult[]
 ): CalibratedConfig {
-  // Prefer configs that are:
-  // 1. Statistically significant improvement over ELO-only baseline
-  // 2. Stable across tournaments (low std of per-tournament RPS)
-  // 3. Not extremely optimized (avoid top-1 in-sample, prefer top-5 with best OOS)
-
   const eloBaseline: ParamPoint = { marketValueWeight: 0, heritageScale: 0, rho: 0 }
-  const topFive = topConfigs.slice(0, 5)
 
-  // Walk-forward to get OOS RPS for each
-  const oosResults = topFive.map(c => ({
-    config: c,
-    wf: walkForwardEval(c),
-  })).sort((a, b) => a.wf.avgTestRPS - b.wf.avgTestRPS)
+  // Walk-forward for top 20 candidates to get OOS metrics
+  const candidates = topConfigs.slice(0, 20)
+  const oosResults = candidates.map(c => {
+    const wf = walkForwardEval(c)
+    const foldRPS = wf.folds.map(f => f.testRPS)
+    const mean = foldRPS.reduce((s, v) => s + v, 0) / foldRPS.length
+    const std  = Math.sqrt(foldRPS.reduce((s, v) => s + (v - mean) ** 2, 0) / foldRPS.length)
+    return { config: c, wf, stabilityStd: std }
+  })
 
-  const best = oosResults[0]
+  // Remove configs with confirmed overfitting (OOS much worse than train)
+  const nonOverfit = oosResults.filter(r => r.wf.conclusion !== 'overfit')
+  const pool = nonOverfit.length >= 3 ? nonOverfit : oosResults
 
-  // Bootstrap against ELO-only
+  // Sort by OOS RPS (lower = better)
+  pool.sort((a, b) => a.wf.avgTestRPS - b.wf.avgTestRPS)
+
+  // Among configs within 0.001 of best OOS-RPS, prefer simpler (lower weights = less overfit risk)
+  const bestOOS = pool[0].wf.avgTestRPS
+  const nearlyEqual = pool.filter(r => r.wf.avgTestRPS - bestOOS < 0.001)
+  nearlyEqual.sort((a, b) => {
+    const mvDiff = a.config.marketValueWeight - b.config.marketValueWeight
+    if (Math.abs(mvDiff) > 0.001) return mvDiff
+    const hDiff = a.config.heritageScale - b.config.heritageScale
+    if (Math.abs(hDiff) > 0.001) return hDiff
+    return a.config.rho - b.config.rho
+  })
+
+  const best = nearlyEqual[0]
+
+  // Bootstrap against ELO-only baseline
   const bootResults = bootstrapTopConfigs(matches, [best.config], eloBaseline)
-  const boot = bootResults[0]?.bootstrap ?? { delta: 0, ci95: [0, 0] as [number,number], ci99: [0, 0] as [number,number], pBetter: 0.5, nMatches: 0, nBoot: 2000, reliable: false, interpretation: '' }
+  const boot = bootResults[0]?.bootstrap ?? {
+    delta: 0, ci95: [0, 0] as [number, number], ci99: [0, 0] as [number, number],
+    pBetter: 0.5, nMatches: 0, nBoot: 2000, reliable: false, interpretation: '',
+  }
 
-  const mvWStr = best.config.marketValueWeight.toFixed(2)
-  const hSStr  = best.config.heritageScale.toFixed(2)
-  const rhoStr = best.config.rho.toFixed(2)
+  const boundary = checkBoundary(best.config)
+  const mvWStr   = best.config.marketValueWeight.toFixed(2)
+  const hSStr    = best.config.heritageScale.toFixed(2)
+  const rhoStr   = best.config.rho.toFixed(2)
 
   return {
     marketValueWeight: best.config.marketValueWeight,
@@ -398,8 +436,11 @@ export function recommendRobustConfig(
     rho:               best.config.rho,
     inSampleRPS:       best.config.rps,
     oosRPS:            best.wf.avgTestRPS,
+    avgOverfit:        best.wf.avgOverfit,
     bootstrap:         boot,
     recommendation:    `marketValueLog=${mvWStr}, heritageScale=${hSStr}, rho=${rhoStr}. OOS-RPS=${best.wf.avgTestRPS.toFixed(4)}, Overfit-Δ=${best.wf.avgOverfit.toFixed(4)}.`,
-    version:           `v3.0-calibrated-mv${mvWStr}-h${hSStr}-rho${rhoStr}`,
+    version:           `v3.1-calibrated-mv${mvWStr}-h${hSStr}-rho${rhoStr}`,
+    boundaryWarning:   boundary,
+    stabilityStd:      best.stabilityStd,
   }
 }

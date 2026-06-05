@@ -34,8 +34,9 @@ interface HistQualRow {
 
 interface CalibrationInfo {
   recommendedMode: string
-  reliableTournaments: string[]
+  recentEstimatedTournaments: string[]
   note: string
+  dataQualityWarning?: string
 }
 
 interface ModelResult { rps?: number; ece?: number; recommendation?: string; error?: string; raw?: unknown }
@@ -470,9 +471,14 @@ function HistoricalQualityTab() {
             <span className="font-mono text-indigo-200">{calibration.recommendedMode}</span>
           </div>
           <div className="text-[11px] text-indigo-400/80">
-            Enthält: {calibration.reliableTournaments.join(', ')} — vollständig abgedeckt, Transfermarkt-Archivqualität
+            Enthält: {calibration.recentEstimatedTournaments.join(', ')} — vollständig abgedeckt, aber nicht verifiziert
           </div>
-          <div className="text-[11px] text-gray-500">{calibration.note}</div>
+          {calibration.dataQualityWarning && (
+            <div className="text-[11px] text-amber-400/80">
+              Achtung: {calibration.dataQualityWarning}
+            </div>
+          )}
+          <div className="text-[11px] text-gray-600">{calibration.note}</div>
         </div>
       )}
 
@@ -568,13 +574,15 @@ function HistoricalQualityTab() {
 
 // ─── Param result panel ───────────────────────────────────────────────────────
 
-function ParamResultPanel({ result }: { result: ModelResult | null }) {
+function ParamResultPanel({ result, calibMode }: { result: ModelResult | null; calibMode: string }) {
   if (!result?.raw || result.error) return null
   const d = result.raw as Record<string, unknown>
   const rec = d.recommendation as Record<string, unknown> | undefined
   if (!rec) return null
-  const boot = rec.bootstrap as Record<string, unknown> | undefined
-  const pBetter = typeof boot?.pBetter === 'number' ? (boot.pBetter * 100).toFixed(1) + '%' : '—'
+  const boot     = rec.bootstrap as Record<string, unknown> | undefined
+  const boundary = rec.boundaryWarning as Record<string, unknown> | undefined
+  const dcComp   = d.dixonColesComparison as Record<string, unknown> | undefined
+  const pBetter  = typeof boot?.pBetter === 'number' ? (boot.pBetter * 100).toFixed(1) + '%' : '—'
   const items = [
     { label: 'MV-Gewicht', val: (rec.marketValueWeight as number)?.toFixed(2), color: 'text-violet-300' },
     { label: 'Heritage',   val: (rec.heritageScale    as number)?.toFixed(2), color: 'text-blue-300'   },
@@ -583,9 +591,13 @@ function ParamResultPanel({ result }: { result: ModelResult | null }) {
     { label: 'RPS (OOS)',  val: (rec.oosRPS           as number)?.toFixed(4), color: 'text-amber-400'  },
     { label: 'Bootstrap p', val: pBetter,                                     color: 'text-emerald-300'},
   ]
+  const boundaryWarnings = boundary?.warnings as string[] | undefined
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
-      <div className="text-sm font-semibold text-white">Empfohlene Konfiguration</div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-white">Empfohlene Konfiguration</div>
+        <span className="text-[10px] font-mono text-gray-500 bg-gray-800 px-2 py-0.5 rounded">{calibMode}</span>
+      </div>
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-xs">
         {items.map(item => (
           <div key={item.label} className="bg-gray-800 rounded-lg p-2.5">
@@ -594,6 +606,26 @@ function ParamResultPanel({ result }: { result: ModelResult | null }) {
           </div>
         ))}
       </div>
+      {boundaryWarnings && boundaryWarnings.length > 0 && (
+        <div className="bg-amber-950/40 border border-amber-800/40 rounded-lg px-3 py-2 text-[11px] text-amber-400 space-y-0.5">
+          <div className="font-semibold">Optimum liegt am Rand des Suchraums — Suchbereich erweitern oder vorsichtig interpretieren:</div>
+          {boundaryWarnings.map((w, i) => <div key={i}>· {w}</div>)}
+        </div>
+      )}
+      {dcComp && (() => {
+        const withRho    = dcComp.withRho    as Record<string, number> | undefined
+        const withoutRho = dcComp.withoutRho as Record<string, number> | undefined
+        return (
+          <div className="text-[11px] text-gray-500 space-y-0.5 border-t border-gray-800 pt-2">
+            <div className="text-gray-400 font-semibold mb-1">Dixon-Coles Vergleich</div>
+            <div>Mit DC (ρ={withRho?.rho?.toFixed(2)}): RPS={withRho?.rps?.toFixed(4)}, ECE={withRho?.ece?.toFixed(4)}</div>
+            <div>Ohne DC (ρ=0): RPS={withoutRho?.rps?.toFixed(4)}, ECE={withoutRho?.ece?.toFixed(4)}</div>
+            {dcComp.removeDCRecommended === true && (
+              <div className="text-amber-400">Empfehlung: Dixon-Coles hat keinen messbaren Effekt → ρ=0 bevorzugen</div>
+            )}
+          </div>
+        )
+      })()}
       {typeof rec.version === 'string' && (
         <p className="text-[10px] text-gray-600">{rec.version}</p>
       )}
@@ -603,11 +635,22 @@ function ParamResultPanel({ result }: { result: ModelResult | null }) {
 
 // ─── Model Test Tab (D) ───────────────────────────────────────────────────────
 
+type CompareRow = {
+  calibMode: string; matchCount?: number; error?: string
+  marketValueWeight?: number; heritageScale?: number; rho?: number
+  inSampleRPS?: number; oosRPS?: number; avgOverfit?: number
+  bootstrapP?: number; stabilityStd?: number
+  boundaryWarning?: { any: boolean; warnings: string[] }
+}
+
 function ModelTestTab({ stats }: { stats: TeamStats | null }) {
   const [backtestResult, setBacktestResult]   = useState<ModelResult | null>(null)
   const [backtestLoading, setBacktestLoading] = useState(false)
   const [paramsResult, setParamsResult]       = useState<ModelResult | null>(null)
   const [paramsLoading, setParamsLoading]     = useState(false)
+  const [calibMode, setCalibMode]             = useState<'recentEstimated' | 'allSnapshots'>('recentEstimated')
+  const [compareRows, setCompareRows]         = useState<CompareRow[] | null>(null)
+  const [compareLoading, setCompareLoading]   = useState(false)
   const [qualResult, setQualResult]           = useState<string | null>(null)
 
   const missingData = stats && (stats.missingElo > 0 || stats.teamsWithoutSquad > 0 || stats.teamsWithZeroMv > 0)
@@ -631,16 +674,21 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
   async function runParamSearch() {
     setParamsLoading(true)
     setParamsResult(null)
-    const res = await fetch('/api/calibrate-params?mode=recommend')
+    const res = await fetch(`/api/calibrate-params?mode=recommend&calibMode=${calibMode}`)
     const data = await res.json()
     setParamsLoading(false)
     if (!data.ok) { setParamsResult({ error: data.error }); return }
     const rec = data.recommendation
-    setParamsResult({
-      rps: rec?.inSampleRPS,
-      recommendation: rec?.recommendation,
-      raw: data,
-    })
+    setParamsResult({ rps: rec?.inSampleRPS, recommendation: rec?.recommendation, raw: data })
+  }
+
+  async function runCompare() {
+    setCompareLoading(true)
+    setCompareRows(null)
+    const res = await fetch('/api/calibrate-params?mode=compare')
+    const data = await res.json()
+    setCompareLoading(false)
+    if (data.ok) setCompareRows(data.rows)
   }
 
   function checkQuality() {
@@ -691,6 +739,16 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
         {/* 3. Parametersuche */}
         <div className={`bg-gray-900 border rounded-xl p-5 space-y-3 ${missingData ? 'border-gray-800 opacity-60' : 'border-gray-800'}`}>
           <div className="text-xs text-gray-500 uppercase tracking-wider">3. Parametersuche starten</div>
+          {!missingData && (
+            <div className="flex gap-1">
+              {(['recentEstimated', 'allSnapshots'] as const).map(m => (
+                <button key={m} onClick={() => setCalibMode(m)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${calibMode === m ? 'bg-violet-700 text-white' : 'bg-gray-800 text-gray-500 hover:text-white'}`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="text-xs text-gray-400">
             {missingData
               ? `Deaktiviert: Daten unvollständig (${[
@@ -698,12 +756,18 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
                   stats!.teamsWithoutSquad > 0 ? `${stats!.teamsWithoutSquad} ohne Kader` : '',
                   stats!.teamsWithZeroMv > 0 ? `${stats!.teamsWithZeroMv} Teams mit 0-MW` : '',
                 ].filter(Boolean).join(', ')}).`
-              : 'Grid Search (450 Kombinationen) + Walk-Forward + Bootstrap. ~60s.'}
+              : `Grid Search (936 Kombinationen) + Walk-Forward + Bootstrap · Modus: ${calibMode} · ~60s.`}
           </p>
-          <button onClick={runParamSearch} disabled={paramsLoading || !!missingData}
-            className="w-full px-4 py-2 bg-violet-700 hover:bg-violet-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-semibold rounded-lg transition-colors">
-            {paramsLoading ? 'Läuft (~60s)…' : 'Parametersuche starten'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={runParamSearch} disabled={paramsLoading || !!missingData}
+              className="flex-1 px-4 py-2 bg-violet-700 hover:bg-violet-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-semibold rounded-lg transition-colors">
+              {paramsLoading ? 'Läuft (~60s)…' : 'Parametersuche starten'}
+            </button>
+            <button onClick={runCompare} disabled={compareLoading || !!missingData}
+              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-gray-300 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
+              {compareLoading ? '…' : 'Vergleichen'}
+            </button>
+          </div>
           {paramsResult?.error && <p className="text-xs text-red-400">{paramsResult.error}</p>}
           {paramsResult?.recommendation && !paramsResult.error && (
             <p className="text-xs text-emerald-400">{paramsResult.recommendation}</p>
@@ -711,7 +775,52 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
         </div>
       </div>
 
-      <ParamResultPanel result={paramsResult} />
+      <ParamResultPanel result={paramsResult} calibMode={calibMode} />
+
+      {/* Comparison table */}
+      {compareRows && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+          <div className="text-sm font-semibold text-white">Vergleich Kalibrierungsmodi</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-[10px] text-gray-500 uppercase">
+                <tr>
+                  <th className="pb-2 pr-4">Modus</th>
+                  <th className="pb-2 pr-4 text-right">Spiele</th>
+                  <th className="pb-2 pr-4 text-right">MV-W</th>
+                  <th className="pb-2 pr-4 text-right">Heritage</th>
+                  <th className="pb-2 pr-4 text-right">ρ</th>
+                  <th className="pb-2 pr-4 text-right">IS-RPS</th>
+                  <th className="pb-2 pr-4 text-right">OOS-RPS</th>
+                  <th className="pb-2 pr-4 text-right">Bootstrap p</th>
+                  <th className="pb-2">Hinweis</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compareRows.map(row => (
+                  <tr key={row.calibMode} className="border-t border-gray-800">
+                    <td className="py-2 pr-4 font-mono text-gray-300">{row.calibMode}</td>
+                    <td className="py-2 pr-4 text-right text-gray-500">{row.error ? '—' : row.matchCount}</td>
+                    <td className="py-2 pr-4 text-right font-mono text-violet-300">{row.marketValueWeight?.toFixed(2) ?? '—'}</td>
+                    <td className="py-2 pr-4 text-right font-mono text-blue-300">{row.heritageScale?.toFixed(2) ?? '—'}</td>
+                    <td className="py-2 pr-4 text-right font-mono text-cyan-300">{row.rho?.toFixed(2) ?? '—'}</td>
+                    <td className="py-2 pr-4 text-right font-mono text-amber-300">{row.inSampleRPS?.toFixed(4) ?? '—'}</td>
+                    <td className="py-2 pr-4 text-right font-mono text-amber-400">{row.oosRPS?.toFixed(4) ?? '—'}</td>
+                    <td className="py-2 pr-4 text-right font-mono text-emerald-300">{row.bootstrapP != null ? (row.bootstrapP * 100).toFixed(1) + '%' : '—'}</td>
+                    <td className="py-2 text-[10px]">
+                      {row.error
+                        ? <span className="text-red-400">{row.error}</span>
+                        : row.boundaryWarning?.any
+                        ? <span className="text-amber-400">Rand ⚠</span>
+                        : <span className="text-gray-600">ok</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="pt-2 border-t border-gray-800 flex flex-wrap gap-3 text-xs text-gray-500">
         <span>Details auf:</span>

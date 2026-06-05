@@ -12,15 +12,15 @@ export type TournamentId = 'WC2014' | 'WC2018' | 'WC2022' | 'EURO2024'
 
 /**
  * verifiedOnly   — only teams with genuinely verified market values (none currently; future use)
- * reliableRecent — WC2022 + EURO2024: complete coverage, Transfermarkt-archive quality
+ * recentEstimated — WC2022 + EURO2024: complete coverage, Transfermarkt-archive quality
  * allSnapshots   — all four tournaments including rough WC2014/WC2018 estimates; comparison only
  */
-export type CalibrationMode = 'verifiedOnly' | 'reliableRecent' | 'allSnapshots'
+export type CalibrationMode = 'verifiedOnly' | 'recentEstimated' | 'allSnapshots'
 
 export const CALIBRATION_TOURNAMENT_MAP: Record<CalibrationMode, TournamentId[]> = {
-  verifiedOnly:    [],
-  reliableRecent:  ['WC2022', 'EURO2024'],
-  allSnapshots:    ['WC2014', 'WC2018', 'WC2022', 'EURO2024'],
+  verifiedOnly:     [],
+  recentEstimated:  ['WC2022', 'EURO2024'],
+  allSnapshots:     ['WC2014', 'WC2018', 'WC2022', 'EURO2024'],
 }
 
 export interface HistoricalTeamSnapshot {
