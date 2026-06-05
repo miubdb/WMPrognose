@@ -10,37 +10,20 @@ const sb = createClient(
 
 export async function GET() {
   try {
-    const [playersRes, eloRes, wm2026Res] = await Promise.all([
-      sb.from('players').select('team_id, market_value_m, is_in_starting_xi'),
+    // Use server-side aggregation (RPC) to avoid the 1000-row PostgREST default limit
+    // when fetching 48×26=1248 player rows individually.
+    const [squadRes, eloRes, wm2026Res] = await Promise.all([
+      sb.rpc('get_squad_stats'),
       sb.from('team_elo_ratings').select('team_id, elo_rating, source, updated_at, elo_delta_1y'),
       sb.from('wm2026_teams').select('team_id, verified, notes').in('team_id', ACTIVE_WM_TEAM_IDS),
     ])
 
-    // Aggregate squad stats per team from players table
-    const squadStats = new Map<string, {
-      playerCount: number
-      playersWithMv: number
-      zeroMvCount: number
-      totalMvM: number
-      starterCount: number
-      starterMvM: number
-    }>()
+    type SquadRow = { team_id: string; player_count: number; players_with_mv: number; zero_mv_count: number; total_mv_m: number; starter_count: number; starter_mv_m: number }
+    const squadStats = new Map<string, SquadRow>(
+      ((squadRes.data ?? []) as SquadRow[]).map(r => [r.team_id, r])
+    )
 
-    for (const p of (playersRes.data ?? [])) {
-      if (!ACTIVE_WM_TEAM_IDS.includes(p.team_id)) continue
-      const s = squadStats.get(p.team_id) ?? {
-        playerCount: 0, playersWithMv: 0, zeroMvCount: 0,
-        totalMvM: 0, starterCount: 0, starterMvM: 0,
-      }
-      s.playerCount++
-      const mv = p.market_value_m ?? 0
-      if (mv > 0) { s.playersWithMv++; s.totalMvM += mv }
-      else s.zeroMvCount++
-      if (p.is_in_starting_xi) { s.starterCount++; s.starterMvM += mv }
-      squadStats.set(p.team_id, s)
-    }
-
-    const eloMap  = new Map((eloRes.data  ?? []).map(e => [e.team_id, e]))
+    const eloMap    = new Map((eloRes.data    ?? []).map(e => [e.team_id, e]))
     const wm2026Map = new Map((wm2026Res.data ?? []).map(w => [w.team_id, w]))
 
     // Build response for exactly the 48 schedule teams
@@ -60,12 +43,12 @@ export async function GET() {
         elo_source:      elo?.source       ?? null,
         elo_updated:     elo?.updated_at   ?? null,
         elo_delta_1y:    elo?.elo_delta_1y ?? 0,
-        player_count:    sq?.playerCount   ?? 0,
-        players_with_mv: sq?.playersWithMv ?? 0,
-        zero_mv_count:   sq?.zeroMvCount   ?? 0,
-        total_mv_m:      sq ? Math.round(sq.totalMvM  * 10) / 10 : null,
-        starter_count:   sq?.starterCount  ?? 0,
-        starter_mv_m:    sq ? Math.round(sq.starterMvM * 10) / 10 : null,
+        player_count:    sq ? Number(sq.player_count)    : 0,
+        players_with_mv: sq ? Number(sq.players_with_mv) : 0,
+        zero_mv_count:   sq ? Number(sq.zero_mv_count)   : 0,
+        total_mv_m:      sq ? Math.round(Number(sq.total_mv_m)   * 10) / 10 : null,
+        starter_count:   sq ? Number(sq.starter_count)   : 0,
+        starter_mv_m:    sq ? Math.round(Number(sq.starter_mv_m) * 10) / 10 : null,
       }
     }).sort((a, b) => a.confederation.localeCompare(b.confederation) || a.team_name.localeCompare(b.team_name))
 
