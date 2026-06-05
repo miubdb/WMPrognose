@@ -708,7 +708,7 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
         Führe Tests in dieser Reihenfolge aus. Fehlende Daten schränken die Aussagekraft ein.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 1. Datenqualität */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
           <div className="text-xs text-gray-500 uppercase tracking-wider">1. Datenqualität prüfen</div>
@@ -735,47 +735,56 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
             <p className="text-xs text-emerald-400">{backtestResult.recommendation}</p>
           )}
         </div>
-
-        {/* 3. Parametersuche */}
-        <div className={`bg-gray-900 border rounded-xl p-5 space-y-3 ${missingData ? 'border-gray-800 opacity-60' : 'border-gray-800'}`}>
-          <div className="text-xs text-gray-500 uppercase tracking-wider">3. Parametersuche starten</div>
-          {!missingData && (
-            <div className="flex gap-1">
-              {(['recentEstimated', 'allSnapshots'] as const).map(m => (
-                <button key={m} onClick={() => setCalibMode(m)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${calibMode === m ? 'bg-violet-700 text-white' : 'bg-gray-800 text-gray-500 hover:text-white'}`}>
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-          <p className="text-xs text-gray-400">
-            {missingData
-              ? `Deaktiviert: Daten unvollständig (${[
-                  stats!.missingElo > 0 ? `${stats!.missingElo} ELO fehlend` : '',
-                  stats!.teamsWithoutSquad > 0 ? `${stats!.teamsWithoutSquad} ohne Kader` : '',
-                  stats!.teamsWithZeroMv > 0 ? `${stats!.teamsWithZeroMv} Teams mit 0-MW` : '',
-                ].filter(Boolean).join(', ')}).`
-              : `Grid Search (936 Kombinationen) + Walk-Forward + Bootstrap · Modus: ${calibMode} · ~60s.`}
-          </p>
-          <div className="flex gap-2">
-            <button onClick={runParamSearch} disabled={paramsLoading || !!missingData}
-              className="flex-1 px-4 py-2 bg-violet-700 hover:bg-violet-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-semibold rounded-lg transition-colors">
-              {paramsLoading ? 'Läuft (~60s)…' : 'Parametersuche starten'}
-            </button>
-            <button onClick={runCompare} disabled={compareLoading || !!missingData}
-              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-gray-300 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
-              {compareLoading ? '…' : 'Vergleichen'}
-            </button>
-          </div>
-          {paramsResult?.error && <p className="text-xs text-red-400">{paramsResult.error}</p>}
-          {paramsResult?.recommendation && !paramsResult.error && (
-            <p className="text-xs text-emerald-400">{paramsResult.recommendation}</p>
-          )}
-        </div>
       </div>
 
-      <ParamResultPanel result={paramsResult} calibMode={calibMode} />
+      {/* Parametersuche — hinter Details versteckt */}
+      <details className="group">
+        <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300 transition-colors select-none list-none flex items-center gap-2 py-1">
+          <span className="group-open:hidden">▶</span>
+          <span className="hidden group-open:inline">▼</span>
+          Details: Parametersuche &amp; Kalibrierung
+        </summary>
+        <div className="mt-4 space-y-4">
+          <div className={`bg-gray-900 border rounded-xl p-5 space-y-3 ${missingData ? 'border-gray-800 opacity-60' : 'border-gray-800'}`}>
+            <div className="text-xs text-gray-500 uppercase tracking-wider">Parametersuche</div>
+            {!missingData && (
+              <div className="flex gap-1">
+                {(['recentEstimated', 'allSnapshots'] as const).map(m => (
+                  <button key={m} onClick={() => setCalibMode(m)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${calibMode === m ? 'bg-violet-700 text-white' : 'bg-gray-800 text-gray-500 hover:text-white'}`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-400">
+              {missingData
+                ? `Deaktiviert: Daten unvollständig (${[
+                    stats!.missingElo > 0 ? `${stats!.missingElo} ELO fehlend` : '',
+                    stats!.teamsWithoutSquad > 0 ? `${stats!.teamsWithoutSquad} ohne Kader` : '',
+                    stats!.teamsWithZeroMv > 0 ? `${stats!.teamsWithZeroMv} Teams mit 0-MW` : '',
+                  ].filter(Boolean).join(', ')}).`
+                : `Grid Search (936 Kombinationen) + Walk-Forward + Bootstrap · Modus: ${calibMode} · ~60s.`}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={runParamSearch} disabled={paramsLoading || !!missingData}
+                className="flex-1 px-4 py-2 bg-violet-700 hover:bg-violet-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-semibold rounded-lg transition-colors">
+                {paramsLoading ? 'Läuft (~60s)…' : 'Parametersuche starten'}
+              </button>
+              <button onClick={runCompare} disabled={compareLoading || !!missingData}
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-gray-300 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
+                {compareLoading ? '…' : 'Vergleichen'}
+              </button>
+            </div>
+            {paramsResult?.error && <p className="text-xs text-red-400">{paramsResult.error}</p>}
+            {paramsResult?.recommendation && !paramsResult.error && (
+              <p className="text-xs text-emerald-400">{paramsResult.recommendation}</p>
+            )}
+          </div>
+
+          <ParamResultPanel result={paramsResult} calibMode={calibMode} />
+        </div>
+      </details>
 
       {/* Comparison table */}
       {compareRows && (
@@ -949,7 +958,7 @@ export default function DatenModellPage() {
   const TABS: { key: Tab; label: string }[] = [
     { key: 'daten',    label: 'WM-2026-Daten' },
     { key: 'qualität', label: 'Hist. Qualität' },
-    { key: 'modell',   label: 'Modell testen' },
+    { key: 'modell',   label: 'Modellstatus' },
     { key: 'live',     label: 'Live-Modus' },
   ]
 

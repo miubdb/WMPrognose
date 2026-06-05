@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
-import { analyzeAllMatches, type MatchAnalysis, type SquadSummary } from '@/lib/modelAdapter'
+import { analyzeAllMatches, type MatchAnalysis, type SquadSummary, type MatchFactor } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
@@ -21,6 +21,23 @@ function fmtDateHeader(dateStr: string): string {
   const [, mm, dd] = dateStr.split('-')
   const weekday = new Date(dateStr).toLocaleDateString('de-DE', { weekday: 'short' })
   return `${weekday}, ${dd}.${mm}.`
+}
+
+function TopFactorLine({ factors }: { factors: MatchFactor[] }) {
+  const top = factors
+    .filter(f => Math.abs(f.logEffectA - f.logEffectB) > 0.012)
+    .sort((a, b) => Math.abs(b.logEffectA - b.logEffectB) - Math.abs(a.logEffectA - a.logEffectB))
+    .slice(0, 2)
+  if (top.length === 0) return <div className="text-[10px] text-gray-700 mt-1 text-center">Ausgeglichen</div>
+  return (
+    <div className="text-[10px] text-gray-600 mt-1 text-center truncate">
+      {top.map(f => {
+        const diff = f.logEffectA - f.logEffectB
+        const pct  = Math.round(Math.abs(Math.exp(diff) - 1) * 100)
+        return `${f.label.split(' ')[0]} ${diff > 0 ? '+' : '−'}${pct}%`
+      }).join(' · ')}
+    </div>
+  )
 }
 
 function ProbBar({ probA, probDraw, probB, nameA, nameB }: {
@@ -198,9 +215,6 @@ function MatchCard({
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-600 font-mono">vs</div>
-              <div className="text-xs text-gray-700 mt-0.5">
-                {analysis.expectedGoalsA.toFixed(1)} : {analysis.expectedGoalsB.toFixed(1)} xG
-              </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-2xl">{analysis.teamB.flag}</span>
@@ -218,6 +232,7 @@ function MatchCard({
             nameA={analysis.teamA.name}
             nameB={analysis.teamB.name}
           />
+          <TopFactorLine factors={analysis.factors} />
 
           <div className="flex items-center justify-between mt-2">
             <div className="text-xs text-gray-500">
