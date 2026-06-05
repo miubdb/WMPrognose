@@ -8,20 +8,22 @@ interface WM2026Team {
   team_id: string
   team_name: string
   confederation: string
-  market_value_m: number | null
-  market_value_source: string | null
-  market_value_date: string | null
-  squad_size: number | null
-  squad_size_db: number
   verified: boolean
   notes: string | null
   elo_rating: number | null
   elo_source: string | null
   elo_updated: string | null
   elo_delta_1y: number
+  // Squad stats computed from players table
+  player_count: number
+  players_with_mv: number
+  zero_mv_count: number
+  total_mv_m: number | null
+  starter_count: number
+  starter_mv_m: number | null
 }
 
-interface TeamStats { total: number; missingElo: number; missingMv: number; unverified: number }
+interface TeamStats { total: number; missingElo: number; teamsWithZeroMv: number; unverified: number }
 
 interface HistQualRow {
   tournamentId: string; label: string; teamCount: number
@@ -62,21 +64,21 @@ function StatusPanel({ stats, histLoaded, lastBacktest }: {
 }) {
   if (!stats) return <div className="text-gray-600 text-sm animate-pulse">Lade Status…</div>
 
-  const eloOk = stats.missingElo === 0
-  const mvOk  = stats.missingMv  === 0
-  const verOk = stats.unverified  === 0
+  const eloOk = stats.missingElo       === 0
+  const mvOk  = stats.teamsWithZeroMv  === 0
+  const verOk = stats.unverified       === 0
 
   let nextStep = ''
   if (!eloOk) nextStep = `${stats.missingElo} Teams haben keine ELO-Werte. Bitte zuerst ELO aktualisieren.`
-  else if (!mvOk) nextStep = `${stats.missingMv} Teams haben keinen Marktwert. Bitte Marktwerte ergänzen.`
-  else if (!verOk) nextStep = `${stats.unverified} Teams noch ungeprüft. Marktwerte als geprüft bestätigen.`
+  else if (!mvOk) nextStep = `${stats.teamsWithZeroMv} Teams haben Spieler ohne Marktwert. Spieler-Daten prüfen.`
+  else if (!verOk) nextStep = `${stats.unverified} Teams noch ungeprüft. Als geprüft bestätigen.`
   else nextStep = 'Alle Daten vollständig. Backtest oder Parametersuche starten.'
 
   return (
     <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
         <Light ok={eloOk}   label={eloOk  ? 'ELO vollständig' : `ELO: ${stats.missingElo} fehlen`} />
-        <Light ok={mvOk}    label={mvOk   ? 'Marktwerte vollständig' : `MW: ${stats.missingMv} fehlen`} />
+        <Light ok={mvOk}    label={mvOk   ? 'Spieler-MW vollständig' : `${stats.teamsWithZeroMv} Teams mit 0-MW-Spielern`} />
         <Light ok={verOk}   label={verOk  ? 'Alle geprüft' : `${stats.unverified} ungeprüft`} />
         <Light ok={histLoaded} label={histLoaded ? 'Hist. Snapshots geladen' : 'Hist. Daten laden…'} />
         <Light ok={!!lastBacktest} label={lastBacktest ? `Backtest: ${lastBacktest}` : 'Backtest: ausstehend'} />
@@ -92,69 +94,88 @@ function StatusPanel({ stats, histLoaded, lastBacktest }: {
   )
 }
 
-// ─── Team Table (B) ───────────────────────────────────────────────────────────
+// ─── Team Control Row (compact, read-only MV, editable ELO+Geprüft) ───────────
 
 function TeamRow({ team, onSave }: {
   team: WM2026Team
-  onSave: (id: string, fields: Partial<WM2026Team>) => Promise<void>
+  onSave: (id: string, fields: Record<string, unknown>) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState({ ...team })
+  const [draftElo, setDraftElo] = useState<string>(team.elo_rating?.toString() ?? '')
+  const [draftVerified, setDraftVerified] = useState(team.verified)
   const [saving, setSaving] = useState(false)
 
   async function save() {
     setSaving(true)
     const changed: Record<string, unknown> = {}
-    if (draft.elo_rating        !== team.elo_rating)        changed.elo_rating        = draft.elo_rating ? Number(draft.elo_rating) : null
-    if (draft.market_value_m    !== team.market_value_m)    changed.market_value_m    = draft.market_value_m ? Number(draft.market_value_m) : null
-    if (draft.market_value_source !== team.market_value_source) changed.market_value_source = draft.market_value_source
-    if (draft.market_value_date !== team.market_value_date) changed.market_value_date = draft.market_value_date
-    if (draft.squad_size        !== team.squad_size)        changed.squad_size        = draft.squad_size
-    if (draft.verified          !== team.verified)          changed.verified          = draft.verified
-    if (draft.notes             !== team.notes)             changed.notes             = draft.notes
-    if (Object.keys(changed).length > 0) await onSave(team.team_id, changed as Partial<WM2026Team>)
+    const eloNum = draftElo ? Number(draftElo) : null
+    if (eloNum !== team.elo_rating) changed.elo_rating = eloNum
+    if (draftVerified !== team.verified) changed.verified = draftVerified
+    if (Object.keys(changed).length > 0) await onSave(team.team_id, changed)
     setEditing(false)
     setSaving(false)
   }
 
-  const missingMv  = !team.market_value_m
-  const missingElo = !team.elo_rating
-  const rowCls = missingMv || missingElo
+  function cancel() {
+    setDraftElo(team.elo_rating?.toString() ?? '')
+    setDraftVerified(team.verified)
+    setEditing(false)
+  }
+
+  const hasZeroMv   = team.zero_mv_count > 0
+  const missingElo  = !team.elo_rating
+  const statusOk    = !hasZeroMv && !missingElo
+  const statusWarn  = !missingElo && hasZeroMv
+
+  const statusCell = statusOk
+    ? <span className="text-emerald-400 text-sm" title="Vollständig">✓</span>
+    : statusWarn
+    ? <span className="text-amber-400 text-sm" title={`${team.zero_mv_count} Spieler ohne Marktwert`}>⚠</span>
+    : <span className="text-red-400 text-sm" title="ELO fehlt">✗</span>
+
+  const rowCls = missingElo || hasZeroMv
     ? 'border-t border-amber-900/30 bg-amber-950/10'
     : 'border-t border-gray-800/60'
+
+  const starterMv = team.starter_count > 0 ? team.starter_mv_m : null
 
   if (editing) {
     return (
       <tr className="border-t border-blue-800/60 bg-blue-950/20">
         <td className="px-3 py-2 text-xs font-medium text-white">{team.team_name}</td>
-        <td className="px-3 py-2 text-xs text-gray-500">{team.confederation}</td>
-        <td className="px-3 py-2">
-          <input type="number" value={draft.elo_rating ?? ''} onChange={e => setDraft(d => ({ ...d, elo_rating: e.target.value ? Number(e.target.value) : null }))}
-            className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500" />
+        <td className="px-3 py-2 text-[10px] text-gray-500">{team.confederation}</td>
+        <td className="px-3 py-2 text-xs text-gray-400 text-right">{team.player_count}</td>
+        <td className="px-3 py-2 text-xs text-gray-400 text-right">{team.players_with_mv}</td>
+        <td className="px-3 py-2 text-xs font-mono text-gray-300 text-right">
+          {team.total_mv_m != null ? `${team.total_mv_m}M` : '—'}
+        </td>
+        <td className="px-3 py-2 text-xs font-mono text-gray-400 text-right">
+          {starterMv != null ? `${starterMv}M` : '—'}
         </td>
         <td className="px-3 py-2">
-          <input type="number" value={draft.market_value_m ?? ''} onChange={e => setDraft(d => ({ ...d, market_value_m: e.target.value ? Number(e.target.value) : null }))}
-            className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500" placeholder="Mio €" />
-        </td>
-        <td className="px-3 py-2">
-          <input type="text" value={draft.market_value_source ?? ''} onChange={e => setDraft(d => ({ ...d, market_value_source: e.target.value }))}
-            className="w-28 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:border-blue-500" placeholder="Quelle" />
-        </td>
-        <td className="px-3 py-2">
-          <input type="text" value={draft.market_value_date ?? ''} onChange={e => setDraft(d => ({ ...d, market_value_date: e.target.value }))}
-            className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500" placeholder="2025-06" />
+          <input
+            type="number"
+            value={draftElo}
+            onChange={e => setDraftElo(e.target.value)}
+            className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+          />
         </td>
         <td className="px-3 py-2 text-center">
-          <input type="checkbox" checked={draft.verified} onChange={e => setDraft(d => ({ ...d, verified: e.target.checked }))}
-            className="w-4 h-4 rounded accent-emerald-500 cursor-pointer" />
+          <input
+            type="checkbox"
+            checked={draftVerified}
+            onChange={e => setDraftVerified(e.target.checked)}
+            className="w-4 h-4 rounded accent-emerald-500 cursor-pointer"
+          />
         </td>
-        <td className="px-3 py-2 text-xs">
+        <td className="px-3 py-2 text-center">—</td>
+        <td className="px-3 py-2">
           <div className="flex gap-1">
             <button onClick={save} disabled={saving}
               className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-[10px] font-semibold disabled:opacity-50">
               {saving ? '…' : 'OK'}
             </button>
-            <button onClick={() => { setDraft({ ...team }); setEditing(false) }}
+            <button onClick={cancel}
               className="px-2 py-0.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-[10px]">
               ✕
             </button>
@@ -168,28 +189,31 @@ function TeamRow({ team, onSave }: {
     <tr className={`${rowCls} hover:bg-gray-800/30 transition-colors`}>
       <td className="px-3 py-2 text-xs font-medium text-white">{team.team_name}</td>
       <td className="px-3 py-2 text-[10px] text-gray-500">{team.confederation}</td>
-      <td className={`px-3 py-2 font-mono text-xs ${missingElo ? 'text-amber-400 font-bold' : 'text-gray-300'}`}>
+      <td className="px-3 py-2 text-xs text-gray-400 text-right">{team.player_count}</td>
+      <td className={`px-3 py-2 text-xs text-right font-mono ${hasZeroMv ? 'text-amber-400' : 'text-gray-400'}`}>
+        {team.players_with_mv}
+        {hasZeroMv && <span className="text-[9px] ml-1 text-amber-500">({team.zero_mv_count}×0)</span>}
+      </td>
+      <td className="px-3 py-2 text-xs font-mono text-gray-300 text-right">
+        {team.total_mv_m != null ? `${team.total_mv_m}M` : <span className="text-gray-600">—</span>}
+      </td>
+      <td className="px-3 py-2 text-xs font-mono text-gray-500 text-right">
+        {starterMv != null ? `${starterMv}M` : <span className="text-gray-700">—</span>}
+      </td>
+      <td className={`px-3 py-2 font-mono text-xs text-right ${missingElo ? 'text-amber-400 font-bold' : 'text-gray-300'}`}>
         {team.elo_rating ?? <span className="text-amber-500">— fehlt</span>}
-        {team.elo_delta_1y !== 0 && (
+        {(team.elo_delta_1y ?? 0) !== 0 && (
           <span className={`ml-1 text-[10px] ${team.elo_delta_1y > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
             {team.elo_delta_1y > 0 ? '+' : ''}{team.elo_delta_1y}
           </span>
         )}
-      </td>
-      <td className={`px-3 py-2 font-mono text-xs ${missingMv ? 'text-amber-400 font-bold' : 'text-gray-300'}`}>
-        {team.market_value_m ? `${team.market_value_m}M` : <span className="text-amber-500">— fehlt</span>}
-      </td>
-      <td className="px-3 py-2 text-[10px] text-gray-500 max-w-[100px] truncate">
-        {team.market_value_source ?? '—'}
-      </td>
-      <td className="px-3 py-2 text-[10px] font-mono text-gray-600">
-        {team.market_value_date ?? '—'}
       </td>
       <td className="px-3 py-2 text-center">
         {team.verified
           ? <span className="text-emerald-400 text-xs">✓</span>
           : <span className="text-gray-600 text-xs">○</span>}
       </td>
+      <td className="px-3 py-2 text-center">{statusCell}</td>
       <td className="px-3 py-2">
         <button onClick={() => setEditing(true)}
           className="text-[10px] px-2 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded transition-colors">
@@ -199,6 +223,8 @@ function TeamRow({ team, onSave }: {
     </tr>
   )
 }
+
+// ─── Team Data Tab (B) ────────────────────────────────────────────────────────
 
 function TeamDataTab({ teams, stats, loading, onRefresh }: {
   teams: WM2026Team[]
@@ -214,13 +240,13 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
   const [bulkResult, setBulkResult] = useState<string | null>(null)
 
   const filtered = teams.filter(t => {
-    if (filter === 'fehlend_mv')  return !t.market_value_m
+    if (filter === 'fehlend_mv')  return t.zero_mv_count > 0
     if (filter === 'fehlend_elo') return !t.elo_rating
     if (filter === 'ungeprüft')   return !t.verified
     return true
   })
 
-  async function handleSave(teamId: string, fields: Partial<WM2026Team>) {
+  async function handleSave(teamId: string, fields: Record<string, unknown>) {
     setSaving(teamId)
     await fetch(`/api/wm2026-teams/${teamId}`, {
       method: 'PATCH',
@@ -246,17 +272,17 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
   }
 
   const FILTERS: { key: Filter; label: string; count?: number }[] = [
-    { key: 'alle',        label: 'Alle Teams',   count: teams.length },
-    { key: 'fehlend_mv',  label: 'Fehlende MV',  count: stats?.missingMv ?? 0 },
-    { key: 'fehlend_elo', label: 'Fehlende ELO', count: stats?.missingElo ?? 0 },
-    { key: 'ungeprüft',   label: 'Ungeprüft',    count: stats?.unverified ?? 0 },
+    { key: 'alle',        label: 'Alle Teams',      count: teams.length },
+    { key: 'fehlend_mv',  label: '0-MW-Spieler',    count: stats?.teamsWithZeroMv ?? 0 },
+    { key: 'fehlend_elo', label: 'Fehlende ELO',    count: stats?.missingElo ?? 0 },
+    { key: 'ungeprüft',   label: 'Ungeprüft',       count: stats?.unverified ?? 0 },
   ]
 
   return (
     <div className="space-y-4">
       {/* Filter + actions */}
       <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {FILTERS.map(f => (
             <button key={f.key} onClick={() => setFilter(f.key)}
               className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${filter === f.key ? 'bg-amber-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
@@ -283,7 +309,11 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
       {bulkOpen && (
         <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
           <div className="text-xs font-semibold text-white">ELO-Bulk-Import</div>
-          <p className="text-xs text-gray-500">Format: eine Zeile pro Team — z.B. <code className="text-gray-300">Germany 1944</code> oder <code className="text-gray-300">ARG 2057</code></p>
+          <p className="text-xs text-gray-500">
+            Format: eine Zeile pro Team — z.B.{' '}
+            <code className="text-gray-300">Germany 1944</code> oder{' '}
+            <code className="text-gray-300">ARG 2057</code>
+          </p>
           <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={8}
             className="w-full bg-gray-950 border border-gray-700 rounded-lg p-3 text-xs font-mono text-gray-200 focus:outline-none focus:border-amber-500 resize-y"
             placeholder={'Germany 1944\nFrance 2025\nBrazil 2013\n...'} />
@@ -292,37 +322,53 @@ function TeamDataTab({ teams, stats, loading, onRefresh }: {
               className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-semibold rounded-lg transition-colors">
               {bulkLoading ? 'Importiere…' : 'ELO importieren'}
             </button>
-            {bulkResult && <span className={`text-xs ${bulkResult.startsWith('✓') ? 'text-emerald-400' : 'text-red-400'}`}>{bulkResult}</span>}
+            {bulkResult && (
+              <span className={`text-xs ${bulkResult.startsWith('✓') ? 'text-emerald-400' : 'text-red-400'}`}>{bulkResult}</span>
+            )}
           </div>
         </div>
       )}
 
-      {/* Table */}
+      {/* Compact control table */}
       <div className="overflow-x-auto rounded-xl border border-gray-800">
         <table className="w-full text-left">
           <thead className="bg-gray-900/80 text-[10px] text-gray-500 uppercase tracking-wider">
             <tr>
               <th className="px-3 py-2.5">Team</th>
               <th className="px-3 py-2.5">Konf.</th>
-              <th className="px-3 py-2.5">ELO</th>
-              <th className="px-3 py-2.5">Marktwert</th>
-              <th className="px-3 py-2.5">Quelle</th>
-              <th className="px-3 py-2.5">Datum</th>
+              <th className="px-3 py-2.5 text-right">Spieler</th>
+              <th className="px-3 py-2.5 text-right">mit&nbsp;MW</th>
+              <th className="px-3 py-2.5 text-right">Kader-MW</th>
+              <th className="px-3 py-2.5 text-right">Startelf-MW</th>
+              <th className="px-3 py-2.5 text-right">ELO</th>
               <th className="px-3 py-2.5 text-center">Geprüft</th>
+              <th className="px-3 py-2.5 text-center">Status</th>
               <th className="px-3 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-600 text-sm">Keine Teams in diesem Filter</td></tr>
+              <tr>
+                <td colSpan={10} className="px-3 py-6 text-center text-gray-600 text-sm">
+                  Keine Teams in diesem Filter
+                </td>
+              </tr>
             )}
             {filtered.map(t => (
-              <TeamRow key={t.team_id} team={{ ...t, ...(saving === t.team_id ? {} : {}) }} onSave={handleSave} />
+              <TeamRow
+                key={t.team_id}
+                team={{ ...t, ...(saving === t.team_id ? {} : {}) }}
+                onSave={handleSave}
+              />
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-gray-600">{filtered.length} von {teams.length} Teams angezeigt</p>
+
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span>{filtered.length} von {teams.length} Teams angezeigt</span>
+        <span>Marktwerte werden automatisch aus der Spielerdatenbank berechnet (<a href="/teams" className="text-amber-500/80 hover:text-amber-400">Teams → Spieler bearbeiten</a>)</span>
+      </div>
     </div>
   )
 }
@@ -413,7 +459,7 @@ function HistoricalQualityTab() {
   )
 }
 
-// ─── Param result panel (extracted to satisfy TSX type inference) ─────────────
+// ─── Param result panel ───────────────────────────────────────────────────────
 
 function ParamResultPanel({ result }: { result: ModelResult | null }) {
   if (!result?.raw || result.error) return null
@@ -451,13 +497,13 @@ function ParamResultPanel({ result }: { result: ModelResult | null }) {
 // ─── Model Test Tab (D) ───────────────────────────────────────────────────────
 
 function ModelTestTab({ stats }: { stats: TeamStats | null }) {
-  const [backtestResult, setBacktestResult]     = useState<ModelResult | null>(null)
-  const [backtestLoading, setBacktestLoading]   = useState(false)
-  const [paramsResult, setParamsResult]         = useState<ModelResult | null>(null)
-  const [paramsLoading, setParamsLoading]       = useState(false)
-  const [qualResult, setQualResult]             = useState<string | null>(null)
+  const [backtestResult, setBacktestResult]   = useState<ModelResult | null>(null)
+  const [backtestLoading, setBacktestLoading] = useState(false)
+  const [paramsResult, setParamsResult]       = useState<ModelResult | null>(null)
+  const [paramsLoading, setParamsLoading]     = useState(false)
+  const [qualResult, setQualResult]           = useState<string | null>(null)
 
-  const missingData = stats && (stats.missingElo > 0 || stats.missingMv > 0)
+  const missingData = stats && (stats.missingElo > 0 || stats.teamsWithZeroMv > 0)
 
   async function runBacktest() {
     setBacktestLoading(true)
@@ -493,9 +539,9 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
   function checkQuality() {
     if (!stats) return
     const issues = []
-    if (stats.missingElo > 0) issues.push(`${stats.missingElo} Teams ohne ELO`)
-    if (stats.missingMv  > 0) issues.push(`${stats.missingMv} Teams ohne Marktwert`)
-    if (stats.unverified > 0) issues.push(`${stats.unverified} Teams ungeprüft`)
+    if (stats.missingElo > 0)      issues.push(`${stats.missingElo} Teams ohne ELO`)
+    if (stats.teamsWithZeroMv > 0) issues.push(`${stats.teamsWithZeroMv} Teams mit 0-MW-Spielern`)
+    if (stats.unverified > 0)      issues.push(`${stats.unverified} Teams ungeprüft`)
     setQualResult(issues.length === 0 ? '✓ Alle Daten vorhanden und vollständig.' : `Offene Punkte: ${issues.join(' · ')}`)
   }
 
@@ -509,7 +555,7 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
         {/* 1. Datenqualität */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
           <div className="text-xs text-gray-500 uppercase tracking-wider">1. Datenqualität prüfen</div>
-          <p className="text-xs text-gray-400">Prüft ob alle Teams ELO, Marktwert und Verifikation haben.</p>
+          <p className="text-xs text-gray-400">Prüft ob alle Teams ELO-Werte haben und keine Spieler mit 0-Marktwert vorliegen.</p>
           <button onClick={checkQuality}
             className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold rounded-lg transition-colors">
             Prüfen
@@ -538,7 +584,7 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
           <div className="text-xs text-gray-500 uppercase tracking-wider">3. Parametersuche starten</div>
           <p className="text-xs text-gray-400">
             {missingData
-              ? `Deaktiviert: Daten unvollständig (${stats!.missingElo > 0 ? `${stats!.missingElo} ELO fehlend, ` : ''}${stats!.missingMv > 0 ? `${stats!.missingMv} Marktwerte fehlend` : ''}).`
+              ? `Deaktiviert: Daten unvollständig (${stats!.missingElo > 0 ? `${stats!.missingElo} ELO fehlend` : ''}${stats!.teamsWithZeroMv > 0 ? `${stats!.missingElo > 0 ? ', ' : ''}${stats!.teamsWithZeroMv} Teams mit 0-MW` : ''}).`
               : 'Grid Search (450 Kombinationen) + Walk-Forward + Bootstrap. ~60s.'}
           </p>
           <button onClick={runParamSearch} disabled={paramsLoading || !!missingData}
@@ -547,22 +593,18 @@ function ModelTestTab({ stats }: { stats: TeamStats | null }) {
           </button>
           {paramsResult?.error && <p className="text-xs text-red-400">{paramsResult.error}</p>}
           {paramsResult?.recommendation && !paramsResult.error && (
-            <div className="text-xs space-y-1">
-              <p className="text-emerald-400">{paramsResult.recommendation}</p>
-            </div>
+            <p className="text-xs text-emerald-400">{paramsResult.recommendation}</p>
           )}
         </div>
       </div>
 
-      {/* Parametersuche detailed results */}
       <ParamResultPanel result={paramsResult} />
 
-      {/* Links to detailed pages */}
       <div className="pt-2 border-t border-gray-800 flex flex-wrap gap-3 text-xs text-gray-500">
         <span>Details auf:</span>
-        <a href="/model-lab" className="text-pink-400/80 hover:text-pink-300 transition-colors">Model Lab</a>
-        <a href="/backtest" className="text-indigo-400/80 hover:text-indigo-300 transition-colors">Backtest</a>
-        <a href="/calibrate" className="text-cyan-400/80 hover:text-cyan-300 transition-colors">Kalibrierung</a>
+        <a href="/model-lab"  className="text-pink-400/80 hover:text-pink-300 transition-colors">Model Lab</a>
+        <a href="/backtest"   className="text-indigo-400/80 hover:text-indigo-300 transition-colors">Backtest</a>
+        <a href="/calibrate"  className="text-cyan-400/80 hover:text-cyan-300 transition-colors">Kalibrierung</a>
       </div>
     </div>
   )
@@ -587,7 +629,6 @@ function LiveModeTab({ teams }: { teams: WM2026Team[] }) {
 
   return (
     <div className="space-y-5">
-      {/* Mode selector */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
         <div className="text-sm font-semibold text-white">ELO-Modus</div>
         <div className="flex gap-3">
@@ -613,7 +654,6 @@ function LiveModeTab({ teams }: { teams: WM2026Team[] }) {
         </div>
       </div>
 
-      {/* ELO table */}
       <div>
         <div className="text-sm font-semibold text-white mb-3">ELO-Übersicht ({teamsWithDelta.length} Teams)</div>
         <div className="overflow-x-auto rounded-xl border border-gray-800">
@@ -661,12 +701,12 @@ function LiveModeTab({ teams }: { teams: WM2026Team[] }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DatenModellPage() {
-  const [tab, setTab] = useState<Tab>('daten')
+  const [tab, setTab]             = useState<Tab>('daten')
   const [teams, setTeams]         = useState<WM2026Team[]>([])
   const [stats, setStats]         = useState<TeamStats | null>(null)
   const [loading, setLoading]     = useState(true)
   const [histLoaded, setHistLoaded] = useState(false)
-  const [lastBacktest]            = useState<string | null>(null) // can be stored in localStorage later
+  const [lastBacktest]            = useState<string | null>(null)
 
   const loadTeams = useCallback(async () => {
     setLoading(true)
@@ -700,10 +740,8 @@ export default function DatenModellPage() {
         </p>
       </div>
 
-      {/* A. Status */}
       <StatusPanel stats={stats} histLoaded={histLoaded} lastBacktest={lastBacktest} />
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-800 pb-0">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -717,7 +755,6 @@ export default function DatenModellPage() {
         ))}
       </div>
 
-      {/* Tab content */}
       <div className="min-h-[400px]">
         {tab === 'daten'    && <TeamDataTab teams={teams} stats={stats} loading={loading} onRefresh={loadTeams} />}
         {tab === 'qualität' && <HistoricalQualityTab />}

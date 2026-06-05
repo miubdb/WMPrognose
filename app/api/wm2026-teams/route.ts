@@ -7,7 +7,6 @@ const sb = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Display name → team_id mapping (must match team_elo_ratings)
 const NAME_TO_ID: Record<string, string> = {
   'Germany': 'germany', 'France': 'france', 'Spain': 'spain', 'England': 'england',
   'Portugal': 'portugal', 'Netherlands': 'netherlands', 'Belgium': 'belgium',
@@ -49,34 +48,63 @@ export async function GET() {
     const [teamsRes, eloRes, playersRes] = await Promise.all([
       sb.from('wm2026_teams').select('*').order('confederation').order('team_name'),
       sb.from('team_elo_ratings').select('team_id, elo_rating, source, updated_at, elo_delta_1y'),
-      sb.from('players').select('team_id').then(r => r),
+      sb.from('players').select('team_id, market_value_m, is_in_starting_xi'),
     ])
 
     if (teamsRes.error) throw teamsRes.error
 
-    const eloMap = new Map((eloRes.data ?? []).map(e => [e.team_id, e]))
-    const squadCounts = new Map<string, number>()
+    // Aggregate squad stats per team from players table
+    const squadStats = new Map<string, {
+      playerCount: number
+      playersWithMv: number
+      zeroMvCount: number
+      totalMvM: number
+      starterCount: number
+      starterMvM: number
+    }>()
+
     for (const p of (playersRes.data ?? [])) {
-      squadCounts.set(p.team_id, (squadCounts.get(p.team_id) ?? 0) + 1)
+      const s = squadStats.get(p.team_id) ?? {
+        playerCount: 0, playersWithMv: 0, zeroMvCount: 0,
+        totalMvM: 0, starterCount: 0, starterMvM: 0,
+      }
+      s.playerCount++
+      const mv = p.market_value_m ?? 0
+      if (mv > 0) { s.playersWithMv++; s.totalMvM += mv }
+      else s.zeroMvCount++
+      if (p.is_in_starting_xi) { s.starterCount++; s.starterMvM += mv }
+      squadStats.set(p.team_id, s)
     }
 
+    const eloMap = new Map((eloRes.data ?? []).map(e => [e.team_id, e]))
+
     const teams = (teamsRes.data ?? []).map(t => {
-      const elo = eloMap.get(t.team_id)
+      const elo  = eloMap.get(t.team_id)
+      const sq   = squadStats.get(t.team_id)
       return {
         ...t,
-        elo_rating:    elo?.elo_rating ?? null,
-        elo_source:    elo?.source ?? null,
-        elo_updated:   elo?.updated_at ?? null,
-        elo_delta_1y:  elo?.elo_delta_1y ?? 0,
-        squad_size_db: squadCounts.get(t.team_id) ?? 0,
+        elo_rating:      elo?.elo_rating ?? null,
+        elo_source:      elo?.source ?? null,
+        elo_updated:     elo?.updated_at ?? null,
+        elo_delta_1y:    elo?.elo_delta_1y ?? 0,
+        player_count:    sq?.playerCount   ?? 0,
+        players_with_mv: sq?.playersWithMv ?? 0,
+        zero_mv_count:   sq?.zeroMvCount   ?? 0,
+        total_mv_m:      sq ? Math.round(sq.totalMvM * 10) / 10 : null,
+        starter_count:   sq?.starterCount  ?? 0,
+        starter_mv_m:    sq ? Math.round(sq.starterMvM * 10) / 10 : null,
       }
     })
 
-    const missingElo = teams.filter(t => !t.elo_rating).length
-    const missingMv  = teams.filter(t => !t.market_value_m).length
-    const unverified = teams.filter(t => !t.verified).length
+    const missingElo      = teams.filter(t => !t.elo_rating).length
+    const teamsWithZeroMv = teams.filter(t => t.zero_mv_count > 0).length
+    const unverified      = teams.filter(t => !t.verified).length
 
-    return NextResponse.json({ ok: true, teams, stats: { total: teams.length, missingElo, missingMv, unverified } })
+    return NextResponse.json({
+      ok: true,
+      teams,
+      stats: { total: teams.length, missingElo, teamsWithZeroMv, unverified },
+    })
   } catch (err) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 })
   }
