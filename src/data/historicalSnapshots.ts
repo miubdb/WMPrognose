@@ -19,8 +19,48 @@ export interface HistoricalTeamSnapshot {
   avgAge?: number
   fifaRanking?: number
   sourceQuality: 'high' | 'medium' | 'low' | 'elo_only'
+  marketValueSource?: string       // z.B. "Transfermarkt archive"
+  marketValueSnapshotDate?: string // z.B. "2022-11" (YYYY-MM)
+  marketValueEstimated?: boolean   // true = Schätzung, nicht verifiziert
   notes?: string
 }
+
+// WM 2014 — Kader-Marktwerte grob geschätzt (keine verlässliche Archivquelle verfügbar)
+// worldCupTitles/Appearances: Stand vor WM 2014
+const WC2014_SNAPSHOTS: HistoricalTeamSnapshot[] = [
+  { teamName: 'Germany',          tournament: 'WC2014', marketValueM:  560, worldCupTitles: 3, worldCupAppearances: 18, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Brazil',           tournament: 'WC2014', marketValueM:  600, worldCupTitles: 5, worldCupAppearances: 20, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Spain',            tournament: 'WC2014', marketValueM:  650, worldCupTitles: 1, worldCupAppearances: 14, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'France',           tournament: 'WC2014', marketValueM:  480, worldCupTitles: 1, worldCupAppearances: 14, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Argentina',        tournament: 'WC2014', marketValueM:  480, worldCupTitles: 2, worldCupAppearances: 16, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'England',          tournament: 'WC2014', marketValueM:  600, worldCupTitles: 1, worldCupAppearances: 14, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Netherlands',      tournament: 'WC2014', marketValueM:  450, worldCupTitles: 0, worldCupAppearances: 10, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Belgium',          tournament: 'WC2014', marketValueM:  380, worldCupTitles: 0, worldCupAppearances: 12, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Italy',            tournament: 'WC2014', marketValueM:  350, worldCupTitles: 4, worldCupAppearances: 18, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Portugal',         tournament: 'WC2014', marketValueM:  320, worldCupTitles: 0, worldCupAppearances:  7, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Switzerland',      tournament: 'WC2014', marketValueM:  200, worldCupTitles: 0, worldCupAppearances: 11, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Colombia',         tournament: 'WC2014', marketValueM:  140, worldCupTitles: 0, worldCupAppearances:  5, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Uruguay',          tournament: 'WC2014', marketValueM:  160, worldCupTitles: 2, worldCupAppearances: 13, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Chile',            tournament: 'WC2014', marketValueM:  110, worldCupTitles: 0, worldCupAppearances:  9, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Croatia',          tournament: 'WC2014', marketValueM:  140, worldCupTitles: 0, worldCupAppearances:  4, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Mexico',           tournament: 'WC2014', marketValueM:  180, worldCupTitles: 0, worldCupAppearances: 15, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'USA',              tournament: 'WC2014', marketValueM:  150, worldCupTitles: 0, worldCupAppearances: 10, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Russia',           tournament: 'WC2014', marketValueM:  170, worldCupTitles: 0, worldCupAppearances: 10, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Bosnia-Herzegovina', tournament: 'WC2014', marketValueM:  90, worldCupTitles: 0, worldCupAppearances:  1, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Ivory Coast',      tournament: 'WC2014', marketValueM:  120, worldCupTitles: 0, worldCupAppearances:  3, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Nigeria',          tournament: 'WC2014', marketValueM:   90, worldCupTitles: 0, worldCupAppearances:  5, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Algeria',          tournament: 'WC2014', marketValueM:   80, worldCupTitles: 0, worldCupAppearances:  4, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Ghana',            tournament: 'WC2014', marketValueM:   80, worldCupTitles: 0, worldCupAppearances:  3, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Japan',            tournament: 'WC2014', marketValueM:   80, worldCupTitles: 0, worldCupAppearances:  5, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'South Korea',      tournament: 'WC2014', marketValueM:   80, worldCupTitles: 0, worldCupAppearances: 10, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Ecuador',          tournament: 'WC2014', marketValueM:   60, worldCupTitles: 0, worldCupAppearances:  3, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Greece',           tournament: 'WC2014', marketValueM:   80, worldCupTitles: 0, worldCupAppearances:  4, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Australia',        tournament: 'WC2014', marketValueM:   80, worldCupTitles: 0, worldCupAppearances:  4, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Cameroon',         tournament: 'WC2014', marketValueM:   70, worldCupTitles: 0, worldCupAppearances:  7, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Iran',             tournament: 'WC2014', marketValueM:   40, worldCupTitles: 0, worldCupAppearances:  4, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Costa Rica',       tournament: 'WC2014', marketValueM:   40, worldCupTitles: 0, worldCupAppearances:  4, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+  { teamName: 'Honduras',         tournament: 'WC2014', marketValueM:   30, worldCupTitles: 0, worldCupAppearances:  3, sourceQuality: 'low', marketValueEstimated: true, marketValueSnapshotDate: '2014-06' },
+]
 
 // WM 2022 — Kader-Marktwerte (Schätzungen aus Transfermarkt-Archiv, November 2022)
 // ELO-Werte kommen aus den Match-Records, nicht von hier
@@ -101,8 +141,9 @@ const EURO2024_SNAPSHOTS: HistoricalTeamSnapshot[] = [
 ]
 
 export const HISTORICAL_SNAPSHOTS: HistoricalTeamSnapshot[] = [
-  ...WC2022_SNAPSHOTS,
+  ...WC2014_SNAPSHOTS,
   ...WC2018_SNAPSHOTS,
+  ...WC2022_SNAPSHOTS,
   ...EURO2024_SNAPSHOTS,
 ]
 

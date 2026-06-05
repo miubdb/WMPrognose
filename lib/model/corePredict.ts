@@ -70,6 +70,9 @@ export interface CorePredictParams {
   useManualRatings?: boolean  // attack/defense/setPiece ratings (default true)
   useMarketValue?: boolean    // squad market value factor (default true)
   useHeritage?: boolean       // tournament heritage factor (default true)
+  // Fine-grained weight overrides for calibration parameter sweep
+  marketValueWeight?: number  // override MODEL_WEIGHTS.marketValueLog (default: config value)
+  heritageScale?: number      // multiplier on computed heritage log-effect (0.0=off, 1.0=full, default 1.0)
   // Caps sum of non-validated experimental factors per team (log-space).
   // 0.08 ≈ max ~8% xG effect from all experimental factors combined.
   experimentalOverlayMax?: number  // default: no cap (undefined)
@@ -149,18 +152,21 @@ function computeXG(
   const useMarketValue   = params.useMarketValue   !== false    // default true
   const useHeritage      = params.useHeritage      !== false    // default true
 
-  // Market value (validated in clean backtest when historical snapshots available)
+  // Market value — weight overridable for calibration sweep
+  const mvWeight = params.marketValueWeight ?? MODEL_WEIGHTS.marketValueLog
   const mvA = teamA.squadMarketValueM ?? 200
   const mvB = teamB.squadMarketValueM ?? 200
   const mvRatio = mvA > 0 && mvB > 0 ? Math.log(mvA / mvB) / Math.log(10) : 0
-  const mvLogA = useMarketValue ? clampLogEffect(MODEL_WEIGHTS.marketValueLog * mvRatio) : 0
+  const mvLogA = useMarketValue ? clampLogEffect(mvWeight * mvRatio) : 0
 
-  // Tournament heritage (absolute per-team — not differential, no double-count)
+  // Tournament heritage — scale overridable (0.0=off, 1.0=full, default 1.0)
+  // Cap at ±1% xG (≈0.01 log) recommended for robustness
+  const hScale = params.heritageScale ?? 1.0
   const heritageLogA = useHeritage
-    ? computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
+    ? computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances) * hScale
     : 0
   const heritageLogB = useHeritage
-    ? computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
+    ? computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances) * hScale
     : 0
 
   // Manual editorial ratings — disabled in historical backtest modes
