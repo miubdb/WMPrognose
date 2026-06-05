@@ -16,17 +16,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-bold text-white tracking-tight">
               WM 2026 <span className="text-emerald-400">Prognose</span>
             </Link>
-            <nav className="flex items-center gap-6 text-sm text-gray-400">
+            <nav className="flex items-center gap-5 text-sm text-gray-400">
               <Link href="/" className="hover:text-white transition-colors">Spiele</Link>
               <Link href="/gruppen" className="hover:text-white transition-colors">Gruppen</Link>
-              <Link href="/turnierbaum" className="hover:text-white transition-colors">Turnierbaum</Link>
-              <Link href="/tournament" className="hover:text-white transition-colors text-emerald-400/80">Turnierrechner</Link>
-              <Link href="/simulation" className="hover:text-white transition-colors text-violet-400/80">WM-Simulation</Link>
+              <Link href="/simulation" className="hover:text-white transition-colors">Simulation</Link>
               <Link href="/teams" className="hover:text-white transition-colors">Teams</Link>
-              <Link href="/backtest" className="hover:text-white transition-colors text-indigo-400/80">Backtest</Link>
-              <Link href="/model-lab" className="hover:text-white transition-colors text-pink-400/80">Model Lab</Link>
-              <Link href="/calibrate" className="hover:text-white transition-colors text-cyan-400/80">Kalibrierung</Link>
-              <Link href="/admin" className="hover:text-white transition-colors text-amber-500/80">Admin</Link>
+              <Link href="/daten-modell" className="hover:text-white transition-colors text-amber-400/90">Daten & Modell</Link>
+              <Link href="/turnierbaum" className="hover:text-white transition-colors">Turnierbaum</Link>
             </nav>
           </div>
         </header>
