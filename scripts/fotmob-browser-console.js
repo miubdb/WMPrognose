@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════╗
- * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v6     ║
+ * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v7     ║
  * ╠══════════════════════════════════════════════════════════╣
  * ║  1. Öffne: fotmob.com/de/leagues/77/overview/world-cup/teams ║
  * ║  2. Seite vollständig laden                             ║
@@ -317,6 +317,31 @@ async function nextFetch(path) {
   return r.json()
 }
 
+// ─── Beste Liga im JSON finden ───────────────────────────────────────────────
+// Scannt ALLE Strings im JSON und nimmt die mit dem höchsten Qualitätskoeff.
+// So wird "Bundesliga" einer "Czech Cup" oder "Friendlies" vorgezogen.
+
+function findBestLeague(obj) {
+  const candidates = new Set()
+  const search = (o, d=0) => {
+    if (!o || d > 14) return
+    if (typeof o === 'string' && o.length > 3 && o.length < 60 && !/^\d/.test(o.trim())) {
+      candidates.add(o.trim())
+    } else if (Array.isArray(o)) {
+      for (const i of o) search(i, d+1)
+    } else if (typeof o === 'object') {
+      for (const v of Object.values(o)) search(v, d+1)
+    }
+  }
+  search(obj)
+  let best = null, bestQ = -1
+  for (const s of candidates) {
+    const q = leagueQuality(s)
+    if (q > bestQ) { bestQ = q; best = s }
+  }
+  return { league: best, quality: bestQ }
+}
+
 // ─── Stats-Extraktion — alle relevanten Felder ───────────────────────────────
 
 function extractStats(obj) {
@@ -325,7 +350,7 @@ function extractStats(obj) {
     defensiveContribPer90:null, tacklesPer90:null,
     interceptionsPer90:null, clearancesPer90:null,
     aerialDuelsWonPct:null, goalsConcededPer90:null,
-    cleanSheetsPer90:null, minutes:null, league:null,
+    cleanSheetsTotal:null, minutes:null, league:null,
   }
 
   const scan = (o, depth=0) => {
@@ -371,8 +396,8 @@ function extractStats(obj) {
               s.clearancesPer90 = r3(val)
             if ((key==='goals conceded while on pitch'||key==='goals_conceded'||key==='goals conceded') && s.goalsConcededPer90===null)
               s.goalsConcededPer90 = r3(val)
-            if ((key==='clean sheets'||key==='clean_sheets') && s.cleanSheetsPer90===null)
-              s.cleanSheetsPer90 = r3(val)
+            if ((key==='clean sheets'||key==='clean_sheets') && s.cleanSheetsTotal===null)
+              s.cleanSheetsTotal = Math.round(!isNaN(total) ? total : val)
           }
           // ─ Prozentwerte ──────────────────────────────────────────────────
           if (val >= 0 && val <= 100) {
@@ -410,6 +435,13 @@ function extractStats(obj) {
   }
 
   scan(obj)
+
+  // Beste Liga aus dem gesamten JSON holen (schlägt Cups/Friendlies)
+  const bestLeague = findBestLeague(obj)
+  if (bestLeague.league && bestLeague.quality >= leagueQuality(s.league ?? '')) {
+    s.league = bestLeague.league
+  }
+
   return s
 }
 
@@ -470,7 +502,7 @@ function extractTeamsFromDOM() {
 async function main() {
   const t0 = Date.now()
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
-  console.log('%c  FotMob xG-Import v6  —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
+  console.log('%c  FotMob xG-Import v7  —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
   console.log('%c  xG·xA·xGA·Def·Tackles·Clearances·GK    ', 'color:#4ade80')
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
   console.log(DRY_RUN?'%c⚠  TESTLAUF':'%c✏  SCHREIBMODUS','color:orange;font-weight:bold')
@@ -542,8 +574,12 @@ async function main() {
       // ─ Defensiv (DEF + GK) ───────────────────────────────────────────────
       if(pos==='DEF'||pos==='GK'){
         if(raw.xgaPer90!==null)             update.xga_per90                   = r3(raw.xgaPer90*lq)
-        if(raw.goalsConcededPer90!==null)   update.goals_conceded_per90         = r3(raw.goalsConcededPer90)  // kein lq hier — echte Tore
-        if(raw.cleanSheetsPer90!==null)     update.clean_sheets_per90           = r3(raw.cleanSheetsPer90)
+        if(raw.goalsConcededPer90!==null)   update.goals_conceded_per90         = r3(raw.goalsConcededPer90)  // kein lq — echte Tore
+        // Clean sheets: Total aus FotMob → per90 umrechnen wenn Minuten bekannt
+        if(raw.cleanSheetsTotal!==null && raw.minutes > 0)
+          update.clean_sheets_per90 = r3(raw.cleanSheetsTotal / (raw.minutes / 90))
+        else if(raw.cleanSheetsTotal!==null)
+          update.clean_sheets_per90 = r3(raw.cleanSheetsTotal / 38) // Saison-Durchschnitt als Fallback
         if(raw.defensiveContribPer90!==null)update.defensive_contributions_per90= r3(raw.defensiveContribPer90)
         if(raw.tacklesPer90!==null)         update.tackles_per90                = r3(raw.tacklesPer90)
         if(raw.interceptionsPer90!==null)   update.interceptions_per90          = r3(raw.interceptionsPer90)
@@ -572,7 +608,7 @@ async function main() {
         update.clearances_per90!==undefined?`Cl=${update.clearances_per90}`:'',
         update.aerial_duels_won_pct!==undefined?`AD=${update.aerial_duels_won_pct}%`:'',
         update.goals_conceded_per90!==undefined?`GC=${update.goals_conceded_per90}`:'',
-        update.clean_sheets_per90!==undefined?`CS=${update.clean_sheets_per90}`:'',
+        update.clean_sheets_per90!==undefined?`CS/90=${update.clean_sheets_per90}(total:${raw.cleanSheetsTotal})`:'',
         update.minutes_played!==undefined?`${update.minutes_played}min`:'',
       ].filter(Boolean).join('  ')
 
