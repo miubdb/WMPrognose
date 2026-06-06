@@ -117,7 +117,7 @@ function extractXg(obj, depth=0) {
     for (const item of obj) {
       if (!item || typeof item !== 'object') continue
       const key = String(item.key??item.title??item.name??item.statKey??'').toLowerCase()
-      const per90 = parseFloat(item.per90Value??item.per90??)
+      const per90 = parseFloat(item.per90Value??item.per90??'')
       const val   = !isNaN(per90) ? per90 : parseFloat(item.value??item.stat?.value??'')
       if (!isNaN(val) && val>=0 && val<10) {
         if ((key==='expected_goals'||key==='xg') && !key.includes('against') && xgPer90===null) xgPer90=Math.round(val*1000)/1000
