@@ -27,6 +27,8 @@ export const MODEL_WEIGHTS = {
     under4: -0.041,      // ln(0.96)
     under5: -0.020,      // ln(0.98)
   },
+  defenseScore: 0.12,    // pro 100 Punkte compositem Defensiv-Score (xGA+Tackles+Clearances, 0-100)
+  xaAttack: 1.2,         // pro Einheit avgXaPer90Attack-Differenz (Assist-Kreativität, sekundär)
   avgRating: 0.004,      // STARK reduziert, da aus Marktwert abgeleitet (Doppelzählung!)
                           // nur noch subtiler Differenzierungseffekt, max ±0.10
   avgAge: {

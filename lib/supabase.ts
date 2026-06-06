@@ -16,6 +16,11 @@ export interface DBPlayer {
   market_value_m: number
   rating: number
   xg_per90: number | null
+  xa_per90: number | null
   xga_per90: number | null
+  tackles_per90: number | null
+  clearances_per90: number | null
+  goals_conceded_per90: number | null
+  clean_sheets_per90: number | null
   is_in_starting_xi: boolean
 }

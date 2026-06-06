@@ -114,8 +114,8 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   // Fetch all data in parallel
   const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xga_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
     supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
@@ -123,9 +123,26 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   type PlayerRow = {
     market_value_m: number | null; position: string | null
-    xg_per90: number | null; xga_per90: number | null
+    xg_per90: number | null; xa_per90: number | null; xga_per90: number | null
+    tackles_per90: number | null; clearances_per90: number | null; goals_conceded_per90: number | null
     is_in_starting_xi: boolean | null
     age: number | null; rating: number | null
+  }
+
+  function norm100(v: number, min: number, max: number, invert = false): number {
+    const ratio = Math.max(0, Math.min(1, (v - min) / (max - min)))
+    return (invert ? 1 - ratio : ratio) * 100
+  }
+
+  function playerDefScore(pos: string, xga: number | null, tackles: number | null, clearances: number | null, gc: number | null): number | null {
+    let score = 0, w = 0
+    if ((xga ?? 0) > 0) { score += norm100(xga!, 0.5, 2.5, true) * 0.5; w += 0.5 }
+    if (pos === 'DEF') {
+      if ((tackles ?? 0) > 0)    { score += norm100(tackles!, 0.5, 4.0) * 0.3; w += 0.3 }
+      if ((clearances ?? 0) > 0) { score += norm100(clearances!, 1.0, 9.0) * 0.2; w += 0.2 }
+    }
+    if (pos === 'GK' && (gc ?? 0) > 0) { score += norm100(gc!, 0.3, 2.0, true) * 0.5; w += 0.5 }
+    return w >= 0.4 ? score / w : null
   }
 
   // Determine elo source for data quality scoring
@@ -145,19 +162,28 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       usingStartingXI,
     }
 
-    // xG attack: market-value-weighted average so a star striker counts more
-    const attackP = effectivePlayers.filter(p => (p.position === 'FWD' || p.position === 'MID') && (p.xg_per90 ?? 0) > 0)
-    if (attackP.length > 0) {
-      const totalMv = attackP.reduce((s, p) => s + Math.max(p.market_value_m ?? 1, 1), 0)
-      summary.avgXgPer90Attack = attackP.reduce((s, p) => s + (p.xg_per90 ?? 0) * Math.max(p.market_value_m ?? 1, 1), 0) / totalMv
+    type WSum = { vw: number; w: number }
+    const atk: { xg: WSum; xa: WSum } = { xg: { vw: 0, w: 0 }, xa: { vw: 0, w: 0 } }
+    const def: WSum = { vw: 0, w: 0 }
+    const defSc: WSum = { vw: 0, w: 0 }
+
+    for (const p of effectivePlayers) {
+      const mv = Math.max(0.1, p.market_value_m ?? 0.1)
+      if (p.position === 'FWD' || p.position === 'MID') {
+        if ((p.xg_per90 ?? 0) > 0) { atk.xg.vw += p.xg_per90! * mv; atk.xg.w += mv }
+        if ((p.xa_per90 ?? 0) > 0) { atk.xa.vw += p.xa_per90! * mv; atk.xa.w += mv }
+      }
+      if (p.position === 'DEF' || p.position === 'GK') {
+        if ((p.xga_per90 ?? 0) > 0) { def.vw += p.xga_per90! * mv; def.w += mv }
+        const ds = playerDefScore(p.position, p.xga_per90, p.tackles_per90, p.clearances_per90, p.goals_conceded_per90)
+        if (ds !== null) { defSc.vw += ds * mv; defSc.w += mv }
+      }
     }
 
-    // xGA defense: market-value-weighted
-    const defP = effectivePlayers.filter(p => (p.position === 'DEF' || p.position === 'GK') && (p.xga_per90 ?? 0) > 0)
-    if (defP.length > 0) {
-      const totalMv = defP.reduce((s, p) => s + Math.max(p.market_value_m ?? 1, 1), 0)
-      summary.avgXgaPer90Defense = defP.reduce((s, p) => s + (p.xga_per90 ?? 0) * Math.max(p.market_value_m ?? 1, 1), 0) / totalMv
-    }
+    if (atk.xg.w > 0) summary.avgXgPer90Attack   = atk.xg.vw / atk.xg.w
+    if (atk.xa.w > 0) summary.avgXaPer90Attack   = atk.xa.vw / atk.xa.w
+    if (def.w     > 0) summary.avgXgaPer90Defense = def.vw     / def.w
+    if (defSc.w   > 0) summary.avgDefenseScore    = defSc.vw   / defSc.w
 
     // Average player rating (1–100) of effective players
     const ratedP = effectivePlayers.filter(p => (p.rating ?? 0) > 0)

@@ -521,11 +521,13 @@ export interface MatchFactor {
 export interface SquadSummary {
   count: number
   totalMarketValueM: number
-  avgXgPer90Attack?: number     // market-value-weighted xG/90 of FWD+MID starters
-  avgXgaPer90Defense?: number   // market-value-weighted xGA/90 of DEF+GK starters
+  avgXgPer90Attack?: number     // market-value-weighted xG/90 of FWD+MID
+  avgXaPer90Attack?: number     // market-value-weighted xA/90 of FWD+MID (Kreativität)
+  avgXgaPer90Defense?: number   // market-value-weighted xGA/90 of DEF+GK
+  avgDefenseScore?: number      // composite 0-100: xGA + Tackles + Clearances + GC
   avgRating?: number            // average player rating (1–100) of effective players
   avgAge?: number               // average age of effective players
-  dataQuality?: DataQualityScore // Datenqualitäts-Score (optional, Phase 1)
+  dataQuality?: DataQualityScore
 }
 
 export interface TeamPressure {
@@ -661,7 +663,7 @@ export function analyzeMatch(
     factors.push({
       category: 'squad',
       label: 'Saisonform xG/90',
-      source: 'FBref.com – Klubsaison 2024/25',
+      source: 'FotMob – Saison 2025/26 (ligabereinigt)',
       valueA: hasFormA ? `${xgAttackA.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
       valueB: hasFormB ? `${xgAttackB.toFixed(2)} xG/90 Angriff` : 'Keine Daten',
       logEffectA: formLogEffectA,
@@ -670,7 +672,51 @@ export function analyzeMatch(
       effectB: logEffectToLinear(-formLogEffectA),
       confidence: (hasFormA && hasFormB) ? 0.75 : 0.0,
       isCalibrated: false,
-      explanation: 'Durchschnittliche xG/90 der Angreifer und Mittelfeldspieler aus der Klubsaison 2024/25. Höherer Wert = statistisch mehr Torchancen. Quelle: FBref.com.',
+      explanation: 'Ligabereinigte Expected Goals pro 90 min der Angreifer+Mittelfeldspieler (FotMob 2025/26). xGA der Verteidiger als Defensiv-Proxy (niedriger = besser).',
+    })
+  }
+
+  // 2b-ii. xA/90 Kreativität (Torvorlage-Erwartung, sekundäres Angriffssignal)
+  const xaA = squadData?.[match.teamAId]?.avgXaPer90Attack ?? 0
+  const xaB = squadData?.[match.teamBId]?.avgXaPer90Attack ?? 0
+  if (xaA > 0 || xaB > 0) {
+    const xaLogEffectA = clampLogEffect((xaA - xaB) * MODEL_WEIGHTS.xaAttack, 0.08)
+    factors.push({
+      category: 'squad',
+      label: 'Kreativität xA/90',
+      source: 'FotMob – Saison 2025/26 (ligabereinigt)',
+      valueA: xaA > 0 ? `${xaA.toFixed(2)} xA/90` : 'Keine Daten',
+      valueB: xaB > 0 ? `${xaB.toFixed(2)} xA/90` : 'Keine Daten',
+      logEffectA: xaLogEffectA,
+      logEffectB: -xaLogEffectA,
+      effectA: logEffectToLinear(xaLogEffectA),
+      effectB: logEffectToLinear(-xaLogEffectA),
+      confidence: (xaA > 0 && xaB > 0) ? 0.65 : 0.0,
+      isCalibrated: false,
+      explanation: 'Expected Assists pro 90 min (FotMob xA). Misst Kreativität und Chance-Kreierung — ergänzt xG um die Qualität der Vorlagen.',
+    })
+  }
+
+  // 2b-iii. Defensiv-Score (xGA + Tackles + Clearances + GK Goals Conceded, 0–100)
+  const defScoreA = squadData?.[match.teamAId]?.avgDefenseScore ?? null
+  const defScoreB = squadData?.[match.teamBId]?.avgDefenseScore ?? null
+  if (defScoreA !== null || defScoreB !== null) {
+    const dA = defScoreA ?? 50
+    const dB = defScoreB ?? 50
+    const defScoreLogEffectA = clampLogEffect(MODEL_WEIGHTS.defenseScore * (dA - dB) / 100, 0.10)
+    factors.push({
+      category: 'squad',
+      label: 'Defensiv-Score (Spielerdaten)',
+      source: 'FotMob – Tackles, Clearances, xGA, GK Goals Conceded 2025/26',
+      valueA: defScoreA !== null ? `${dA.toFixed(0)}/100` : 'Keine Daten',
+      valueB: defScoreB !== null ? `${dB.toFixed(0)}/100` : 'Keine Daten',
+      logEffectA: defScoreLogEffectA,
+      logEffectB: -defScoreLogEffectA,
+      effectA: logEffectToLinear(defScoreLogEffectA),
+      effectB: logEffectToLinear(-defScoreLogEffectA),
+      confidence: (defScoreA !== null && defScoreB !== null) ? 0.70 : 0.0,
+      isCalibrated: false,
+      explanation: 'Composite-Score 0–100 aus: xGA/90 der Verteidiger (50%), Tackles/90 (30%), Clearances/90 (20%) für DEF; GK: Goals Conceded/90 (60%) + xGA (40%). Market-Value gewichtet. Höher = bessere Defensive.',
     })
   }
 
