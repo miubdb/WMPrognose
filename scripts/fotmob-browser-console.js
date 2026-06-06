@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════╗
- * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v8     ║
+ * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v9     ║
  * ╠══════════════════════════════════════════════════════════╣
  * ║  1. Öffne: fotmob.com/de/leagues/77/overview/world-cup/teams ║
  * ║  2. Seite vollständig laden                             ║
@@ -208,15 +208,61 @@ const LEAGUE_QUALITY = {
   'Australian A-League':          0.68,
   'New Zealand National League':  0.55,
   // ── WM / Nationalteam ──────────────────────────────────────────────────────
+  // WICHTIG: Spezifischere Einträge müssen VOR 'World Cup' stehen,
+  // sonst matcht "World Cup Qualification" auf 'World Cup' → falscher Wert!
+  //
+  // Jugend-Turniere
+  'World Cup U17':                0.62,
+  'World Cup U20':                0.68,
+  'FIFA U17 World Cup':           0.62,
+  'FIFA U20 World Cup':           0.68,
+  'Under-17 World Cup':           0.62,
+  'Under-20 World Cup':           0.68,
+  // WM-Qualifikation (national, kompetitiv aber nicht WM-Niveau)
+  'World Cup Qualification':      0.87,
+  'World Cup Qualifying':         0.87,
+  'World Cup Qualifiers':         0.87,
+  'WC Qualification':             0.87,
+  'Concacaf World Cup':           0.85,  // CONCACAF WC Qualifying
+  'CONMEBOL World Cup':           0.86,
+  'AFC World Cup':                0.84,
+  'CAF World Cup':                0.82,
+  'UEFA World Cup':               0.88,
+  // Club World Cup (FIFA Klub-Weltmeisterschaft — beste Vereinsklubs weltweit)
+  'FIFA Club World Cup':          0.90,
+  'FIFA Klub-Weltmeiste':         0.90,
+  'Club World Cup':               0.90,
+  'Klub-Weltmeiste':              0.90,
+  // Kontinental-Pokal Clubs
+  'UEFA Champions League':        0.96,
+  'UEFA Europa League':           0.85,
+  'UEFA Conference League':       0.80,
+  'Copa Libertadores':            0.80,
+  'Copa Sudamericana':            0.74,
+  'AFC Champions League':         0.72,
+  'CAF Champions League':         0.70,
+  'CONCACAF Champions Cup':       0.72,
+  // Eigentliche WM (nach den Qualifiern, damit Qualifier zuerst matchen)
   'World Cup':                    1.05,  // WM-Stats leicht höher werten
   'Weltmeisterschaft':            1.05,
   'UEFA Nations League':          0.90,
   'EURO':                         0.95,
+  'European Championship':        0.95,
   'Copa América':                 0.90,
   'Africa Cup of Nations':        0.80,
   'AFCON':                        0.80,
   'Asian Cup':                    0.75,
   'Gold Cup':                     0.72,
+  'Nations League':               0.85,
+  // Sonstige Turniere / Freundschaftsspiele
+  'Super Cup':                    0.70,
+  'Supercup':                     0.70,
+  'King Cup':                     0.68,
+  "King's Cup":                   0.68,
+  'Tipsport':                     0.60,
+  'Friendly':                     0.55,
+  'Friendlies':                   0.55,
+  'Testspiel':                    0.55,
   // Fallback
   'default':                      0.72,
 }
@@ -538,7 +584,7 @@ function extractTeamsFromDOM() {
 async function main() {
   const t0 = Date.now()
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
-  console.log('%c  FotMob xG-Import v8  —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
+  console.log('%c  FotMob xG-Import v9  —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
   console.log('%c  xG·xA·xGA·Def·Tackles·Clearances·GK    ', 'color:#4ade80')
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
   console.log(DRY_RUN?'%c⚠  TESTLAUF':'%c✏  SCHREIBMODUS','color:orange;font-weight:bold')
@@ -597,9 +643,8 @@ async function main() {
       const pos=match.player.position  // 'GK','DEF','MID','FWD'
       const update={}
 
-      // Minuten: nur Saisontotal (>= 250 min) schreiben; null = explizit löschen wenn vorher Mist drin
+      // Minuten: nur schreiben wenn Saisontotal gefunden (>= 250); nie null schreiben
       if(raw.minutes !== null)    update.minutes_played = raw.minutes
-      else                        update.minutes_played = null  // explizit löschen (verhindert Altdaten)
       if(raw.league !== null)     update.league_name = raw.league
 
       // Hilfsfunktion: Goals conceded per90 — direkt oder aus Total berechnen
@@ -657,7 +702,7 @@ async function main() {
         update.aerial_duels_won_pct!==undefined?`AD=${update.aerial_duels_won_pct}%`:'',
         update.goals_conceded_per90!==undefined?`GC=${update.goals_conceded_per90}`:'',
         update.clean_sheets_per90!==undefined?`CS/90=${update.clean_sheets_per90}(total:${raw.cleanSheetsTotal})`:'',
-        update.minutes_played!=null?`${update.minutes_played}min`:(update.minutes_played===null?'min=∅':''),
+        update.minutes_played!=null?`${update.minutes_played}min`:'',
       ].filter(Boolean).join('  ')
 
       console.log(`  ✎ [${conf}] ${fp.name} → ${match.player.name} [${pos}]${lqStr}\n      ${statStr}`)
