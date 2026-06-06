@@ -148,8 +148,8 @@ export async function GET() {
 
   // ── 4. Model config sanity ───────────────────────────────────────────────────
   checks.push({
-    name: `Modellversion: ${MODEL_META.version}`,
-    ok: MODEL_META.version === 'v3.2-final-candidate',
+    name: 'Modellversion: v3.3-final',
+    ok: MODEL_META.version === 'v3.3-final',
     detail: `version = "${MODEL_META.version}"`,
     critical: false,
   })
@@ -167,6 +167,47 @@ export async function GET() {
     detail: `marketValueLog = ${MODEL_WEIGHTS.marketValueLog}`,
     critical: false,
   })
+
+  checks.push({
+    name: 'avgRating-Faktor deaktiviert (Doppelzählung)',
+    ok: MODEL_WEIGHTS.avgRating === 0,
+    detail: `avgRating = ${MODEL_WEIGHTS.avgRating} (soll 0 sein)`,
+    critical: false,
+  })
+
+  // ── 5. Spielerdaten-Qualität ─────────────────────────────────────────────────
+  if (!playerError && playerRows) {
+    const allPlayers = playerRows ?? []
+    const playersByTeam: Record<string, typeof allPlayers> = {}
+    for (const p of allPlayers) {
+      if (!playersByTeam[p.team_id]) playersByTeam[p.team_id] = []
+      playersByTeam[p.team_id].push(p)
+    }
+
+    // xG coverage: how many teams have FotMob xG data
+    const { data: xgRows } = await supabase
+      .from('players')
+      .select('team_id, xg_per90, xa_per90, xga_per90')
+      .in('position', ['FWD', 'MID', 'DEF', 'GK'])
+      .not('xg_per90', 'is', null)
+
+    const teamsWithXg = new Set((xgRows ?? []).map(r => r.team_id))
+    checks.push({
+      name: 'FotMob xG-Daten: Teams mit Spielerdaten',
+      ok: teamsWithXg.size >= 40,
+      detail: `${teamsWithXg.size}/48 Teams haben FotMob-xG-Daten`,
+      critical: false,
+    })
+
+    // Teams with exactly 26 players
+    const teamsWith26 = ACTIVE_WM_TEAM_IDS.filter(id => (playersByTeam[id]?.length ?? 0) === 26)
+    checks.push({
+      name: 'Kader: Teams mit exakt 26 Spielern',
+      ok: teamsWith26.length >= 44,
+      detail: `${teamsWith26.length}/48 Teams mit genau 26 Spielern`,
+      critical: false,
+    })
+  }
 
   // ── Summary ──────────────────────────────────────────────────────────────────
   const criticalChecks = checks.filter(c => c.critical)

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
-import { analyzeAllMatches, type MatchAnalysis, type SquadSummary, type MatchFactor } from '@/lib/modelAdapter'
+import { analyzeAllMatches, type MatchAnalysis, type SquadSummary } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
@@ -41,22 +41,6 @@ function fmtDateHeader(dateStr: string): string {
   return `${weekday}, ${dd}.${mm}.`
 }
 
-function TopFactorLine({ factors }: { factors: MatchFactor[] }) {
-  const top = factors
-    .filter(f => Math.abs(f.logEffectA - f.logEffectB) > 0.012)
-    .sort((a, b) => Math.abs(b.logEffectA - b.logEffectB) - Math.abs(a.logEffectA - a.logEffectB))
-    .slice(0, 2)
-  if (top.length === 0) return <div className="text-[10px] text-gray-700 mt-1 text-center">Ausgeglichen</div>
-  return (
-    <div className="text-[10px] text-gray-600 mt-1 text-center truncate">
-      {top.map(f => {
-        const diff = f.logEffectA - f.logEffectB
-        const pct  = Math.round(Math.abs(Math.exp(diff) - 1) * 100)
-        return `${f.label.split(' ')[0]} ${diff > 0 ? '+' : '−'}${pct}%`
-      }).join(' · ')}
-    </div>
-  )
-}
 
 function ProbBar({ probA, probDraw, probB, nameA, nameB }: {
   probA: number; probDraw: number; probB: number; nameA: string; nameB: string
@@ -243,34 +227,24 @@ function MatchCard({
             nameA={analysis.teamA.name}
             nameB={analysis.teamB.name}
           />
-          <TopFactorLine factors={analysis.factors} />
 
-          {/* Top scorelines */}
-          <div className="flex gap-1.5 mt-2">
-            {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, 4).map(({ i, j, p }) => {
-              const winner = i > j ? 'A' : j > i ? 'B' : 'X'
-              const color = winner === 'A'
-                ? 'border-emerald-800/50 bg-emerald-900/15 text-emerald-300'
-                : winner === 'B'
-                ? 'border-blue-800/50 bg-blue-900/15 text-blue-300'
-                : 'border-gray-700/60 bg-gray-800/30 text-gray-400'
-              return (
-                <div key={`${i}-${j}`} className={`flex-1 rounded-lg border ${color} py-1 text-center`}>
-                  <div className="text-xs font-bold font-mono">{i}:{j}</div>
-                  <div className="text-[10px] text-gray-500">{Math.round(p * 100)}%</div>
+          {/* Wahrscheinlichstes Ergebnis + Tipp */}
+          {(() => {
+            const best = topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, 1)[0]
+            const winner = best.i > best.j ? 'A' : best.j > best.i ? 'B' : 'X'
+            const scoreColor = winner === 'A' ? 'text-emerald-400' : winner === 'B' ? 'text-blue-400' : 'text-gray-400'
+            return (
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-xs text-gray-500">
+                  Tipp: <span className="text-white font-medium">{tipLabel}</span>
+                  <span className="text-gray-700 mx-1.5">·</span>
+                  <span className={`font-mono font-bold ${scoreColor}`}>{best.i}:{best.j}</span>
+                  <span className="text-gray-700 ml-0.5">({Math.round(best.p * 100)}%)</span>
                 </div>
-              )
-            })}
-          </div>
-
-          <div className="flex items-center justify-between mt-2">
-            <div className="text-xs text-gray-500">
-              Tipp: <span className="text-white font-medium">{tipLabel}</span>
-            </div>
-            <span className={`text-xs font-medium ${confLabel.color}`}>
-              {confLabel.label}
-            </span>
-          </div>
+                <span className={`text-xs font-medium ${confLabel.color}`}>{confLabel.label}</span>
+              </div>
+            )
+          })()}
         </Link>
       )}
 

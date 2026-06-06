@@ -29,8 +29,7 @@ export const MODEL_WEIGHTS = {
   },
   defenseScore: 0.12,    // pro 100 Punkte compositem Defensiv-Score (xGA+Tackles+Clearances, 0-100)
   xaAttack: 1.2,         // pro Einheit avgXaPer90Attack-Differenz (Assist-Kreativität, sekundär)
-  avgRating: 0.004,      // STARK reduziert, da aus Marktwert abgeleitet (Doppelzählung!)
-                          // nur noch subtiler Differenzierungseffekt, max ±0.10
+  avgRating: 0,           // DEAKTIVIERT v3.3: aus Marktwert abgeleitet = Doppelzählung mit marketValueLog
   avgAge: {
     youngPenaltyPerYear: 0.012, // pro Jahr unter 24
     oldPenaltyPerYear: 0.008,   // pro Jahr über 29
@@ -84,7 +83,7 @@ export const COACH_CONFIG = {
 } as const
 
 export const MODEL_META = {
-  version: 'v3.2-final-candidate',
+  version: 'v3.3-final',
   baseGoalRate: 1.50,
   dixonColesRho: 0,         // Nicht signifikant in Walk-Forward OOS (Δ<0.0005 RPS) — entfernt
   maxGoals: 10,             // Score-Matrix 0..10
@@ -92,4 +91,7 @@ export const MODEL_META = {
   logLambdaMax: Math.log(4.0),
   calibrated: true,
   calibrationDataset: 'WM2014+2018+2022+EURO2024 Walk-Forward OOS — konservative MV-Gewichtswahl (0.25)',
+  // v3.3 Änderungen: avgRating-Faktor deaktiviert (Doppelzählung); attackDefense-Faktor
+  // nur noch Fallback wenn keine FotMob-Spielerdaten vorhanden; xG-Cap 0.10, xA 0.06, defScore 0.06;
+  // zentrale squadComputation.ts für API, SSR und Simulation identisch.
 } as const

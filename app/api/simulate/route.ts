@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { runSimulation, MatchPrecomputed } from '@/lib/simulation'
-import { analyzeMatch } from '@/lib/modelAdapter'
+import { analyzeMatch, type SquadSummary } from '@/lib/modelAdapter'
+import { computeSquadSummary } from '@/lib/model/squadComputation'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { ALL_TEAMS, TEAM_BY_ID } from '@/src/data/allTeams'
 import type { CoreTeamData } from '@/lib/model/corePredict'
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
     const n = Math.min(Math.max(body.n ?? 10000, 100), 50000)
 
     const eloRatings: Record<string, number> = {}
+    const squadDataForSim: Record<string, SquadSummary> = {}
     let playerRows: { id: string; name: string; team_id: string; position: string; xg_per90: number | null }[] = []
 
     try {
@@ -32,9 +34,12 @@ export async function POST(request: NextRequest) {
       if (supabaseUrl && supabaseKey) {
         const supabase = createClient(supabaseUrl, supabaseKey)
 
-        const [eloRes, playerRes] = await Promise.all([
+        const [eloRes, playerRes, squadRes] = await Promise.all([
           supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y'),
           supabase.from('players').select('id, name, team_id, position, xg_per90').in('position', ['FWD', 'MID']),
+          supabase.from('players')
+            .select('team_id, market_value_m, position, age, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90')
+            .limit(2000),
         ])
 
         for (const row of eloRes.data ?? []) {
@@ -43,17 +48,29 @@ export async function POST(request: NextRequest) {
         }
 
         playerRows = (playerRes.data ?? []) as typeof playerRows
+
+        // Squad summaries for group stage predictions (same logic as match-context API)
+        const byTeam: Record<string, Parameters<typeof computeSquadSummary>[0]> = {}
+        for (const row of squadRes.data ?? []) {
+          if (!byTeam[row.team_id]) byTeam[row.team_id] = []
+          byTeam[row.team_id].push(row)
+        }
+        for (const [tid, players] of Object.entries(byTeam)) {
+          squadDataForSim[tid] = computeSquadSummary(players)
+        }
       }
     } catch {
       // Fallback: allTeams-Ratings werden in runSimulation automatisch verwendet
     }
 
     // TeamData-Map für corePredictFull in KO-Runden
+    // Nutzt DB-Marktwert wenn verfügbar (konsistenter mit Gruppenphase)
     const teamDataMap: Record<string, CoreTeamData> = {}
     for (const team of ALL_TEAMS) {
+      const dbMV = squadDataForSim[team.id]?.totalMarketValueM
       teamDataMap[team.id] = {
         eloRating:          eloRatings[team.id] ?? team.eloRating,
-        squadMarketValueM:  team.squadMarketValueM,
+        squadMarketValueM:  dbMV && dbMV > 0 ? dbMV : team.squadMarketValueM,
         worldCupTitles:     team.worldCupTitles,
         worldCupAppearances: team.worldCupAppearances,
         attackRating:       team.attackRating,
@@ -63,11 +80,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Gruppenspiele vorberechnen (gleicher Algorithmus wie UI)
+    // Gruppenspiele vorberechnen — gleiche zentrale Logik wie Spielübersicht (analyzeMatch + squadData)
     const precomputed: MatchPrecomputed[] = GROUP_SCHEDULE
       .filter(m => m.group)
       .map(match => {
-        const analysis = analyzeMatch(match, undefined, undefined, eloRatings)
+        const analysis = analyzeMatch(match, squadDataForSim, undefined, eloRatings)
         return {
           matchId: match.id,
           teamAId: match.teamAId,

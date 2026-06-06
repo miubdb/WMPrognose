@@ -658,7 +658,7 @@ export function analyzeMatch(
     // Net effect in log-space: own attack quality vs opponent defense quality
     const attackLogDiff = hasFormA && hasFormB ? (xgAttackA - xgAttackB) * MODEL_WEIGHTS.xgAttack : 0
     const defLogDiff = hasFormA && hasFormB ? (defB - defA) * MODEL_WEIGHTS.xgDefense : 0  // lower xGA = better defense
-    const formLogEffectA = clampLogEffect(attackLogDiff + defLogDiff)
+    const formLogEffectA = clampLogEffect(attackLogDiff + defLogDiff, 0.10)
 
     factors.push({
       category: 'squad',
@@ -680,7 +680,7 @@ export function analyzeMatch(
   const xaA = squadData?.[match.teamAId]?.avgXaPer90Attack ?? 0
   const xaB = squadData?.[match.teamBId]?.avgXaPer90Attack ?? 0
   if (xaA > 0 || xaB > 0) {
-    const xaLogEffectA = clampLogEffect((xaA - xaB) * MODEL_WEIGHTS.xaAttack, 0.08)
+    const xaLogEffectA = clampLogEffect((xaA - xaB) * MODEL_WEIGHTS.xaAttack, 0.06)
     factors.push({
       category: 'squad',
       label: 'Kreativität xA/90',
@@ -703,7 +703,7 @@ export function analyzeMatch(
   if (defScoreA !== null || defScoreB !== null) {
     const dA = defScoreA ?? 50
     const dB = defScoreB ?? 50
-    const defScoreLogEffectA = clampLogEffect(MODEL_WEIGHTS.defenseScore * (dA - dB) / 100, 0.10)
+    const defScoreLogEffectA = clampLogEffect(MODEL_WEIGHTS.defenseScore * (dA - dB) / 100, 0.06)
     factors.push({
       category: 'squad',
       label: 'Defensiv-Score (Spielerdaten)',
@@ -717,29 +717,6 @@ export function analyzeMatch(
       confidence: (defScoreA !== null && defScoreB !== null) ? 0.70 : 0.0,
       isCalibrated: false,
       explanation: 'Composite-Score 0–100 aus: xGA/90 der Verteidiger (50%), Tackles/90 (30%), Clearances/90 (20%) für DEF; GK: Goals Conceded/90 (60%) + xGA (40%). Market-Value gewichtet. Höher = bessere Defensive.',
-    })
-  }
-
-  // 2c. Ø Spieler-Rating der Startelf
-  // Gewicht stark reduziert (0.004) da Rating aus Marktwert abgeleitet → Doppelzählung vermeiden
-  const avgRatingA = squadData?.[match.teamAId]?.avgRating
-  const avgRatingB = squadData?.[match.teamBId]?.avgRating
-  if (avgRatingA && avgRatingB) {
-    const ratingDiff = avgRatingA - avgRatingB
-    const ratingLogEffectA = clampLogEffect(MODEL_WEIGHTS.avgRating * ratingDiff, 0.10)
-    factors.push({
-      category: 'squad',
-      label: 'Ø Spieler-Rating Startelf',
-      source: 'Transfermarkt – Marktwert → Rating (1–100)',
-      valueA: `Ø ${avgRatingA.toFixed(1)}`,
-      valueB: `Ø ${avgRatingB.toFixed(1)}`,
-      logEffectA: ratingLogEffectA,
-      logEffectB: -ratingLogEffectA,
-      effectA: logEffectToLinear(ratingLogEffectA),
-      effectB: logEffectToLinear(-ratingLogEffectA),
-      confidence: 0.50,
-      isCalibrated: false,
-      explanation: 'Durchschnittliches individuelles Spieler-Rating der Startelf (aus Marktwert abgeleitet, Skala 1–100). Rating aus Marktwert — nur marginaler Differenzierungseffekt (reduziertes Gewicht wegen Doppelzählung mit Marktwert-Faktor).',
     })
   }
 
@@ -891,25 +868,28 @@ export function analyzeMatch(
   })
 
   // 9. Kader-Qualität: Attack vs Defense (Maher 1982)
-  // Each team's xG independently: teamX.attack vs teamY.defense — not mirrored
-  const attackDiffA = (teamA.attackRating - teamB.defenseRating) / 100
-  const attackDiffB = (teamB.attackRating - teamA.defenseRating) / 100
-  const attackLogEffectA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffA)
-  const attackLogEffectB = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffB)
-  factors.push({
-    category: 'squad',
-    label: 'Angriff vs. Abwehr (Ratings)',
-    source: 'Maher (1982) – Attack/Defense Strength',
-    valueA: `Angriff ${teamA.attackRating} vs. Abwehr ${teamB.defenseRating}`,
-    valueB: `Angriff ${teamB.attackRating} vs. Abwehr ${teamA.defenseRating}`,
-    logEffectA: attackLogEffectA,
-    logEffectB: attackLogEffectB,
-    effectA: logEffectToLinear(attackLogEffectA),
-    effectB: logEffectToLinear(attackLogEffectB),
-    confidence: 0.50,
-    isCalibrated: false,
-    explanation: 'Maher-Modell: Expected Goals aus Angriffsstärke gegen Defensivstärke des Gegners — für jedes Team unabhängig berechnet.',
-  })
+  // Nur aktiv wenn KEIN FotMob-Datensatz vorhanden — verhindert Doppelzählung mit xG-Faktor.
+  // Wenn beide Teams FotMob-xG-Daten haben, wird dieser Faktor durch xG/90 + Defensiv-Score abgedeckt.
+  if (!hasFormA && !hasFormB) {
+    const attackDiffA = (teamA.attackRating - teamB.defenseRating) / 100
+    const attackDiffB = (teamB.attackRating - teamA.defenseRating) / 100
+    const attackLogEffectA = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffA)
+    const attackLogEffectB = clampLogEffect(MODEL_WEIGHTS.attackDefense * attackDiffB)
+    factors.push({
+      category: 'squad',
+      label: 'Angriff vs. Abwehr (Ratings)',
+      source: 'Maher (1982) – Fallback wenn keine FotMob-Daten',
+      valueA: `Angriff ${teamA.attackRating} vs. Abwehr ${teamB.defenseRating}`,
+      valueB: `Angriff ${teamB.attackRating} vs. Abwehr ${teamA.defenseRating}`,
+      logEffectA: attackLogEffectA,
+      logEffectB: attackLogEffectB,
+      effectA: logEffectToLinear(attackLogEffectA),
+      effectB: logEffectToLinear(attackLogEffectB),
+      confidence: 0.45,
+      isCalibrated: false,
+      explanation: 'Maher-Modell: Angriffsstärke gegen Defensivstärke — nur wenn keine FotMob-Spielerdaten vorhanden (vermeidet Doppelzählung mit xG/90).',
+    })
+  }
 
   // 9b. Standards / Set-Pieces (~28% aller WM-Tore)
   {
