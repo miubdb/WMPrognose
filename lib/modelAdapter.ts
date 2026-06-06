@@ -972,27 +972,25 @@ export function analyzeMatch(
     })
   }
 
-  // Turnier-Erbe: absoluter Qualitätsbonus pro Team (unabhängig vom Gegner)
-  // computeTournamentHeritage: Titel×3 + Teilnahmen×0.3 → max 0.030 log-Effekt
-  // Ergänzt den relativen Erfahrungs-Differenz-Faktor um eine absolute Komponente
+  // Turnier-Erbe: nicht in OOS-Kalibrierung bestätigt → heritageScale=0 in Modellconfig
+  // Faktor wird für UI-Transparenz angezeigt, hat aber logEffect=0 (fließt nicht in xG ein)
   {
     const heritageLogA = computeTournamentHeritage(teamA.worldCupTitles, teamA.worldCupAppearances)
     const heritageLogB = computeTournamentHeritage(teamB.worldCupTitles, teamB.worldCupAppearances)
-    // Only add factor if at least one team has non-trivial heritage (>0.003)
     if (heritageLogA > 0.003 || heritageLogB > 0.003) {
       factors.push({
         category: 'experience',
-        label: 'Turnier-Erbe (absolute Qualität)',
+        label: 'Turnier-Erbe (nicht kalibriert)',
         source: 'Forrest et al. (2005) – Heritage Premium',
         valueA: `${teamA.worldCupTitles}× Weltmeister, ${teamA.worldCupAppearances}× dabei`,
         valueB: `${teamB.worldCupTitles}× Weltmeister, ${teamB.worldCupAppearances}× dabei`,
-        logEffectA: heritageLogA,
-        logEffectB: heritageLogB,
-        effectA: logEffectToLinear(heritageLogA),
-        effectB: logEffectToLinear(heritageLogB),
-        confidence: 0.55,
+        logEffectA: 0,  // heritageScale=0 — nicht in OOS bestätigt, kein Einfluss
+        logEffectB: 0,
+        effectA: 0,
+        effectB: 0,
+        confidence: 0.30,
         isCalibrated: false,
-        explanation: 'Absoluter xG-Bonus für Teams mit WM-Titeln und -Teilnahmen — unabhängig vom Gegner. Ergänzt den relativen Erfahrungs-Faktor um eine "DNA-unter-Druck"-Komponente (max +3%).',
+        explanation: `Turnier-Erfahrung (${teamA.worldCupTitles > 0 ? 'Brasilien/Deutschland etc.' : 'kein Titel'}) — in Walk-Forward OOS nicht signifikant. Kein Einfluss auf die Prognose (heritageScale=0).`,
       })
     }
   }
@@ -1005,7 +1003,10 @@ export function analyzeMatch(
 
   // NEU: Dixon-Coles Score-Matrix (ersetzt interne poissonWinProbs)
   const rawMatrix = computeScorelineMatrix(xgA, xgB)
-  const correctedMatrix = applyDixonColesCorrection(rawMatrix, xgA, xgB)
+  // rho=0 in kalibriertem Modell → DC-Korrektur hat keinen Effekt, skip für Konsistenz
+  const correctedMatrix = MODEL_META.dixonColesRho === 0
+    ? rawMatrix
+    : applyDixonColesCorrection(rawMatrix, xgA, xgB)
   const { winA: rawWinA, draw: rawDraw, winB: rawWinB } = aggregateOutcomeProbabilities(correctedMatrix)
 
   // Phase 2: Regression zur Mitte basierend auf kombinierter Datenqualität
