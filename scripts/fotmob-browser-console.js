@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════╗
- * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v9     ║
+ * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v10    ║
  * ╠══════════════════════════════════════════════════════════╣
  * ║  1. Öffne: fotmob.com/de/leagues/77/overview/world-cup/teams ║
  * ║  2. Seite vollständig laden                             ║
@@ -208,8 +208,7 @@ const LEAGUE_QUALITY = {
   'Australian A-League':          0.68,
   'New Zealand National League':  0.55,
   // ── WM / Nationalteam ──────────────────────────────────────────────────────
-  // WICHTIG: Spezifischere Einträge müssen VOR 'World Cup' stehen,
-  // sonst matcht "World Cup Qualification" auf 'World Cup' → falscher Wert!
+  // WICHTIG: Spezifischere Einträge müssen VOR 'World Cup' stehen!
   //
   // Jugend-Turniere
   'World Cup U17':                0.62,
@@ -218,16 +217,17 @@ const LEAGUE_QUALITY = {
   'FIFA U20 World Cup':           0.68,
   'Under-17 World Cup':           0.62,
   'Under-20 World Cup':           0.68,
-  // WM-Qualifikation (national, kompetitiv aber nicht WM-Niveau)
-  'World Cup Qualification':      0.87,
-  'World Cup Qualifying':         0.87,
-  'World Cup Qualifiers':         0.87,
-  'WC Qualification':             0.87,
-  'Concacaf World Cup':           0.85,  // CONCACAF WC Qualifying
-  'CONMEBOL World Cup':           0.86,
-  'AFC World Cup':                0.84,
-  'CAF World Cup':                0.82,
-  'UEFA World Cup':               0.88,
+  // WM-Qualifikation: gedeckelt auf 0.80 damit Bundesliga/PL/Eredivisie etc. immer gewinnen
+  // Spieler aus schwachen Ligen profitieren trotzdem (African/Asian leagues < 0.80)
+  'World Cup Qualification':      0.80,
+  'World Cup Qualifying':         0.80,
+  'World Cup Qualifiers':         0.80,
+  'WC Qualification':             0.80,
+  'Concacaf World Cup':           0.78,  // CONCACAF WC Qualifying (schwächere Gegner)
+  'CONMEBOL World Cup':           0.80,
+  'AFC World Cup':                0.78,
+  'CAF World Cup':                0.76,
+  'UEFA World Cup':               0.80,
   // Club World Cup (FIFA Klub-Weltmeisterschaft — beste Vereinsklubs weltweit)
   'FIFA Club World Cup':          0.90,
   'FIFA Klub-Weltmeiste':         0.90,
@@ -385,108 +385,102 @@ async function nextFetch(path) {
   return r.json()
 }
 
-// ─── Beste Liga im JSON finden ───────────────────────────────────────────────
-// Scannt ALLE Strings im JSON und nimmt die mit dem höchsten Qualitätskoeff.
-// So wird "Bundesliga" einer "Czech Cup" oder "Friendlies" vorgezogen.
-
-function findBestLeague(obj) {
-  const candidates = new Set()
-  const search = (o, d=0) => {
-    if (!o || d > 14) return
-    if (typeof o === 'string' && o.length > 3 && o.length < 60 && !/^\d/.test(o.trim())) {
-      candidates.add(o.trim())
-    } else if (Array.isArray(o)) {
-      for (const i of o) search(i, d+1)
-    } else if (typeof o === 'object') {
-      for (const v of Object.values(o)) search(v, d+1)
-    }
-  }
-  search(obj)
-  let best = null, bestQ = -1
-  for (const s of candidates) {
-    const q = leagueQuality(s)
-    if (q > bestQ) { bestQ = q; best = s }
-  }
-  return { league: best, quality: bestQ }
-}
-
-// ─── Stats-Extraktion — alle relevanten Felder ───────────────────────────────
+// ─── Stats-Extraktion — qualitätsgewichtetes Mitteln über alle Wettbewerbe ───
+//
+// Statt nur den ersten gefundenen Wert zu nehmen:
+// 1. Für jede Stat alle (wert, ligaQualität) Paare sammeln
+// 2. Qualitätsgewichteter Durchschnitt → Bundesliga zählt mehr als WC-Quali
+// 3. contextQuality wird durch die Rekursion weitergegeben (Elternobjekt → Kinder)
 
 function extractStats(obj) {
-  const s = {
-    xgPer90:null, xgaPer90:null, xaPer90:null,
-    defensiveContribPer90:null, tacklesPer90:null,
-    interceptionsPer90:null, clearancesPer90:null,
-    aerialDuelsWonPct:null, goalsConcededPer90:null,
-    cleanSheetsTotal:null, goalsConcededTotal:null,
-    minutesCandidates:[], minutes:null, league:null,
+  // Gesammelte (value, quality) Paare pro Stat-Typ
+  const C = {
+    xg:[], xa:[], xga:[], dc:[], tackles:[], interceptions:[],
+    clearances:[], aerialPct:[], gc:[], gcTotal:[], csTotal:[], minutes:[],
+  }
+  let bestLeagueName = null
+  let bestLeagueQ = -1
+
+  // Kontext-Liga aus einem Objekt lesen
+  const ctxLeague = (o) => {
+    const n = o?.leagueName ?? o?.competitionName ?? o?.tournamentName
+      ?? o?.league?.name ?? o?.competition?.name ?? o?.tournament?.name
+    if (typeof n === 'string' && n.length > 3 && !/^\d/.test(n)) return n
+    return null
   }
 
-  const scan = (o, depth=0) => {
-    if (!o || typeof o !== 'object' || depth > 10) return
+  // Hilfsfunktion: Wert + Qualität registrieren (verhindert exakte Duplikate)
+  const push = (arr, val, q) => {
+    if (isNaN(val) || val < 0) return
+    // Selber Wert mit selber Qualität nicht doppelt hinzufügen
+    if (!arr.some(e => e.v === val && e.q === q)) arr.push({v: val, q})
+  }
 
-    // Liga-Name
-    if (!s.league) {
-      const n = o.leagueName ?? o.competitionName ?? o.tournamentName
-        ?? o.league?.name ?? o.competition?.name ?? o.tournament?.name
-      if (typeof n==='string' && n.length>3 && !/^\d/.test(n)) s.league = n
-    }
+  const scan = (o, depth=0, ctxQ=LEAGUE_QUALITY.default) => {
+    if (!o || typeof o !== 'object' || depth > 12) return
+
+    // Liga-Qualität aus diesem Objekt lesen, dann in Kinder weitergeben
+    const ln = ctxLeague(o)
+    const myQ = ln ? leagueQuality(ln) : ctxQ
+    if (ln && myQ > bestLeagueQ) { bestLeagueQ = myQ; bestLeagueName = ln }
 
     if (Array.isArray(o)) {
       for (const item of o) {
-        if (!item || typeof item !== 'object') { scan(item, depth+1); continue }
+        if (!item || typeof item !== 'object') continue
 
-        // Key-Label des Stat-Items
-        const key = norm(String(item.key ?? item.title ?? item.name ?? item.statKey ?? item.statName ?? ''))
+        // Liga-Qualität dieses Array-Items (z.B. competition-Objekt)
+        const iLn = ctxLeague(item)
+        const iQ  = iLn ? leagueQuality(iLn) : myQ
+        if (iLn && iQ > bestLeagueQ) { bestLeagueQ = iQ; bestLeagueName = iLn }
+
+        const key   = norm(String(item.key ?? item.title ?? item.name ?? item.statKey ?? item.statName ?? ''))
         const per90 = parseFloat(item.per90Value ?? item.per90 ?? '')
-        const total  = parseFloat(item.value ?? item.stat?.value ?? '')
-        // Bevorzuge per90-Wert; bei Minuten und Prozentwerten den Gesamtwert
-        const val = !isNaN(per90) ? per90 : total
+        const total = parseFloat(item.value ?? item.stat?.value ?? '')
+        const val   = !isNaN(per90) ? per90 : total
 
         if (!isNaN(val) && val >= 0) {
-          // ─ Offensiv ──────────────────────────────────────────────────────
+          // ─ Offensiv ────────────────────────────────────────────────────
           if (val < 10) {
-            if ((key==='expected_goals'||key==='xc'||key==='xg'||key==='expected goals (xc)'||key==='expected goals') && !key.includes('against') && !key.includes('xa') && s.xgPer90===null)
-              s.xgPer90 = r3(val)
-            if ((key==='expected_assists'||key==='xa'||key==='expected assists (xa)'||key==='expected assists') && s.xaPer90===null)
-              s.xaPer90 = r3(val)
+            if ((key==='expected_goals'||key==='xc'||key==='xg'||key==='expected goals (xc)'||key==='expected goals') && !key.includes('against') && !key.includes('xa'))
+              push(C.xg, val, iQ)
+            if (key==='expected_assists'||key==='xa'||key==='expected assists (xa)'||key==='expected assists')
+              push(C.xa, val, iQ)
           }
-          // ─ Defensiv (on pitch) ───────────────────────────────────────────
+          // ─ Defensiv ────────────────────────────────────────────────────
           if (val < 20) {
-            if ((key.includes('xc against')||key.includes('xg against')||key==='xc against while on pitch'||key==='xg against while on pitch'||key==='goals_conceded_xg'||key==='xga') && s.xgaPer90===null)
-              s.xgaPer90 = r3(val)
-            if ((key==='defensive contributions'||key==='defensive_contributions') && s.defensiveContribPer90===null)
-              s.defensiveContribPer90 = r3(val)
-            if (key==='tackles' && s.tacklesPer90===null)
-              s.tacklesPer90 = r3(val)
-            if (key==='interceptions' && s.interceptionsPer90===null)
-              s.interceptionsPer90 = r3(val)
-            if (key==='clearances' && s.clearancesPer90===null)
-              s.clearancesPer90 = r3(val)
-            // Goals conceded: per90 wenn < 5, sonst Saisontotal
+            if (key.includes('xc against')||key.includes('xg against')||key==='xc against while on pitch'||key==='xg against while on pitch'||key==='xga')
+              push(C.xga, val, iQ)
+            if (key==='defensive contributions'||key==='defensive_contributions')
+              push(C.dc, val, iQ)
+            if (key==='tackles')         push(C.tackles, val, iQ)
+            if (key==='interceptions')   push(C.interceptions, val, iQ)
+            if (key==='clearances')      push(C.clearances, val, iQ)
+            // Goals conceded
             if (key==='goals conceded while on pitch'||key==='goals_conceded'||key==='goals conceded') {
-              const gcPer90 = !isNaN(per90) ? per90 : (val < 5 ? val : NaN)
-              const gcTotal = !isNaN(total) ? total : (val >= 5 ? val : NaN)
-              if (!isNaN(gcPer90) && s.goalsConcededPer90===null) s.goalsConcededPer90 = r3(gcPer90)
-              else if (!isNaN(gcTotal) && gcTotal < 150 && s.goalsConcededTotal===null) s.goalsConcededTotal = Math.round(gcTotal)
+              if (!isNaN(per90) && per90 < 5)   push(C.gc, per90, iQ)
+              else if (!isNaN(total) && total >= 5 && total < 150) push(C.gcTotal, total, iQ)
+              else if (val < 5)                  push(C.gc, val, iQ)
+              else if (val < 150)                push(C.gcTotal, val, iQ)
             }
-            // Clean sheets: immer als Total (kein sinnvoller per90-Wert)
-            if ((key==='clean sheets'||key==='clean_sheets') && s.cleanSheetsTotal===null)
-              s.cleanSheetsTotal = Math.round(!isNaN(total) ? total : val)
+            // Clean sheets: immer Total
+            if (key==='clean sheets'||key==='clean_sheets') {
+              const cs = !isNaN(total) ? total : val
+              if (cs < 80) push(C.csTotal, cs, iQ)
+            }
           }
-          // ─ Prozentwerte ──────────────────────────────────────────────────
+          // ─ Prozentwerte ──────────────────────────────────────────────
           if (val >= 0 && val <= 100) {
-            if ((key==='aerial duels won %'||key==='aerial_duels_won'||key.includes('aerial duels won')) && s.aerialDuelsWonPct===null)
-              s.aerialDuelsWonPct = pct(val)
+            if (key==='aerial duels won %'||key==='aerial_duels_won'||key.includes('aerial duels won'))
+              push(C.aerialPct, val, iQ)
           }
-          // ─ Minuten: alle Kandidaten sammeln, am Ende wird der größte reale Wert gewählt
+          // ─ Minuten ───────────────────────────────────────────────────
           if (key==='minutes_played'||key==='minutes'||key==='mins') {
-            const m = !isNaN(total) && total > 0 ? Math.round(total) : (!isNaN(val) && val > 0 ? Math.round(val) : 0)
-            if (m > 0) s.minutesCandidates.push(m)
+            const m = !isNaN(total) && total > 0 ? Math.round(total) : Math.round(val)
+            if (m > 0) push(C.minutes, m, iQ)
           }
         }
 
-        scan(item, depth+1)
+        scan(item, depth+1, iQ)
       }
       return
     }
@@ -495,36 +489,54 @@ function extractStats(obj) {
       const key = k.toLowerCase()
       if (typeof v === 'number' && v >= 0) {
         if (v < 10) {
-          if ((key==='xg'||key==='expected_goals') && !key.includes('against') && s.xgPer90===null) s.xgPer90=r3(v)
-          if ((key==='xa'||key==='expected_assists') && s.xaPer90===null) s.xaPer90=r3(v)
-          if ((key==='xga'||key==='expected_goals_against') && s.xgaPer90===null) s.xgaPer90=r3(v)
+          if ((key==='xg'||key==='expected_goals') && !key.includes('against')) push(C.xg, v, myQ)
+          if (key==='xa'||key==='expected_assists') push(C.xa, v, myQ)
+          if (key==='xga'||key==='expected_goals_against') push(C.xga, v, myQ)
         }
         if (v < 20) {
-          if (key==='tackles' && s.tacklesPer90===null) s.tacklesPer90=r3(v)
-          if (key==='interceptions' && s.interceptionsPer90===null) s.interceptionsPer90=r3(v)
-          if (key==='clearances' && s.clearancesPer90===null) s.clearancesPer90=r3(v)
-          if ((key==='defensive_contributions'||key==='defensivecontributions') && s.defensiveContribPer90===null) s.defensiveContribPer90=r3(v)
+          if (key==='tackles') push(C.tackles, v, myQ)
+          if (key==='interceptions') push(C.interceptions, v, myQ)
+          if (key==='clearances') push(C.clearances, v, myQ)
+          if (key==='defensive_contributions'||key==='defensivecontributions') push(C.dc, v, myQ)
         }
-        if (key==='minutesplayed'||key==='minutes_played') s.minutesCandidates.push(Math.round(v))
+        if (key==='minutesplayed'||key==='minutes_played') push(C.minutes, Math.round(v), myQ)
       }
-      if (v && typeof v==='object') scan(v, depth+1)
+      if (v && typeof v === 'object') scan(v, depth+1, myQ)
     }
   }
 
   scan(obj)
 
-  // Minuten: Saisontotal = größter Wert ≥ 250 (Spielminuten einer Partie sind ≤ 120)
-  // Unter 250 = Einzelspiel oder sehr wenige Einsätze → auf null setzen
-  const seasonMins = s.minutesCandidates.filter(m => m >= 250)
-  s.minutes = seasonMins.length > 0 ? Math.max(...seasonMins) : null
-
-  // Beste Liga aus dem gesamten JSON holen (schlägt Cups/Friendlies)
-  const bestLeague = findBestLeague(obj)
-  if (bestLeague.league && bestLeague.quality >= leagueQuality(s.league ?? '')) {
-    s.league = bestLeague.league
+  // Qualitätsgewichteter Durchschnitt (höhere Liga zählt mehr)
+  const wavg = (pairs) => {
+    if (!pairs.length) return null
+    const sumW = pairs.reduce((a,p) => a + p.q, 0)
+    return r3(pairs.reduce((a,p) => a + p.v * p.q, 0) / sumW)
   }
+  // Für Totals (CS, GC-total, Minuten): Summe der Maximalwerte (nicht mitteln)
+  const maxVal = (pairs) => pairs.length ? Math.max(...pairs.map(p=>p.v)) : null
+  // GC total: gewichteter Durchschnitt macht hier weniger Sinn → max
+  const gcT = maxVal(C.gcTotal)
+  const csT = maxVal(C.csTotal)
+  // Minuten: größter Wert >= 250 ist der Saisontotal
+  const seasonMins = C.minutes.filter(p => p.v >= 250)
+  const minutes = seasonMins.length ? Math.max(...seasonMins.map(p=>p.v)) : null
 
-  return s
+  return {
+    xgPer90:              wavg(C.xg),
+    xaPer90:              wavg(C.xa),
+    xgaPer90:             wavg(C.xga),
+    defensiveContribPer90:wavg(C.dc),
+    tacklesPer90:         wavg(C.tackles),
+    interceptionsPer90:   wavg(C.interceptions),
+    clearancesPer90:      wavg(C.clearances),
+    aerialDuelsWonPct:    C.aerialPct.length ? pct(wavg(C.aerialPct)) : null,
+    goalsConcededPer90:   wavg(C.gc),
+    goalsConcededTotal:   gcT,
+    cleanSheetsTotal:     csT,
+    minutes,
+    league:               bestLeagueName,
+  }
 }
 
 // ─── Squad + Player Stats ─────────────────────────────────────────────────────
@@ -584,7 +596,7 @@ function extractTeamsFromDOM() {
 async function main() {
   const t0 = Date.now()
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
-  console.log('%c  FotMob xG-Import v9  —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
+  console.log('%c  FotMob xG-Import v10 —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
   console.log('%c  xG·xA·xGA·Def·Tackles·Clearances·GK    ', 'color:#4ade80')
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
   console.log(DRY_RUN?'%c⚠  TESTLAUF':'%c✏  SCHREIBMODUS','color:orange;font-weight:bold')
