@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════╗
- * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v7     ║
+ * ║  FotMob → WM2026 DB  —  BROWSER-KONSOLEN-SKRIPT v8     ║
  * ╠══════════════════════════════════════════════════════════╣
  * ║  1. Öffne: fotmob.com/de/leagues/77/overview/world-cup/teams ║
  * ║  2. Seite vollständig laden                             ║
@@ -289,11 +289,33 @@ async function dbGet(path) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
       apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
-      Accept: 'application/json', 'Range-Unit': 'items', Range: '0-1999',
+      Accept: 'application/json', 'Range-Unit': 'items', Range: '0-999',
     }
   })
   if (!r.ok) throw new Error(`DB GET ${r.status}`)
   return r.json()
+}
+
+// Paginiert — lädt alle Spieler aus der DB (>1000 werden in Seiten à 1000 geholt)
+async function dbGetAll(path) {
+  const all = []
+  let offset = 0
+  const PAGE = 1000
+  while (true) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        Accept: 'application/json', 'Range-Unit': 'items',
+        Range: `${offset}-${offset + PAGE - 1}`,
+      }
+    })
+    if (!r.ok) throw new Error(`DB GET ${r.status}`)
+    const page = await r.json()
+    all.push(...page)
+    if (page.length < PAGE) break
+    offset += PAGE
+  }
+  return all
 }
 async function dbPatch(id, data) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/players?id=eq.${id}`, {
@@ -350,7 +372,8 @@ function extractStats(obj) {
     defensiveContribPer90:null, tacklesPer90:null,
     interceptionsPer90:null, clearancesPer90:null,
     aerialDuelsWonPct:null, goalsConcededPer90:null,
-    cleanSheetsTotal:null, minutes:null, league:null,
+    cleanSheetsTotal:null, goalsConcededTotal:null,
+    minutesCandidates:[], minutes:null, league:null,
   }
 
   const scan = (o, depth=0) => {
@@ -394,8 +417,14 @@ function extractStats(obj) {
               s.interceptionsPer90 = r3(val)
             if (key==='clearances' && s.clearancesPer90===null)
               s.clearancesPer90 = r3(val)
-            if ((key==='goals conceded while on pitch'||key==='goals_conceded'||key==='goals conceded') && s.goalsConcededPer90===null)
-              s.goalsConcededPer90 = r3(val)
+            // Goals conceded: per90 wenn < 5, sonst Saisontotal
+            if (key==='goals conceded while on pitch'||key==='goals_conceded'||key==='goals conceded') {
+              const gcPer90 = !isNaN(per90) ? per90 : (val < 5 ? val : NaN)
+              const gcTotal = !isNaN(total) ? total : (val >= 5 ? val : NaN)
+              if (!isNaN(gcPer90) && s.goalsConcededPer90===null) s.goalsConcededPer90 = r3(gcPer90)
+              else if (!isNaN(gcTotal) && gcTotal < 150 && s.goalsConcededTotal===null) s.goalsConcededTotal = Math.round(gcTotal)
+            }
+            // Clean sheets: immer als Total (kein sinnvoller per90-Wert)
             if ((key==='clean sheets'||key==='clean_sheets') && s.cleanSheetsTotal===null)
               s.cleanSheetsTotal = Math.round(!isNaN(total) ? total : val)
           }
@@ -404,9 +433,11 @@ function extractStats(obj) {
             if ((key==='aerial duels won %'||key==='aerial_duels_won'||key.includes('aerial duels won')) && s.aerialDuelsWonPct===null)
               s.aerialDuelsWonPct = pct(val)
           }
-          // ─ Minuten ───────────────────────────────────────────────────────
-          if ((key==='minutes_played'||key==='minutes'||key==='mins') && isNaN(per90) && !isNaN(total) && total > 0 && s.minutes===null)
-            s.minutes = Math.round(total)
+          // ─ Minuten: alle Kandidaten sammeln, am Ende wird der größte reale Wert gewählt
+          if (key==='minutes_played'||key==='minutes'||key==='mins') {
+            const m = !isNaN(total) && total > 0 ? Math.round(total) : (!isNaN(val) && val > 0 ? Math.round(val) : 0)
+            if (m > 0) s.minutesCandidates.push(m)
+          }
         }
 
         scan(item, depth+1)
@@ -428,13 +459,18 @@ function extractStats(obj) {
           if (key==='clearances' && s.clearancesPer90===null) s.clearancesPer90=r3(v)
           if ((key==='defensive_contributions'||key==='defensivecontributions') && s.defensiveContribPer90===null) s.defensiveContribPer90=r3(v)
         }
-        if ((key==='minutesplayed'||key==='minutes_played') && s.minutes===null) s.minutes=Math.round(v)
+        if (key==='minutesplayed'||key==='minutes_played') s.minutesCandidates.push(Math.round(v))
       }
       if (v && typeof v==='object') scan(v, depth+1)
     }
   }
 
   scan(obj)
+
+  // Minuten: Saisontotal = größter Wert ≥ 250 (Spielminuten einer Partie sind ≤ 120)
+  // Unter 250 = Einzelspiel oder sehr wenige Einsätze → auf null setzen
+  const seasonMins = s.minutesCandidates.filter(m => m >= 250)
+  s.minutes = seasonMins.length > 0 ? Math.max(...seasonMins) : null
 
   // Beste Liga aus dem gesamten JSON holen (schlägt Cups/Friendlies)
   const bestLeague = findBestLeague(obj)
@@ -502,7 +538,7 @@ function extractTeamsFromDOM() {
 async function main() {
   const t0 = Date.now()
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
-  console.log('%c  FotMob xG-Import v7  —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
+  console.log('%c  FotMob xG-Import v8  —  WM 2026 DB     ', 'color:#4ade80;font-weight:bold')
   console.log('%c  xG·xA·xGA·Def·Tackles·Clearances·GK    ', 'color:#4ade80')
   console.log('%c══════════════════════════════════════════', 'color:#4ade80;font-weight:bold')
   console.log(DRY_RUN?'%c⚠  TESTLAUF':'%c✏  SCHREIBMODUS','color:orange;font-weight:bold')
@@ -516,12 +552,12 @@ async function main() {
     return
   }
 
-  console.log('\n📥 Lade Spieler aus DB...')
+  console.log('\n📥 Lade Spieler aus DB (paginiert)...')
   let dbPlayers
   try {
-    dbPlayers = await dbGet('players?select=id,name,team_id,position,xg_per90,xga_per90,xa_per90,minutes_played,league_name&order=team_id')
+    dbPlayers = await dbGetAll('players?select=id,name,team_id,position,xg_per90,xga_per90,xa_per90,minutes_played,league_name&order=team_id')
   } catch(e){console.error('❌',e.message);return}
-  console.log(`  ✓ ${dbPlayers.length} Spieler`)
+  console.log(`  ✓ ${dbPlayers.length} Spieler (${[...new Set(dbPlayers.map(p=>p.team_id))].length} Teams)`)
   const byTeam={}
   for(const p of dbPlayers){(byTeam[p.team_id]??=[]).push(p)}
 
@@ -561,9 +597,25 @@ async function main() {
       const pos=match.player.position  // 'GK','DEF','MID','FWD'
       const update={}
 
-      // Minuten + Liga (immer)
-      if(raw.minutes!==null)  update.minutes_played=raw.minutes
-      if(raw.league!==null)   update.league_name=raw.league
+      // Minuten: nur Saisontotal (>= 250 min) schreiben; null = explizit löschen wenn vorher Mist drin
+      if(raw.minutes !== null)    update.minutes_played = raw.minutes
+      else                        update.minutes_played = null  // explizit löschen (verhindert Altdaten)
+      if(raw.league !== null)     update.league_name = raw.league
+
+      // Hilfsfunktion: Goals conceded per90 — direkt oder aus Total berechnen
+      const gcPer90 = () => {
+        if (raw.goalsConcededPer90 !== null && raw.goalsConcededPer90 < 5) return r3(raw.goalsConcededPer90)
+        if (raw.goalsConcededTotal !== null && raw.minutes > 0)
+          return r3(raw.goalsConcededTotal / (raw.minutes / 90))
+        return null
+      }
+
+      // Hilfsfunktion: Clean sheets per90 aus Total + Minuten
+      const csPer90 = () => {
+        if (raw.cleanSheetsTotal === null) return null
+        if (raw.minutes > 0) return r3(raw.cleanSheetsTotal / (raw.minutes / 90))
+        return null  // ohne Minuten nicht berechenbar
+      }
 
       // ─ Offensiv (FWD, MID — und DEF als Bonus) ───────────────────────────
       if(pos!=='GK'){
@@ -573,18 +625,14 @@ async function main() {
 
       // ─ Defensiv (DEF + GK) ───────────────────────────────────────────────
       if(pos==='DEF'||pos==='GK'){
-        if(raw.xgaPer90!==null)             update.xga_per90                   = r3(raw.xgaPer90*lq)
-        if(raw.goalsConcededPer90!==null)   update.goals_conceded_per90         = r3(raw.goalsConcededPer90)  // kein lq — echte Tore
-        // Clean sheets: Total aus FotMob → per90 umrechnen wenn Minuten bekannt
-        if(raw.cleanSheetsTotal!==null && raw.minutes > 0)
-          update.clean_sheets_per90 = r3(raw.cleanSheetsTotal / (raw.minutes / 90))
-        else if(raw.cleanSheetsTotal!==null)
-          update.clean_sheets_per90 = r3(raw.cleanSheetsTotal / 38) // Saison-Durchschnitt als Fallback
-        if(raw.defensiveContribPer90!==null)update.defensive_contributions_per90= r3(raw.defensiveContribPer90)
-        if(raw.tacklesPer90!==null)         update.tackles_per90                = r3(raw.tacklesPer90)
-        if(raw.interceptionsPer90!==null)   update.interceptions_per90          = r3(raw.interceptionsPer90)
-        if(raw.clearancesPer90!==null)      update.clearances_per90             = r3(raw.clearancesPer90)
-        if(raw.aerialDuelsWonPct!==null)    update.aerial_duels_won_pct         = raw.aerialDuelsWonPct
+        if(raw.xgaPer90!==null)              update.xga_per90                    = r3(raw.xgaPer90*lq)
+        const gc=gcPer90(); if(gc!==null)    update.goals_conceded_per90         = gc
+        const cs=csPer90(); if(cs!==null)    update.clean_sheets_per90           = cs
+        if(raw.defensiveContribPer90!==null) update.defensive_contributions_per90 = r3(raw.defensiveContribPer90)
+        if(raw.tacklesPer90!==null)          update.tackles_per90                = r3(raw.tacklesPer90)
+        if(raw.interceptionsPer90!==null)    update.interceptions_per90          = r3(raw.interceptionsPer90)
+        if(raw.clearancesPer90!==null)       update.clearances_per90             = r3(raw.clearancesPer90)
+        if(raw.aerialDuelsWonPct!==null)     update.aerial_duels_won_pct         = raw.aerialDuelsWonPct
       }
 
       // ─ MID erhält auch xGA (Pressingindikator) ────────────────────────────
@@ -609,7 +657,7 @@ async function main() {
         update.aerial_duels_won_pct!==undefined?`AD=${update.aerial_duels_won_pct}%`:'',
         update.goals_conceded_per90!==undefined?`GC=${update.goals_conceded_per90}`:'',
         update.clean_sheets_per90!==undefined?`CS/90=${update.clean_sheets_per90}(total:${raw.cleanSheetsTotal})`:'',
-        update.minutes_played!==undefined?`${update.minutes_played}min`:'',
+        update.minutes_played!=null?`${update.minutes_played}min`:(update.minutes_played===null?'min=∅':''),
       ].filter(Boolean).join('  ')
 
       console.log(`  ✎ [${conf}] ${fp.name} → ${match.player.name} [${pos}]${lqStr}\n      ${statStr}`)
