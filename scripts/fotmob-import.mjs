@@ -24,8 +24,8 @@
 
 // ─── KONFIGURATION ────────────────────────────────────────────────────────────
 
-const FOTMOB_COOKIE = 'HIER_COOKIE_EINFÜGEN'   // aus Browser-DevTools (F12 → Network)
-const FOTMOB_XMAS   = 'HIER_X_MAS_EINFÜGEN'   // aus Browser-DevTools (F12 → Network)
+const FOTMOB_COOKIE = 'NEXT_LOCALE=de; u:location=%7B%22countryCode%22%3A%22DE%22%2C%22regionId%22%3Anull%2C%22ip%22%3A%22127.0.0.1%22%2C%22ccode3%22%3A%22DEU%22%2C%22ccode3NoRegion%22%3A%22DEU%22%2C%22timezone%22%3A%22Europe%2FBerlin%22%7D; turnstile_verified=1.1780735209.439907f7d7f4d3d48212d125b0d96a9723d0ee9f0b3d5aa6611bd0549d3047aa; g_state={"i_l":0,"i_ll":1780735846355,"i_b":"RCEmX3GuCchoHSjweggPtnsgYEb3H38tWOcDhbyfJIc","i_e":{"enable_itp_optimization":0},"i_et":1780735117705}'
+const FOTMOB_XMAS   = 'eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaGVzP2RhdGU9MjAyNjA2MDYmdGltZXpvbmU9RXVyb3BlJTJGQmVybGluJmNjb2RlMz1ERVUmaW5jbHVkZU5leHREYXlMYXRlTmlnaHQ9dHJ1ZSIsImNvZGUiOjE3ODA3MzU4OTM4ODQsImZvbyI6InByb2R1Y3Rpb246Y2QxMGQ4ZGVhM2IzYjFmYzMyM2UwMTE5ZDg1MDNjMjBjNjE0MDIzMiJ9LCJzaWduYXR1cmUiOiJBRDFGMjI5MkY3Q0FFNkFBRDdGMUQ3QkVENTdDRTZCMCJ9'
 
 const SUPABASE_URL = 'https://bcwcgwoppuueduvzoyqa.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjd2Nnd29wcHV1ZWR1dnpveXFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjQ2NTcsImV4cCI6MjA5NDg0MDY1N30.U-J9aSUopsWyZSy_McLpG7RQQAxRayY7XsHCDUbnWiM'
