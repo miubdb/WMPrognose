@@ -9,6 +9,24 @@ import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
+function topScorelines(xgA: number, xgB: number, n = 4): { i: number; j: number; p: number }[] {
+  const pmf = (lambda: number, k: number) => {
+    if (lambda <= 0) return k === 0 ? 1 : 0
+    let logP = k * Math.log(lambda) - lambda
+    for (let i = 1; i <= k; i++) logP -= Math.log(i)
+    return Math.exp(logP)
+  }
+  const scores: { i: number; j: number; p: number }[] = []
+  for (let i = 0; i <= 6; i++)
+    for (let j = 0; j <= 6; j++)
+      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) })
+  const favorA = xgA >= xgB
+  const outcomeRank = (i: number, j: number) => i > j ? (favorA ? 0 : 2) : i === j ? 1 : favorA ? 2 : 0
+  return scores
+    .sort((a, b) => outcomeRank(a.i, a.j) - outcomeRank(b.i, b.j) || b.p - a.p)
+    .slice(0, n)
+}
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -226,6 +244,24 @@ function MatchCard({
             nameB={analysis.teamB.name}
           />
           <TopFactorLine factors={analysis.factors} />
+
+          {/* Top scorelines */}
+          <div className="flex gap-1.5 mt-2">
+            {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, 4).map(({ i, j, p }) => {
+              const winner = i > j ? 'A' : j > i ? 'B' : 'X'
+              const color = winner === 'A'
+                ? 'border-emerald-800/50 bg-emerald-900/15 text-emerald-300'
+                : winner === 'B'
+                ? 'border-blue-800/50 bg-blue-900/15 text-blue-300'
+                : 'border-gray-700/60 bg-gray-800/30 text-gray-400'
+              return (
+                <div key={`${i}-${j}`} className={`flex-1 rounded-lg border ${color} py-1 text-center`}>
+                  <div className="text-xs font-bold font-mono">{i}:{j}</div>
+                  <div className="text-[10px] text-gray-500">{Math.round(p * 100)}%</div>
+                </div>
+              )
+            })}
+          </div>
 
           <div className="flex items-center justify-between mt-2">
             <div className="text-xs text-gray-500">
