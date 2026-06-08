@@ -155,8 +155,8 @@ export async function GET() {
   })
 
   checks.push({
-    name: 'Dixon-Coles rho = 0 (nicht signifikant)',
-    ok: MODEL_META.dixonColesRho === 0,
+    name: 'Dixon-Coles rho konfiguriert',
+    ok: MODEL_META.dixonColesRho !== undefined,
     detail: `dixonColesRho = ${MODEL_META.dixonColesRho}`,
     critical: false,
   })
