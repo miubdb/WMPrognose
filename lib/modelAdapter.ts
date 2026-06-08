@@ -1029,10 +1029,9 @@ export function analyzeMatch(
 
   // NEU: Dixon-Coles Score-Matrix (ersetzt interne poissonWinProbs)
   const rawMatrix = computeScorelineMatrix(xgA, xgB)
-  // rho=0 in kalibriertem Modell → DC-Korrektur hat keinen Effekt, skip für Konsistenz
-  const correctedMatrix = MODEL_META.dixonColesRho === 0
-    ? rawMatrix
-    : applyDixonColesCorrection(rawMatrix, xgA, xgB)
+  const correctedMatrix = MODEL_META.dixonColesRho !== 0
+    ? applyDixonColesCorrection(rawMatrix, xgA, xgB)
+    : rawMatrix
   const { winA: rawWinA, draw: rawDraw, winB: rawWinB } = aggregateOutcomeProbabilities(correctedMatrix)
 
   // Phase 2: Regression zur Mitte basierend auf kombinierter Datenqualität
