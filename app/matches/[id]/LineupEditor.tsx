@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -51,11 +51,11 @@ function MarketValueBadge({ mv }: { mv: number | null }) {
 function TeamLineup({
   team,
   onToggle,
-  savingId,
+  savingIds,
 }: {
   team: TeamData
   onToggle: (id: string, current: boolean) => void
-  savingId: string | null
+  savingIds: Set<string>
 }) {
   const byPos = POS_ORDER.reduce((acc, pos) => {
     acc[pos] = team.players.filter(p => p.position === pos)
@@ -100,7 +100,7 @@ function TeamLineup({
                 </div>
                 {group.map(p => {
                   const isSelected = !!p.is_in_starting_xi
-                  const isSaving = savingId === p.id
+                  const isSaving = savingIds.has(p.id)
                   const blocked = full && !isSelected
 
                   return (
@@ -152,10 +152,24 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
   const router = useRouter()
   const [playersA, setPlayersA] = useState(teamA.players)
   const [playersB, setPlayersB] = useState(teamB.players)
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const pendingSaves = useRef(0)
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Debounced refresh: fires 1.5s after all saves complete
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current)
+    refreshTimer.current = setTimeout(() => {
+      if (pendingSaves.current === 0) {
+        setRefreshing(true)
+        router.refresh()
+        setTimeout(() => setRefreshing(false), 800)
+      }
+    }, 1500)
+  }, [router])
 
   const toggle = useCallback(async (id: string, current: boolean, isTeamA: boolean) => {
     const next = !current
@@ -168,8 +182,9 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
     if (isTeamA) setPlayersA(applyUpdate)
     else setPlayersB(applyUpdate)
 
-    setSavingId(id)
+    setSavingIds(prev => new Set(prev).add(id))
     setError(null)
+    pendingSaves.current++
 
     try {
       const res = await fetch(`/api/players/${id}`, {
@@ -181,18 +196,16 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
         const data = await res.json().catch(() => ({})) as { error?: string }
         throw new Error(data.error ?? `Fehler ${res.status}`)
       }
-      // Refresh server component so win probabilities re-calculate with new starting XI
-      setRefreshing(true)
-      router.refresh()
     } catch (err) {
       if (isTeamA) setPlayersA(revert)
       else setPlayersB(revert)
       setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setSavingId(null)
-      setRefreshing(false)
+      setSavingIds(prev => { const s = new Set(prev); s.delete(id); return s })
+      pendingSaves.current = Math.max(0, pendingSaves.current - 1)
+      scheduleRefresh()
     }
-  }, [router])
+  }, [scheduleRefresh])
 
   const startA = playersA.filter(p => p.is_in_starting_xi).length
   const startB = playersB.filter(p => p.is_in_starting_xi).length
@@ -243,13 +256,13 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
             <TeamLineup
               team={{ ...teamA, players: playersA }}
               onToggle={(id, cur) => toggle(id, cur, true)}
-              savingId={savingId}
+              savingIds={savingIds}
             />
             <div className="w-px bg-gray-800 flex-shrink-0" />
             <TeamLineup
               team={{ ...teamB, players: playersB }}
               onToggle={(id, cur) => toggle(id, cur, false)}
-              savingId={savingId}
+              savingIds={savingIds}
             />
           </div>
         </div>

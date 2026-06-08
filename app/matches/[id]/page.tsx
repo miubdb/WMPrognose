@@ -336,6 +336,19 @@ export default async function MatchDetailPage({ params }: { params: { id: string
           </div>
           <span className={`text-xs font-medium ${confConfig.color}`}>{confConfig.label}</span>
         </div>
+
+        {/* Data quality / S11 indicator */}
+        <div className="mt-3 flex items-center gap-3 text-[11px] text-gray-600 flex-wrap">
+          <span className={lineupStatus[match.teamAId] ? 'text-emerald-500' : 'text-gray-600'}>
+            {analysis.teamA.flag} {lineupStatus[match.teamAId] ? '✓ S11 aktiv' : '○ Kaderdurchschnitt'}
+          </span>
+          <span className="text-gray-700">·</span>
+          <span className={lineupStatus[match.teamBId] ? 'text-emerald-500' : 'text-gray-600'}>
+            {analysis.teamB.flag} {lineupStatus[match.teamBId] ? '✓ S11 aktiv' : '○ Kaderdurchschnitt'}
+          </span>
+          <span className="text-gray-700">·</span>
+          <span>Datenqualität: {Math.round((analysis.regressionWeight) * 100)}% Regression zur Mitte</span>
+        </div>
       </div>
 
       {/* Top-Einflussfaktoren */}
@@ -497,7 +510,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             )
           })}
         </div>
-        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt · Sortiert: Favorit zuerst</p>
+        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt · Sortiert nach Wahrscheinlichkeit</p>
       </div>
 
       {/* Modell-Erklärung */}
@@ -534,7 +547,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             <div className="font-semibold text-gray-300">3. Poisson-Verteilung + Dixon-Coles-Korrektur</div>
             <p className="text-gray-500">
               Aus den xG-Werten ({analysis.expectedGoalsA.toFixed(2)} für {analysis.teamA.flag}, {analysis.expectedGoalsB.toFixed(2)} für {analysis.teamB.flag}) wird jedes mögliche Ergebnis 0:0 bis 10:10 per Poisson-Formel berechnet.
-              Dixon-Coles (ρ={MODEL_META.dixonColesRho}) korrigiert niedrig-Ergebnisse: senkt P(1:1), erhöht P(1:0) und P(0:1) leicht — mathematisch realistischer.
+              Dixon-Coles (ρ={MODEL_META.dixonColesRho}) korrigiert Niedrig-Ergebnisse: erhöht P(0:0) und P(1:1), senkt P(0:1) und P(1:0) leicht — mathematisch realistischer als reines Poisson.
             </p>
           </div>
 

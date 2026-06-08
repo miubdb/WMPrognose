@@ -234,20 +234,27 @@ function MatchCard({
             nameB={analysis.teamB.name}
           />
 
-          {/* Wahrscheinlichstes Ergebnis + Tipp */}
+          {/* Wahrscheinlichste Ergebnisse (Top 3) + Tipp */}
           {(() => {
-            const best = topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, 1)[0]
-            const winner = best.i > best.j ? 'A' : best.j > best.i ? 'B' : 'X'
-            const scoreColor = winner === 'A' ? 'text-emerald-400' : winner === 'B' ? 'text-blue-400' : 'text-gray-400'
+            const top3 = topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, 3)
             return (
-              <div className="flex items-center justify-between mt-2">
-                <div className="text-xs text-gray-500">
-                  Tipp: <span className="text-white font-medium">{tipLabel}</span>
-                  <span className="text-gray-700 mx-1.5">·</span>
-                  <span className={`font-mono font-bold ${scoreColor}`}>{best.i}:{best.j}</span>
-                  <span className="text-gray-700 ml-0.5">({Math.round(best.p * 100)}%)</span>
+              <div className="mt-2 space-y-1.5">
+                <div className="flex gap-1.5">
+                  {top3.map(({ i, j, p }) => {
+                    const w = i > j ? 'A' : j > i ? 'B' : 'X'
+                    const col = w === 'A' ? 'border-emerald-800/50 bg-emerald-900/10 text-emerald-300' : w === 'B' ? 'border-blue-800/50 bg-blue-900/10 text-blue-300' : 'border-gray-700 bg-gray-800/30 text-gray-300'
+                    return (
+                      <div key={`${i}-${j}`} className={`flex-1 rounded border ${col} px-1.5 py-1 text-center`}>
+                        <div className="text-xs font-bold font-mono">{i}:{j}</div>
+                        <div className="text-[10px] text-gray-600">{Math.round(p * 100)}%</div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <span className={`text-xs font-medium ${confLabel.color}`}>{confLabel.label}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-600">Tipp: <span className="text-gray-400 font-medium">{tipLabel}</span></span>
+                  <span className={`text-xs font-medium ${confLabel.color}`}>{confLabel.label}</span>
+                </div>
               </div>
             )
           })()}
