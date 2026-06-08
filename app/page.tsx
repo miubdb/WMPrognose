@@ -334,7 +334,7 @@ export default function Dashboard() {
   const [results, setResults] = useState<Record<string, MatchResult>>({})
 
   useEffect(() => {
-    fetch('/api/match-context')
+    fetch('/api/match-context', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         if (data.squadData) setSquadData(data.squadData)

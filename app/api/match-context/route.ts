@@ -66,5 +66,8 @@ export async function GET() {
     results[row.match_id] = { goals_a: row.goals_a, goals_b: row.goals_b }
   }
 
-  return NextResponse.json({ squadData, eloOverrides, results })
+  return NextResponse.json(
+    { squadData, eloOverrides, results },
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
 }
