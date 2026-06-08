@@ -7,7 +7,7 @@ export async function GET() {
   const [squadRes, eloRes, resultsRes] = await Promise.all([
     // limit=2000 — alle 1248 Spieler laden (Supabase-Standard-Limit: 1000)
     supabase.from('players')
-      .select('team_id, market_value_m, position, age, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90')
+      .select('team_id, market_value_m, position, age, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi')
       .limit(2000),
     supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y'),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
@@ -20,10 +20,12 @@ export async function GET() {
     playersByTeam[row.team_id].push(row)
   }
 
-  // SquadSummary zentral berechnen — identische Logik wie auf der Match-Seite
+  // SquadSummary zentral berechnen — wenn ≥11 Starter gesetzt: nur Startelf nutzen
   const squadData: Record<string, SquadSummary> = {}
   for (const [tid, players] of Object.entries(playersByTeam)) {
-    squadData[tid] = computeSquadSummary(players)
+    const starters = players.filter(p => (p as { is_in_starting_xi?: boolean }).is_in_starting_xi)
+    const effective = starters.length >= 11 ? starters : players
+    squadData[tid] = computeSquadSummary(effective)
   }
 
   // ELO aus Supabase + langfristiger Trend-Bonus (20% von elo_delta_1y)

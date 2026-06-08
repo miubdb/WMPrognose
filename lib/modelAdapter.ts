@@ -1224,10 +1224,15 @@ function simulateKORound(
 }
 
 function simulateMatchScore(teamA: TeamBasic, teamB: TeamBasic): { goalsA: number, goalsB: number } {
-  const eloA = teamA.eloRating
-  const eloB = teamB.eloRating
-  const lambdaA = 1.15 * (1 + (eloA - eloB) / 2000)
-  const lambdaB = 1.15 * (1 + (eloB - eloA) / 2000)
+  const eloDiff = teamA.eloRating - teamB.eloRating
+  const eloLogA = clampLogEffect(MODEL_WEIGHTS.elo * eloDiff, 0.25)
+
+  const mvA = Math.max(1, teamA.squadMarketValueM ?? 200)
+  const mvB = Math.max(1, teamB.squadMarketValueM ?? 200)
+  const mvLogA = clampLogEffect(MODEL_WEIGHTS.marketValueLog * Math.log(mvA / mvB) / Math.log(10))
+
+  const lambdaA = computeLambda(MODEL_META.baseGoalRate, [eloLogA, mvLogA])
+  const lambdaB = computeLambda(MODEL_META.baseGoalRate, [-eloLogA, -mvLogA])
 
   return {
     goalsA: poissonRandom(Math.max(0.2, Math.min(4, lambdaA))),
