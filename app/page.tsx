@@ -6,24 +6,30 @@ import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
 import { analyzeAllMatches, type MatchAnalysis, type SquadSummary } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
+import { MODEL_META } from '@/lib/model/config'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
-function topScorelines(xgA: number, xgB: number, n = 4): { i: number; j: number; p: number }[] {
+function topScorelines(xgA: number, xgB: number, rho: number, n = 4): { i: number; j: number; p: number }[] {
   const pmf = (lambda: number, k: number) => {
     if (lambda <= 0) return k === 0 ? 1 : 0
     let logP = k * Math.log(lambda) - lambda
     for (let i = 1; i <= k; i++) logP -= Math.log(i)
     return Math.exp(logP)
   }
+  const dcFactor = (i: number, j: number) => {
+    if (i === 0 && j === 0) return 1 - rho * xgA * xgB
+    if (i === 0 && j === 1) return 1 + rho * xgA
+    if (i === 1 && j === 0) return 1 + rho * xgB
+    if (i === 1 && j === 1) return 1 - rho
+    return 1
+  }
   const scores: { i: number; j: number; p: number }[] = []
-  for (let i = 0; i <= 6; i++)
-    for (let j = 0; j <= 6; j++)
-      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) })
-  const favorA = xgA >= xgB
-  const outcomeRank = (i: number, j: number) => i > j ? (favorA ? 0 : 2) : i === j ? 1 : favorA ? 2 : 0
+  for (let i = 0; i <= 7; i++)
+    for (let j = 0; j <= 7; j++)
+      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dcFactor(i, j) })
   return scores
-    .sort((a, b) => outcomeRank(a.i, a.j) - outcomeRank(b.i, b.j) || b.p - a.p)
+    .sort((a, b) => b.p - a.p)
     .slice(0, n)
 }
 
@@ -230,7 +236,7 @@ function MatchCard({
 
           {/* Wahrscheinlichstes Ergebnis + Tipp */}
           {(() => {
-            const best = topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, 1)[0]
+            const best = topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, 1)[0]
             const winner = best.i > best.j ? 'A' : best.j > best.i ? 'B' : 'X'
             const scoreColor = winner === 'A' ? 'text-emerald-400' : winner === 'B' ? 'text-blue-400' : 'text-gray-400'
             return (
