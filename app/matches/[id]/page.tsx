@@ -34,15 +34,8 @@ function topScorelines(xgA: number, xgB: number, rho: number, n = 8): { i: numbe
       scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dcFactor(i, j) })
     }
   }
-  // Outcome-priority: predicted winner's scores first, draws second, underdog's scores last
-  const favorA = xgA >= xgB
-  const outcomeRank = (i: number, j: number) => {
-    if (i > j) return favorA ? 0 : 2
-    if (i === j) return 1
-    return favorA ? 2 : 0
-  }
   return scores
-    .sort((a, b) => outcomeRank(a.i, a.j) - outcomeRank(b.i, b.j) || b.p - a.p)
+    .sort((a, b) => b.p - a.p)
     .slice(0, n)
 }
 
