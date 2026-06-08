@@ -1027,11 +1027,8 @@ export function analyzeMatch(
   const xgA = computeLambda(MODEL_META.baseGoalRate, logEffectsA)
   const xgB = computeLambda(MODEL_META.baseGoalRate, logEffectsB)
 
-  // NEU: Dixon-Coles Score-Matrix (ersetzt interne poissonWinProbs)
   const rawMatrix = computeScorelineMatrix(xgA, xgB)
-  const correctedMatrix = MODEL_META.dixonColesRho !== 0
-    ? applyDixonColesCorrection(rawMatrix, xgA, xgB)
-    : rawMatrix
+  const correctedMatrix = applyDixonColesCorrection(rawMatrix, xgA, xgB)
   const { winA: rawWinA, draw: rawDraw, winB: rawWinB } = aggregateOutcomeProbabilities(correctedMatrix)
 
   // Phase 2: Regression zur Mitte basierend auf kombinierter Datenqualität
