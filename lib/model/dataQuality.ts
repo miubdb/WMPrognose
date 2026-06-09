@@ -37,8 +37,8 @@ export function computeDataQuality(
 
   const lineupSet = startingXI.length >= 11
 
-  // ELO-Frische: eloratings.net = 0.90, wikipedia = 0.85, manual = 0.65, fallback = 0.55, unbekannt = 0.30
-  const eloFreshness = eloSource?.startsWith('eloratings.net') ? 0.90
+  // ELO-Frische: eloratings.net/csv = 0.90, wikipedia = 0.85, manual = 0.65, fallback = 0.55, unbekannt = 0.30
+  const eloFreshness = (eloSource?.startsWith('eloratings.net') || eloSource?.startsWith('csv-')) ? 0.90
     : eloSource === 'wikipedia-elo' ? 0.85
     : eloSource === 'manual-text' ? 0.65
     : eloSource === 'fallback-apr2025' ? 0.55

@@ -596,7 +596,8 @@ export function analyzeMatch(
   const eloSrcA = eloSources?.[match.teamAId] ?? (eloOverrides?.[match.teamAId] != null ? 'unknown' : null)
   const eloSrcB = eloSources?.[match.teamBId] ?? (eloOverrides?.[match.teamBId] != null ? 'unknown' : null)
   const eloSrc = eloSrcA ?? eloSrcB ?? null
-  const eloConfidence = eloSrc === 'wikipedia-elo' ? 0.85
+  const eloConfidence = (eloSrc?.startsWith('eloratings.net') || eloSrc?.startsWith('csv-')) ? 0.90
+    : eloSrc === 'wikipedia-elo' ? 0.85
     : eloSrc === 'manual-text' ? 0.65
     : eloSrc === 'fallback-apr2025' ? 0.55
     : eloSrc === 'unknown' ? 0.60
