@@ -7,11 +7,14 @@ import type { SquadSummary } from '@/lib/modelAdapter'
 
 export const dynamic = 'force-dynamic'
 
+const PLAYER_SELECT = 'team_id, market_value_m, position, age, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, rating'
+
 export async function GET() {
-  const [squadRes, eloRes, resultsRes] = await Promise.all([
-    supabase.from('players')
-      .select('team_id, market_value_m, position, age, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, rating')
-      .limit(2000),
+  // Fetch players in two batches — Supabase PostgREST caps at max_rows=1000
+  // With 1248+ players, a single .limit(2000) only returns 1000
+  const [batch1, batch2, eloRes, resultsRes] = await Promise.all([
+    supabase.from('players').select(PLAYER_SELECT).order('team_id').range(0, 999),
+    supabase.from('players').select(PLAYER_SELECT).order('team_id').range(1000, 1999),
     supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
   ])
@@ -31,9 +34,11 @@ export async function GET() {
     is_in_starting_xi: boolean | null
   }
 
+  const allPlayers = [...(batch1.data ?? []), ...(batch2.data ?? [])] as RawPlayerRow[]
+
   // Group players by team
   const playersByTeam: Record<string, RawPlayerRow[]> = {}
-  for (const row of (squadRes.data ?? []) as RawPlayerRow[]) {
+  for (const row of allPlayers) {
     if (!playersByTeam[row.team_id]) playersByTeam[row.team_id] = []
     playersByTeam[row.team_id].push(row)
   }
@@ -79,20 +84,6 @@ export async function GET() {
   // The homepage consumes these directly so it always matches the detail page
   // (which also runs analyzeMatch server-side with the same DB data).
   const matchAnalyses = analyzeAllMatches(squadData, eloOverrides, eloSources, results)
-
-  // Temporary debug: log A1 analysis + squad inputs
-  const a1 = matchAnalyses.find(m => m.matchId === 'A1')
-  const mexStarters = (playersByTeam['mexico'] ?? []).filter(p => p.is_in_starting_xi).length
-  const saStarters = (playersByTeam['south_africa'] ?? []).filter(p => p.is_in_starting_xi).length
-  console.log('DEBUG A1', JSON.stringify({
-    xgA: a1?.expectedGoalsA, xgB: a1?.expectedGoalsB,
-    mexTotal: playersByTeam['mexico']?.length, mexStarters,
-    mexMV: squadData['mexico']?.totalMarketValueM,
-    saTotal: playersByTeam['south_africa']?.length, saStarters,
-    saMV: squadData['south_africa']?.totalMarketValueM,
-    mexXgAtk: squadData['mexico']?.avgXgPer90Attack,
-    saXgAtk: squadData['south_africa']?.avgXgPer90Attack,
-  }))
 
   return NextResponse.json(
     { squadData, eloOverrides, results, eloSources, matchAnalyses },
