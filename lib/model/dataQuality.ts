@@ -63,7 +63,7 @@ export function computeDataQuality(
   if (!lineupSet) warnings.push('Startelf noch nicht eingetragen — Gesamtkader wird verwendet')
   if (xgCoverage < 0.3) warnings.push(`Nur ${Math.round(xgCoverage * 100)}% der Spieler haben xG-Daten`)
   if (xgCoverage === 0) warnings.push('Keine xG-Statistiken — Saisonform-Faktor entfällt')
-  if (eloFreshness < 0.6) warnings.push('ELO-Ratings veraltet oder nicht vorhanden')
+  if (eloFreshness < 0.45) warnings.push('ELO-Rating nicht vorhanden — Prognose stark eingeschränkt')
   if (players.length < 11) warnings.push('Zu wenige Spieler im Kader — Prognose unzuverlässig')
 
   return { completeness, xgCoverage, eloFreshness, lineupSet, overall, score, badge, warnings }

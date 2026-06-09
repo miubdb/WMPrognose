@@ -10,29 +10,8 @@ import { MODEL_META } from '@/lib/model/config'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
-function topScorelines(xgA: number, xgB: number, rho: number, n = 4): { i: number; j: number; p: number }[] {
-  const pmf = (lambda: number, k: number) => {
-    if (lambda <= 0) return k === 0 ? 1 : 0
-    let logP = k * Math.log(lambda) - lambda
-    for (let i = 1; i <= k; i++) logP -= Math.log(i)
-    return Math.exp(logP)
-  }
-  const dcFactor = (i: number, j: number) => {
-    if (i === 0 && j === 0) return 1 - rho * xgA * xgB
-    if (i === 0 && j === 1) return 1 + rho * xgA
-    if (i === 1 && j === 0) return 1 + rho * xgB
-    if (i === 1 && j === 1) return 1 - rho
-    return 1
-  }
-  const scores: { i: number; j: number; p: number }[] = []
-  for (let i = 0; i <= 7; i++)
-    for (let j = 0; j <= 7; j++)
-      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dcFactor(i, j) })
-  return scores.sort((a, b) => b.p - a.p).slice(0, n)
-}
-
-// Best score per outcome category (A wins / draw / B wins)
-function bestConditionalScores(xgA: number, xgB: number, rho: number) {
+// Top N scores within a predicted outcome category
+function topConditionalScores(xgA: number, xgB: number, rho: number, outcome: '1' | 'X' | '2', n = 3): { i: number; j: number; p: number }[] {
   const pmf = (lambda: number, k: number) => {
     if (lambda <= 0) return k === 0 ? 1 : 0
     let logP = k * Math.log(lambda) - lambda
@@ -46,17 +25,15 @@ function bestConditionalScores(xgA: number, xgB: number, rho: number) {
     if (i === 1 && j === 1) return 1 - rho
     return 1
   }
-  type S = { i: number; j: number; p: number }
-  let winA: S | null = null, draw: S | null = null, winB: S | null = null
+  const scores: { i: number; j: number; p: number }[] = []
   for (let i = 0; i <= 7; i++) {
     for (let j = 0; j <= 7; j++) {
-      const p = pmf(xgA, i) * pmf(xgB, j) * dc(i, j)
-      if (i > j && (!winA || p > winA.p)) winA = { i, j, p }
-      if (i === j && (!draw || p > draw.p)) draw = { i, j, p }
-      if (i < j && (!winB || p > winB.p)) winB = { i, j, p }
+      const matches = outcome === '1' ? i > j : outcome === '2' ? j > i : i === j
+      if (!matches) continue
+      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dc(i, j) })
     }
   }
-  return { winA, draw, winB }
+  return scores.sort((a, b) => b.p - a.p).slice(0, n)
 }
 
 function todayStr() {
@@ -260,22 +237,20 @@ function MatchCard({
             nameB={analysis.teamB.name}
           />
 
-          {/* Ergebnisse pro Kategorie (konditionell) + Tipp */}
+          {/* Top-3 Ergebnisse innerhalb des Prognosetipps */}
           {(() => {
-            const { winA, draw, winB } = bestConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho)
             const tip = analysis.suggestedTip
-            const outcomes = [
-              { score: winA, cat: '1' as const, col: 'border-emerald-800/50 bg-emerald-900/10 text-emerald-300' },
-              { score: draw,  cat: 'X' as const, col: 'border-gray-700 bg-gray-800/30 text-gray-300' },
-              { score: winB, cat: '2' as const, col: 'border-blue-800/50 bg-blue-900/10 text-blue-300' },
-            ]
+            const scores = topConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, tip)
+            const col = tip === '1' ? 'border-emerald-800/50 bg-emerald-900/10 text-emerald-300'
+              : tip === '2' ? 'border-blue-800/50 bg-blue-900/10 text-blue-300'
+              : 'border-gray-700 bg-gray-800/30 text-gray-300'
             return (
               <div className="mt-2 space-y-1.5">
                 <div className="flex gap-1.5">
-                  {outcomes.map(({ score, cat, col }) => (
-                    <div key={cat} className={`flex-1 rounded border ${col} px-1.5 py-1 text-center ${tip === cat ? '' : 'opacity-50'}`}>
-                      <div className="text-xs font-bold font-mono">{score ? `${score.i}:${score.j}` : '–'}</div>
-                      <div className="text-[10px] text-gray-600">{score ? `${Math.round(score.p * 100)}%` : ''}</div>
+                  {scores.map((s, idx) => (
+                    <div key={`${s.i}-${s.j}`} className={`flex-1 rounded border ${col} px-1.5 py-1 text-center ${idx === 0 ? '' : 'opacity-60'}`}>
+                      <div className="text-xs font-bold font-mono">{s.i}:{s.j}</div>
+                      <div className="text-[10px] text-gray-600">{Math.round(s.p * 100)}%</div>
                     </div>
                   ))}
                 </div>

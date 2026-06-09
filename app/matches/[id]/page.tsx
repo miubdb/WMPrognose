@@ -35,8 +35,8 @@ function topScorelines(xgA: number, xgB: number, rho: number, n = 8): { i: numbe
   return scores.sort((a, b) => b.p - a.p).slice(0, n)
 }
 
-// Best score per outcome category (A wins / draw / B wins)
-function bestConditionalScores(xgA: number, xgB: number, rho: number) {
+// Top N scores within a predicted outcome category
+function topConditionalScores(xgA: number, xgB: number, rho: number, outcome: '1' | 'X' | '2', n = 3): { i: number; j: number; p: number }[] {
   const pmf = (lambda: number, k: number) => {
     if (lambda <= 0) return k === 0 ? 1 : 0
     let logP = k * Math.log(lambda) - lambda
@@ -50,17 +50,15 @@ function bestConditionalScores(xgA: number, xgB: number, rho: number) {
     if (i === 1 && j === 1) return 1 - rho
     return 1
   }
-  type S = { i: number; j: number; p: number }
-  let winA: S | null = null, draw: S | null = null, winB: S | null = null
+  const scores: { i: number; j: number; p: number }[] = []
   for (let i = 0; i <= 7; i++) {
     for (let j = 0; j <= 7; j++) {
-      const p = pmf(xgA, i) * pmf(xgB, j) * dc(i, j)
-      if (i > j && (!winA || p > winA.p)) winA = { i, j, p }
-      if (i === j && (!draw || p > draw.p)) draw = { i, j, p }
-      if (i < j && (!winB || p > winB.p)) winB = { i, j, p }
+      const matches = outcome === '1' ? i > j : outcome === '2' ? j > i : i === j
+      if (!matches) continue
+      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dc(i, j) })
     }
   }
-  return { winA, draw, winB }
+  return scores.sort((a, b) => b.p - a.p).slice(0, n)
 }
 
 function fmtEffect(e: number): string {
@@ -525,25 +523,28 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Wahrscheinlichste Ergebnisse</h2>
 
-        {/* Conditional best score per outcome — matches overview display */}
+        {/* Top-3 scores within predicted outcome */}
         {(() => {
-          const { winA, draw, winB } = bestConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho)
           const tip = analysis.suggestedTip
-          const outcomes = [
-            { score: winA, label: `${analysis.teamA.flag} Sieg`, cat: '1', col: 'border-emerald-800/60 bg-emerald-900/10' },
-            { score: draw,  label: 'Remis',                       cat: 'X', col: 'border-gray-700 bg-gray-800/30' },
-            { score: winB, label: `${analysis.teamB.flag} Sieg`, cat: '2', col: 'border-blue-800/60 bg-blue-900/10' },
-          ]
+          const scores = topConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, tip as '1' | 'X' | '2')
+          const tipLabel = tip === '1' ? `${analysis.teamA.flag} ${analysis.teamA.name} Sieg`
+            : tip === '2' ? `${analysis.teamB.flag} ${analysis.teamB.name} Sieg`
+            : 'Unentschieden'
+          const col = tip === '1' ? 'border-emerald-800/60 bg-emerald-900/10'
+            : tip === '2' ? 'border-blue-800/60 bg-blue-900/10'
+            : 'border-gray-700 bg-gray-800/30'
           return (
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              {outcomes.map(({ score, label, cat, col }) => (
-                <div key={cat} className={`rounded-xl border ${col} p-3 text-center ${tip === cat ? '' : 'opacity-50'}`}>
-                  <div className="text-[10px] text-gray-500 mb-1.5">{label}</div>
-                  <div className="text-2xl font-bold font-mono text-white">{score ? `${score.i}:${score.j}` : '–'}</div>
-                  <div className="text-xs text-gray-500 mt-1">{score ? `${Math.round(score.p * 100)}%` : ''}</div>
-                  {tip === cat && <div className="text-[9px] text-emerald-400 mt-1.5 font-medium">← Prognose</div>}
-                </div>
-              ))}
+            <div className="mb-5">
+              <div className="text-[10px] text-gray-500 mb-2">Prognose: <span className="text-gray-300 font-medium">{tipLabel}</span></div>
+              <div className="grid grid-cols-3 gap-3">
+                {scores.map((s, idx) => (
+                  <div key={`${s.i}-${s.j}`} className={`rounded-xl border ${col} p-3 text-center ${idx === 0 ? '' : 'opacity-60'}`}>
+                    <div className="text-2xl font-bold font-mono text-white">{s.i}:{s.j}</div>
+                    <div className="text-xs text-gray-500 mt-1">{Math.round(s.p * 100)}%</div>
+                    {idx === 0 && <div className="text-[9px] text-emerald-400 mt-1.5 font-medium">Wahrscheinlichstes</div>}
+                  </div>
+                ))}
+              </div>
             </div>
           )
         })()}
@@ -561,7 +562,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             )
           })}
         </div>
-        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: bestes Ergebnis pro Ausgang · Unten: Top-8 alle Ergebnisse</p>
+        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: Top-3 innerhalb Prognosetipp · Unten: Top-8 alle Ergebnisse</p>
       </div>
 
       {/* Modell-Erklärung */}
