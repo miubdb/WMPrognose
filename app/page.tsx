@@ -28,9 +28,35 @@ function topScorelines(xgA: number, xgB: number, rho: number, n = 4): { i: numbe
   for (let i = 0; i <= 7; i++)
     for (let j = 0; j <= 7; j++)
       scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dcFactor(i, j) })
-  return scores
-    .sort((a, b) => b.p - a.p)
-    .slice(0, n)
+  return scores.sort((a, b) => b.p - a.p).slice(0, n)
+}
+
+// Best score per outcome category (A wins / draw / B wins)
+function bestConditionalScores(xgA: number, xgB: number, rho: number) {
+  const pmf = (lambda: number, k: number) => {
+    if (lambda <= 0) return k === 0 ? 1 : 0
+    let logP = k * Math.log(lambda) - lambda
+    for (let i = 1; i <= k; i++) logP -= Math.log(i)
+    return Math.exp(logP)
+  }
+  const dc = (i: number, j: number) => {
+    if (i === 0 && j === 0) return 1 - rho * xgA * xgB
+    if (i === 0 && j === 1) return 1 + rho * xgA
+    if (i === 1 && j === 0) return 1 + rho * xgB
+    if (i === 1 && j === 1) return 1 - rho
+    return 1
+  }
+  type S = { i: number; j: number; p: number }
+  let winA: S | null = null, draw: S | null = null, winB: S | null = null
+  for (let i = 0; i <= 7; i++) {
+    for (let j = 0; j <= 7; j++) {
+      const p = pmf(xgA, i) * pmf(xgB, j) * dc(i, j)
+      if (i > j && (!winA || p > winA.p)) winA = { i, j, p }
+      if (i === j && (!draw || p > draw.p)) draw = { i, j, p }
+      if (i < j && (!winB || p > winB.p)) winB = { i, j, p }
+    }
+  }
+  return { winA, draw, winB }
 }
 
 function todayStr() {
@@ -234,22 +260,24 @@ function MatchCard({
             nameB={analysis.teamB.name}
           />
 
-          {/* Wahrscheinlichste Ergebnisse (Top 3) + Tipp */}
+          {/* Ergebnisse pro Kategorie (konditionell) + Tipp */}
           {(() => {
-            const top3 = topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, 3)
+            const { winA, draw, winB } = bestConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho)
+            const tip = analysis.suggestedTip
+            const outcomes = [
+              { score: winA, cat: '1' as const, col: 'border-emerald-800/50 bg-emerald-900/10 text-emerald-300' },
+              { score: draw,  cat: 'X' as const, col: 'border-gray-700 bg-gray-800/30 text-gray-300' },
+              { score: winB, cat: '2' as const, col: 'border-blue-800/50 bg-blue-900/10 text-blue-300' },
+            ]
             return (
               <div className="mt-2 space-y-1.5">
                 <div className="flex gap-1.5">
-                  {top3.map(({ i, j, p }) => {
-                    const w = i > j ? 'A' : j > i ? 'B' : 'X'
-                    const col = w === 'A' ? 'border-emerald-800/50 bg-emerald-900/10 text-emerald-300' : w === 'B' ? 'border-blue-800/50 bg-blue-900/10 text-blue-300' : 'border-gray-700 bg-gray-800/30 text-gray-300'
-                    return (
-                      <div key={`${i}-${j}`} className={`flex-1 rounded border ${col} px-1.5 py-1 text-center`}>
-                        <div className="text-xs font-bold font-mono">{i}:{j}</div>
-                        <div className="text-[10px] text-gray-600">{Math.round(p * 100)}%</div>
-                      </div>
-                    )
-                  })}
+                  {outcomes.map(({ score, cat, col }) => (
+                    <div key={cat} className={`flex-1 rounded border ${col} px-1.5 py-1 text-center ${tip === cat ? '' : 'opacity-50'}`}>
+                      <div className="text-xs font-bold font-mono">{score ? `${score.i}:${score.j}` : '–'}</div>
+                      <div className="text-[10px] text-gray-600">{score ? `${Math.round(score.p * 100)}%` : ''}</div>
+                    </div>
+                  ))}
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-gray-600">Tipp: <span className="text-gray-400 font-medium">{tipLabel}</span></span>

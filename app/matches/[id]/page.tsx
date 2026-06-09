@@ -29,14 +29,38 @@ function topScorelines(xgA: number, xgB: number, rho: number, n = 8): { i: numbe
     return 1
   }
   const scores: { i: number; j: number; p: number }[] = []
+  for (let i = 0; i <= 7; i++)
+    for (let j = 0; j <= 7; j++)
+      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dcFactor(i, j) })
+  return scores.sort((a, b) => b.p - a.p).slice(0, n)
+}
+
+// Best score per outcome category (A wins / draw / B wins)
+function bestConditionalScores(xgA: number, xgB: number, rho: number) {
+  const pmf = (lambda: number, k: number) => {
+    if (lambda <= 0) return k === 0 ? 1 : 0
+    let logP = k * Math.log(lambda) - lambda
+    for (let i = 1; i <= k; i++) logP -= Math.log(i)
+    return Math.exp(logP)
+  }
+  const dc = (i: number, j: number) => {
+    if (i === 0 && j === 0) return 1 - rho * xgA * xgB
+    if (i === 0 && j === 1) return 1 + rho * xgA
+    if (i === 1 && j === 0) return 1 + rho * xgB
+    if (i === 1 && j === 1) return 1 - rho
+    return 1
+  }
+  type S = { i: number; j: number; p: number }
+  let winA: S | null = null, draw: S | null = null, winB: S | null = null
   for (let i = 0; i <= 7; i++) {
     for (let j = 0; j <= 7; j++) {
-      scores.push({ i, j, p: pmf(xgA, i) * pmf(xgB, j) * dcFactor(i, j) })
+      const p = pmf(xgA, i) * pmf(xgB, j) * dc(i, j)
+      if (i > j && (!winA || p > winA.p)) winA = { i, j, p }
+      if (i === j && (!draw || p > draw.p)) draw = { i, j, p }
+      if (i < j && (!winB || p > winB.p)) winB = { i, j, p }
     }
   }
-  return scores
-    .sort((a, b) => b.p - a.p)
-    .slice(0, n)
+  return { winA, draw, winB }
 }
 
 function fmtEffect(e: number): string {
@@ -499,7 +523,32 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
       {/* Wahrscheinlichste Ergebnisse */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Wahrscheinlichste Ergebnisse</h2>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Wahrscheinlichste Ergebnisse</h2>
+
+        {/* Conditional best score per outcome — matches overview display */}
+        {(() => {
+          const { winA, draw, winB } = bestConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho)
+          const tip = analysis.suggestedTip
+          const outcomes = [
+            { score: winA, label: `${analysis.teamA.flag} Sieg`, cat: '1', col: 'border-emerald-800/60 bg-emerald-900/10' },
+            { score: draw,  label: 'Remis',                       cat: 'X', col: 'border-gray-700 bg-gray-800/30' },
+            { score: winB, label: `${analysis.teamB.flag} Sieg`, cat: '2', col: 'border-blue-800/60 bg-blue-900/10' },
+          ]
+          return (
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              {outcomes.map(({ score, label, cat, col }) => (
+                <div key={cat} className={`rounded-xl border ${col} p-3 text-center ${tip === cat ? '' : 'opacity-50'}`}>
+                  <div className="text-[10px] text-gray-500 mb-1.5">{label}</div>
+                  <div className="text-2xl font-bold font-mono text-white">{score ? `${score.i}:${score.j}` : '–'}</div>
+                  <div className="text-xs text-gray-500 mt-1">{score ? `${Math.round(score.p * 100)}%` : ''}</div>
+                  {tip === cat && <div className="text-[9px] text-emerald-400 mt-1.5 font-medium">← Prognose</div>}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+
+        {/* All top scores for full reference */}
         <div className="grid grid-cols-4 gap-2">
           {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho).map(({ i, j, p }) => {
             const winner = i > j ? 'A' : j > i ? 'B' : 'X'
@@ -512,7 +561,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             )
           })}
         </div>
-        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles-Modell · Grün = {analysis.teamA.flag} gewinnt · Blau = {analysis.teamB.flag} gewinnt · Sortiert nach Wahrscheinlichkeit</p>
+        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: bestes Ergebnis pro Ausgang · Unten: Top-8 alle Ergebnisse</p>
       </div>
 
       {/* Modell-Erklärung */}
