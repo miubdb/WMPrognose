@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
-import { analyzeAllMatches, type MatchAnalysis, type SquadSummary } from '@/lib/modelAdapter'
+import type { MatchAnalysis } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 import { MODEL_META } from '@/lib/model/config'
 
@@ -329,30 +329,31 @@ export default function Dashboard() {
   const [activeGroup, setActiveGroup] = useState('Alle')
   const [matchday, setMatchday] = useState(0)
   const [filterDate, setFilterDate] = useState<string | null>(null)
-  const [squadData, setSquadData] = useState<Record<string, SquadSummary>>({})
-  const [eloOverrides, setEloOverrides] = useState<Record<string, number>>({})
-  const [eloSources, setEloSources] = useState<Record<string, string>>({})
+  // Server-computed analyses — single source of truth, always matches detail page
+  const [allAnalyses, setAllAnalyses] = useState<MatchAnalysis[]>([])
   const [results, setResults] = useState<Record<string, MatchResult>>({})
 
-  useEffect(() => {
+  const fetchContext = useCallback(() => {
     fetch('/api/match-context', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
-        if (data.squadData) setSquadData(data.squadData)
-        if (data.eloOverrides) setEloOverrides(data.eloOverrides)
-        if (data.eloSources) setEloSources(data.eloSources)
+        if (data.matchAnalyses) setAllAnalyses(data.matchAnalyses)
         if (data.results) setResults(data.results)
       })
       .catch(() => {/* silently ignore */})
   }, [])
 
+  useEffect(() => { fetchContext() }, [fetchContext])
+
   const handleResultSaved = useCallback((matchId: string, r: MatchResult) => {
+    // Optimistic update for immediate score display
     setResults(prev => ({ ...prev, [matchId]: r }))
-  }, [])
+    // Re-fetch server-computed analyses so pressure/motivation updates correctly
+    fetchContext()
+  }, [fetchContext])
 
   const analyses = useMemo(() => {
-    const all = analyzeAllMatches(squadData, eloOverrides, eloSources, results)
-    return all
+    return allAnalyses
       .filter(a => {
         const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
         if (activeGroup !== 'Alle' && match.group !== activeGroup) return false
@@ -366,7 +367,7 @@ export default function Dashboard() {
         const d = ma.date.localeCompare(mb.date)
         return d !== 0 ? d : ma.kickoffUTC.localeCompare(mb.kickoffUTC)
       })
-  }, [activeGroup, matchday, filterDate, squadData, eloOverrides, eloSources, results])
+  }, [allAnalyses, activeGroup, matchday, filterDate])
 
   // Group by date for display
   const byDate = useMemo(() => {

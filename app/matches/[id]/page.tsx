@@ -123,11 +123,12 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     age: number | null; rating: number | null
   }
 
-  // Per-team ELO sources for data quality (matches match-context API behavior)
+  // Per-team ELO sources for data quality — use 'fallback-apr2025' when source is null
+  // but row exists (prevents false "ELO nicht vorhanden" warning)
   const eloRows = eloRes.data ?? []
-  const eloSourceByTeam: Record<string, string | null> = {}
+  const eloSourceByTeam: Record<string, string> = {}
   for (const r of eloRows) {
-    eloSourceByTeam[(r as { team_id: string }).team_id] = (r as { source?: string | null }).source ?? null
+    eloSourceByTeam[(r as { team_id: string }).team_id] = (r as { source?: string | null }).source ?? 'fallback-apr2025'
   }
 
   function buildSquadSummary(players: PlayerRow[], teamId: string): SquadSummary & { usingStartingXI: boolean } {
