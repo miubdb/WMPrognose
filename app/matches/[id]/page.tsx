@@ -123,13 +123,14 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     age: number | null; rating: number | null
   }
 
-  // Determine elo source for data quality scoring
-  // Use the actual source field from the DB if available; fall back to 'fallback-apr2025' when ELO exists but no source is set
+  // Per-team ELO sources for data quality (matches match-context API behavior)
   const eloRows = eloRes.data ?? []
-  const firstEloSource = eloRows.length > 0 ? (eloRows[0] as { team_id: string; elo_rating: number; source?: string | null }).source ?? 'fallback-apr2025' : null
-  const eloSourceForQuality: string | null = eloRows.length > 0 ? firstEloSource : null
+  const eloSourceByTeam: Record<string, string | null> = {}
+  for (const r of eloRows) {
+    eloSourceByTeam[(r as { team_id: string }).team_id] = (r as { source?: string | null }).source ?? null
+  }
 
-  function buildSquadSummary(players: PlayerRow[]): SquadSummary & { usingStartingXI: boolean } {
+  function buildSquadSummary(players: PlayerRow[], teamId: string): SquadSummary & { usingStartingXI: boolean } {
     const startingXI = players.filter(p => p.is_in_starting_xi === true)
     const effectivePlayers = startingXI.length >= 11 ? startingXI : players
     const usingStartingXI = startingXI.length >= 11
@@ -140,19 +141,19 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     return {
       ...base,
       usingStartingXI,
-      dataQuality: computeDataQuality(players, eloSourceForQuality),
+      dataQuality: computeDataQuality(players, eloSourceByTeam[teamId] ?? null),
     }
   }
 
   const squadData: Record<string, SquadSummary> = {}
   const lineupStatus: Record<string, boolean> = {}
   if ((squadA.data?.length ?? 0) > 0) {
-    const s = buildSquadSummary(squadA.data as PlayerRow[])
+    const s = buildSquadSummary(squadA.data as PlayerRow[], match.teamAId)
     lineupStatus[match.teamAId] = s.usingStartingXI
     squadData[match.teamAId] = s
   }
   if ((squadB.data?.length ?? 0) > 0) {
-    const s = buildSquadSummary(squadB.data as PlayerRow[])
+    const s = buildSquadSummary(squadB.data as PlayerRow[], match.teamBId)
     lineupStatus[match.teamBId] = s.usingStartingXI
     squadData[match.teamBId] = s
   }

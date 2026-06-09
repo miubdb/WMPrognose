@@ -48,11 +48,7 @@ export const PRESET_ENSEMBLES: EnsembleConfig[] = [
 
 // ─── Scoreline Helper ─────────────────────────────────────────────────────────
 
-function topScorelinesFromXG(
-  xgA: number,
-  xgB: number,
-  n = 3
-): { goalsA: number; goalsB: number; p: number }[] {
+function allScorelinesFromXG(xgA: number, xgB: number): { goalsA: number; goalsB: number; p: number }[] {
   const pmf = (lambda: number, k: number): number => {
     if (lambda <= 0) return k === 0 ? 1 : 0
     let logP = k * Math.log(lambda) - lambda
@@ -71,7 +67,22 @@ function topScorelinesFromXG(
   for (let a = 0; a <= 7; a++)
     for (let b = 0; b <= 7; b++)
       scores.push({ goalsA: a, goalsB: b, p: pmf(xgA, a) * pmf(xgB, b) * dc(a, b) })
-  return scores.sort((a, b) => b.p - a.p).slice(0, n)
+  return scores.sort((a, b) => b.p - a.p)
+}
+
+function topScorelinesFromXG(xgA: number, xgB: number, n = 3) {
+  return allScorelinesFromXG(xgA, xgB).slice(0, n)
+}
+
+// Best score within the predicted outcome category (1=home win, X=draw, 2=away win)
+function bestConditionalScore(xgA: number, xgB: number, outcome: '1' | 'X' | '2'): { goalsA: number; goalsB: number } {
+  const all = allScorelinesFromXG(xgA, xgB)
+  const filtered = all.filter(s =>
+    outcome === '1' ? s.goalsA > s.goalsB :
+    outcome === '2' ? s.goalsB > s.goalsA :
+    s.goalsA === s.goalsB
+  )
+  return filtered[0] ?? { goalsA: 1, goalsB: 1 }
 }
 
 // ─── Name-zu-ID Mapping ───────────────────────────────────────────────────────
@@ -305,10 +316,11 @@ export function evaluateModel(
     if (correct) correctCount++
     count++
 
-    // Exact scoreline accuracy
+    // Exact scoreline accuracy — use conditional score (most likely within predicted outcome)
     const top3 = topScorelinesFromXG(xgA, xgB, 3)
-    const predictedScoreA = top3[0]?.goalsA ?? 0
-    const predictedScoreB = top3[0]?.goalsB ?? 0
+    const conditional = bestConditionalScore(xgA, xgB, predictedOutcome)
+    const predictedScoreA = conditional.goalsA
+    const predictedScoreB = conditional.goalsB
     const exactScoreHit = predictedScoreA === m.homeGoals && predictedScoreB === m.awayGoals
     const top3ScoreHit = top3.some(s => s.goalsA === m.homeGoals && s.goalsB === m.awayGoals)
     if (exactScoreHit) exactScoreHits++
