@@ -84,7 +84,7 @@ export const COACH_CONFIG = {
 
 export const MODEL_META = {
   version: 'v3.3-final',
-  baseGoalRate: 1.50,
+  baseGoalRate: 1.30,
   dixonColesRho: -0.08,     // DC-Korrektur: erhöht 0-0/1-1 Wahrscheinlichkeit, reduziert Ausreißer-Scores
   maxGoals: 10,             // Score-Matrix 0..10
   logLambdaMin: Math.log(0.3),

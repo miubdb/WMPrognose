@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -40,10 +40,39 @@ function MarketValueBadge({ mv }: { mv: number | null }) {
     ? 'text-gray-300'
     : 'text-gray-500'
   return (
-    <span className={`ml-auto flex-shrink-0 text-[10px] font-mono tabular-nums ${color}`}>
+    <span className={`flex-shrink-0 text-[10px] font-mono tabular-nums ${color}`}>
       {label}
     </span>
   )
+}
+
+// ── xG/xGA Stat-Indikator ─────────────────────────────────────────────────────
+
+function StatBadge({ position, xg, xga }: { position: string | null; xg: number | null; xga: number | null }) {
+  const pos = position ?? ''
+
+  if ((pos === 'FWD' || pos === 'MID') && (xg ?? 0) > 0) {
+    const v = xg!
+    const color = v >= 0.25 ? 'text-emerald-400' : v >= 0.12 ? 'text-blue-400' : 'text-gray-500'
+    return (
+      <span className={`flex-shrink-0 text-[9px] font-mono tabular-nums ${color}`} title="xG/90">
+        {v.toFixed(2)} xG
+      </span>
+    )
+  }
+
+  if ((pos === 'DEF' || pos === 'GK') && (xga ?? 0) > 0) {
+    const v = xga!
+    // lower xGA = better = greener
+    const color = v <= 0.8 ? 'text-emerald-400' : v <= 1.3 ? 'text-blue-400' : 'text-gray-500'
+    return (
+      <span className={`flex-shrink-0 text-[9px] font-mono tabular-nums ${color}`} title="xGA/90">
+        {v.toFixed(2)} xGA
+      </span>
+    )
+  }
+
+  return null
 }
 
 // ── Per-team lineup panel ─────────────────────────────────────────────────────
@@ -133,6 +162,7 @@ function TeamLineup({
                         {p.jersey_number ?? '–'}
                       </span>
                       <span className="truncate flex-1">{p.name}</span>
+                      <StatBadge position={p.position} xg={p.xg_per90} xga={p.xga_per90} />
                       <MarketValueBadge mv={p.market_value_m} />
                     </button>
                   )
@@ -148,39 +178,74 @@ function TeamLineup({
 
 // ── Main editor ───────────────────────────────────────────────────────────────
 
-export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamData }) {
+export function LineupEditor({
+  matchId,
+  teamA,
+  teamB,
+  xgA,
+  xgB,
+}: {
+  matchId: string
+  teamA: TeamData
+  teamB: TeamData
+  xgA?: number
+  xgB?: number
+}) {
   const router = useRouter()
   const [playersA, setPlayersA] = useState(teamA.players)
   const [playersB, setPlayersB] = useState(teamB.players)
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(true)
+  const [needsRefresh, setNeedsRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const pendingSaves = useRef(0)
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Debounced refresh: fires 1.5s after all saves complete
-  const scheduleRefresh = useCallback(() => {
-    if (refreshTimer.current) clearTimeout(refreshTimer.current)
-    refreshTimer.current = setTimeout(() => {
-      if (pendingSaves.current === 0) {
-        setRefreshing(true)
-        router.refresh()
-        setTimeout(() => setRefreshing(false), 800)
-      }
-    }, 1500)
+  // Restore selections from sessionStorage on mount (survives same-tab navigation)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = sessionStorage.getItem(`lineup-${matchId}`)
+    if (!stored) return
+    const { selected } = JSON.parse(stored) as { selected: string[] }
+    setPlayersA(ps => ps.map(p => ({ ...p, is_in_starting_xi: selected.includes(p.id) })))
+    setPlayersB(ps => ps.map(p => ({ ...p, is_in_starting_xi: selected.includes(p.id) })))
+  }, [matchId])
+
+  // Persist selected player IDs to sessionStorage
+  const persistToSession = useCallback((newA: LineupPlayer[], newB: LineupPlayer[]) => {
+    if (typeof window === 'undefined') return
+    const selected = [
+      ...newA.filter(p => p.is_in_starting_xi).map(p => p.id),
+      ...newB.filter(p => p.is_in_starting_xi).map(p => p.id),
+    ]
+    sessionStorage.setItem(`lineup-${matchId}`, JSON.stringify({ selected }))
+  }, [matchId])
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
+    router.refresh()
+    setTimeout(() => { setRefreshing(false); setNeedsRefresh(false) }, 1000)
   }, [router])
 
   const toggle = useCallback(async (id: string, current: boolean, isTeamA: boolean) => {
     const next = !current
+
     const applyUpdate = (ps: LineupPlayer[]) =>
       ps.map(p => p.id === id ? { ...p, is_in_starting_xi: next } : p)
     const revert = (ps: LineupPlayer[]) =>
       ps.map(p => p.id === id ? { ...p, is_in_starting_xi: current } : p)
 
-    // Optimistic update
-    if (isTeamA) setPlayersA(applyUpdate)
-    else setPlayersB(applyUpdate)
+    // Optimistic update + persist to sessionStorage immediately
+    let nextA = playersA
+    let nextB = playersB
+    if (isTeamA) {
+      nextA = applyUpdate(playersA)
+      setPlayersA(nextA)
+    } else {
+      nextB = applyUpdate(playersB)
+      setPlayersB(nextB)
+    }
+    persistToSession(nextA, nextB)
 
     setSavingIds(prev => new Set(prev).add(id))
     setError(null)
@@ -196,16 +261,20 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
         const data = await res.json().catch(() => ({})) as { error?: string }
         throw new Error(data.error ?? `Fehler ${res.status}`)
       }
+      setNeedsRefresh(true)
     } catch (err) {
       if (isTeamA) setPlayersA(revert)
       else setPlayersB(revert)
+      persistToSession(
+        isTeamA ? revert(playersA) : playersA,
+        isTeamA ? playersB : revert(playersB),
+      )
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSavingIds(prev => { const s = new Set(prev); s.delete(id); return s })
       pendingSaves.current = Math.max(0, pendingSaves.current - 1)
-      scheduleRefresh()
     }
-  }, [scheduleRefresh])
+  }, [playersA, playersB, persistToSession])
 
   const startA = playersA.filter(p => p.is_in_starting_xi).length
   const startB = playersB.filter(p => p.is_in_starting_xi).length
@@ -217,17 +286,34 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
         onClick={() => setOpen(o => !o)}
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-800/40 transition-colors"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm font-semibold">Erwartete Aufstellung</span>
           <span className="text-xs text-gray-500">
             {teamA.flag} {startA}/11 · {teamB.flag} {startB}/11
           </span>
-          {refreshing && (
-            <span className="text-xs text-emerald-500 animate-pulse">Prognose wird aktualisiert…</span>
+          {xgA !== undefined && xgB !== undefined && lineupComplete && (
+            <span className="text-xs text-gray-600 font-mono">
+              Prognose: <span className="text-gray-300">{xgA.toFixed(1)} – {xgB.toFixed(1)} xG</span>
+            </span>
           )}
         </div>
         <span className="text-gray-600 text-xs">{open ? '▲ Einklappen' : '▼ Aufstellung eintragen'}</span>
       </button>
+
+      {needsRefresh && pendingSaves.current === 0 && (
+        <div className="border-t border-emerald-800/30 bg-emerald-900/10 px-4 py-2 flex items-center justify-between gap-3">
+          <span className="text-xs text-emerald-400">
+            Aufstellung gespeichert — Prognose oben neu berechnen?
+          </span>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-xs px-3 py-1 rounded bg-emerald-800/50 text-emerald-300 hover:bg-emerald-700/50 transition-colors disabled:opacity-50"
+          >
+            {refreshing ? 'Wird geladen…' : '⟳ Prognose aktualisieren'}
+          </button>
+        </div>
+      )}
 
       {!lineupComplete && (startA > 0 || startB > 0) && (
         <div className="border-t border-amber-800/30 bg-amber-900/10 px-4 py-2 text-xs text-amber-400 flex items-center gap-2">
@@ -242,8 +328,11 @@ export function LineupEditor({ teamA, teamB }: { teamA: TeamData; teamB: TeamDat
 
       {open && (
         <div className="border-t border-gray-800 p-4">
-          <p className="text-xs text-gray-600 mb-3">
-            Spieler anklicken = Startelf. Max. 11 pro Team. Zahl rechts = Marktwert in M€.
+          <p className="text-xs text-gray-600 mb-1">
+            Spieler anklicken = Startelf. Max. 11 pro Team.
+          </p>
+          <p className="text-xs text-gray-700 mb-3">
+            Stat-Farben: <span className="text-emerald-400">stark</span> · <span className="text-blue-400">gut</span> · <span className="text-gray-500">schwach</span> — xG/90 für Angriff &amp; Mittelfeld, xGA/90 für Abwehr &amp; Tor (niedriger = besser)
           </p>
 
           {error && (

@@ -605,7 +605,7 @@ export function analyzeMatch(
 
   // 1. ELO-Rating (Hvattum & Arntzen 2010)
   const eloDiff = eloA - eloB
-  const eloLogEffectA = clampLogEffect(MODEL_WEIGHTS.elo * eloDiff, 0.25)
+  const eloLogEffectA = clampLogEffect(MODEL_WEIGHTS.elo * eloDiff, 0.35)
   factors.push({
     category: 'elo',
     label: 'ELO-Rating',
@@ -1047,12 +1047,17 @@ export function analyzeMatch(
   const draw = rawDraw * (1 - regressionWeight) + uniform * regressionWeight
   const winB = rawWinB * (1 - regressionWeight) + uniform * regressionWeight
 
-  // Bestes Ergebnis
+  // Bestes Ergebnis — X wenn kein Team die Prognose klar dominiert (≤10pp über Draw-Wahrscheinlichkeit)
   let suggestedTip: '1' | 'X' | '2'
   let maxProb: number
-  if (winA >= winB && winA >= draw) { suggestedTip = '1'; maxProb = winA }
-  else if (winB > winA && winB > draw) { suggestedTip = '2'; maxProb = winB }
-  else { suggestedTip = 'X'; maxProb = draw }
+  const favWin = Math.max(winA, winB)
+  if (favWin - draw <= 0.10) {
+    suggestedTip = 'X'; maxProb = draw
+  } else if (winA >= winB) {
+    suggestedTip = '1'; maxProb = winA
+  } else {
+    suggestedTip = '2'; maxProb = winB
+  }
 
   let confidence: 'very_high' | 'high' | 'medium' | 'low'
   if (maxProb >= 0.65) confidence = 'very_high'

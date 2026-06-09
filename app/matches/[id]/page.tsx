@@ -638,6 +638,9 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
       {/* Lineup Editor */}
       <LineupEditor
+        matchId={match.id}
+        xgA={analysis.expectedGoalsA}
+        xgB={analysis.expectedGoalsB}
         teamA={{ id: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, players: (squadA.data ?? []) as LineupPlayer[] }}
         teamB={{ id: match.teamBId, name: analysis.teamB.name, flag: analysis.teamB.flag, players: (squadB.data ?? []) as LineupPlayer[] }}
       />
