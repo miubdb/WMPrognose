@@ -80,6 +80,20 @@ export async function GET() {
   // (which also runs analyzeMatch server-side with the same DB data).
   const matchAnalyses = analyzeAllMatches(squadData, eloOverrides, eloSources, results)
 
+  // Temporary debug: log A1 analysis + squad inputs
+  const a1 = matchAnalyses.find(m => m.matchId === 'A1')
+  const mexStarters = (playersByTeam['mexico'] ?? []).filter(p => p.is_in_starting_xi).length
+  const saStarters = (playersByTeam['south_africa'] ?? []).filter(p => p.is_in_starting_xi).length
+  console.log('DEBUG A1', JSON.stringify({
+    xgA: a1?.expectedGoalsA, xgB: a1?.expectedGoalsB,
+    mexTotal: playersByTeam['mexico']?.length, mexStarters,
+    mexMV: squadData['mexico']?.totalMarketValueM,
+    saTotal: playersByTeam['south_africa']?.length, saStarters,
+    saMV: squadData['south_africa']?.totalMarketValueM,
+    mexXgAtk: squadData['mexico']?.avgXgPer90Attack,
+    saXgAtk: squadData['south_africa']?.avgXgPer90Attack,
+  }))
+
   return NextResponse.json(
     { squadData, eloOverrides, results, eloSources, matchAnalyses },
     { headers: { 'Cache-Control': 'no-store' } }
