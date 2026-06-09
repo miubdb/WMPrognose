@@ -62,6 +62,11 @@ const TEAM_NAME_ALIASES: Record<string, string[]> = {
   curacao:      ['Curaçao', 'Curacao', 'CUW'],
   bosnia:       ['Bosnia', 'Bosnia and Herzegovina', 'Bosnien', 'BIH'],
   thailand:     ['Thailand', 'THA'],
+  norway:       ['Norway', 'Norwegen', 'NOR'],
+  uzbekistan:   ['Uzbekistan', 'Usbekistan', 'UZB'],
+  jordan:       ['Jordan', 'Jordanien', 'JOR'],
+  iraq:         ['Iraq', 'Irak', 'IRQ'],
+  south_africa: ['South Africa', 'Südafrika', 'RSA', 'SAF'],
 }
 
 // Build reverse lookup: normalized name → team_id
