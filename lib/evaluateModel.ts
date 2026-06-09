@@ -3,7 +3,8 @@ import {
   rps, logLoss, brierScore, RANDOM_RPS, computeECE, computeDatasetBaselineRPS,
 } from '@/lib/model/evaluation'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
-import { corePredict, type CoreTeamData, type MatchMotivation } from '@/lib/model/corePredict'
+import { corePredict, corePredictFull, type CoreTeamData, type MatchMotivation } from '@/lib/model/corePredict'
+import { MODEL_META } from '@/lib/model/config'
 import { getHistoricalSnapshot, type TournamentId } from '@/src/data/historicalSnapshots'
 
 // ─── Evaluation Mode ─────────────────────────────────────────────────────────
@@ -44,6 +45,34 @@ export const PRESET_ENSEMBLES: EnsembleConfig[] = [
   { label: 'ELO-only baseline',             weights: { eloOnly: 1.00, fullModel: 0.00, uniform: 0.00 } },
   { label: 'Full Model only',               weights: { eloOnly: 0.00, fullModel: 1.00, uniform: 0.00 } },
 ]
+
+// ─── Scoreline Helper ─────────────────────────────────────────────────────────
+
+function topScorelinesFromXG(
+  xgA: number,
+  xgB: number,
+  n = 3
+): { goalsA: number; goalsB: number; p: number }[] {
+  const pmf = (lambda: number, k: number): number => {
+    if (lambda <= 0) return k === 0 ? 1 : 0
+    let logP = k * Math.log(lambda) - lambda
+    for (let i = 1; i <= k; i++) logP -= Math.log(i)
+    return Math.exp(logP)
+  }
+  const rho = MODEL_META.dixonColesRho
+  const dc = (a: number, b: number): number => {
+    if (a === 0 && b === 0) return 1 - rho * xgA * xgB
+    if (a === 0 && b === 1) return 1 + rho * xgA
+    if (a === 1 && b === 0) return 1 + rho * xgB
+    if (a === 1 && b === 1) return 1 - rho
+    return 1
+  }
+  const scores: { goalsA: number; goalsB: number; p: number }[] = []
+  for (let a = 0; a <= 7; a++)
+    for (let b = 0; b <= 7; b++)
+      scores.push({ goalsA: a, goalsB: b, p: pmf(xgA, a) * pmf(xgB, b) * dc(a, b) })
+  return scores.sort((a, b) => b.p - a.p).slice(0, n)
+}
 
 // ─── Name-zu-ID Mapping ───────────────────────────────────────────────────────
 
@@ -178,11 +207,18 @@ export interface EvaluationResult {
   // Per-match RPS pairs for bootstrap: [modelRps, eloOnlyRps]
   rpsPairs: Array<[number, number]>
   ensembleComparison?: EnsembleResult[]
+  // Exact scoreline prediction accuracy
+  exactScoreHits: number
+  exactScoreAccuracy: number
+  top3ScoreHits: number
+  top3ScoreAccuracy: number
   perMatch: Array<{
     homeTeam: string; awayTeam: string; homeGoals: number; awayGoals: number
     predWin: number; predDraw: number; predLoss: number
     rps: number; outcome: 'W' | 'D' | 'L'; phase: string; group?: string
     predicted: '1' | 'X' | '2'; correct: boolean; tournament: string
+    predictedScoreA: number; predictedScoreB: number
+    exactScoreHit: boolean; top3ScoreHit: boolean
   }>
 }
 
@@ -200,6 +236,7 @@ export function evaluateModel(
   const perMatch: EvaluationResult['perMatch'] = []
   let totalRPS = 0, totalLogLoss = 0, totalBrier = 0, totalEloOnlyRPS = 0
   let correctCount = 0, count = 0
+  let exactScoreHits = 0, top3ScoreHits = 0
 
   const allPredictions: [number, number, number][] = []
   const allObserved:   [number, number, number][] = []
@@ -237,7 +274,7 @@ export function evaluateModel(
       mustWinB: m.mustWinAway ?? false,
     } : {}
 
-    const [predWin, predDraw, predLoss] = corePredict(teamA, teamB, motivation, {}, modeParams)
+    const { probs: [predWin, predDraw, predLoss], xgA, xgB } = corePredictFull(teamA, teamB, motivation, {}, modeParams)
     // ELO-only baseline: no motivation, no MV, no heritage — pure ELO signal
     const [eloWin, eloDraw, eloLoss]   = corePredict(eloTeamA, eloTeamB, {}, {}, eloParams)
 
@@ -267,6 +304,15 @@ export function evaluateModel(
     totalBrier += matchBrier
     if (correct) correctCount++
     count++
+
+    // Exact scoreline accuracy
+    const top3 = topScorelinesFromXG(xgA, xgB, 3)
+    const predictedScoreA = top3[0]?.goalsA ?? 0
+    const predictedScoreB = top3[0]?.goalsB ?? 0
+    const exactScoreHit = predictedScoreA === m.homeGoals && predictedScoreB === m.awayGoals
+    const top3ScoreHit = top3.some(s => s.goalsA === m.homeGoals && s.goalsB === m.awayGoals)
+    if (exactScoreHit) exactScoreHits++
+    if (top3ScoreHit) top3ScoreHits++
 
     allPredictions.push(predicted)
     allObserved.push(observed)
@@ -308,6 +354,7 @@ export function evaluateModel(
       rps: matchRPS, outcome, phase: m.phase, group: m.group,
       predicted: predictedOutcome, correct,
       tournament: m.tournament,
+      predictedScoreA, predictedScoreB, exactScoreHit, top3ScoreHit,
     })
   }
 
@@ -419,6 +466,10 @@ export function evaluateModel(
     tournamentBreakdown,
     rpsPairs,
     ensembleComparison,
+    exactScoreHits,
+    exactScoreAccuracy: count > 0 ? exactScoreHits / count : 0,
+    top3ScoreHits,
+    top3ScoreAccuracy: count > 0 ? top3ScoreHits / count : 0,
     perMatch,
   }
 }

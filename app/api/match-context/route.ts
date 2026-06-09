@@ -66,8 +66,14 @@ export async function GET() {
     results[row.match_id] = { goals_a: row.goals_a, goals_b: row.goals_b }
   }
 
+  const eloSources: Record<string, string> = {}
+  for (const row of eloRes.data ?? []) {
+    const src = (row as { source?: string | null }).source
+    if (src) eloSources[row.team_id] = src
+  }
+
   return NextResponse.json(
-    { squadData, eloOverrides, results },
+    { squadData, eloOverrides, results, eloSources },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }

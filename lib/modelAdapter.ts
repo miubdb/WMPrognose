@@ -20,6 +20,7 @@ import { computeTournamentHeritage } from '@/lib/model/coachScore'
 import { computeSquadRating, type SquadPlayer } from '@/lib/model/squadRating'
 import { computePenaltyWinProbability, defaultPenaltySkills } from '@/lib/model/penaltyShootout'
 import { MOTIVATION_WEIGHTS } from '@/lib/model/corePredict'
+import { computeGroupStandings, computePressure } from '@/lib/standings'
 
 // ─── TeamData Builder ──────────────────────────────────────────────────────────
 
@@ -1080,9 +1081,22 @@ export function analyzeMatch(
 export function analyzeAllMatches(
   squadData?: Record<string, SquadSummary>,
   eloOverrides?: Record<string, number>,
-  eloSources?: Record<string, string>
+  eloSources?: Record<string, string>,
+  results?: Record<string, { goals_a: number; goals_b: number }>
 ): MatchAnalysis[] {
-  return GROUP_SCHEDULE.map(m => analyzeMatch(m, squadData, undefined, eloOverrides, eloSources))
+  const standings = results ? computeGroupStandings(results) : {}
+  return GROUP_SCHEDULE.map(m => {
+    let pressure: { A: TeamPressure; B: TeamPressure } | undefined
+    if (results && m.group) {
+      const remainingMatchIds = GROUP_SCHEDULE
+        .filter(mm => mm.group === m.group && !results[mm.id])
+        .map(mm => mm.id)
+      const pressureA = computePressure(m.teamAId, m.group, standings, remainingMatchIds, results)
+      const pressureB = computePressure(m.teamBId, m.group, standings, remainingMatchIds, results)
+      pressure = { A: pressureA, B: pressureB }
+    }
+    return analyzeMatch(m, squadData, pressure, eloOverrides, eloSources)
+  })
 }
 
 // ─── Tournament Simulation ─────────────────────────────────────────────────────

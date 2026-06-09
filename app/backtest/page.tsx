@@ -173,15 +173,31 @@ export default function BacktestPage() {
               color={data.correctTendency >= 0.5 ? 'text-emerald-400' : 'text-yellow-400'} />
           </div>
 
+          {/* Exact scoreline accuracy */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard
+              label="Genaue Ergebnisse"
+              value={`${data.exactScoreHits}/${data.matchCount}`}
+              sub={`${(data.exactScoreAccuracy * 100).toFixed(1)}% — Top-1 exakt`}
+              color={data.exactScoreAccuracy >= 0.10 ? 'text-emerald-400' : 'text-yellow-400'}
+            />
+            <StatCard
+              label="Top-3 Ergebnisse"
+              value={`${data.top3ScoreHits}/${data.matchCount}`}
+              sub={`${(data.top3ScoreAccuracy * 100).toFixed(1)}% — Actual in Top-3`}
+              color={data.top3ScoreAccuracy >= 0.25 ? 'text-emerald-400' : 'text-yellow-400'}
+            />
             <StatCard label="ECE" value={(data.ece * 100).toFixed(1) + '%'} sub="Kalibrierungsfehler (↓ besser)"
               color={data.ece < 0.04 ? 'text-emerald-400' : data.ece < 0.08 ? 'text-yellow-400' : 'text-red-400'} />
-            <StatCard label="MCE" value={(data.mce * 100).toFixed(1) + '%'} sub="Max Calib. Error"
-              color={data.mce < 0.10 ? 'text-emerald-400' : data.mce < 0.20 ? 'text-yellow-400' : 'text-red-400'} />
             <StatCard label="Draw Rate"
               value={(data.drawRate * 100).toFixed(0) + '%'}
               sub={`Prognose Ø: ${(data.drawPredictionAvg * 100).toFixed(0)}%`}
               color={Math.abs(data.drawRate - data.drawPredictionAvg) < 0.03 ? 'text-emerald-400' : 'text-yellow-400'} />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="MCE" value={(data.mce * 100).toFixed(1) + '%'} sub="Max Calib. Error"
+              color={data.mce < 0.10 ? 'text-emerald-400' : data.mce < 0.20 ? 'text-yellow-400' : 'text-red-400'} />
             <StatCard label="LogLoss" value={data.avgLogLoss.toFixed(4)} sub={`Brier: ${data.avgBrier.toFixed(4)}`} color="text-gray-300" />
           </div>
 
@@ -285,22 +301,31 @@ export default function BacktestPage() {
                   <th className="px-3 py-2">Heim</th>
                   <th className="px-3 py-2 text-center">Erg.</th>
                   <th className="px-3 py-2">Gast</th>
+                  <th className="px-3 py-2 text-center">Tipp</th>
                   <th className="px-3 py-2 text-right">1</th>
                   <th className="px-3 py-2 text-right">X</th>
                   <th className="px-3 py-2 text-right">2</th>
-                  <th className="px-3 py-2 text-center">OK?</th>
+                  <th className="px-3 py-2 text-center">Tend.</th>
                   <th className="px-3 py-2 text-right">RPS</th>
                 </tr></thead>
                 <tbody>
                   {data.perMatch.map((m, i) => {
-                    const rowBg = m.correct ? 'bg-emerald-900/10' : m.predicted === 'X' ? 'bg-yellow-900/10' : 'bg-red-900/10'
+                    const rowBg = m.exactScoreHit ? 'bg-emerald-900/20' : m.correct ? 'bg-emerald-900/8' : m.predicted === 'X' ? 'bg-yellow-900/10' : 'bg-red-900/10'
                     return (
                       <tr key={i} className={`border-b border-gray-800/40 hover:bg-gray-800/20 ${rowBg}`}>
                         <td className="px-3 py-1.5 text-gray-600 font-mono text-[10px]">{m.tournament}</td>
                         <td className="px-3 py-1.5 text-gray-500">{PHASE_LABELS[m.phase] ?? m.phase}</td>
                         <td className="px-3 py-1.5 text-gray-300">{m.homeTeam}</td>
-                        <td className="px-3 py-1.5 text-center font-mono text-white font-bold">{m.homeGoals}:{m.awayGoals}</td>
+                        <td className="px-3 py-1.5 text-center">
+                          <span className="font-mono text-white font-bold">{m.homeGoals}:{m.awayGoals}</span>
+                        </td>
                         <td className="px-3 py-1.5 text-gray-300">{m.awayTeam}</td>
+                        <td className="px-3 py-1.5 text-center">
+                          <span className={`font-mono font-bold ${m.exactScoreHit ? 'text-emerald-400' : m.top3ScoreHit ? 'text-yellow-400' : 'text-gray-500'}`}>
+                            {m.predictedScoreA}:{m.predictedScoreB}
+                          </span>
+                          {m.exactScoreHit && <span className="ml-1 text-emerald-400">✓</span>}
+                        </td>
                         <td className={`px-3 py-1.5 text-right font-mono ${m.outcome === 'W' ? 'text-white font-bold' : 'text-gray-500'}`}>{(m.predWin * 100).toFixed(0)}%</td>
                         <td className={`px-3 py-1.5 text-right font-mono ${m.outcome === 'D' ? 'text-white font-bold' : 'text-gray-500'}`}>{(m.predDraw * 100).toFixed(0)}%</td>
                         <td className={`px-3 py-1.5 text-right font-mono ${m.outcome === 'L' ? 'text-white font-bold' : 'text-gray-500'}`}>{(m.predLoss * 100).toFixed(0)}%</td>

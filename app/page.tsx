@@ -331,6 +331,7 @@ export default function Dashboard() {
   const [filterDate, setFilterDate] = useState<string | null>(null)
   const [squadData, setSquadData] = useState<Record<string, SquadSummary>>({})
   const [eloOverrides, setEloOverrides] = useState<Record<string, number>>({})
+  const [eloSources, setEloSources] = useState<Record<string, string>>({})
   const [results, setResults] = useState<Record<string, MatchResult>>({})
 
   useEffect(() => {
@@ -339,6 +340,7 @@ export default function Dashboard() {
       .then(data => {
         if (data.squadData) setSquadData(data.squadData)
         if (data.eloOverrides) setEloOverrides(data.eloOverrides)
+        if (data.eloSources) setEloSources(data.eloSources)
         if (data.results) setResults(data.results)
       })
       .catch(() => {/* silently ignore */})
@@ -349,7 +351,7 @@ export default function Dashboard() {
   }, [])
 
   const analyses = useMemo(() => {
-    const all = analyzeAllMatches(squadData, eloOverrides)
+    const all = analyzeAllMatches(squadData, eloOverrides, eloSources, results)
     return all
       .filter(a => {
         const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
@@ -364,7 +366,7 @@ export default function Dashboard() {
         const d = ma.date.localeCompare(mb.date)
         return d !== 0 ? d : ma.kickoffUTC.localeCompare(mb.kickoffUTC)
       })
-  }, [activeGroup, matchday, filterDate, squadData, eloOverrides])
+  }, [activeGroup, matchday, filterDate, squadData, eloOverrides, eloSources, results])
 
   // Group by date for display
   const byDate = useMemo(() => {
