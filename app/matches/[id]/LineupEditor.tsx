@@ -31,7 +31,7 @@ const POS_LABELS: Record<string, string> = { GK: 'Tor', DEF: 'Abwehr', MID: 'Mit
 
 function MarketValueBadge({ mv }: { mv: number | null }) {
   if (!mv || mv <= 0) return null
-  const label = mv >= 100 ? `${Math.round(mv)}M` : mv >= 10 ? `${mv.toFixed(0)}M` : `${mv.toFixed(1)}M`
+  const label = mv >= 100 ? `${Math.round(mv)}M` : mv >= 10 ? `${mv.toFixed(0)}M` : mv >= 1 ? `${mv.toFixed(1)}M` : `${Math.round(mv * 1000)}T`
   const color = mv >= 80
     ? 'text-amber-300'
     : mv >= 30
