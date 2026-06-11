@@ -551,6 +551,8 @@ export interface MatchAnalysis {
   expectedGoalsA: number
   expectedGoalsB: number
   suggestedTip: '1' | 'X' | '2'
+  suggestedScoreA: number
+  suggestedScoreB: number
   confidence: 'very_high' | 'high' | 'medium' | 'low'
   factors: MatchFactor[]
   squadDataA: boolean
@@ -581,7 +583,7 @@ export function analyzeMatch(
       venueId: match.venueId, venueName: venue.name, venueCity: venue.city,
       winProbA: 0.33, drawProb: 0.34, winProbB: 0.33,
       expectedGoalsA: 1.3, expectedGoalsB: 1.3,
-      suggestedTip: 'X', confidence: 'low', factors: [],
+      suggestedTip: 'X', suggestedScoreA: 1, suggestedScoreB: 1, confidence: 'low', factors: [],
       squadDataA: false, squadDataB: false,
       dataQualityA: null, dataQualityB: null, regressionWeight: 1,
     }
@@ -1048,17 +1050,17 @@ export function analyzeMatch(
   const draw = rawDraw * (1 - regressionWeight) + uniform * regressionWeight
   const winB = rawWinB * (1 - regressionWeight) + uniform * regressionWeight
 
-  // Bestes Ergebnis — X wenn kein Team die Prognose klar dominiert (≤10pp über Draw-Wahrscheinlichkeit)
-  let suggestedTip: '1' | 'X' | '2'
-  let maxProb: number
-  const favWin = Math.max(winA, winB)
-  if (favWin - draw <= 0.10) {
-    suggestedTip = 'X'; maxProb = draw
-  } else if (winA >= winB) {
-    suggestedTip = '1'; maxProb = winA
-  } else {
-    suggestedTip = '2'; maxProb = winB
+  // Tipp = Ausgang des wahrscheinlichsten einzelnen Ergebnisses aus der Score-Matrix
+  let bestSI = 0, bestSJ = 0, bestSP = 0
+  for (const row of correctedMatrix) {
+    for (const cell of row) {
+      if (cell.probability > bestSP) { bestSP = cell.probability; bestSI = cell.goalsA; bestSJ = cell.goalsB }
+    }
   }
+  const suggestedScoreA = bestSI
+  const suggestedScoreB = bestSJ
+  const suggestedTip: '1' | 'X' | '2' = bestSI > bestSJ ? '1' : bestSI < bestSJ ? '2' : 'X'
+  const maxProb = suggestedTip === '1' ? winA : suggestedTip === '2' ? winB : draw
 
   let confidence: 'very_high' | 'high' | 'medium' | 'low'
   if (maxProb >= 0.65) confidence = 'very_high'
@@ -1074,7 +1076,7 @@ export function analyzeMatch(
     winProbB: Math.round(winB * 1000) / 1000,
     expectedGoalsA: Math.round(xgA * 100) / 100,
     expectedGoalsB: Math.round(xgB * 100) / 100,
-    suggestedTip, confidence, factors,
+    suggestedTip, suggestedScoreA, suggestedScoreB, confidence, factors,
     squadDataA: hasSquadA,
     squadDataB: hasSquadB,
     pressureA: pressure?.A,

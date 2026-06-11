@@ -257,7 +257,7 @@ function MatchCard({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-gray-200">
                     <span className={tip === '1' ? 'text-emerald-400' : tip === '2' ? 'text-blue-400' : 'text-gray-500'}>→</span>
-                    {' '}{tipLabel} · {scores[0].i}:{scores[0].j}
+                    {' '}{tipLabel} · {analysis.suggestedScoreA}:{analysis.suggestedScoreB}
                   </span>
                   <span className={`text-xs font-medium shrink-0 ${confLabel.color}`}>{confLabel.label}</span>
                 </div>
