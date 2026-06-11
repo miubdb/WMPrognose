@@ -541,7 +541,6 @@ export default async function MatchDetailPage({ params }: { params: { id: string
                   <div key={`${s.i}-${s.j}`} className={`rounded-xl border ${col} p-3 text-center ${idx === 0 ? '' : 'opacity-60'}`}>
                     <div className="text-2xl font-bold font-mono text-white">{s.i}:{s.j}</div>
                     <div className="text-xs text-gray-500 mt-1">{Math.round(s.p * 100)}%</div>
-                    {idx === 0 && <div className="text-[9px] text-emerald-400 mt-1.5 font-medium">Wahrscheinlichstes</div>}
                   </div>
                 ))}
               </div>
@@ -551,18 +550,19 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
         {/* All top scores for full reference */}
         <div className="grid grid-cols-4 gap-2">
-          {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho).map(({ i, j, p }) => {
+          {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho).map(({ i, j, p }, idx) => {
             const winner = i > j ? 'A' : j > i ? 'B' : 'X'
             const color = winner === 'A' ? 'border-emerald-800/60 bg-emerald-900/10' : winner === 'B' ? 'border-blue-800/60 bg-blue-900/10' : 'border-gray-700 bg-gray-800/30'
             return (
               <div key={`${i}-${j}`} className={`rounded-lg border ${color} p-2 text-center`}>
                 <div className="text-sm font-bold font-mono text-white">{i}:{j}</div>
                 <div className="text-[10px] text-gray-500 mt-0.5">{Math.round(p * 100)}%</div>
+                {idx === 0 && <div className="text-[9px] text-emerald-400 mt-1 font-medium">★ Wahrscheinlichstes</div>}
               </div>
             )
           })}
         </div>
-        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: Top-3 innerhalb Prognosetipp · Unten: Top-8 alle Ergebnisse</p>
+        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: Top-3 beim Prognosetipp · Unten: Top-8 alle Ergebnisse · ★ = insgesamt wahrscheinlichstes Ergebnis</p>
       </div>
 
       {/* Modell-Erklärung */}
