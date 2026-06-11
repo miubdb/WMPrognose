@@ -52,6 +52,22 @@ function MarketValueBadge({ mv }: { mv: number | null }) {
   )
 }
 
+// ── Sofascore Rating Badge ────────────────────────────────────────────────────
+
+function RatingBadge({ rating }: { rating: number | null }) {
+  if (!rating || rating <= 0) return null
+  const color = rating >= 8.0 ? 'text-amber-300'
+    : rating >= 7.0 ? 'text-emerald-400'
+    : rating >= 6.5 ? 'text-blue-400'
+    : rating >= 6.0 ? 'text-gray-400'
+    : 'text-red-400'
+  return (
+    <span className={`flex-shrink-0 text-[10px] font-mono tabular-nums font-semibold ${color}`}>
+      {rating.toFixed(1)}
+    </span>
+  )
+}
+
 // ── xG/xGA Stat-Indikator ─────────────────────────────────────────────────────
 
 function StatBadge({ position, xg, xga }: { position: string | null; xg: number | null; xga: number | null }) {
@@ -178,6 +194,7 @@ function TeamLineup({
                       </span>
                       <span className="truncate flex-1">{p.name}</span>
                       {suspended && <span className="text-[9px] text-red-500 font-semibold flex-shrink-0">GESPERRT</span>}
+                      {!suspended && <RatingBadge rating={p.rating} />}
                       {!suspended && <StatBadge position={p.position} xg={p.xg_per90} xga={p.xga_per90} />}
                       {!suspended && <MarketValueBadge mv={p.market_value_m} />}
                     </button>
