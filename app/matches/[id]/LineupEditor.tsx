@@ -194,9 +194,7 @@ function TeamLineup({
                       </span>
                       <span className="truncate flex-1">{p.name}</span>
                       {suspended && <span className="text-[9px] text-red-500 font-semibold flex-shrink-0">GESPERRT</span>}
-                      {!suspended && <RatingBadge rating={p.rating} />}
-                      {!suspended && <StatBadge position={p.position} xg={p.xg_per90} xga={p.xga_per90} />}
-                      {!suspended && <MarketValueBadge mv={p.market_value_m} />}
+                      {!suspended && (p.rating ? <RatingBadge rating={p.rating} /> : <MarketValueBadge mv={p.market_value_m} />)}
                     </button>
                   )
                 })}
