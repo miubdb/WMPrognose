@@ -98,7 +98,7 @@ function MatchCard({
   const [saveError, setSaveError] = useState<string | null>(null)
 
   const kickoff = new Date(`${match.date}T${match.kickoffUTC}:00Z`)
-  const isPast = kickoff.getTime() + 110 * 60 * 1000 < Date.now() // ~110 min nach Anpfiff
+  const isPast = kickoff.getTime() + 85 * 60 * 1000 < Date.now() // ~85 min nach Anpfiff
 
   const confLabel = {
     'very_high': { label: 'Sehr sicher', color: 'text-emerald-400' },
