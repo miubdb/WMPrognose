@@ -527,6 +527,7 @@ export interface SquadSummary {
   avgXgaPer90Defense?: number   // market-value-weighted xGA/90 of DEF+GK
   avgDefenseScore?: number      // composite 0-100: xGA + Tackles + Clearances + GC
   avgRating?: number            // average player rating (1–100) of effective players
+  avgMatchRating?: number       // avg Sofascore match rating (0–10) — recent form signal
   avgAge?: number               // average age of effective players
   dataQuality?: DataQualityScore
 }
@@ -722,6 +723,30 @@ export function analyzeMatch(
       confidence: (defScoreA !== null && defScoreB !== null) ? 0.70 : 0.0,
       isCalibrated: false,
       explanation: 'Composite-Score 0–100 aus: xGA/90 der Verteidiger (50%), Tackles/90 (30%), Clearances/90 (20%) für DEF; GK: Goals Conceded/90 (60%) + xGA (40%). Market-Value gewichtet. Höher = bessere Defensive.',
+    })
+  }
+
+  // 2c-form. Sofascore Formfaktor — nur wenn mindestens ein Team echte Match-Ratings hat
+  const formRatingA = squadData?.[match.teamAId]?.avgMatchRating ?? null
+  const formRatingB = squadData?.[match.teamBId]?.avgMatchRating ?? null
+  if (formRatingA !== null || formRatingB !== null) {
+    const BASELINE = 6.5
+    const rA = formRatingA ?? BASELINE
+    const rB = formRatingB ?? BASELINE
+    const formLogEffectA = clampLogEffect(MODEL_WEIGHTS.matchRating * ((rA - BASELINE) - (rB - BASELINE)), 0.12)
+    factors.push({
+      category: 'squad',
+      label: 'Aktuelle Form (Sofascore)',
+      source: 'Sofascore Match-Ratings WM 2026',
+      valueA: formRatingA !== null ? `Ø ${rA.toFixed(2)}` : 'Keine Daten',
+      valueB: formRatingB !== null ? `Ø ${rB.toFixed(2)}` : 'Keine Daten',
+      logEffectA: formLogEffectA,
+      logEffectB: -formLogEffectA,
+      effectA: logEffectToLinear(formLogEffectA),
+      effectB: logEffectToLinear(-formLogEffectA),
+      confidence: (formRatingA !== null && formRatingB !== null) ? 0.70 : 0.40,
+      isCalibrated: false,
+      explanation: 'Durchschnittliche Sofascore-Bewertung der Spieler aus dem letzten WM-Spiel. Baseline 6.5 — Teams über/unter diesem Wert erhalten einen kleinen Form-Bonus/-Malus.',
     })
   }
 

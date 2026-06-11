@@ -17,6 +17,7 @@ export type PlayerForSquad = {
   clearances_per90?: number | null
   goals_conceded_per90?: number | null
   age?: number | null
+  rating?: number | null  // Sofascore match rating 1–10
 }
 
 function norm100(v: number, min: number, max: number, invert = false): number {
@@ -92,6 +93,10 @@ export function computeSquadSummary(players: PlayerForSquad[]): Omit<SquadSummar
 
   const aged = players.filter(p => (p.age ?? 0) > 0)
   if (aged.length > 0) summary.avgAge = aged.reduce((s, p) => s + p.age!, 0) / aged.length
+
+  // Sofascore match rating — simple average of players with a rating (> 0)
+  const rated = players.filter(p => (p.rating ?? 0) > 0)
+  if (rated.length >= 5) summary.avgMatchRating = rated.reduce((s, p) => s + p.rating!, 0) / rated.length
 
   return summary
 }

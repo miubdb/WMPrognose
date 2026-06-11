@@ -7,7 +7,7 @@ import type { SquadSummary } from '@/lib/modelAdapter'
 
 export const dynamic = 'force-dynamic'
 
-const PLAYER_SELECT = 'team_id, market_value_m, position, age, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, rating'
+const PLAYER_SELECT = 'team_id, market_value_m, position, age, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, rating, suspended, suspended_until_date'
 
 export async function GET() {
   // Fetch players in two batches — Supabase PostgREST caps at max_rows=1000
@@ -32,6 +32,8 @@ export async function GET() {
     clearances_per90: number | null
     goals_conceded_per90: number | null
     is_in_starting_xi: boolean | null
+    suspended: boolean | null
+    suspended_until_date: string | null
   }
 
   const allPlayers = [...(batch1.data ?? []), ...(batch2.data ?? [])] as RawPlayerRow[]
@@ -50,11 +52,17 @@ export async function GET() {
     eloSourceByTeam[row.team_id] = (row as { source?: string | null }).source ?? 'fallback-apr2025'
   }
 
-  // SquadSummary + DataQuality
+  // Today's date for suspension filtering
+  const today = new Date().toISOString().slice(0, 10)
+
+  // SquadSummary + DataQuality — suspended players excluded from effective squad
   const squadData: Record<string, SquadSummary> = {}
   for (const [tid, players] of Object.entries(playersByTeam)) {
-    const starters = players.filter(p => p.is_in_starting_xi)
-    const effective = starters.length >= 11 ? starters : players
+    const active = players.filter(p =>
+      !p.suspended || !p.suspended_until_date || p.suspended_until_date < today
+    )
+    const starters = active.filter(p => p.is_in_starting_xi)
+    const effective = starters.length >= 11 ? starters : active
     const base = computeSquadSummary(effective)
     const dq = computeDataQuality(players, eloSourceByTeam[tid] ?? null)
     squadData[tid] = { ...base, dataQuality: dq }

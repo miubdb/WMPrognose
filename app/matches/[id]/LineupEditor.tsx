@@ -15,6 +15,8 @@ export interface LineupPlayer {
   age: number | null
   rating: number | null
   is_in_starting_xi: boolean | null
+  suspended: boolean | null
+  suspended_until_date: string | null
 }
 
 interface TeamData {
@@ -26,6 +28,10 @@ interface TeamData {
 
 const POS_ORDER = ['GK', 'DEF', 'MID', 'FWD']
 const POS_LABELS: Record<string, string> = { GK: 'Tor', DEF: 'Abwehr', MID: 'Mittelfeld', FWD: 'Sturm' }
+
+function isSuspendedForMatch(p: LineupPlayer, matchDate: string): boolean {
+  return !!p.suspended && !!p.suspended_until_date && p.suspended_until_date >= matchDate
+}
 
 // ── Marktwert-Badge ───────────────────────────────────────────────────────────
 
@@ -81,17 +87,19 @@ function TeamLineup({
   team,
   onToggle,
   savingIds,
+  matchDate,
 }: {
   team: TeamData
   onToggle: (id: string, current: boolean) => void
   savingIds: Set<string>
+  matchDate: string
 }) {
   const byPos = POS_ORDER.reduce((acc, pos) => {
     acc[pos] = team.players.filter(p => p.position === pos)
     return acc
   }, {} as Record<string, LineupPlayer[]>)
 
-  const startingCount = team.players.filter(p => p.is_in_starting_xi).length
+  const startingCount = team.players.filter(p => p.is_in_starting_xi && !isSuspendedForMatch(p, matchDate)).length
   const full = startingCount >= 11
 
   return (
@@ -128,18 +136,21 @@ function TeamLineup({
                   {POS_LABELS[pos]}
                 </div>
                 {group.map(p => {
-                  const isSelected = !!p.is_in_starting_xi
+                  const suspended = isSuspendedForMatch(p, matchDate)
+                  const isSelected = !!p.is_in_starting_xi && !suspended
                   const isSaving = savingIds.has(p.id)
-                  const blocked = full && !isSelected
+                  const blocked = (full && !isSelected) || suspended
 
                   return (
                     <button
                       key={p.id}
                       onClick={() => !blocked && !isSaving && onToggle(p.id, isSelected)}
                       disabled={blocked || isSaving}
-                      title={blocked ? 'Bereits 11 ausgewählt – zuerst einen anderen abwählen' : undefined}
+                      title={suspended ? `Gesperrt bis ${p.suspended_until_date}` : blocked ? 'Bereits 11 ausgewählt – zuerst einen anderen abwählen' : undefined}
                       className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors mb-0.5 text-left group ${
-                        isSelected
+                        suspended
+                          ? 'bg-red-900/20 border border-red-800/40 text-red-400/60 cursor-not-allowed'
+                          : isSelected
                           ? 'bg-emerald-900/30 border border-emerald-700/50 text-emerald-300'
                           : blocked
                           ? 'bg-gray-800/20 border border-transparent text-gray-600 cursor-not-allowed opacity-50'
@@ -149,11 +160,15 @@ function TeamLineup({
                       }`}
                     >
                       <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${
-                        isSelected
+                        suspended
+                          ? 'border-red-700 bg-red-900/40'
+                          : isSelected
                           ? 'bg-emerald-500 border-emerald-500'
                           : 'border-gray-600'
                       }`}>
-                        {isSaving
+                        {suspended
+                          ? <span className="text-[8px] text-red-400 font-bold">✕</span>
+                          : isSaving
                           ? <span className="block w-1.5 h-1.5 rounded-full bg-gray-500 animate-pulse" />
                           : isSelected && <span className="text-[8px] text-black font-bold">✓</span>
                         }
@@ -162,8 +177,9 @@ function TeamLineup({
                         {p.jersey_number ?? '–'}
                       </span>
                       <span className="truncate flex-1">{p.name}</span>
-                      <StatBadge position={p.position} xg={p.xg_per90} xga={p.xga_per90} />
-                      <MarketValueBadge mv={p.market_value_m} />
+                      {suspended && <span className="text-[9px] text-red-500 font-semibold flex-shrink-0">GESPERRT</span>}
+                      {!suspended && <StatBadge position={p.position} xg={p.xg_per90} xga={p.xga_per90} />}
+                      {!suspended && <MarketValueBadge mv={p.market_value_m} />}
                     </button>
                   )
                 })}
@@ -180,12 +196,14 @@ function TeamLineup({
 
 export function LineupEditor({
   matchId,
+  matchDate,
   teamA,
   teamB,
   xgA,
   xgB,
 }: {
   matchId: string
+  matchDate: string
   teamA: TeamData
   teamB: TeamData
   xgA?: number
@@ -346,12 +364,14 @@ export function LineupEditor({
               team={{ ...teamA, players: playersA }}
               onToggle={(id, cur) => toggle(id, cur, true)}
               savingIds={savingIds}
+              matchDate={matchDate}
             />
             <div className="w-px bg-gray-800 flex-shrink-0" />
             <TeamLineup
               team={{ ...teamB, players: playersB }}
               onToggle={(id, cur) => toggle(id, cur, false)}
               savingIds={savingIds}
+              matchDate={matchDate}
             />
           </div>
         </div>

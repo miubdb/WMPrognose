@@ -130,8 +130,8 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   // Fetch all data in parallel
   const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, rating').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, rating, suspended, suspended_until_date').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, rating, suspended, suspended_until_date').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
     supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
@@ -143,6 +143,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     tackles_per90: number | null; clearances_per90: number | null; goals_conceded_per90: number | null
     is_in_starting_xi: boolean | null
     age: number | null; rating: number | null
+    suspended: boolean | null; suspended_until_date: string | null
   }
 
   // Per-team ELO sources for data quality — use 'fallback-apr2025' when source is null
@@ -154,8 +155,12 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   }
 
   function buildSquadSummary(players: PlayerRow[], teamId: string): SquadSummary & { usingStartingXI: boolean } {
-    const startingXI = players.filter(p => p.is_in_starting_xi === true)
-    const effectivePlayers = startingXI.length >= 11 ? startingXI : players
+    // Exclude suspended players for this specific match date
+    const active = players.filter(p =>
+      !p.suspended || !p.suspended_until_date || p.suspended_until_date < match!.date
+    )
+    const startingXI = active.filter(p => p.is_in_starting_xi === true)
+    const effectivePlayers = startingXI.length >= 11 ? startingXI : active
     const usingStartingXI = startingXI.length >= 11
 
     // Zentrale Berechnung — identische Logik wie match-context und simulate
@@ -639,6 +644,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       {/* Lineup Editor */}
       <LineupEditor
         matchId={match.id}
+        matchDate={match.date}
         xgA={analysis.expectedGoalsA}
         xgB={analysis.expectedGoalsB}
         teamA={{ id: match.teamAId, name: analysis.teamA.name, flag: analysis.teamA.flag, players: (squadA.data ?? []) as LineupPlayer[] }}
