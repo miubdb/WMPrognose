@@ -233,6 +233,7 @@ export function LineupEditor({
   const [needsRefresh, setNeedsRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const pendingSaves = useRef(0)
+  const pendingRefresh = useRef(false)
 
   // Restore selections from sessionStorage on mount (survives same-tab navigation)
   useEffect(() => {
@@ -295,6 +296,7 @@ export function LineupEditor({
         throw new Error(data.error ?? `Fehler ${res.status}`)
       }
       setNeedsRefresh(true)
+      pendingRefresh.current = true
     } catch (err) {
       if (isTeamA) setPlayersA(revert)
       else setPlayersB(revert)
@@ -306,8 +308,16 @@ export function LineupEditor({
     } finally {
       setSavingIds(prev => { const s = new Set(prev); s.delete(id); return s })
       pendingSaves.current = Math.max(0, pendingSaves.current - 1)
+      // Auto-refresh once all saves are done so the S11 indicator updates immediately
+      if (pendingSaves.current === 0 && pendingRefresh.current) {
+        pendingRefresh.current = false
+        setNeedsRefresh(false)
+        setRefreshing(true)
+        router.refresh()
+        setTimeout(() => setRefreshing(false), 1200)
+      }
     }
-  }, [playersA, playersB, persistToSession])
+  }, [playersA, playersB, persistToSession, router])
 
   const startA = playersA.filter(p => p.is_in_starting_xi).length
   const startB = playersB.filter(p => p.is_in_starting_xi).length
