@@ -13,7 +13,7 @@ export interface LineupPlayer {
   xg_per90: number | null
   xga_per90: number | null
   age: number | null
-  rating: number | null
+  sofascore_rating: number | null
   is_in_starting_xi: boolean | null
   suspended: boolean | null
   suspended_until_date: string | null
@@ -194,7 +194,7 @@ function TeamLineup({
                       </span>
                       <span className="truncate flex-1">{p.name}</span>
                       {suspended && <span className="text-[9px] text-red-500 font-semibold flex-shrink-0">GESPERRT</span>}
-                      {!suspended && (p.rating ? <RatingBadge rating={p.rating} /> : <MarketValueBadge mv={p.market_value_m} />)}
+                      {!suspended && (p.sofascore_rating ? <RatingBadge rating={p.sofascore_rating} /> : <MarketValueBadge mv={p.market_value_m} />)}
                     </button>
                   )
                 })}

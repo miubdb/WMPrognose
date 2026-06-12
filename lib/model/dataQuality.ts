@@ -5,7 +5,6 @@ export interface PlayerDataRow {
   xg_per90: number | null
   is_in_starting_xi: boolean | null
   age: number | null
-  rating: number | null
 }
 
 export function computeDataQuality(
