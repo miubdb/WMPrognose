@@ -160,6 +160,8 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       !p.suspended || !p.suspended_until_date || p.suspended_until_date < match!.date
     )
     const startingXI = active.filter(p => p.is_in_starting_xi === true)
+    // DEBUG: trace actual DB values for is_in_starting_xi
+    console.log(`[DEBUG buildSquadSummary] ${teamId}: total=${players.length} active=${active.length} s11=${startingXI.length} sample_is_in_starting_xi=${JSON.stringify(players.slice(0,5).map(p => p.is_in_starting_xi))} types=${JSON.stringify(players.slice(0,5).map(p => typeof p.is_in_starting_xi))}`)
     const effectivePlayers = startingXI.length >= 11 ? startingXI : active
     const usingStartingXI = startingXI.length >= 11
 
