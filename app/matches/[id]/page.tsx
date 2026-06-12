@@ -329,54 +329,106 @@ export default async function MatchDetailPage({ params }: { params: { id: string
         </div>
       </div>
 
-      {/* Probabilities */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Ausgangsprognose</h2>
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className={`rounded-xl p-4 text-center ${pA > pD && pA > pB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
-            <div className="text-2xl font-bold text-white">{pA}%</div>
-            <div className="text-xs text-gray-400 mt-1">{analysis.teamA.flag} Sieg</div>
-            <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pA - confRange)}–{Math.min(100, pA + confRange)}%</div>
+      {/* Prognose + Wahrscheinlichste Ergebnisse — gemeinsame Karte für Screenshot */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-5">
+        {/* Ausgangsprognose */}
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Ausgangsprognose</h2>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className={`rounded-xl p-4 text-center ${pA > pD && pA > pB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
+              <div className="text-2xl font-bold text-white">{pA}%</div>
+              <div className="text-xs text-gray-400 mt-1">{analysis.teamA.flag} Sieg</div>
+              <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pA - confRange)}–{Math.min(100, pA + confRange)}%</div>
+            </div>
+            <div className={`rounded-xl p-4 text-center ${pD > pA && pD > pB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
+              <div className="text-2xl font-bold text-white">{pD}%</div>
+              <div className="text-xs text-gray-400 mt-1">Unentschieden</div>
+              <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pD - confRange)}–{Math.min(100, pD + confRange)}%</div>
+            </div>
+            <div className={`rounded-xl p-4 text-center ${pB > pA && pB > pD ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
+              <div className="text-2xl font-bold text-white">{pB}%</div>
+              <div className="text-xs text-gray-400 mt-1">{analysis.teamB.flag} Sieg</div>
+              <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pB - confRange)}–{Math.min(100, pB + confRange)}%</div>
+            </div>
           </div>
-          <div className={`rounded-xl p-4 text-center ${pD > pA && pD > pB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
-            <div className="text-2xl font-bold text-white">{pD}%</div>
-            <div className="text-xs text-gray-400 mt-1">Unentschieden</div>
-            <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pD - confRange)}–{Math.min(100, pD + confRange)}%</div>
+
+          {/* Bar */}
+          <div className="flex h-2 rounded-full overflow-hidden gap-px mb-3">
+            <div className="bg-emerald-500" style={{ width: `${pA}%` }} />
+            <div className="bg-gray-600" style={{ width: `${pD}%` }} />
+            <div className="bg-blue-500" style={{ width: `${pB}%` }} />
           </div>
-          <div className={`rounded-xl p-4 text-center ${pB > pA && pB > pD ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
-            <div className="text-2xl font-bold text-white">{pB}%</div>
-            <div className="text-xs text-gray-400 mt-1">{analysis.teamB.flag} Sieg</div>
-            <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{Math.max(0, pB - confRange)}–{Math.min(100, pB + confRange)}%</div>
+
+          {/* Recommendation */}
+          <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${confConfig.bg}`}>
+            <div>
+              <div className="text-xs text-gray-500 mb-0.5">Empfehlung</div>
+              <div className="text-sm font-bold text-white">{tipLabel}</div>
+            </div>
+            <span className={`text-xs font-medium ${confConfig.color}`}>{confConfig.label}</span>
+          </div>
+
+          {/* Data quality / S11 indicator */}
+          <div className="mt-3 flex items-center gap-3 text-[11px] text-gray-600 flex-wrap">
+            <span className={lineupStatus[match.teamAId] ? 'text-emerald-500' : 'text-gray-600'}>
+              {analysis.teamA.flag} {lineupStatus[match.teamAId] ? '✓ S11 aktiv' : '○ Kaderdurchschnitt'}
+            </span>
+            <span className="text-gray-700">·</span>
+            <span className={lineupStatus[match.teamBId] ? 'text-emerald-500' : 'text-gray-600'}>
+              {analysis.teamB.flag} {lineupStatus[match.teamBId] ? '✓ S11 aktiv' : '○ Kaderdurchschnitt'}
+            </span>
+            <span className="text-gray-700">·</span>
+            <span>Datenqualität: {Math.round((analysis.regressionWeight) * 100)}% Regression zur Mitte</span>
           </div>
         </div>
 
-        {/* Bar */}
-        <div className="flex h-2 rounded-full overflow-hidden gap-px mb-3">
-          <div className="bg-emerald-500" style={{ width: `${pA}%` }} />
-          <div className="bg-gray-600" style={{ width: `${pD}%` }} />
-          <div className="bg-blue-500" style={{ width: `${pB}%` }} />
-        </div>
+        {/* Divider */}
+        <div className="border-t border-gray-800" />
 
-        {/* Recommendation */}
-        <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${confConfig.bg}`}>
-          <div>
-            <div className="text-xs text-gray-500 mb-0.5">Empfehlung</div>
-            <div className="text-sm font-bold text-white">{tipLabel}</div>
+        {/* Wahrscheinlichste Ergebnisse */}
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Wahrscheinlichste Ergebnisse</h2>
+
+          {/* Top-3 scores within predicted outcome */}
+          {(() => {
+            const tip = analysis.suggestedTip
+            const scores = topConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, tip as '1' | 'X' | '2')
+            const tipLabel = tip === '1' ? `${analysis.teamA.flag} ${analysis.teamA.name} Sieg`
+              : tip === '2' ? `${analysis.teamB.flag} ${analysis.teamB.name} Sieg`
+              : 'Unentschieden'
+            const col = tip === '1' ? 'border-emerald-800/60 bg-emerald-900/10'
+              : tip === '2' ? 'border-blue-800/60 bg-blue-900/10'
+              : 'border-gray-700 bg-gray-800/30'
+            return (
+              <div className="mb-5">
+                <div className="text-[10px] text-gray-500 mb-2">Prognose: <span className="text-gray-300 font-medium">{tipLabel}</span></div>
+                <div className="grid grid-cols-3 gap-3">
+                  {scores.map((s, idx) => (
+                    <div key={`${s.i}-${s.j}`} className={`rounded-xl border ${col} p-3 text-center ${idx === 0 ? '' : 'opacity-60'}`}>
+                      <div className="text-2xl font-bold font-mono text-white">{s.i}:{s.j}</div>
+                      <div className="text-xs text-gray-500 mt-1">{Math.round(s.p * 100)}%</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* All top scores for full reference */}
+          <div className="grid grid-cols-4 gap-2">
+            {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho).map(({ i, j, p }, idx) => {
+              const winner = i > j ? 'A' : j > i ? 'B' : 'X'
+              const color = winner === 'A' ? 'border-emerald-800/60 bg-emerald-900/10' : winner === 'B' ? 'border-blue-800/60 bg-blue-900/10' : 'border-gray-700 bg-gray-800/30'
+              return (
+                <div key={`${i}-${j}`} className={`rounded-lg border ${color} p-2 text-center`}>
+                  <div className="text-sm font-bold font-mono text-white">{i}:{j}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">{Math.round(p * 100)}%</div>
+                  {idx === 0 && <div className="text-[9px] text-emerald-400 mt-1 font-medium">★ Wahrscheinlichstes</div>}
+                </div>
+              )
+            })}
           </div>
-          <span className={`text-xs font-medium ${confConfig.color}`}>{confConfig.label}</span>
-        </div>
-
-        {/* Data quality / S11 indicator */}
-        <div className="mt-3 flex items-center gap-3 text-[11px] text-gray-600 flex-wrap">
-          <span className={lineupStatus[match.teamAId] ? 'text-emerald-500' : 'text-gray-600'}>
-            {analysis.teamA.flag} {lineupStatus[match.teamAId] ? '✓ S11 aktiv' : '○ Kaderdurchschnitt'}
-          </span>
-          <span className="text-gray-700">·</span>
-          <span className={lineupStatus[match.teamBId] ? 'text-emerald-500' : 'text-gray-600'}>
-            {analysis.teamB.flag} {lineupStatus[match.teamBId] ? '✓ S11 aktiv' : '○ Kaderdurchschnitt'}
-          </span>
-          <span className="text-gray-700">·</span>
-          <span>Datenqualität: {Math.round((analysis.regressionWeight) * 100)}% Regression zur Mitte</span>
+          <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: Top-3 beim Prognosetipp · Unten: Top-8 alle Ergebnisse · ★ = insgesamt wahrscheinlichstes Ergebnis</p>
         </div>
       </div>
 
@@ -523,52 +575,6 @@ export default async function MatchDetailPage({ params }: { params: { id: string
           )}
         </div>
       )}
-
-      {/* Wahrscheinlichste Ergebnisse */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Wahrscheinlichste Ergebnisse</h2>
-
-        {/* Top-3 scores within predicted outcome */}
-        {(() => {
-          const tip = analysis.suggestedTip
-          const scores = topConditionalScores(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho, tip as '1' | 'X' | '2')
-          const tipLabel = tip === '1' ? `${analysis.teamA.flag} ${analysis.teamA.name} Sieg`
-            : tip === '2' ? `${analysis.teamB.flag} ${analysis.teamB.name} Sieg`
-            : 'Unentschieden'
-          const col = tip === '1' ? 'border-emerald-800/60 bg-emerald-900/10'
-            : tip === '2' ? 'border-blue-800/60 bg-blue-900/10'
-            : 'border-gray-700 bg-gray-800/30'
-          return (
-            <div className="mb-5">
-              <div className="text-[10px] text-gray-500 mb-2">Prognose: <span className="text-gray-300 font-medium">{tipLabel}</span></div>
-              <div className="grid grid-cols-3 gap-3">
-                {scores.map((s, idx) => (
-                  <div key={`${s.i}-${s.j}`} className={`rounded-xl border ${col} p-3 text-center ${idx === 0 ? '' : 'opacity-60'}`}>
-                    <div className="text-2xl font-bold font-mono text-white">{s.i}:{s.j}</div>
-                    <div className="text-xs text-gray-500 mt-1">{Math.round(s.p * 100)}%</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* All top scores for full reference */}
-        <div className="grid grid-cols-4 gap-2">
-          {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho).map(({ i, j, p }, idx) => {
-            const winner = i > j ? 'A' : j > i ? 'B' : 'X'
-            const color = winner === 'A' ? 'border-emerald-800/60 bg-emerald-900/10' : winner === 'B' ? 'border-blue-800/60 bg-blue-900/10' : 'border-gray-700 bg-gray-800/30'
-            return (
-              <div key={`${i}-${j}`} className={`rounded-lg border ${color} p-2 text-center`}>
-                <div className="text-sm font-bold font-mono text-white">{i}:{j}</div>
-                <div className="text-[10px] text-gray-500 mt-0.5">{Math.round(p * 100)}%</div>
-                {idx === 0 && <div className="text-[9px] text-emerald-400 mt-1 font-medium">★ Wahrscheinlichstes</div>}
-              </div>
-            )
-          })}
-        </div>
-        <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: Top-3 beim Prognosetipp · Unten: Top-8 alle Ergebnisse · ★ = insgesamt wahrscheinlichstes Ergebnis</p>
-      </div>
 
       {/* Modell-Erklärung */}
       <details className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
