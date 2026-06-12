@@ -17,6 +17,9 @@ export interface LineupPlayer {
   is_in_starting_xi: boolean | null
   suspended: boolean | null
   suspended_until_date: string | null
+  goals: number | null
+  yellow_cards: number | null
+  red_cards: number | null
 }
 
 interface TeamData {
@@ -64,6 +67,29 @@ function RatingBadge({ rating }: { rating: number | null }) {
   return (
     <span className={`flex-shrink-0 text-[10px] font-mono tabular-nums font-semibold ${color}`}>
       {rating.toFixed(1)}
+    </span>
+  )
+}
+
+// ── Turnier-Stats: Tore + Karten ──────────────────────────────────────────────
+
+function TournamentStatsBadge({ p }: { p: LineupPlayer }) {
+  const goals = p.goals ?? 0
+  const yellows = p.yellow_cards ?? 0
+  const reds = p.red_cards ?? 0
+  if (goals === 0 && yellows === 0 && reds === 0) return null
+  return (
+    <span className="flex-shrink-0 flex items-center gap-0.5 text-[9px]">
+      {goals > 0 && <span title={`${goals} Tor(e) im Turnier`}>⚽{goals > 1 ? `×${goals}` : ''}</span>}
+      {yellows > 0 && (
+        <span
+          className={yellows >= 2 ? 'text-red-400 font-bold' : 'text-yellow-400'}
+          title={yellows >= 2 ? 'Gelbsperre! 2. Gelbe Karte → nächstes Spiel gesperrt' : `${yellows}. Gelbe Karte — bei der 2. droht Gelbsperre`}
+        >
+          🟨{yellows > 1 ? `×${yellows}` : ''}
+        </span>
+      )}
+      {reds > 0 && <span title="Rote Karte im Turnier">🟥</span>}
     </span>
   )
 }
@@ -193,6 +219,7 @@ function TeamLineup({
                         {p.jersey_number ?? '–'}
                       </span>
                       <span className="truncate flex-1">{p.name}</span>
+                      <TournamentStatsBadge p={p} />
                       {suspended && <span className="text-[9px] text-red-500 font-semibold flex-shrink-0">GESPERRT</span>}
                       {!suspended && (p.sofascore_rating ? <RatingBadge rating={p.sofascore_rating} /> : <MarketValueBadge mv={p.market_value_m} />)}
                     </button>

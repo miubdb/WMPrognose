@@ -528,6 +528,7 @@ export interface SquadSummary {
   avgDefenseScore?: number      // composite 0-100: xGA + Tackles + Clearances + GC
   avgRating?: number            // average player rating (1–100) of effective players
   avgMatchRating?: number       // avg Sofascore match rating (0–10) — recent form signal
+  tournamentGoals?: number      // WM-2026-Tore der effektiven Spieler — Torschützen-Form
   avgAge?: number               // average age of effective players
   dataQuality?: DataQualityScore
 }
@@ -747,6 +748,27 @@ export function analyzeMatch(
       confidence: (formRatingA !== null && formRatingB !== null) ? 0.70 : 0.40,
       isCalibrated: false,
       explanation: 'Durchschnittliche Sofascore-Bewertung der Spieler aus dem letzten WM-Spiel. Baseline 6.5 — Teams über/unter diesem Wert erhalten einen kleinen Form-Bonus/-Malus.',
+    })
+  }
+
+  // 2c-goals. Torschützen-Form — Turniertore der effektiven Elf (klein, gedeckelt)
+  const tGoalsA = squadData?.[match.teamAId]?.tournamentGoals ?? 0
+  const tGoalsB = squadData?.[match.teamBId]?.tournamentGoals ?? 0
+  if (tGoalsA > 0 || tGoalsB > 0) {
+    const goalsLogEffectA = clampLogEffect(MODEL_WEIGHTS.tournamentGoals * (tGoalsA - tGoalsB), 0.08)
+    factors.push({
+      category: 'squad',
+      label: 'Torschützen in Form',
+      source: 'WM-2026-Tore der aufgestellten Spieler',
+      valueA: `${tGoalsA} Tor(e)`,
+      valueB: `${tGoalsB} Tor(e)`,
+      logEffectA: goalsLogEffectA,
+      logEffectB: -goalsLogEffectA,
+      effectA: logEffectToLinear(goalsLogEffectA),
+      effectB: logEffectToLinear(-goalsLogEffectA),
+      confidence: 0.60,
+      isCalibrated: false,
+      explanation: 'Spieler, die im Turnier bereits getroffen haben, stehen für Abschlussform. Kleiner Bonus pro Tordifferenz der effektiven Elf, gedeckelt auf ±0.08 Log-Effekt.',
     })
   }
 

@@ -30,6 +30,7 @@ export const MODEL_WEIGHTS = {
   defenseScore: 0.12,    // pro 100 Punkte compositem Defensiv-Score (xGA+Tackles+Clearances, 0-100)
   xaAttack: 1.2,         // pro Einheit avgXaPer90Attack-Differenz (Assist-Kreativität, sekundär)
   matchRating: 0.08,     // pro Sofascore-Rating-Punkt über Baseline 6.5 — aktuelle Form (max ±0.12)
+  tournamentGoals: 0.025, // pro Turniertor-Differenz der effektiven Elf — Torschützen in Form (max ±0.08)
   avgRating: 0,           // DEAKTIVIERT v3.3: aus Marktwert abgeleitet = Doppelzählung mit marketValueLog
   avgAge: {
     youngPenaltyPerYear: 0.012, // pro Jahr unter 24
