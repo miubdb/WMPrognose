@@ -130,8 +130,8 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   // Fetch all data in parallel
   const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, sofascore_rating, suspended, suspended_until_date, goals, yellow_cards, red_cards').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
-    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, sofascore_rating, suspended, suspended_until_date, goals, yellow_cards, red_cards').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, sofascore_rating, suspended, suspended_until_date, goals, assists, yellow_cards, red_cards').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
+    supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, sofascore_rating, suspended, suspended_until_date, goals, assists, yellow_cards, red_cards').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
     supabase.from('match_results').select('match_id, goals_a, goals_b'),
     supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
@@ -144,7 +144,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     is_in_starting_xi: boolean | null
     age: number | null; sofascore_rating: number | null
     suspended: boolean | null; suspended_until_date: string | null
-    goals: number | null; yellow_cards: number | null; red_cards: number | null
+    goals: number | null; assists: number | null; yellow_cards: number | null; red_cards: number | null
   }
 
   // Per-team ELO sources for data quality — use 'fallback-apr2025' when source is null

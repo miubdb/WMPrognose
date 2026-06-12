@@ -18,6 +18,7 @@ export interface LineupPlayer {
   suspended: boolean | null
   suspended_until_date: string | null
   goals: number | null
+  assists: number | null
   yellow_cards: number | null
   red_cards: number | null
 }
@@ -75,12 +76,14 @@ function RatingBadge({ rating }: { rating: number | null }) {
 
 function TournamentStatsBadge({ p }: { p: LineupPlayer }) {
   const goals = p.goals ?? 0
+  const assists = p.assists ?? 0
   const yellows = p.yellow_cards ?? 0
   const reds = p.red_cards ?? 0
-  if (goals === 0 && yellows === 0 && reds === 0) return null
+  if (goals === 0 && assists === 0 && yellows === 0 && reds === 0) return null
   return (
     <span className="flex-shrink-0 flex items-center gap-0.5 text-[9px]">
       {goals > 0 && <span title={`${goals} Tor(e) im Turnier`}>⚽{goals > 1 ? `×${goals}` : ''}</span>}
+      {assists > 0 && <span className="text-blue-300" title={`${assists} Vorlage(n) im Turnier`}>👟{assists > 1 ? `×${assists}` : ''}</span>}
       {yellows > 0 && (
         <span
           className={yellows >= 2 ? 'text-red-400 font-bold' : 'text-yellow-400'}
