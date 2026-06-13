@@ -40,6 +40,10 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function yesterdayStr() {
+  return new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+}
+
 function fmtDateHeader(dateStr: string): string {
   const today = todayStr()
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
@@ -335,6 +339,7 @@ export default function Dashboard() {
   const [activeGroup, setActiveGroup] = useState('Alle')
   const [matchday, setMatchday] = useState(0)
   const [filterDate, setFilterDate] = useState<string | null>(null)
+  const [showOldResults, setShowOldResults] = useState(false)
   // Server-computed analyses — single source of truth, always matches detail page
   const [allAnalyses, setAllAnalyses] = useState<MatchAnalysis[]>([])
   const [results, setResults] = useState<Record<string, MatchResult>>({})
@@ -358,13 +363,19 @@ export default function Dashboard() {
     fetchContext()
   }, [fetchContext])
 
+  // In "Alle Gruppen" without any extra filter, hide completed matches older than 1 day
+  const isDefaultView = activeGroup === 'Alle' && matchday === 0 && !filterDate
+
   const analyses = useMemo(() => {
+    const yesterday = yesterdayStr()
     return allAnalyses
       .filter(a => {
         const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
         if (activeGroup !== 'Alle' && match.group !== activeGroup) return false
         if (matchday !== 0 && match.matchday !== matchday) return false
         if (filterDate && match.date !== filterDate) return false
+        // In default "Alle" view: hide finished matches older than 1 day (unless toggled)
+        if (isDefaultView && !showOldResults && results[a.matchId] && match.date < yesterday) return false
         return true
       })
       .sort((a, b) => {
@@ -373,7 +384,16 @@ export default function Dashboard() {
         const d = ma.date.localeCompare(mb.date)
         return d !== 0 ? d : ma.kickoffUTC.localeCompare(mb.kickoffUTC)
       })
-  }, [allAnalyses, activeGroup, matchday, filterDate])
+  }, [allAnalyses, activeGroup, matchday, filterDate, isDefaultView, showOldResults, results])
+
+  const hiddenCount = useMemo(() => {
+    if (!isDefaultView || showOldResults) return 0
+    const yesterday = yesterdayStr()
+    return allAnalyses.filter(a => {
+      const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
+      return results[a.matchId] && match.date < yesterday
+    }).length
+  }, [allAnalyses, isDefaultView, showOldResults, results])
 
   // Group by date for display
   const byDate = useMemo(() => {
@@ -411,7 +431,7 @@ export default function Dashboard() {
           {GROUPS.map(g => (
             <button
               key={g}
-              onClick={() => { setActiveGroup(g); setFilterDate(null) }}
+              onClick={() => { setActiveGroup(g); setFilterDate(null); setShowOldResults(false) }}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                 activeGroup === g && !filterDate
                   ? 'bg-emerald-500 text-black'
@@ -440,7 +460,28 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-600">{analyses.length} Spiele · klicken für vollständige Analyse</p>
+      <p className="text-xs text-gray-600">
+        {analyses.length} Spiele · klicken für vollständige Analyse
+        {hiddenCount > 0 && (
+          <span className="ml-2 text-gray-700">
+            · {hiddenCount} ältere Ergebnis{hiddenCount !== 1 ? 'se' : ''} ausgeblendet
+            <button
+              onClick={() => setShowOldResults(true)}
+              className="ml-1 underline hover:text-gray-500 transition-colors"
+            >
+              (anzeigen)
+            </button>
+          </span>
+        )}
+        {showOldResults && isDefaultView && (
+          <button
+            onClick={() => setShowOldResults(false)}
+            className="ml-2 text-gray-700 underline hover:text-gray-500 transition-colors"
+          >
+            (ältere ausblenden)
+          </button>
+        )}
+      </p>
 
       <div className="space-y-4">
         {byDate.map(({ date, items }) => (
