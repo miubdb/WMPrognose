@@ -1097,24 +1097,29 @@ export function analyzeMatch(
   const draw = rawDraw * (1 - regressionWeight) + uniform * regressionWeight
   const winB = rawWinB * (1 - regressionWeight) + uniform * regressionWeight
 
-  // Wahrscheinlichstes Einzelergebnis — für Scoreboard-Anzeige
-  let bestSI = 0, bestSJ = 0, bestSP = 0
-  for (const row of correctedMatrix) {
-    for (const cell of row) {
-      if (cell.probability > bestSP) { bestSP = cell.probability; bestSI = cell.goalsA; bestSJ = cell.goalsB }
-    }
-  }
-  const suggestedScoreA = bestSI
-  const suggestedScoreB = bestSJ
-
-  // Tipp = wahrscheinlichster AUSGANG (1/X/2), nicht wahrscheinlichstes Einzelergebnis.
+  // Tipp = wahrscheinlichster AUSGANG (1/X/2).
   // Hintergrund: Bei Poisson-Modellen ist 1-1 oft das häufigste Einzelergebnis (~13%),
   // obwohl der Sieg des Favoriten 50%+ Wahrscheinlichkeit hat (auf viele Scores verteilt).
-  // Den Tipp auf den wahrscheinlichsten Ausgang zu stützen ist mathematisch korrekter.
   const suggestedTip: '1' | 'X' | '2' = winA >= draw && winA >= winB ? '1'
     : winB > draw && winB > winA ? '2'
     : 'X'
   const maxProb = suggestedTip === '1' ? winA : suggestedTip === '2' ? winB : draw
+
+  // Vorgeschlagenes Ergebnis = wahrscheinlichstes Einzelergebnis KONSISTENT mit dem Tipp.
+  // So passt "Schweden gewinnt" mit "2:1" zusammen statt widersprüchlich mit "1:1".
+  let bestSI = 0, bestSJ = 0, bestSP = 0
+  for (const row of correctedMatrix) {
+    for (const cell of row) {
+      const consistent = suggestedTip === '1' ? cell.goalsA > cell.goalsB
+        : suggestedTip === '2' ? cell.goalsB > cell.goalsA
+        : cell.goalsA === cell.goalsB
+      if (consistent && cell.probability > bestSP) {
+        bestSP = cell.probability; bestSI = cell.goalsA; bestSJ = cell.goalsB
+      }
+    }
+  }
+  const suggestedScoreA = bestSI
+  const suggestedScoreB = bestSJ
 
   let confidence: 'very_high' | 'high' | 'medium' | 'low'
   if (maxProb >= 0.65) confidence = 'very_high'
