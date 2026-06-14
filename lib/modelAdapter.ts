@@ -1097,7 +1097,7 @@ export function analyzeMatch(
   const draw = rawDraw * (1 - regressionWeight) + uniform * regressionWeight
   const winB = rawWinB * (1 - regressionWeight) + uniform * regressionWeight
 
-  // Tipp = Ausgang des wahrscheinlichsten einzelnen Ergebnisses aus der Score-Matrix
+  // Wahrscheinlichstes Einzelergebnis — für Scoreboard-Anzeige
   let bestSI = 0, bestSJ = 0, bestSP = 0
   for (const row of correctedMatrix) {
     for (const cell of row) {
@@ -1106,7 +1106,14 @@ export function analyzeMatch(
   }
   const suggestedScoreA = bestSI
   const suggestedScoreB = bestSJ
-  const suggestedTip: '1' | 'X' | '2' = bestSI > bestSJ ? '1' : bestSI < bestSJ ? '2' : 'X'
+
+  // Tipp = wahrscheinlichster AUSGANG (1/X/2), nicht wahrscheinlichstes Einzelergebnis.
+  // Hintergrund: Bei Poisson-Modellen ist 1-1 oft das häufigste Einzelergebnis (~13%),
+  // obwohl der Sieg des Favoriten 50%+ Wahrscheinlichkeit hat (auf viele Scores verteilt).
+  // Den Tipp auf den wahrscheinlichsten Ausgang zu stützen ist mathematisch korrekter.
+  const suggestedTip: '1' | 'X' | '2' = winA >= draw && winA >= winB ? '1'
+    : winB > draw && winB > winA ? '2'
+    : 'X'
   const maxProb = suggestedTip === '1' ? winA : suggestedTip === '2' ? winB : draw
 
   let confidence: 'very_high' | 'high' | 'medium' | 'low'
