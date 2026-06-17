@@ -1111,21 +1111,19 @@ export function analyzeMatch(
     : 'X'
   const maxProb = suggestedTip === '1' ? winA : suggestedTip === '2' ? winB : draw
 
-  // Vorgeschlagenes Ergebnis = wahrscheinlichstes Einzelergebnis KONSISTENT mit dem Tipp.
-  // So passt "Schweden gewinnt" mit "2:1" zusammen statt widersprüchlich mit "1:1".
-  let bestSI = 0, bestSJ = 0, bestSP = 0
-  for (const row of correctedMatrix) {
-    for (const cell of row) {
-      const consistent = suggestedTip === '1' ? cell.goalsA > cell.goalsB
-        : suggestedTip === '2' ? cell.goalsB > cell.goalsA
-        : cell.goalsA === cell.goalsB
-      if (consistent && cell.probability > bestSP) {
-        bestSP = cell.probability; bestSI = cell.goalsA; bestSJ = cell.goalsB
-      }
-    }
+  // Vorgeschlagenes Ergebnis = gerundete erwartete Tore (xG), konsistent mit dem Tipp.
+  // Verwendet Erwartungswerte statt Poisson-Modus → realistischere Prognosen (2:1 statt 1:0).
+  let suggestedScoreA = Math.round(xgA)
+  let suggestedScoreB = Math.round(xgB)
+  if (suggestedTip === '1' && suggestedScoreA <= suggestedScoreB) {
+    suggestedScoreA = suggestedScoreB + 1
+  } else if (suggestedTip === '2' && suggestedScoreB <= suggestedScoreA) {
+    suggestedScoreB = suggestedScoreA + 1
+  } else if (suggestedTip === 'X') {
+    const eq = Math.min(suggestedScoreA, suggestedScoreB)
+    suggestedScoreA = eq
+    suggestedScoreB = eq
   }
-  const suggestedScoreA = bestSI
-  const suggestedScoreB = bestSJ
 
   let confidence: 'very_high' | 'high' | 'medium' | 'low'
   if (maxProb >= 0.65) confidence = 'very_high'
