@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/gruppen" className="hover:text-white transition-colors">Gruppen</Link>
               <Link href="/simulation" className="hover:text-white transition-colors">Simulation</Link>
               <Link href="/teams" className="hover:text-white transition-colors">Teams</Link>
+              <Link href="/stats" className="hover:text-white transition-colors">Statistiken</Link>
               <Link href="/daten-modell" className="hover:text-white transition-colors text-amber-400/90">Daten & Modell</Link>
               <Link href="/turnierbaum" className="hover:text-white transition-colors">Turnierbaum</Link>
             </nav>
