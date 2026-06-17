@@ -529,6 +529,7 @@ export interface SquadSummary {
   avgRating?: number            // average player rating (1–100) of effective players
   avgMatchRating?: number       // avg Sofascore match rating (0–10) — recent form signal
   tournamentGoals?: number      // WM-2026-Tore der effektiven Spieler — Torschützen-Form
+  tournamentAssists?: number    // WM-2026-Vorlagen der effektiven Spieler — Kreativ-Form
   avgAge?: number               // average age of effective players
   dataQuality?: DataQualityScore
 }
@@ -751,24 +752,29 @@ export function analyzeMatch(
     })
   }
 
-  // 2c-goals. Torschützen-Form — Turniertore der effektiven Elf (klein, gedeckelt)
+  // 2c-goals. Torschützen & Vorlagen in Form — Tore + 0.5×Vorlagen der effektiven Elf
   const tGoalsA = squadData?.[match.teamAId]?.tournamentGoals ?? 0
   const tGoalsB = squadData?.[match.teamBId]?.tournamentGoals ?? 0
-  if (tGoalsA > 0 || tGoalsB > 0) {
-    const goalsLogEffectA = clampLogEffect(MODEL_WEIGHTS.tournamentGoals * (tGoalsA - tGoalsB), 0.08)
+  const tAssistsA = squadData?.[match.teamAId]?.tournamentAssists ?? 0
+  const tAssistsB = squadData?.[match.teamBId]?.tournamentAssists ?? 0
+  // Combined form units: goals count full, assists count half (assists signal creativity not just finishing)
+  const tFormA = tGoalsA + 0.5 * tAssistsA
+  const tFormB = tGoalsB + 0.5 * tAssistsB
+  if (tFormA > 0 || tFormB > 0) {
+    const goalsLogEffectA = clampLogEffect(MODEL_WEIGHTS.tournamentGoals * (tFormA - tFormB), 0.08)
     factors.push({
       category: 'squad',
-      label: 'Torschützen in Form',
-      source: 'WM-2026-Tore der aufgestellten Spieler',
-      valueA: `${tGoalsA} Tor(e)`,
-      valueB: `${tGoalsB} Tor(e)`,
+      label: 'Torschützen & Vorlagen in Form',
+      source: 'WM-2026-Tore + Vorlagen der aufgestellten Spieler',
+      valueA: `${tGoalsA}G + ${tAssistsA}A`,
+      valueB: `${tGoalsB}G + ${tAssistsB}A`,
       logEffectA: goalsLogEffectA,
       logEffectB: -goalsLogEffectA,
       effectA: logEffectToLinear(goalsLogEffectA),
       effectB: logEffectToLinear(-goalsLogEffectA),
       confidence: 0.60,
       isCalibrated: false,
-      explanation: 'Spieler, die im Turnier bereits getroffen haben, stehen für Abschlussform. Kleiner Bonus pro Tordifferenz der effektiven Elf, gedeckelt auf ±0.08 Log-Effekt.',
+      explanation: 'Spieler, die im Turnier bereits getroffen oder aufgelegt haben, stehen für Abschluss- und Kreativform. Tore zählen voll, Vorlagen halb. Gedeckelt auf ±0.08 Log-Effekt.',
     })
   }
 

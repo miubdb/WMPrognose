@@ -19,6 +19,7 @@ export type PlayerForSquad = {
   age?: number | null
   sofascore_rating?: number | null  // Sofascore match rating 1–10 (separate from legacy 0-100 rating)
   goals?: number | null             // Turniertore (WM 2026)
+  assists?: number | null           // Turniervorlagen (WM 2026)
 }
 
 function norm100(v: number, min: number, max: number, invert = false): number {
@@ -99,8 +100,9 @@ export function computeSquadSummary(players: PlayerForSquad[]): Omit<SquadSummar
   const rated = players.filter(p => (p.sofascore_rating ?? 0) > 0)
   if (rated.length >= 5) summary.avgMatchRating = rated.reduce((s, p) => s + p.sofascore_rating!, 0) / rated.length
 
-  // Turniertore der effektiven Spieler — Torschützen-in-Form-Signal
+  // Turniertore + Vorlagen der effektiven Spieler — Torschützen- & Vorlagen-Form-Signal
   summary.tournamentGoals = players.reduce((s, p) => s + (p.goals ?? 0), 0)
+  summary.tournamentAssists = players.reduce((s, p) => s + (p.assists ?? 0), 0)
 
   return summary
 }
