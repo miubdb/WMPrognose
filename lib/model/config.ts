@@ -86,7 +86,7 @@ export const COACH_CONFIG = {
 
 export const MODEL_META = {
   version: 'v3.3-final',
-  baseGoalRate: 1.40,
+  baseGoalRate: 1.55,   // kalibriert auf WM 2026 Spieltag 1: 75 Tore / 24 Spiele = 1.56/Team
   dixonColesRho: -0.08,     // DC-Korrektur: erhöht 0-0/1-1 Wahrscheinlichkeit, reduziert Ausreißer-Scores
   maxGoals: 10,             // Score-Matrix 0..10
   logLambdaMin: Math.log(0.3),

@@ -1099,9 +1099,25 @@ export function analyzeMatch(
   // quality=1.0 → keine Regression; quality=0.72 → 28% Regression (max ohne Kaderdaten)
   const regressionWeight = 1 - combinedQuality
   const uniform = 1 / 3
-  const winA = rawWinA * (1 - regressionWeight) + uniform * regressionWeight
-  const draw = rawDraw * (1 - regressionWeight) + uniform * regressionWeight
-  const winB = rawWinB * (1 - regressionWeight) + uniform * regressionWeight
+  let winA = rawWinA * (1 - regressionWeight) + uniform * regressionWeight
+  let draw = rawDraw * (1 - regressionWeight) + uniform * regressionWeight
+  let winB = rawWinB * (1 - regressionWeight) + uniform * regressionWeight
+
+  // Turnier-Unentschieden-Bonus: Außenseiter stellen sich defensiv auf → mehr Remis als Poisson vorhersagt.
+  // Empirisch: Spieltag 1 WM 2026 — 9 von 24 Spielen Unentschieden (37.5%), davon viele vs. Großfavoriten.
+  // Boost greift ab 100 ELO-Punkte Differenz, linear bis max 0.07 bei 500+ Punkten Abstand.
+  const absEloDiff = Math.abs(eloDiff)
+  if (absEloDiff > 100) {
+    const drawBoost = Math.min(0.07, (absEloDiff - 100) / 400 * 0.07)
+    if (eloDiff > 0) {
+      winA = Math.max(0, winA - drawBoost)
+    } else {
+      winB = Math.max(0, winB - drawBoost)
+    }
+    draw += drawBoost
+    const total = winA + draw + winB
+    winA /= total; draw /= total; winB /= total
+  }
 
   // Tipp = wahrscheinlichster AUSGANG (1/X/2).
   // Hintergrund: Bei Poisson-Modellen ist 1-1 oft das häufigste Einzelergebnis (~13%),
