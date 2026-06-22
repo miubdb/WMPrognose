@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { TEAM_BY_ID } from '@/src/data/allTeams'
 import { supabase } from '@/lib/supabase'
 import { computeDataQuality } from '@/lib/model/dataQuality'
-import { DeleteButton } from './DeleteButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,76 +170,77 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                 </div>
                 <div className="divide-y divide-gray-800/60">
                   {group.map((p) => {
-                    const hasTournamentStats = (p.goals ?? 0) > 0 || (p.assists ?? 0) > 0 || (p.yellow_cards ?? 0) > 0 || (p.red_cards ?? 0) > 0
                     const app = appearancesByPlayer[p.id]
                     const avgRating = app && app.ratingCount > 0 ? app.ratingSum / app.ratingCount : null
+                    const displayRating = avgRating ?? (Number(p.sofascore_rating) || null)
+                    const ratingTitle = avgRating != null
+                      ? `Ø ${app!.games} Spiele · ${app!.totalMinutes} Min.`
+                      : 'Note letztes Spiel'
+                    const hasTournamentStats = (p.goals ?? 0) > 0 || (p.assists ?? 0) > 0 || (p.yellow_cards ?? 0) > 0 || (p.red_cards ?? 0) > 0
                     return (
-                    <div key={p.id} className={`px-4 py-2.5 ${p.is_in_starting_xi ? 'bg-emerald-950/10' : ''} ${p.suspended ? 'opacity-50' : ''}`}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-600 font-mono w-5 text-right flex-shrink-0">
-                          {p.jersey_number ?? '–'}
-                        </span>
-                        <span className="flex-1 text-sm text-gray-200 min-w-0 truncate">
-                          {p.name}
-                          {p.suspended && <span className="ml-1.5 text-[10px] text-red-400 font-bold">GESPERRT</span>}
-                        </span>
-                        {p.is_in_starting_xi && (
-                          <span className="text-[10px] text-emerald-600 font-medium flex-shrink-0">XI</span>
-                        )}
-                        {app && app.games > 0 && (
-                          <span className="text-[10px] text-gray-500 flex-shrink-0" title={`${app.totalMinutes} Minuten gespielt`}>
-                            {app.games}Sp {app.totalMinutes > 0 ? `${app.totalMinutes}'` : ''}
+                      <div key={p.id} className={`px-4 py-2.5 ${p.is_in_starting_xi ? 'bg-emerald-950/10' : ''} ${p.suspended ? 'opacity-40' : ''}`}>
+                        {/* Main row */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600 font-mono w-5 text-right flex-shrink-0">
+                            {p.jersey_number ?? '–'}
                           </span>
-                        )}
-                        {avgRating != null && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                            avgRating >= 8 ? 'bg-emerald-900/60 text-emerald-300' :
-                            avgRating >= 7 ? 'bg-blue-900/60 text-blue-300' :
-                            avgRating >= 6 ? 'bg-gray-800 text-gray-400' :
-                            'bg-red-900/40 text-red-400'
-                          }`} title="Ø Sofascore Turnier">
-                            Ø {avgRating.toFixed(1)}
+                          <span className="flex-1 text-sm text-gray-200 min-w-0 truncate font-medium">
+                            {p.name}
                           </span>
-                        )}
-                        {avgRating == null && (p.sofascore_rating ?? 0) > 0 && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                            (p.sofascore_rating as number) >= 8 ? 'bg-emerald-900/60 text-emerald-300' :
-                            (p.sofascore_rating as number) >= 7 ? 'bg-blue-900/60 text-blue-300' :
-                            (p.sofascore_rating as number) >= 6 ? 'bg-gray-800 text-gray-400' :
-                            'bg-red-900/40 text-red-400'
-                          }`} title="Sofascore letztes Spiel">
-                            {(p.sofascore_rating as number).toFixed(1)}
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-600 hidden sm:block truncate max-w-[120px] flex-shrink-0">{p.club_team}</span>
-                        <DeleteButton playerId={p.id} />
-                      </div>
-                      {hasTournamentStats && (
-                        <div className="flex items-center gap-2 mt-1 ml-8 flex-wrap">
-                          {(p.goals ?? 0) > 0 && (
-                            <span className="text-[10px] text-white bg-gray-700 px-1.5 py-0.5 rounded font-medium">
-                              ⚽ {p.goals}
+                          {p.is_in_starting_xi && (
+                            <span className="text-[10px] text-emerald-600 font-semibold flex-shrink-0">XI</span>
+                          )}
+                          {p.suspended && (
+                            <span className="text-[10px] text-red-400 font-bold flex-shrink-0">GESPERRT</span>
+                          )}
+                          {displayRating != null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                              displayRating >= 8 ? 'bg-emerald-900/60 text-emerald-300' :
+                              displayRating >= 7 ? 'bg-blue-900/60 text-blue-300' :
+                              displayRating >= 6 ? 'bg-gray-800 text-gray-400' :
+                              'bg-red-900/40 text-red-400'
+                            }`} title={ratingTitle}>
+                              {avgRating != null ? 'Ø ' : ''}{displayRating.toFixed(1)}
                             </span>
                           )}
-                          {(p.assists ?? 0) > 0 && (
-                            <span className="text-[10px] text-blue-300 bg-blue-900/40 px-1.5 py-0.5 rounded font-medium">
-                              🅰 {p.assists}
-                            </span>
-                          )}
-                          {(p.yellow_cards ?? 0) > 0 && (
-                            <span className="text-[10px] text-yellow-400 bg-yellow-900/30 px-1.5 py-0.5 rounded font-medium">
-                              🟨 {p.yellow_cards}
-                            </span>
-                          )}
-                          {(p.red_cards ?? 0) > 0 && (
-                            <span className="text-[10px] text-red-400 bg-red-900/30 px-1.5 py-0.5 rounded font-medium">
-                              🟥 {p.red_cards}
-                            </span>
-                          )}
+                          <span className="text-xs text-gray-600 hidden sm:block truncate max-w-[110px] flex-shrink-0">{p.club_team}</span>
                         </div>
-                      )}
-                    </div>
-                  )})}
+                        {/* Sub-row: appearances + tournament stats */}
+                        {(app || hasTournamentStats) && (
+                          <div className="flex items-center gap-2 mt-1 ml-7 flex-wrap">
+                            {app && app.games > 0 && (
+                              <span className="text-[10px] text-gray-600">
+                                {app.games}Sp · {app.totalMinutes}&apos;
+                              </span>
+                            )}
+                            {hasTournamentStats && app && app.games > 0 && (
+                              <span className="text-[10px] text-gray-700">·</span>
+                            )}
+                            {(p.goals ?? 0) > 0 && (
+                              <span className="text-[10px] text-gray-300 bg-gray-700/60 px-1.5 py-0.5 rounded font-medium">
+                                ⚽ {p.goals}
+                              </span>
+                            )}
+                            {(p.assists ?? 0) > 0 && (
+                              <span className="text-[10px] text-blue-300 bg-blue-900/30 px-1.5 py-0.5 rounded font-medium">
+                                🅰 {p.assists}
+                              </span>
+                            )}
+                            {(p.yellow_cards ?? 0) > 0 && (
+                              <span className="text-[10px] text-yellow-400 bg-yellow-900/20 px-1.5 py-0.5 rounded font-medium">
+                                🟨 {p.yellow_cards}
+                              </span>
+                            )}
+                            {(p.red_cards ?? 0) > 0 && (
+                              <span className="text-[10px] text-red-400 bg-red-900/20 px-1.5 py-0.5 rounded font-medium">
+                                🟥 {p.red_cards}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )

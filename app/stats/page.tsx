@@ -56,13 +56,14 @@ export default async function StatsPage() {
     assists: p.assists ?? 0,
     yellow_cards: p.yellow_cards ?? 0,
     red_cards: p.red_cards ?? 0,
+    sofascore_rating: p.sofascore_rating != null ? Number(p.sofascore_rating) : null,
   }))
 
   // ── Top Scorers ────────────────────────────────────────────────────────────
   const topScorers = players
     .filter(p => p.goals > 0)
     .sort((a, b) => b.goals - a.goals || b.assists - a.assists || (b.sofascore_rating ?? 0) - (a.sofascore_rating ?? 0))
-    .slice(0, 15)
+    .slice(0, 20)
 
   // ── Top Assists ────────────────────────────────────────────────────────────
   const topAssists = players
