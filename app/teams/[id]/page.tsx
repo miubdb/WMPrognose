@@ -23,7 +23,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
   const [playerRes, eloRes] = await Promise.all([
     supabase
       .from('players')
-      .select('id, name, position, jersey_number, age, club_team, market_value_m, rating, xg_per90, xga_per90, is_in_starting_xi')
+      .select('id, name, position, jersey_number, age, club_team, market_value_m, rating, xg_per90, xga_per90, is_in_starting_xi, goals, assists, yellow_cards, red_cards, sofascore_rating, suspended')
       .eq('team_id', params.id)
       .order('position')
       .order('market_value_m', { ascending: false }),
@@ -151,30 +151,60 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                   <span className="text-xs text-gray-600 ml-2">{group.length} Spieler</span>
                 </div>
                 <div className="divide-y divide-gray-800/60">
-                  {group.map((p) => (
-                    <div key={p.id} className={`px-4 py-2.5 flex items-center gap-3 ${p.is_in_starting_xi ? 'bg-emerald-950/10' : ''}`}>
-                      <span className="text-xs text-gray-600 font-mono w-5 text-right">
-                        {p.jersey_number ?? '–'}
-                      </span>
-                      <span className="flex-1 text-sm text-gray-200">{p.name}</span>
-                      {p.is_in_starting_xi && (
-                        <span className="text-[10px] text-emerald-600 font-medium">XI</span>
-                      )}
-                      <span className="text-xs text-gray-500">{p.age} J.</span>
-                      <span className="text-xs text-gray-600 hidden sm:block truncate max-w-[140px]">{p.club_team}</span>
-                      <span className="text-xs text-gray-500 font-mono">
-                        {(p.market_value_m ?? 0) >= 1
-                          ? `${(p.market_value_m as number).toFixed(1)}M€`
-                          : `${Math.round((p.market_value_m ?? 0) * 1000)}T€`}
-                      </span>
-                      {(p.xg_per90 ?? 0) > 0 && (
-                        <span className="text-[10px] text-blue-400 font-mono hidden md:block" title="xG/90 Saison 2024/25">
-                          {(p.xg_per90 as number).toFixed(2)} xG
+                  {group.map((p) => {
+                    const hasTournamentStats = (p.goals ?? 0) > 0 || (p.assists ?? 0) > 0 || (p.yellow_cards ?? 0) > 0 || (p.red_cards ?? 0) > 0
+                    return (
+                    <div key={p.id} className={`px-4 py-2.5 ${p.is_in_starting_xi ? 'bg-emerald-950/10' : ''} ${p.suspended ? 'opacity-50' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-600 font-mono w-5 text-right flex-shrink-0">
+                          {p.jersey_number ?? '–'}
                         </span>
+                        <span className="flex-1 text-sm text-gray-200 min-w-0 truncate">
+                          {p.name}
+                          {p.suspended && <span className="ml-1.5 text-[10px] text-red-400 font-bold">GESPERRT</span>}
+                        </span>
+                        {p.is_in_starting_xi && (
+                          <span className="text-[10px] text-emerald-600 font-medium flex-shrink-0">XI</span>
+                        )}
+                        {(p.sofascore_rating ?? 0) > 0 && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                            (p.sofascore_rating as number) >= 8 ? 'bg-emerald-900/60 text-emerald-300' :
+                            (p.sofascore_rating as number) >= 7 ? 'bg-blue-900/60 text-blue-300' :
+                            (p.sofascore_rating as number) >= 6 ? 'bg-gray-800 text-gray-400' :
+                            'bg-red-900/40 text-red-400'
+                          }`} title="Sofascore letztes Spiel">
+                            {(p.sofascore_rating as number).toFixed(1)}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-600 hidden sm:block truncate max-w-[120px] flex-shrink-0">{p.club_team}</span>
+                        <DeleteButton playerId={p.id} />
+                      </div>
+                      {hasTournamentStats && (
+                        <div className="flex items-center gap-2 mt-1 ml-8 flex-wrap">
+                          {(p.goals ?? 0) > 0 && (
+                            <span className="text-[10px] text-white bg-gray-700 px-1.5 py-0.5 rounded font-medium">
+                              ⚽ {p.goals}
+                            </span>
+                          )}
+                          {(p.assists ?? 0) > 0 && (
+                            <span className="text-[10px] text-blue-300 bg-blue-900/40 px-1.5 py-0.5 rounded font-medium">
+                              🅰 {p.assists}
+                            </span>
+                          )}
+                          {(p.yellow_cards ?? 0) > 0 && (
+                            <span className="text-[10px] text-yellow-400 bg-yellow-900/30 px-1.5 py-0.5 rounded font-medium">
+                              🟨 {p.yellow_cards}
+                            </span>
+                          )}
+                          {(p.red_cards ?? 0) > 0 && (
+                            <span className="text-[10px] text-red-400 bg-red-900/30 px-1.5 py-0.5 rounded font-medium">
+                              🟥 {p.red_cards}
+                            </span>
+                          )}
+                        </div>
                       )}
-                      <DeleteButton playerId={p.id} />
                     </div>
-                  ))}
+                  )})
                 </div>
               </div>
             )
