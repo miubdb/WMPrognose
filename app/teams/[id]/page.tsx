@@ -36,6 +36,25 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
 
   const players = playerRes.data ?? []
   const eloRow = eloRes.data
+
+  // Fetch appearances for these players (sequential — needs player IDs first)
+  const playerIds = players.map(p => p.id)
+  const appearancesByPlayer: Record<string, { games: number; totalMinutes: number; ratingSum: number; ratingCount: number }> = {}
+  if (playerIds.length > 0) {
+    const { data: appRows } = await supabase
+      .from('game_appearances')
+      .select('player_id, minutes_played, sofascore_rating')
+      .in('player_id', playerIds)
+    for (const a of appRows ?? []) {
+      if (!appearancesByPlayer[a.player_id]) {
+        appearancesByPlayer[a.player_id] = { games: 0, totalMinutes: 0, ratingSum: 0, ratingCount: 0 }
+      }
+      const entry = appearancesByPlayer[a.player_id]
+      entry.games++
+      entry.totalMinutes += a.minutes_played ?? 0
+      if (a.sofascore_rating != null) { entry.ratingSum += Number(a.sofascore_rating); entry.ratingCount++ }
+    }
+  }
   const eloSource = eloRow?.source ?? null
   const liveElo = eloRow ? eloRow.elo_rating + Math.round((eloRow.elo_delta_1y ?? 0) * 0.2) : null
 
@@ -153,6 +172,8 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                 <div className="divide-y divide-gray-800/60">
                   {group.map((p) => {
                     const hasTournamentStats = (p.goals ?? 0) > 0 || (p.assists ?? 0) > 0 || (p.yellow_cards ?? 0) > 0 || (p.red_cards ?? 0) > 0
+                    const app = appearancesByPlayer[p.id]
+                    const avgRating = app && app.ratingCount > 0 ? app.ratingSum / app.ratingCount : null
                     return (
                     <div key={p.id} className={`px-4 py-2.5 ${p.is_in_starting_xi ? 'bg-emerald-950/10' : ''} ${p.suspended ? 'opacity-50' : ''}`}>
                       <div className="flex items-center gap-3">
@@ -166,7 +187,22 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                         {p.is_in_starting_xi && (
                           <span className="text-[10px] text-emerald-600 font-medium flex-shrink-0">XI</span>
                         )}
-                        {(p.sofascore_rating ?? 0) > 0 && (
+                        {app && app.games > 0 && (
+                          <span className="text-[10px] text-gray-500 flex-shrink-0" title={`${app.totalMinutes} Minuten gespielt`}>
+                            {app.games}Sp {app.totalMinutes > 0 ? `${app.totalMinutes}'` : ''}
+                          </span>
+                        )}
+                        {avgRating != null && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                            avgRating >= 8 ? 'bg-emerald-900/60 text-emerald-300' :
+                            avgRating >= 7 ? 'bg-blue-900/60 text-blue-300' :
+                            avgRating >= 6 ? 'bg-gray-800 text-gray-400' :
+                            'bg-red-900/40 text-red-400'
+                          }`} title="Ø Sofascore Turnier">
+                            Ø {avgRating.toFixed(1)}
+                          </span>
+                        )}
+                        {avgRating == null && (p.sofascore_rating ?? 0) > 0 && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
                             (p.sofascore_rating as number) >= 8 ? 'bg-emerald-900/60 text-emerald-300' :
                             (p.sofascore_rating as number) >= 7 ? 'bg-blue-900/60 text-blue-300' :
@@ -204,7 +240,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
                         </div>
                       )}
                     </div>
-                  )})
+                  )})}
                 </div>
               </div>
             )
