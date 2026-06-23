@@ -30,6 +30,7 @@ function RatingBadge({ r }: { r: number | null }) {
 }
 
 type Player = {
+  id: string
   name: string
   team_id: string
   position: string | null
@@ -45,19 +46,38 @@ type Player = {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function StatsPage() {
-  // Fetch all players that have any stat data
-  const { data: raw } = await supabase
-    .from('players')
-    .select('name, team_id, position, jersey_number, goals, assists, sofascore_rating, is_in_starting_xi, yellow_cards, red_cards')
+  const [{ data: raw }, { data: appRows }] = await Promise.all([
+    supabase
+      .from('players')
+      .select('id, name, team_id, position, jersey_number, goals, assists, sofascore_rating, is_in_starting_xi, yellow_cards, red_cards'),
+    supabase
+      .from('game_appearances')
+      .select('player_id, sofascore_rating'),
+  ])
 
-  const players: Player[] = (raw ?? []).map(p => ({
-    ...p,
-    goals: p.goals ?? 0,
-    assists: p.assists ?? 0,
-    yellow_cards: p.yellow_cards ?? 0,
-    red_cards: p.red_cards ?? 0,
-    sofascore_rating: p.sofascore_rating != null ? Number(p.sofascore_rating) : null,
-  }))
+  // Build cumulative avg rating per player from game_appearances
+  const avgRatingByPlayer: Record<string, { sum: number; count: number; games: number }> = {}
+  for (const a of appRows ?? []) {
+    if (!avgRatingByPlayer[a.player_id]) avgRatingByPlayer[a.player_id] = { sum: 0, count: 0, games: 0 }
+    avgRatingByPlayer[a.player_id].games++
+    if (a.sofascore_rating != null) {
+      avgRatingByPlayer[a.player_id].sum += Number(a.sofascore_rating)
+      avgRatingByPlayer[a.player_id].count++
+    }
+  }
+
+  const players: Player[] = (raw ?? []).map(p => {
+    const agg = avgRatingByPlayer[p.id]
+    const avgRating = agg && agg.count > 0 ? agg.sum / agg.count : null
+    return {
+      ...p,
+      goals: p.goals ?? 0,
+      assists: p.assists ?? 0,
+      yellow_cards: p.yellow_cards ?? 0,
+      red_cards: p.red_cards ?? 0,
+      sofascore_rating: avgRating ?? (p.sofascore_rating != null ? Number(p.sofascore_rating) : null),
+    }
+  })
 
   // ── Top Scorers ────────────────────────────────────────────────────────────
   const topScorers = players
@@ -71,7 +91,7 @@ export default async function StatsPage() {
     .sort((a, b) => b.assists - a.assists || b.goals - a.goals || (b.sofascore_rating ?? 0) - (a.sofascore_rating ?? 0))
     .slice(0, 10)
 
-  // ── Per-position ratings (starters only) ──────────────────────────────────
+  // ── Per-position ratings (starters only, cumulative avg) ──────────────────
   const starters = players.filter(p => p.is_in_starting_xi && p.sofascore_rating !== null)
 
   const byPos: Record<string, Player[]> = { GK: [], DEF: [], MID: [], FWD: [] }
@@ -346,8 +366,8 @@ export default async function StatsPage() {
 
       {/* Footer note */}
       <p className="text-xs text-gray-600 pb-4">
-        Noten = zuletzt erfasste Sofascore-Note (letztes Spiel des Spielers). Tore & Vorlagen = Turnier-Gesamtwerte.
-        Positionsnoten nur für Startspieler (is_in_starting_xi).
+        Noten = Ø Sofascore-Note über alle Turnierspiele (kumuliert). Tore & Vorlagen = Turnier-Gesamtwerte.
+        Positionsnoten nur für eingetragene Startspieler.
       </p>
     </div>
   )
