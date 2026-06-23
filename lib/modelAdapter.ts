@@ -229,19 +229,19 @@ function generateTipForMatch(match: ScheduledMatch): TipSuggestion {
     Math.max(0.3, Math.min(4, baseXgB))
   )
 
-  // Bestes Ergebnis bestimmen
+  // Bestes Ergebnis bestimmen (Draw-Zone: ≤6pp Differenz → Unentschieden)
   let suggestedTip: '1' | 'X' | '2'
   let maxProb: number
 
-  if (winA >= winB && winA >= draw) {
-    suggestedTip = '1'
-    maxProb = winA
-  } else if (winB > winA && winB > draw) {
-    suggestedTip = '2'
-    maxProb = winB
-  } else {
+  if (Math.abs(winA - winB) <= 0.06) {
     suggestedTip = 'X'
     maxProb = draw
+  } else if (winA > winB) {
+    suggestedTip = '1'
+    maxProb = winA
+  } else {
+    suggestedTip = '2'
+    maxProb = winB
   }
 
   // Konfidenz
@@ -1120,11 +1120,13 @@ export function analyzeMatch(
   }
 
   // Tipp = wahrscheinlichster AUSGANG (1/X/2).
-  // Hintergrund: Bei Poisson-Modellen ist 1-1 oft das häufigste Einzelergebnis (~13%),
-  // obwohl der Sieg des Favoriten 50%+ Wahrscheinlichkeit hat (auf viele Scores verteilt).
-  const suggestedTip: '1' | 'X' | '2' = winA >= draw && winA >= winB ? '1'
-    : winB > draw && winB > winA ? '2'
-    : 'X'
+  // Draw-Zone: Poisson-Modelle können strukturell keine Unentschieden als Höchstwahrscheinlichkeit
+  // erzeugen (mit baseRate 1.55: max P(X)≈24% vs P(1/2)≈38% für gleich starke Teams).
+  // Pragmatische Lösung: Wenn keines der Teams einen klaren Vorteil hat (Differenz ≤6pp), Unentschieden.
+  const drawZone = Math.abs(winA - winB) <= 0.06
+  const suggestedTip: '1' | 'X' | '2' = drawZone ? 'X'
+    : winA > winB ? '1'
+    : '2'
   const maxProb = suggestedTip === '1' ? winA : suggestedTip === '2' ? winB : draw
 
   // Vorgeschlagenes Ergebnis = gerundete erwartete Tore (xG), konsistent mit dem Tipp.
