@@ -90,15 +90,49 @@ export function computeGroupStandings(
       if (h2hGfA !== h2hGfB) return h2hGfB - h2hGfA
       return 0 // drawing of lots — maintain stable order
     })
-    // Mark qualified / eliminated (simplified — full logic needs best-3rd comparison)
-    const gamesPerGroup = 6 // C(4,2)
+    // Compute max achievable points per team (current pts + remaining games × 3)
+    const maxPtsFor: Record<string, number> = {}
+    for (const t of standings[g]) {
+      const remaining = GROUP_SCHEDULE.filter(
+        m => m.group === g && !results[m.id] && (m.teamAId === t.teamId || m.teamBId === t.teamId)
+      ).length
+      maxPtsFor[t.teamId] = t.pts + remaining * 3
+    }
+
+    // Determine mathematical qualification / elimination mid-tournament
+    for (const team of standings[g]) {
+      const others = standings[g].filter(t => t.teamId !== team.teamId)
+
+      // ELIMINATED: 2+ other teams have current pts >= team's maximum possible (they can never be overtaken)
+      const definitelyAbove = others.filter(o => o.pts >= maxPtsFor[team.teamId]).length
+      if (definitelyAbove >= 2) {
+        team.eliminated = true
+        continue
+      }
+
+      // QUALIFIED top-2: at most 1 other team can possibly finish strictly above team's current pts
+      // (worst case for team: they earn 0 more pts → final = team.pts)
+      const canFinishAbove = others.filter(o => maxPtsFor[o.teamId] > team.pts).length
+      if (canFinishAbove <= 1) {
+        team.qualified = true
+      }
+    }
+
+    // Mark thirdCanQualify for teams not yet decided
+    const gamesPerGroup = 6
     const resultsInGroup = GROUP_SCHEDULE.filter(m => m.group === g && results[m.id]).length
     if (resultsInGroup === gamesPerGroup) {
-      // Group complete
-      standings[g][0].qualified = true
-      standings[g][1].qualified = true
-      standings[g][3].eliminated = true
-      standings[g][2].thirdCanQualify = true
+      // Group complete: 3rd-place team (index 2 after sort) can still advance as best 3rd
+      if (!standings[g][2].eliminated) {
+        standings[g][2].thirdCanQualify = true
+      }
+    } else {
+      // Ongoing: any undecided team could still end up as best 3rd
+      for (const t of standings[g]) {
+        if (!t.qualified && !t.eliminated) {
+          t.thirdCanQualify = true
+        }
+      }
     }
   }
 
