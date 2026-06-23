@@ -103,9 +103,11 @@ export function computeGroupStandings(
     for (const team of standings[g]) {
       const others = standings[g].filter(t => t.teamId !== team.teamId)
 
-      // ELIMINATED: 2+ other teams have current pts >= team's maximum possible (they can never be overtaken)
+      // ELIMINATED: 3 other teams have current pts >= team's maximum possible.
+      // At WM 2026 the best 8 third-place teams also advance, so a team is only
+      // truly eliminated if it cannot even finish 3rd in its own group.
       const definitelyAbove = others.filter(o => o.pts >= maxPtsFor[team.teamId]).length
-      if (definitelyAbove >= 2) {
+      if (definitelyAbove >= 3) {
         team.eliminated = true
         continue
       }
