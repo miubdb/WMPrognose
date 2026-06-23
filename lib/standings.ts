@@ -141,16 +141,46 @@ export function computeGroupStandings(
   return standings
 }
 
+/**
+ * Returns the stats of the 8th-best current third-place team across all groups.
+ * Used to determine what a team needs to qualify as one of the best thirds.
+ * Only counts groups that have played at least one game.
+ */
+export function computeBestThirdThreshold(
+  allStandings: GroupStandings
+): { pts: number; gd: number; gf: number } | null {
+  const thirds: { pts: number; gd: number; gf: number }[] = []
+  for (const table of Object.values(allStandings)) {
+    const third = table[2]
+    if (third && third.played > 0) {
+      thirds.push({ pts: third.pts, gd: third.gd, gf: third.gf })
+    }
+  }
+  thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
+  return thirds[7] ?? null  // index 7 = 8th best
+}
+
+export interface TeamPressureResult {
+  mustWin: boolean
+  canDraw: boolean
+  alreadyThrough: boolean
+  alreadyOut: boolean
+  drawSuffices: boolean
+  /** Minimum goal margin needed to enter top-8 thirds; null if not relevant or not computable */
+  neededMarginForThird: number | null
+}
+
 export function computePressure(
   teamId: string,
   group: string,
   standings: GroupStandings,
   remainingMatchIds: string[],
-  results: Record<string, { goals_a: number; goals_b: number }>
-): { mustWin: boolean; canDraw: boolean; alreadyThrough: boolean; alreadyOut: boolean; drawSuffices: boolean } {
+  results: Record<string, { goals_a: number; goals_b: number }>,
+  allStandings?: GroupStandings
+): TeamPressureResult {
   const groupTable = standings[group] ?? []
   const team = groupTable.find(t => t.teamId === teamId)
-  if (!team) return { mustWin: false, canDraw: true, alreadyThrough: false, alreadyOut: false, drawSuffices: false }
+  if (!team) return { mustWin: false, canDraw: true, alreadyThrough: false, alreadyOut: false, drawSuffices: false, neededMarginForThird: null }
 
   const remainingInGroup = GROUP_SCHEDULE.filter(
     m => m.group === group && !results[m.id] && (m.teamAId === teamId || m.teamBId === teamId)
@@ -164,7 +194,6 @@ export function computePressure(
   const canDraw = !mustWin && !alreadyThrough && !alreadyOut
 
   // drawSuffices: even with a draw the team is mathematically in top 2
-  // (at most 1 other team can still finish strictly above pts+1)
   const ptsAfterDraw = team.pts + 1
   const canSurpassAfterDraw = groupTable
     .filter(t => t.teamId !== teamId)
@@ -176,5 +205,33 @@ export function computePressure(
     }).length
   const drawSuffices = !alreadyThrough && !alreadyOut && canSurpassAfterDraw <= 1
 
-  return { mustWin, canDraw, alreadyThrough, alreadyOut, drawSuffices }
+  // neededMarginForThird: minimum win margin for team to enter best-8 thirds.
+  // Only relevant in MD3 (remainingInGroup === 1) for teams not already in top 2.
+  let neededMarginForThird: number | null = null
+  if (
+    allStandings &&
+    remainingInGroup === 1 &&
+    !alreadyThrough &&
+    !alreadyOut &&
+    team.thirdCanQualify
+  ) {
+    const threshold = computeBestThirdThreshold(allStandings)
+    if (threshold !== null) {
+      const groupRank = groupTable.findIndex(t => t.teamId === teamId)  // 0-indexed
+      // Only apply if team is realistically aiming for best-third (rank 2 or 3 = 3rd/4th place)
+      if (groupRank >= 2) {
+        const ptsAfterWin = team.pts + 3
+        if (ptsAfterWin > threshold.pts) {
+          neededMarginForThird = 1  // winning by any margin is enough on points
+        } else if (ptsAfterWin === threshold.pts) {
+          // Need to beat threshold on GD
+          const marginNeeded = threshold.gd - team.gd + 1
+          neededMarginForThird = Math.max(1, marginNeeded)
+        }
+        // ptsAfterWin < threshold.pts → even a win isn't enough (left as null)
+      }
+    }
+  }
+
+  return { mustWin, canDraw, alreadyThrough, alreadyOut, drawSuffices, neededMarginForThird }
 }

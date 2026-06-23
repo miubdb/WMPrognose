@@ -209,8 +209,8 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     .filter(m => m.group === matchGroup && !allResults[m.id])
     .map(m => m.id)
 
-  const pressureA = computePressure(match.teamAId, matchGroup, standings, remainingMatchIds, allResults)
-  const pressureB = computePressure(match.teamBId, matchGroup, standings, remainingMatchIds, allResults)
+  const pressureA = computePressure(match.teamAId, matchGroup, standings, remainingMatchIds, allResults, standings)
+  const pressureB = computePressure(match.teamBId, matchGroup, standings, remainingMatchIds, allResults, standings)
 
   const analysis = analyzeMatch(match, squadData, { A: pressureA, B: pressureB }, eloOverrides, eloSources)
   const venue = VENUES[match.venueId]

@@ -94,10 +94,11 @@ export interface CorePredictFull {
 // ─── Motivation Weights ───────────────────────────────────────────────────────
 
 export const MOTIVATION_WEIGHTS = {
-  alreadyThrough: -0.10,  // ~-10% xG: rotation reduces effective squad quality
-  mustWin:         0.049, // ~+5% xG: aggressive pressing, more attacking play
-  alreadyOut:      0.030, // ~+3% xG: nothing to lose, open attacking play
-  mutualDraw:     -0.062, // ~-6% xG per team: both content with draw (Gijón effect)
+  alreadyThrough:  -0.10,  // ~-10% xG: rotation reduces effective squad quality
+  mustWin:          0.049, // ~+5% xG: aggressive pressing, more attacking play
+  alreadyOut:       0.030, // ~+3% xG: nothing to lose, open attacking play
+  mutualDraw:      -0.062, // ~-6% xG per team: both content with draw (Gijón effect)
+  needsLargeMargin: 0.083, // ~+8% xG: must win by 3+ goals to enter best-8 thirds
 } as const
 
 // ─── Dixon-Coles with variable rho ───────────────────────────────────────────

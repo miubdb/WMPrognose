@@ -540,6 +540,7 @@ export interface TeamPressure {
   alreadyThrough: boolean
   alreadyOut: boolean
   drawSuffices: boolean
+  neededMarginForThird: number | null
 }
 
 export interface MatchAnalysis {
@@ -1003,34 +1004,45 @@ export function analyzeMatch(
     const bContent = pressure.B.alreadyThrough || pressure.B.drawSuffices
     const mutualDraw = aContent && bContent && !pressure.A.alreadyOut && !pressure.B.alreadyOut
 
-    // Per-team motivation log effects (mutual draw overrides individual states)
+    // needsLargeMargin: must win by 3+ goals to enter best-8 thirds
+    const needsLargeMarginA = !mutualDraw && (pressure.A.neededMarginForThird ?? 0) >= 3
+    const needsLargeMarginB = !mutualDraw && (pressure.B.neededMarginForThird ?? 0) >= 3
+
+    // Per-team motivation log effects (priority: mutualDraw → large margin → normal states)
     const motivLogA = mutualDraw ? MOTIVATION_WEIGHTS.mutualDraw
+      : needsLargeMarginA ? MOTIVATION_WEIGHTS.needsLargeMargin
       : pressure.A.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
       : pressure.A.mustWin ? MOTIVATION_WEIGHTS.mustWin
       : pressure.A.alreadyOut ? MOTIVATION_WEIGHTS.alreadyOut
       : 0
     const motivLogB = mutualDraw ? MOTIVATION_WEIGHTS.mutualDraw
+      : needsLargeMarginB ? MOTIVATION_WEIGHTS.needsLargeMargin
       : pressure.B.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
       : pressure.B.mustWin ? MOTIVATION_WEIGHTS.mustWin
       : pressure.B.alreadyOut ? MOTIVATION_WEIGHTS.alreadyOut
       : 0
 
+    const marginLabelA = needsLargeMarginA ? `Braucht +${pressure.A.neededMarginForThird} Tore Differenz` : null
+    const marginLabelB = needsLargeMarginB ? `Braucht +${pressure.B.neededMarginForThird} Tore Differenz` : null
+
     const labelA = mutualDraw ? 'Unentschieden reicht (beiden Teams)'
-      : pressure.A.alreadyOut ? 'Ausgeschieden'
+      : marginLabelA ?? (pressure.A.alreadyOut ? 'Ausgeschieden'
       : pressure.A.alreadyThrough ? 'Qualifiziert — Rotation wahrscheinlich'
       : pressure.A.mustWin ? 'Muss gewinnen'
       : pressure.A.drawSuffices ? 'Unentschieden reicht'
-      : 'Normaler Druck'
+      : 'Normaler Druck')
     const labelB = mutualDraw ? 'Unentschieden reicht (beiden Teams)'
-      : pressure.B.alreadyOut ? 'Ausgeschieden'
+      : marginLabelB ?? (pressure.B.alreadyOut ? 'Ausgeschieden'
       : pressure.B.alreadyThrough ? 'Qualifiziert — Rotation wahrscheinlich'
       : pressure.B.mustWin ? 'Muss gewinnen'
       : pressure.B.drawSuffices ? 'Unentschieden reicht'
-      : 'Normaler Druck'
+      : 'Normaler Druck')
 
     const explanation = mutualDraw
       ? 'Ein Unentschieden reicht beiden Teams zum Weiterkommen — reduzierte Intensität auf beiden Seiten (Gijón-Effekt: −6% xG). Teams spielen risikoärmer und vermeiden unnötige Angriffe.'
-      : 'Bereits qualifizierte Teams schonen Stammspieler (Rotation: −10% xG). Teams die gewinnen müssen, spielen aggressiver (+5%). Teams ohne Chance spielen offener (+3%). „Unentschieden reicht": leicht defensivere Spielweise (−3% xG).'
+      : (needsLargeMarginA || needsLargeMarginB)
+        ? 'Team braucht Sieg mit hohem Torvorteil um als einer der 8 besten Gruppendritten weiterzukommen — extreme Offensivausrichtung (+8% xG).'
+        : 'Bereits qualifizierte Teams schonen Stammspieler (Rotation: −10% xG). Teams die gewinnen müssen, spielen aggressiver (+5%). Teams ohne Chance spielen offener (+3%). „Unentschieden reicht": leicht defensivere Spielweise.'
 
     factors.push({
       category: 'context',
@@ -1198,8 +1210,8 @@ export function analyzeAllMatches(
       const remainingMatchIds = GROUP_SCHEDULE
         .filter(mm => mm.group === m.group && !results[mm.id])
         .map(mm => mm.id)
-      const pressureA = computePressure(m.teamAId, m.group, standings, remainingMatchIds, results)
-      const pressureB = computePressure(m.teamBId, m.group, standings, remainingMatchIds, results)
+      const pressureA = computePressure(m.teamAId, m.group, standings, remainingMatchIds, results, standings)
+      const pressureB = computePressure(m.teamBId, m.group, standings, remainingMatchIds, results, standings)
       pressure = { A: pressureA, B: pressureB }
     }
     return analyzeMatch(m, squadData, pressure, eloOverrides, eloSources)
