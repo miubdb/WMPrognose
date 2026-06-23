@@ -97,6 +97,7 @@ export const MOTIVATION_WEIGHTS = {
   alreadyThrough: -0.10,  // ~-10% xG: rotation reduces effective squad quality
   mustWin:         0.049, // ~+5% xG: aggressive pressing, more attacking play
   alreadyOut:      0.030, // ~+3% xG: nothing to lose, open attacking play
+  mutualDraw:     -0.062, // ~-6% xG per team: both content with draw (Gijón effect)
 } as const
 
 // ─── Dixon-Coles with variable rho ───────────────────────────────────────────

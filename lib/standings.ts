@@ -147,10 +147,10 @@ export function computePressure(
   standings: GroupStandings,
   remainingMatchIds: string[],
   results: Record<string, { goals_a: number; goals_b: number }>
-): { mustWin: boolean; canDraw: boolean; alreadyThrough: boolean; alreadyOut: boolean } {
+): { mustWin: boolean; canDraw: boolean; alreadyThrough: boolean; alreadyOut: boolean; drawSuffices: boolean } {
   const groupTable = standings[group] ?? []
   const team = groupTable.find(t => t.teamId === teamId)
-  if (!team) return { mustWin: false, canDraw: true, alreadyThrough: false, alreadyOut: false }
+  if (!team) return { mustWin: false, canDraw: true, alreadyThrough: false, alreadyOut: false, drawSuffices: false }
 
   const remainingInGroup = GROUP_SCHEDULE.filter(
     m => m.group === group && !results[m.id] && (m.teamAId === teamId || m.teamBId === teamId)
@@ -163,5 +163,18 @@ export function computePressure(
   const mustWin = !alreadyThrough && !alreadyOut && maxPossible < (groupTable[1]?.pts ?? 0)
   const canDraw = !mustWin && !alreadyThrough && !alreadyOut
 
-  return { mustWin, canDraw, alreadyThrough, alreadyOut }
+  // drawSuffices: even with a draw the team is mathematically in top 2
+  // (at most 1 other team can still finish strictly above pts+1)
+  const ptsAfterDraw = team.pts + 1
+  const canSurpassAfterDraw = groupTable
+    .filter(t => t.teamId !== teamId)
+    .filter(t => {
+      const rem = GROUP_SCHEDULE.filter(
+        m => m.group === group && !results[m.id] && (m.teamAId === t.teamId || m.teamBId === t.teamId)
+      ).length
+      return t.pts + rem * 3 > ptsAfterDraw
+    }).length
+  const drawSuffices = !alreadyThrough && !alreadyOut && canSurpassAfterDraw <= 1
+
+  return { mustWin, canDraw, alreadyThrough, alreadyOut, drawSuffices }
 }

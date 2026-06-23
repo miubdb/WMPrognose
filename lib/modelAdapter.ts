@@ -539,6 +539,7 @@ export interface TeamPressure {
   canDraw: boolean
   alreadyThrough: boolean
   alreadyOut: boolean
+  drawSuffices: boolean
 }
 
 export interface MatchAnalysis {
@@ -996,25 +997,41 @@ export function analyzeMatch(
 
   // 11. Ausgangslage / Motivation / Rotation
   if (pressure) {
-    // Rotation: already qualified → -10% xG (resting key players)
-    // Must win: aggressive play → +5% xG
-    // Already out: nothing to lose → +3% xG
-    const motivLogA = pressure.A.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
+    // Mutual draw: both teams advance with a draw → reduced intensity (Gijón effect)
+    // Applies when drawSuffices for both, OR when one is alreadyThrough and the other drawSuffices
+    const aContent = pressure.A.alreadyThrough || pressure.A.drawSuffices
+    const bContent = pressure.B.alreadyThrough || pressure.B.drawSuffices
+    const mutualDraw = aContent && bContent && !pressure.A.alreadyOut && !pressure.B.alreadyOut
+
+    // Per-team motivation log effects (mutual draw overrides individual states)
+    const motivLogA = mutualDraw ? MOTIVATION_WEIGHTS.mutualDraw
+      : pressure.A.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
       : pressure.A.mustWin ? MOTIVATION_WEIGHTS.mustWin
       : pressure.A.alreadyOut ? MOTIVATION_WEIGHTS.alreadyOut
       : 0
-    const motivLogB = pressure.B.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
+    const motivLogB = mutualDraw ? MOTIVATION_WEIGHTS.mutualDraw
+      : pressure.B.alreadyThrough ? MOTIVATION_WEIGHTS.alreadyThrough
       : pressure.B.mustWin ? MOTIVATION_WEIGHTS.mustWin
       : pressure.B.alreadyOut ? MOTIVATION_WEIGHTS.alreadyOut
       : 0
-    const labelA = pressure.A.alreadyOut ? 'Ausgeschieden'
+
+    const labelA = mutualDraw ? 'Unentschieden reicht (beiden Teams)'
+      : pressure.A.alreadyOut ? 'Ausgeschieden'
       : pressure.A.alreadyThrough ? 'Qualifiziert — Rotation wahrscheinlich'
       : pressure.A.mustWin ? 'Muss gewinnen'
+      : pressure.A.drawSuffices ? 'Unentschieden reicht'
       : 'Normaler Druck'
-    const labelB = pressure.B.alreadyOut ? 'Ausgeschieden'
+    const labelB = mutualDraw ? 'Unentschieden reicht (beiden Teams)'
+      : pressure.B.alreadyOut ? 'Ausgeschieden'
       : pressure.B.alreadyThrough ? 'Qualifiziert — Rotation wahrscheinlich'
       : pressure.B.mustWin ? 'Muss gewinnen'
+      : pressure.B.drawSuffices ? 'Unentschieden reicht'
       : 'Normaler Druck'
+
+    const explanation = mutualDraw
+      ? 'Ein Unentschieden reicht beiden Teams zum Weiterkommen — reduzierte Intensität auf beiden Seiten (Gijón-Effekt: −6% xG). Teams spielen risikoärmer und vermeiden unnötige Angriffe.'
+      : 'Bereits qualifizierte Teams schonen Stammspieler (Rotation: −10% xG). Teams die gewinnen müssen, spielen aggressiver (+5%). Teams ohne Chance spielen offener (+3%). „Unentschieden reicht": leicht defensivere Spielweise (−3% xG).'
+
     factors.push({
       category: 'context',
       label: 'Ausgangslage / Motivation / Rotation',
@@ -1027,7 +1044,7 @@ export function analyzeMatch(
       effectB: logEffectToLinear(motivLogB),
       confidence: 0.70,
       isCalibrated: false,
-      explanation: 'Bereits qualifizierte Teams schonen Stammspieler (Rotation: −10% xG). Teams die gewinnen müssen, spielen aggressiver (+5%). Teams ohne Chance spielen offener (+3%).',
+      explanation,
     })
   }
 
