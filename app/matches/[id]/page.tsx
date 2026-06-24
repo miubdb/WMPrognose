@@ -416,20 +416,28 @@ export default async function MatchDetailPage({ params }: { params: { id: string
           })()}
 
           {/* All top scores for full reference */}
-          <div className="grid grid-cols-4 gap-2">
-            {topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho).map(({ i, j, p }, idx) => {
-              const winner = i > j ? 'A' : j > i ? 'B' : 'X'
-              const color = winner === 'A' ? 'border-emerald-800/60 bg-emerald-900/10' : winner === 'B' ? 'border-blue-800/60 bg-blue-900/10' : 'border-gray-700 bg-gray-800/30'
-              return (
-                <div key={`${i}-${j}`} className={`rounded-lg border ${color} p-2 text-center`}>
-                  <div className="text-sm font-bold font-mono text-white">{i}:{j}</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">{Math.round(p * 100)}%</div>
-                  {idx === 0 && <div className="text-[9px] text-emerald-400 mt-1 font-medium">★ Wahrscheinlichstes</div>}
-                </div>
-              )
-            })}
-          </div>
-          <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: Top-3 beim Prognosetipp · Unten: Top-8 alle Ergebnisse · ★ = insgesamt wahrscheinlichstes Ergebnis</p>
+          {(() => {
+            const tip = analysis.suggestedTip
+            const tipWinner = tip === '1' ? 'A' : tip === '2' ? 'B' : 'X'
+            const scores = topScorelines(analysis.expectedGoalsA, analysis.expectedGoalsB, MODEL_META.dixonColesRho)
+            const tipMatchIdx = scores.findIndex(({ i, j }) => (i > j ? 'A' : j > i ? 'B' : 'X') === tipWinner)
+            return (
+              <div className="grid grid-cols-4 gap-2">
+                {scores.map(({ i, j, p }, idx) => {
+                  const winner = i > j ? 'A' : j > i ? 'B' : 'X'
+                  const color = winner === 'A' ? 'border-emerald-800/60 bg-emerald-900/10' : winner === 'B' ? 'border-blue-800/60 bg-blue-900/10' : 'border-gray-700 bg-gray-800/30'
+                  return (
+                    <div key={`${i}-${j}`} className={`rounded-lg border ${color} p-2 text-center`}>
+                      <div className="text-sm font-bold font-mono text-white">{i}:{j}</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{Math.round(p * 100)}%</div>
+                      {idx === tipMatchIdx && <div className="text-[9px] text-emerald-400 mt-1 font-medium">★ Wahrscheinlichstes</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+          <p className="text-[10px] text-gray-700 mt-3">Dixon-Coles · Grün = {analysis.teamA.flag} · Blau = {analysis.teamB.flag} · Oben: Top-3 beim Prognosetipp · Unten: Top-8 alle Ergebnisse · ★ = wahrscheinlichstes Ergebnis beim Prognosetipp</p>
         </div>
       </div>
 
