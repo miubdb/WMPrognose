@@ -6,11 +6,35 @@ import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
+// FIFA fairplay points: Yellow=-1, Yellow-Red=-3, Red=-4, Yellow+Red=-5
+// Yellow+Red = yellow_cards counted separately + red via direct red in same game
+// Approximation: we store yellow_red_cards (2nd yellow) and red_cards (direct red) separately
+function fairplayScore(yc: number, yrс: number, rc: number): number {
+  return yc * (-1) + yrс * (-3) + rc * (-4)
+}
+
 export default async function GruppenPage() {
-  const { data: resultsData } = await supabase.from('match_results').select('match_id, goals_a, goals_b')
+  const [resultsRes, cardsRes, eloRes] = await Promise.all([
+    supabase.from('match_results').select('match_id, goals_a, goals_b'),
+    supabase.from('players').select('team_id, yellow_cards, yellow_red_cards, red_cards'),
+    supabase.from('team_elo_ratings').select('team_id, elo_rating'),
+  ])
 
   const results: Record<string, { goals_a: number; goals_b: number }> = {}
-  for (const r of resultsData ?? []) results[r.match_id] = { goals_a: r.goals_a, goals_b: r.goals_b }
+  for (const r of resultsRes.data ?? []) results[r.match_id] = { goals_a: r.goals_a, goals_b: r.goals_b }
+
+  // Fairplay score per team (sum across all players)
+  const fairplayByTeam: Record<string, number> = {}
+  for (const p of cardsRes.data ?? []) {
+    const yc  = (p as { yellow_cards?: number | null }).yellow_cards ?? 0
+    const yrc = (p as { yellow_red_cards?: number | null }).yellow_red_cards ?? 0
+    const rc  = (p as { red_cards?: number | null }).red_cards ?? 0
+    fairplayByTeam[p.team_id] = (fairplayByTeam[p.team_id] ?? 0) + fairplayScore(yc, yrc, rc)
+  }
+
+  // ELO as FIFA ranking proxy (higher ELO = better ranking = higher priority)
+  const eloByTeam: Record<string, number> = {}
+  for (const e of eloRes.data ?? []) eloByTeam[e.team_id] = e.elo_rating
 
   const standings = computeGroupStandings(results)
   const groups = Object.keys(standings).sort()
@@ -36,7 +60,20 @@ export default async function GruppenPage() {
         const thirds = groups
           .filter(g => (standings[g]?.[2]?.played ?? 0) > 0)
           .map(g => ({ ...standings[g][2], group: g }))
-          .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
+          .sort((a, b) => {
+            // Official FIFA WM 2026 best-thirds tiebreaker order:
+            // 1. Points  2. Goal diff  3. Goals scored
+            // 4. Fairplay (fewest disciplinary points)  5. FIFA ranking (ELO proxy)
+            if (b.pts !== a.pts) return b.pts - a.pts
+            if (b.gd  !== a.gd)  return b.gd  - a.gd
+            if (b.gf  !== a.gf)  return b.gf  - a.gf
+            const fpA = fairplayByTeam[a.teamId] ?? 0
+            const fpB = fairplayByTeam[b.teamId] ?? 0
+            if (fpB !== fpA) return fpB - fpA   // higher fairplay score = fewer cards = better
+            const eloA = eloByTeam[a.teamId] ?? 1500
+            const eloB = eloByTeam[b.teamId] ?? 1500
+            return eloB - eloA                  // higher ELO = better FIFA ranking
+          })
 
         if (thirds.length === 0) return null
 
@@ -62,6 +99,7 @@ export default async function GruppenPage() {
                   <th className="px-1 py-1.5 text-center font-normal w-10">Tore</th>
                   <th className="px-1 py-1.5 text-center font-normal w-8">TD</th>
                   <th className="px-1 py-1.5 text-center font-normal w-6">Pkt</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-8 text-yellow-700">Fair</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/40">
@@ -95,15 +133,18 @@ export default async function GruppenPage() {
                         {t.gd > 0 ? `+${t.gd}` : t.gd}
                       </td>
                       <td className="px-1 py-2 text-center font-bold text-white">{t.pts}</td>
+                      <td className={`px-1 py-2 text-center text-[10px] font-mono ${(fairplayByTeam[t.teamId] ?? 0) < 0 ? 'text-yellow-600' : 'text-gray-700'}`}>
+                        {fairplayByTeam[t.teamId] ?? 0}
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
             <div className="px-3 py-2 border-t border-gray-800/60 flex items-center gap-4 text-[10px] text-gray-700">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-900/40 inline-block" />Aktuell qualifiziert (Top 8)</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-900/30 inline-block" />Aktuell ausgeschieden</span>
-              <span className="ml-auto">Sortierung: Pkt → TD → Tore</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-900/40 inline-block" />Top 8 qualifiziert</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-900/30 inline-block" />Nicht qualifiziert</span>
+              <span className="ml-auto">Pkt → TD → Tore → Fair (Gelb=−1, GelbRot=−3, Rot=−4) → FIFA-Rang</span>
             </div>
           </div>
         )
