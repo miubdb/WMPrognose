@@ -31,6 +31,84 @@ export default async function GruppenPage() {
         <p className="text-gray-500 text-sm mt-1">Live-Tabellen · {Object.values(results).length} Spiele eingetragen</p>
       </div>
 
+      {/* Best 8 Thirds Table */}
+      {(() => {
+        const thirds = groups
+          .filter(g => (standings[g]?.[2]?.played ?? 0) > 0)
+          .map(g => ({ ...standings[g][2], group: g }))
+          .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
+
+        if (thirds.length === 0) return null
+
+        return (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-gray-800/40 border-b border-gray-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-gray-300">Beste Gruppendritte</h2>
+                <p className="text-[11px] text-gray-600 mt-0.5">Die besten 8 von 12 qualifizieren sich fürs Achtelfinale</p>
+              </div>
+              <span className="text-xs text-gray-600">{thirds.length}/12 Gruppen gespielt</span>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-600 text-[10px]">
+                  <th className="px-3 py-1.5 text-left font-normal w-6">#</th>
+                  <th className="px-2 py-1.5 text-left font-normal w-8">Gr.</th>
+                  <th className="px-1 py-1.5 text-left font-normal">Team</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-6">Sp</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-6">S</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-6">U</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-6">N</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-10">Tore</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-8">TD</th>
+                  <th className="px-1 py-1.5 text-center font-normal w-6">Pkt</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/40">
+                {thirds.map((t, i) => {
+                  const qualifies = i < 8
+                  const isCutoff = i === 7
+                  const team = TEAM_BY_ID[t.teamId]
+                  const rowBg = qualifies
+                    ? 'bg-emerald-900/10'
+                    : 'bg-red-900/10 opacity-60'
+                  return (
+                    <tr key={t.teamId} className={`${rowBg} ${isCutoff ? 'border-b-2 border-emerald-700/50' : ''}`}>
+                      <td className="px-3 py-2 text-gray-500">{i + 1}</td>
+                      <td className="px-2 py-2 text-gray-500 font-semibold">{t.group}</td>
+                      <td className="px-1 py-2">
+                        <Link href={`/teams/${t.teamId}`} className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">
+                          <span>{team?.flag}</span>
+                          <span className={`font-medium ${qualifies ? 'text-gray-200' : 'text-gray-500'}`}>{team?.name ?? t.teamId}</span>
+                          {qualifies
+                            ? <span className="text-[9px] text-emerald-500 font-bold ml-0.5">✓</span>
+                            : <span className="text-[9px] text-red-500 font-bold ml-0.5">✗</span>
+                          }
+                        </Link>
+                      </td>
+                      <td className="px-1 py-2 text-center text-gray-500">{t.played}</td>
+                      <td className="px-1 py-2 text-center text-gray-400">{t.won}</td>
+                      <td className="px-1 py-2 text-center text-gray-400">{t.drawn}</td>
+                      <td className="px-1 py-2 text-center text-gray-400">{t.lost}</td>
+                      <td className="px-1 py-2 text-center text-gray-500">{t.gf}:{t.ga}</td>
+                      <td className={`px-1 py-2 text-center font-mono ${t.gd > 0 ? 'text-emerald-400' : t.gd < 0 ? 'text-rose-400' : 'text-gray-600'}`}>
+                        {t.gd > 0 ? `+${t.gd}` : t.gd}
+                      </td>
+                      <td className="px-1 py-2 text-center font-bold text-white">{t.pts}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="px-3 py-2 border-t border-gray-800/60 flex items-center gap-4 text-[10px] text-gray-700">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-900/40 inline-block" />Aktuell qualifiziert (Top 8)</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-900/30 inline-block" />Aktuell ausgeschieden</span>
+              <span className="ml-auto">Sortierung: Pkt → TD → Tore</span>
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {groups.map(group => {
           const table = standings[group]
