@@ -392,8 +392,8 @@ export default function Dashboard() {
     if (!isDefaultView || showOldResults) return 0
     const yesterday = yesterdayStr()
     return allAnalyses.filter(a => {
-      const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
-      return results[a.matchId] && match.date < yesterday
+      const match = ALL_MATCHES.find(m => m.id === a.matchId)
+      return match && results[a.matchId] && match.date < yesterday
     }).length
   }, [allAnalyses, isDefaultView, showOldResults, results])
 
@@ -401,7 +401,7 @@ export default function Dashboard() {
   const byDate = useMemo(() => {
     const map: { date: string; items: typeof analyses }[] = []
     for (const a of analyses) {
-      const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
+      const match = ALL_MATCHES.find(m => m.id === a.matchId)!
       const last = map[map.length - 1]
       if (last?.date === match.date) last.items.push(a)
       else map.push({ date: match.date, items: [a] })
