@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { GROUP_SCHEDULE } from '@/src/data/schedule'
+import { GROUP_SCHEDULE, ALL_MATCHES } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
 import { analyzeMatch, type MatchFactor, type SquadSummary } from '@/lib/modelAdapter'
 import { computeDataQuality } from '@/lib/model/dataQuality'
@@ -152,7 +152,7 @@ function FactorRow({ factor }: { factor: MatchFactor }) {
 }
 
 export default async function MatchDetailPage({ params }: { params: { id: string } }) {
-  const match = GROUP_SCHEDULE.find(m => m.id === params.id)
+  const match = ALL_MATCHES.find(m => m.id === params.id)
   if (!match) notFound()
 
   // Fetch all data in parallel

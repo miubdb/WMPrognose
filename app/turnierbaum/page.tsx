@@ -1,15 +1,15 @@
 import Link from 'next/link'
-import { GROUP_SCHEDULE } from '@/src/data/schedule'
+import { ALL_MATCHES } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
-const r32 = GROUP_SCHEDULE.filter(m => m.round === 'round_of_32')
-const r16 = GROUP_SCHEDULE.filter(m => m.round === 'round_of_16')
-const qf  = GROUP_SCHEDULE.filter(m => m.round === 'quarterfinal')
-const sf  = GROUP_SCHEDULE.filter(m => m.round === 'semifinal')
-const fin = GROUP_SCHEDULE.filter(m => m.round === 'final')
+const r32 = ALL_MATCHES.filter(m => m.round === 'round_of_32')
+const r16 = ALL_MATCHES.filter(m => m.round === 'round_of_16')
+const qf  = ALL_MATCHES.filter(m => m.round === 'quarterfinal')
+const sf  = ALL_MATCHES.filter(m => m.round === 'semifinal')
+const fin = ALL_MATCHES.filter(m => m.round === 'final')
 
 function MatchSlot({
   id, teamALabel, teamBLabel, date, venueId, accent = false,

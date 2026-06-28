@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { GROUP_SCHEDULE } from '@/src/data/schedule'
+import { ALL_MATCHES, GROUP_SCHEDULE } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
 import type { MatchAnalysis } from '@/lib/modelAdapter'
 import { toBerlinTime, fmtDate } from '@/lib/utils'
@@ -91,7 +91,7 @@ function MatchCard({
   result?: MatchResult
   onResultSaved: (matchId: string, r: MatchResult) => void
 }) {
-  const match = GROUP_SCHEDULE.find(m => m.id === analysis.matchId)!
+  const match = ALL_MATCHES.find(m => m.id === analysis.matchId)!
   const berlinTime = toBerlinTime(match.kickoffUTC)
   const venue = VENUES[match.venueId]
 
@@ -156,7 +156,9 @@ function MatchCard({
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-emerald-800 hover:bg-gray-900/80 transition-all">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="text-emerald-500 font-mono font-bold">Gr. {match.group}</span>
+          <span className="text-emerald-500 font-mono font-bold">
+            {match.round === 'group' ? `Gr. ${match.group}` : match.round === 'round_of_32' ? 'Sechzehntelfinale' : match.round === 'round_of_16' ? 'Achtelfinale' : match.round === 'quarterfinal' ? 'Viertelfinale' : match.round === 'semifinal' ? 'Halbfinale' : 'Finale'}
+          </span>
           <span>·</span>
           <span>{fmtDate(match.date)}</span>
           <span className="font-mono font-bold text-white">{berlinTime}</span>
@@ -370,7 +372,7 @@ export default function Dashboard() {
     const yesterday = yesterdayStr()
     return allAnalyses
       .filter(a => {
-        const match = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
+        const match = ALL_MATCHES.find(m => m.id === a.matchId)!
         if (activeGroup !== 'Alle' && match.group !== activeGroup) return false
         if (matchday !== 0 && match.matchday !== matchday) return false
         if (filterDate && match.date !== filterDate) return false
@@ -379,8 +381,8 @@ export default function Dashboard() {
         return true
       })
       .sort((a, b) => {
-        const ma = GROUP_SCHEDULE.find(m => m.id === a.matchId)!
-        const mb = GROUP_SCHEDULE.find(m => m.id === b.matchId)!
+        const ma = ALL_MATCHES.find(m => m.id === a.matchId)!
+        const mb = ALL_MATCHES.find(m => m.id === b.matchId)!
         const d = ma.date.localeCompare(mb.date)
         return d !== 0 ? d : ma.kickoffUTC.localeCompare(mb.kickoffUTC)
       })
@@ -412,7 +414,7 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl font-bold">Spielprognosen</h1>
         <p className="text-gray-500 text-sm mt-1">
-          FIFA WM 2026 · {GROUP_SCHEDULE.length} Gruppenspiele · Zeiten in Berliner Zeit
+          FIFA WM 2026 · {GROUP_SCHEDULE.length} Gruppenspiele + KO · Zeiten in Berliner Zeit
         </p>
       </div>
 
