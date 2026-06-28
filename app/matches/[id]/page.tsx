@@ -67,6 +67,33 @@ function fmtEffect(e: number): string {
   return pct > 0 ? `+${pct}%` : `${pct}%`
 }
 
+// ET prediction: 30 min at ~75% intensity → λ_ET ≈ λ_90 * 0.25
+function computeET1X2(xgA: number, xgB: number): { winA: number; draw: number; winB: number } {
+  const la = xgA * 0.25
+  const lb = xgB * 0.25
+  const pmf = (lambda: number, k: number) => {
+    if (lambda <= 0) return k === 0 ? 1 : 0
+    let logP = k * Math.log(lambda) - lambda
+    for (let i = 1; i <= k; i++) logP -= Math.log(i)
+    return Math.exp(logP)
+  }
+  let winA = 0, draw = 0, winB = 0
+  for (let i = 0; i <= 5; i++)
+    for (let j = 0; j <= 5; j++) {
+      const p = pmf(la, i) * pmf(lb, j)
+      if (i > j) winA += p; else if (i === j) draw += p; else winB += p
+    }
+  return { winA, draw, winB }
+}
+
+const ROUND_LABELS: Record<string, string> = {
+  round_of_32: 'Sechzehntelfinale',
+  round_of_16: 'Achtelfinale',
+  quarterfinal: 'Viertelfinale',
+  semifinal: 'Halbfinale',
+  final: 'Finale',
+}
+
 function EffectChip({ value }: { value: number }) {
   const abs = Math.abs(value)
   if (abs < 0.002) return <span className="text-gray-600 text-xs font-mono">±0%</span>
@@ -297,7 +324,9 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
         <div className="text-center mb-1">
           <span className="text-xs font-bold text-emerald-400 tracking-wider uppercase">
-            Gruppe {match.group} · Spieltag {match.matchday}
+            {match.round === 'group'
+              ? `Gruppe ${match.group} · Spieltag ${match.matchday}`
+              : ROUND_LABELS[match.round] ?? match.round}
           </span>
         </div>
         <div className="text-center text-xs text-gray-500 mb-6">
@@ -368,6 +397,60 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             </div>
             <span className={`text-xs font-medium ${confConfig.color}`}>{confConfig.label}</span>
           </div>
+
+          {/* KO: Verlängerung + Weiterkommen */}
+          {match.round !== 'group' && (() => {
+            const et = computeET1X2(analysis.expectedGoalsA, analysis.expectedGoalsB)
+            const penProbA = 0.50
+            const pDraw90 = analysis.drawProb
+            const advanceA = analysis.winProbA + pDraw90 * (et.winA + et.draw * penProbA)
+            const advanceB = analysis.winProbB + pDraw90 * (et.winB + et.draw * (1 - penProbA))
+            const etA = Math.round(et.winA * 100)
+            const etD = Math.round(et.draw * 100)
+            const etB = Math.round(et.winB * 100)
+            const advA = Math.round(advanceA * 100)
+            const advB = Math.round(advanceB * 100)
+            return (
+              <>
+                <div className="border-t border-gray-800" />
+                <div>
+                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                    Falls Verlängerung (bei Unentschieden nach 90 Min)
+                  </h2>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className={`rounded-xl p-4 text-center ${etA > etD && etA > etB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
+                      <div className="text-xl font-bold text-white">{etA}%</div>
+                      <div className="text-[11px] text-gray-400 mt-1">{analysis.teamA.flag} Sieg V.</div>
+                    </div>
+                    <div className={`rounded-xl p-4 text-center ${etD > etA && etD > etB ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
+                      <div className="text-xl font-bold text-white">{etD}%</div>
+                      <div className="text-[11px] text-gray-400 mt-1">→ Elfmeter</div>
+                    </div>
+                    <div className={`rounded-xl p-4 text-center ${etB > etA && etB > etD ? 'bg-emerald-900/30 border border-emerald-800' : 'bg-gray-800/50'}`}>
+                      <div className="text-xl font-bold text-white">{etB}%</div>
+                      <div className="text-[11px] text-gray-400 mt-1">{analysis.teamB.flag} Sieg V.</div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-800/40 rounded-xl p-3 flex items-center justify-between">
+                    <div className="text-center flex-1">
+                      <div className="text-xs text-gray-500 mb-1">Weiterkommen gesamt</div>
+                      <div className="text-lg font-bold text-emerald-400">{advA}%</div>
+                      <div className="text-[10px] text-gray-500">{analysis.teamA.flag} {analysis.teamA.name}</div>
+                    </div>
+                    <div className="text-gray-700 px-4">vs</div>
+                    <div className="text-center flex-1">
+                      <div className="text-xs text-gray-500 mb-1">Weiterkommen gesamt</div>
+                      <div className="text-lg font-bold text-blue-400">{advB}%</div>
+                      <div className="text-[10px] text-gray-500">{analysis.teamB.flag} {analysis.teamB.name}</div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-700 mt-2">
+                    Verlängerung: 30 Min bei ~75% Intensität · Elfmeter: 50/50 Basisannahme · Weiterkommen = P(Sieg 90Min) + P(X 90Min) × P(Sieg Verl. oder Elfmeter)
+                  </p>
+                </div>
+              </>
+            )
+          })()}
 
           {/* Data quality / S11 indicator */}
           <div className="mt-3 flex items-center gap-3 text-[11px] text-gray-600 flex-wrap">
