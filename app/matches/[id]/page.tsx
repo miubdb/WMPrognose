@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { GROUP_SCHEDULE, ALL_MATCHES } from '@/src/data/schedule'
+import { GROUP_SCHEDULE, ALL_MATCHES, resolveBracket, MatchResultRow } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
 import { analyzeMatch, type MatchFactor, type SquadSummary } from '@/lib/modelAdapter'
 import { computeDataQuality } from '@/lib/model/dataQuality'
@@ -152,15 +152,29 @@ function FactorRow({ factor }: { factor: MatchFactor }) {
 }
 
 export default async function MatchDetailPage({ params }: { params: { id: string } }) {
-  const match = ALL_MATCHES.find(m => m.id === params.id)
-  if (!match) notFound()
+  const staticMatch = ALL_MATCHES.find(m => m.id === params.id)
+  if (!staticMatch) notFound()
+
+  // Resolve KO bracket winners first, so 'tbd' placeholders become real teams
+  // wherever the feeding matches are already decided.
+  const allResultsRes0 = await supabase.from('match_results').select('match_id, goals_a, goals_b, penalty_a, penalty_b')
+  const allResults0: Record<string, MatchResultRow> = {}
+  for (const r of allResultsRes0.data ?? []) {
+    allResults0[r.match_id] = { goals_a: r.goals_a, goals_b: r.goals_b, penalty_a: r.penalty_a, penalty_b: r.penalty_b }
+  }
+  const resolvedMatches = resolveBracket(allResults0)
+  const match = resolvedMatches.find(m => m.id === params.id)!
+  if (match.teamAId === 'tbd' || match.teamBId === 'tbd') {
+    // Teams not yet determined (feeding KO match undecided) — nothing to show.
+    notFound()
+  }
 
   // Fetch all data in parallel
   const [squadA, squadB, resultRes, allResultsRes, eloRes] = await Promise.all([
     supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, sofascore_rating, suspended, suspended_until_date, goals, assists, yellow_cards, red_cards').eq('team_id', match.teamAId).order('position').order('market_value_m', { ascending: false }),
     supabase.from('players').select('id, name, position, jersey_number, market_value_m, xg_per90, xa_per90, xga_per90, tackles_per90, clearances_per90, goals_conceded_per90, is_in_starting_xi, age, sofascore_rating, suspended, suspended_until_date, goals, assists, yellow_cards, red_cards').eq('team_id', match.teamBId).order('position').order('market_value_m', { ascending: false }),
-    supabase.from('match_results').select('goals_a, goals_b').eq('match_id', match.id).maybeSingle(),
-    supabase.from('match_results').select('match_id, goals_a, goals_b'),
+    supabase.from('match_results').select('goals_a, goals_b, penalty_a, penalty_b').eq('match_id', match.id).maybeSingle(),
+    Promise.resolve(allResultsRes0),
     supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
   ])
 
@@ -276,8 +290,11 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     ? `${analysis.teamB.flag} ${analysis.teamB.name} gewinnt`
     : 'Unentschieden'
 
+  const resultWonOnPenalties = result && result.goals_a === result.goals_b && result.penalty_a != null && result.penalty_b != null
   const resultWinner =
-    result && result.goals_a > result.goals_b
+    resultWonOnPenalties
+      ? (result!.penalty_a! > result!.penalty_b! ? analysis.teamA : analysis.teamB)
+      : result && result.goals_a > result.goals_b
       ? analysis.teamA
       : result && result.goals_b > result.goals_a
       ? analysis.teamB
@@ -293,7 +310,9 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       {/* Actual result banner */}
       {result && (
         <div className="bg-gray-900 border border-emerald-800/50 rounded-2xl p-5 text-center">
-          <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">Endstand</div>
+          <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">
+            Endstand{resultWonOnPenalties ? ' (n. Verlängerung)' : ''}
+          </div>
           <div className="flex items-center justify-center gap-6">
             <div className="text-right">
               <div className="text-3xl mb-1">{analysis.teamA.flag}</div>
@@ -303,6 +322,9 @@ export default async function MatchDetailPage({ params }: { params: { id: string
             </div>
             <div className="text-4xl font-bold font-mono text-white">
               {result.goals_a} : {result.goals_b}
+              {resultWonOnPenalties && (
+                <span className="text-lg text-gray-500 ml-1">({result.penalty_a}:{result.penalty_b} i.E.)</span>
+              )}
             </div>
             <div className="text-left">
               <div className="text-3xl mb-1">{analysis.teamB.flag}</div>

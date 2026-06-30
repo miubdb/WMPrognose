@@ -80,6 +80,8 @@ function ProbBar({ probA, probDraw, probB, nameA, nameB }: {
 interface MatchResult {
   goals_a: number
   goals_b: number
+  penalty_a?: number | null
+  penalty_b?: number | null
 }
 
 function MatchCard({
@@ -98,8 +100,12 @@ function MatchCard({
   const [showEntry, setShowEntry] = useState(false)
   const [goalsA, setGoalsA] = useState('')
   const [goalsB, setGoalsB] = useState('')
+  const [penA, setPenA] = useState('')
+  const [penB, setPenB] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const isKO = match.round !== 'group'
+  const isDraw = goalsA !== '' && goalsB !== '' && goalsA === goalsB
 
   const kickoff = new Date(`${match.date}T${match.kickoffUTC}:00Z`)
   const isPast = kickoff.getTime() + 85 * 60 * 1000 < Date.now() // ~85 min nach Anpfiff
@@ -124,19 +130,30 @@ function MatchCard({
       setSaveError('Ungültige Eingabe')
       return
     }
+    const needsPenalties = isKO && gA === gB
+    let pA: number | null = null
+    let pB: number | null = null
+    if (needsPenalties) {
+      pA = parseInt(penA)
+      pB = parseInt(penB)
+      if (isNaN(pA) || isNaN(pB) || pA < 0 || pB < 0 || pA === pB) {
+        setSaveError('Elfmeterschießen: Sieger erforderlich')
+        return
+      }
+    }
     setSaving(true)
     setSaveError(null)
     try {
       const res = await fetch(`/api/results/${match.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goals_a: gA, goals_b: gB }),
+        body: JSON.stringify({ goals_a: gA, goals_b: gB, penalty_a: pA, penalty_b: pB }),
       })
       if (!res.ok) {
         const d = await res.json()
         setSaveError(d.error ?? 'Fehler')
       } else {
-        onResultSaved(match.id, { goals_a: gA, goals_b: gB })
+        onResultSaved(match.id, { goals_a: gA, goals_b: gB, penalty_a: pA, penalty_b: pB })
         setShowEntry(false)
       }
     } catch (e) {
@@ -145,8 +162,11 @@ function MatchCard({
     setSaving(false)
   }
 
+  const wonOnPenalties = result && result.goals_a === result.goals_b && result.penalty_a != null && result.penalty_b != null
   const winner =
-    result && result.goals_a > result.goals_b
+    wonOnPenalties
+      ? (result!.penalty_a! > result!.penalty_b! ? analysis.teamA : analysis.teamB)
+      : result && result.goals_a > result.goals_b
       ? analysis.teamA
       : result && result.goals_b > result.goals_a
       ? analysis.teamB
@@ -185,11 +205,17 @@ function MatchCard({
             <div className="text-center">
               <div className="text-2xl font-bold text-white font-mono">
                 {result.goals_a} – {result.goals_b}
+                {wonOnPenalties && (
+                  <span className="text-sm text-gray-500 ml-1">({result.penalty_a}:{result.penalty_b} i.E.)</span>
+                )}
               </div>
-              {winner && (
+              {wonOnPenalties && (
+                <div className="text-[10px] text-emerald-400 mt-0.5">{winner!.name} gewinnt n. Elfmeterschießen</div>
+              )}
+              {!wonOnPenalties && winner && (
                 <div className="text-[10px] text-emerald-400 mt-0.5">{winner.name} gewinnt</div>
               )}
-              {!winner && (
+              {!wonOnPenalties && !winner && !isKO && (
                 <div className="text-[10px] text-gray-500 mt-0.5">Unentschieden</div>
               )}
             </div>
@@ -282,9 +308,13 @@ function MatchCard({
                 if (result) {
                   setGoalsA(String(result.goals_a))
                   setGoalsB(String(result.goals_b))
+                  setPenA(result.penalty_a != null ? String(result.penalty_a) : '')
+                  setPenB(result.penalty_b != null ? String(result.penalty_b) : '')
                 } else {
                   setGoalsA('')
                   setGoalsB('')
+                  setPenA('')
+                  setPenB('')
                 }
                 setShowEntry(true)
               }}
@@ -315,6 +345,28 @@ function MatchCard({
                 />
                 <span className="text-xs text-gray-500">{analysis.teamB.flag}</span>
               </div>
+              {isKO && isDraw && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-500">i.E.</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="99"
+                    value={penA}
+                    onChange={e => setPenA(e.target.value)}
+                    className="w-9 bg-gray-800 border border-gray-700 rounded text-center text-xs text-white focus:border-emerald-600 focus:outline-none"
+                  />
+                  <span className="text-gray-600">:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="99"
+                    value={penB}
+                    onChange={e => setPenB(e.target.value)}
+                    className="w-9 bg-gray-800 border border-gray-700 rounded text-center text-xs text-white focus:border-emerald-600 focus:outline-none"
+                  />
+                </div>
+              )}
               <button
                 onClick={saveResult}
                 disabled={saving}

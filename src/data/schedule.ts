@@ -200,3 +200,59 @@ export const ALL_MATCHES: ScheduledMatch[] = [...GROUP_SCHEDULE, ...KO_SCHEDULE]
 export const MATCH_BY_ID: Record<string, ScheduledMatch> = Object.fromEntries(
   ALL_MATCHES.map(m => [m.id, m])
 )
+
+export interface MatchResultRow {
+  goals_a: number
+  goals_b: number
+  penalty_a?: number | null
+  penalty_b?: number | null
+}
+
+const KO_ROUND_ORDER: ScheduledMatch['round'][] = [
+  'round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final',
+]
+
+function matchWinnerSide(r: MatchResultRow): 'A' | 'B' | null {
+  if (r.goals_a > r.goals_b) return 'A'
+  if (r.goals_b > r.goals_a) return 'B'
+  if (r.penalty_a != null && r.penalty_b != null) {
+    if (r.penalty_a > r.penalty_b) return 'A'
+    if (r.penalty_b > r.penalty_a) return 'B'
+  }
+  return null
+}
+
+/**
+ * Propagiert KO-Sieger rundenweise ("W R32_1" → konkrete teamId) anhand der
+ * tatsächlichen Ergebnisse (inkl. Elfmeterschießen). Gibt eine neue Kopie von
+ * ALL_MATCHES zurück, in der teamAId/teamBId für bereits entschiedene
+ * KO-Spiele aufgelöst sind; unentschiedene/zukünftige Spiele bleiben 'tbd'.
+ */
+export function resolveBracket(results: Record<string, MatchResultRow>): ScheduledMatch[] {
+  const resolved: ScheduledMatch[] = ALL_MATCHES.map(m => ({ ...m }))
+  const winnerTeamId: Record<string, string> = {}
+
+  for (const round of KO_ROUND_ORDER) {
+    for (const m of resolved) {
+      if (m.round !== round) continue
+
+      if (m.teamAId === 'tbd' && m.teamALabel?.startsWith('W ')) {
+        const srcId = m.teamALabel.slice(2)
+        if (winnerTeamId[srcId]) m.teamAId = winnerTeamId[srcId]
+      }
+      if (m.teamBId === 'tbd' && m.teamBLabel?.startsWith('W ')) {
+        const srcId = m.teamBLabel.slice(2)
+        if (winnerTeamId[srcId]) m.teamBId = winnerTeamId[srcId]
+      }
+
+      const r = results[m.id]
+      if (r && m.teamAId !== 'tbd' && m.teamBId !== 'tbd') {
+        const side = matchWinnerSide(r)
+        if (side === 'A') winnerTeamId[m.id] = m.teamAId
+        else if (side === 'B') winnerTeamId[m.id] = m.teamBId
+      }
+    }
+  }
+
+  return resolved
+}

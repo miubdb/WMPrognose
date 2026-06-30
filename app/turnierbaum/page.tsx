@@ -1,29 +1,30 @@
 import Link from 'next/link'
-import { ALL_MATCHES } from '@/src/data/schedule'
+import { resolveBracket, MatchResultRow, ScheduledMatch } from '@/src/data/schedule'
 import { VENUES } from '@/src/data/venues'
-import { toBerlinTime, fmtDate } from '@/lib/utils'
+import { TEAM_BY_ID } from '@/src/data/allTeams'
+import { fmtDate } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
+
+export const dynamic = 'force-dynamic'
 
 const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
-const r32 = ALL_MATCHES.filter(m => m.round === 'round_of_32')
-const r16 = ALL_MATCHES.filter(m => m.round === 'round_of_16')
-const qf  = ALL_MATCHES.filter(m => m.round === 'quarterfinal')
-const sf  = ALL_MATCHES.filter(m => m.round === 'semifinal')
-const fin = ALL_MATCHES.filter(m => m.round === 'final')
-
 function MatchSlot({
-  id, teamALabel, teamBLabel, date, venueId, accent = false,
+  match,
+  result,
+  accent = false,
 }: {
-  id: string
-  teamALabel?: string
-  teamBLabel?: string
-  date: string
-  venueId: string
-  kickoffUTC: string
+  match: ScheduledMatch
+  result?: MatchResultRow
   accent?: boolean
 }) {
-  const venue = VENUES[venueId]
-  const label = id.replace('R32_', 'S').replace('R16_', 'VR16-').replace('QF', 'VF-').replace('SF', 'HF-')
+  const venue = VENUES[match.venueId]
+  const teamA = match.teamAId !== 'tbd' ? TEAM_BY_ID[match.teamAId] : null
+  const teamB = match.teamBId !== 'tbd' ? TEAM_BY_ID[match.teamBId] : null
+  const wonOnPenalties = !!result && result.goals_a === result.goals_b && result.penalty_a != null && result.penalty_b != null
+  const winnerIsA = !!result && (wonOnPenalties ? result.penalty_a! > result.penalty_b! : result.goals_a > result.goals_b)
+  const winnerIsB = !!result && (wonOnPenalties ? result.penalty_b! > result.penalty_a! : result.goals_b > result.goals_a)
+
   return (
     <div
       className={`rounded-lg border p-3 text-xs ${
@@ -33,20 +34,45 @@ function MatchSlot({
       }`}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="font-mono text-[10px] text-gray-600">{id}</span>
-        <span className="text-[10px] text-gray-600">{fmtDate(date)}</span>
+        <span className="font-mono text-[10px] text-gray-600">{match.id}</span>
+        <span className="text-[10px] text-gray-600">{fmtDate(match.date)}</span>
       </div>
       <div className="space-y-1">
-        <div className="text-gray-300 truncate">{teamALabel ?? '?'}</div>
+        <div className={`flex items-center justify-between gap-1 truncate ${winnerIsA ? 'text-white font-bold' : 'text-gray-300'}`}>
+          <span className="truncate">{teamA ? `${teamA.flag} ${teamA.name}` : (match.teamALabel ?? '?')}</span>
+          {result && <span className="font-mono shrink-0">{result.goals_a}</span>}
+        </div>
         <div className="text-gray-600 text-[10px] font-mono">vs</div>
-        <div className="text-gray-300 truncate">{teamBLabel ?? '?'}</div>
+        <div className={`flex items-center justify-between gap-1 truncate ${winnerIsB ? 'text-white font-bold' : 'text-gray-300'}`}>
+          <span className="truncate">{teamB ? `${teamB.flag} ${teamB.name}` : (match.teamBLabel ?? '?')}</span>
+          {result && <span className="font-mono shrink-0">{result.goals_b}</span>}
+        </div>
       </div>
-      <div className="mt-2 text-[10px] text-gray-600 truncate">{venue?.city ?? venueId}</div>
+      {wonOnPenalties && (
+        <div className="mt-1 text-[10px] text-emerald-500">n. Elfmeterschießen ({result!.penalty_a}:{result!.penalty_b})</div>
+      )}
+      <div className="mt-2 text-[10px] text-gray-600 truncate">{venue?.city ?? match.venueId}</div>
     </div>
   )
 }
 
-export default function TurnierbaumPage() {
+export default async function TurnierbaumPage() {
+  const { data: resultRows } = await supabase
+    .from('match_results')
+    .select('match_id, goals_a, goals_b, penalty_a, penalty_b')
+
+  const results: Record<string, MatchResultRow> = {}
+  for (const r of resultRows ?? []) {
+    results[r.match_id] = { goals_a: r.goals_a, goals_b: r.goals_b, penalty_a: r.penalty_a, penalty_b: r.penalty_b }
+  }
+
+  const resolved = resolveBracket(results)
+  const r32 = resolved.filter(m => m.round === 'round_of_32')
+  const r16 = resolved.filter(m => m.round === 'round_of_16')
+  const qf  = resolved.filter(m => m.round === 'quarterfinal')
+  const sf  = resolved.filter(m => m.round === 'semifinal')
+  const fin = resolved.filter(m => m.round === 'final')
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
       <div>
@@ -95,7 +121,7 @@ export default function TurnierbaumPage() {
         <p className="text-xs text-gray-600 mb-4">29. Juni – 6. Juli 2026 · 16 Spiele</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {r32.map(m => (
-            <MatchSlot key={m.id} {...m} />
+            <MatchSlot key={m.id} match={m} result={results[m.id]} />
           ))}
         </div>
       </section>
@@ -108,7 +134,7 @@ export default function TurnierbaumPage() {
         <p className="text-xs text-gray-600 mb-4">8. – 11. Juli 2026 · 8 Spiele</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {r16.map(m => (
-            <MatchSlot key={m.id} {...m} />
+            <MatchSlot key={m.id} match={m} result={results[m.id]} />
           ))}
         </div>
       </section>
@@ -121,7 +147,7 @@ export default function TurnierbaumPage() {
         <p className="text-xs text-gray-600 mb-4">14. – 15. Juli 2026 · 4 Spiele</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {qf.map(m => (
-            <MatchSlot key={m.id} {...m} />
+            <MatchSlot key={m.id} match={m} result={results[m.id]} />
           ))}
         </div>
       </section>
@@ -134,7 +160,7 @@ export default function TurnierbaumPage() {
         <p className="text-xs text-gray-600 mb-4">17. – 18. Juli 2026 · 2 Spiele</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
           {sf.map(m => (
-            <MatchSlot key={m.id} {...m} />
+            <MatchSlot key={m.id} match={m} result={results[m.id]} />
           ))}
         </div>
       </section>
@@ -169,7 +195,7 @@ export default function TurnierbaumPage() {
         <p className="text-xs text-gray-600 mb-4">19. Juli 2026 · MetLife Stadium, New York/New Jersey</p>
         <div className="max-w-xs">
           {fin.map(m => (
-            <MatchSlot key={m.id} {...m} accent />
+            <MatchSlot key={m.id} match={m} result={results[m.id]} accent />
           ))}
         </div>
       </section>

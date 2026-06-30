@@ -16,7 +16,7 @@ export async function GET() {
     supabase.from('players').select(PLAYER_SELECT).order('team_id').range(0, 999),
     supabase.from('players').select(PLAYER_SELECT).order('team_id').range(1000, 1999),
     supabase.from('team_elo_ratings').select('team_id, elo_rating, elo_delta_1y, source'),
-    supabase.from('match_results').select('match_id, goals_a, goals_b'),
+    supabase.from('match_results').select('match_id, goals_a, goals_b, penalty_a, penalty_b'),
   ])
 
   type RawPlayerRow = {
@@ -85,9 +85,14 @@ export async function GET() {
   }
 
   // Match results
-  const results: Record<string, { goals_a: number; goals_b: number }> = {}
+  const results: Record<string, { goals_a: number; goals_b: number; penalty_a: number | null; penalty_b: number | null }> = {}
   for (const row of resultsRes.data ?? []) {
-    results[row.match_id] = { goals_a: row.goals_a, goals_b: row.goals_b }
+    results[row.match_id] = {
+      goals_a: row.goals_a,
+      goals_b: row.goals_b,
+      penalty_a: (row as { penalty_a: number | null }).penalty_a,
+      penalty_b: (row as { penalty_b: number | null }).penalty_b,
+    }
   }
 
   // Compute ALL match analyses server-side — single source of truth.

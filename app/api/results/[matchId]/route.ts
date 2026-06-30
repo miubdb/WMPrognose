@@ -7,14 +7,24 @@ const adminSupabase = createClient(
 )
 
 export async function PUT(req: Request, { params }: { params: { matchId: string } }) {
-  const { goals_a, goals_b } = await req.json()
+  const { goals_a, goals_b, penalty_a, penalty_b } = await req.json()
   if (typeof goals_a !== 'number' || typeof goals_b !== 'number' || goals_a < 0 || goals_b < 0) {
     return NextResponse.json({ error: 'Invalid' }, { status: 400 })
   }
+  const hasPenalties = typeof penalty_a === 'number' && typeof penalty_b === 'number'
+  if ((penalty_a != null || penalty_b != null) && !hasPenalties) {
+    return NextResponse.json({ error: 'Invalid penalty score' }, { status: 400 })
+  }
   const { error } = await adminSupabase
     .from('match_results')
-    .upsert({ match_id: params.matchId, goals_a, goals_b, updated_at: new Date().toISOString() },
-             { onConflict: 'match_id' })
+    .upsert({
+      match_id: params.matchId,
+      goals_a,
+      goals_b,
+      penalty_a: hasPenalties ? penalty_a : null,
+      penalty_b: hasPenalties ? penalty_b : null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'match_id' })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

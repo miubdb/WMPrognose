@@ -10,7 +10,7 @@ import { ALL_TEAMS, TEAM_BY_ID, TeamBasic } from '@/src/data/allTeams'
 import { Player } from '@/src/data/players'
 import { MatchContext } from '@/src/data/matches'
 import { predictMatch, MatchPredictionResult } from '@/src/model/predictMatch'
-import { GROUP_SCHEDULE, ALL_MATCHES, ScheduledMatch } from '@/src/data/schedule'
+import { GROUP_SCHEDULE, ALL_MATCHES, ScheduledMatch, resolveBracket, MatchResultRow } from '@/src/data/schedule'
 import { computeScorelineMatrix } from '@/src/model/poisson'
 import { applyDixonColesCorrection, aggregateOutcomeProbabilities } from '@/src/model/dixonColes'
 import { MODEL_WEIGHTS, MODEL_META } from '@/lib/model/config'
@@ -1201,21 +1201,24 @@ export function analyzeAllMatches(
   squadData?: Record<string, SquadSummary>,
   eloOverrides?: Record<string, number>,
   eloSources?: Record<string, string>,
-  results?: Record<string, { goals_a: number; goals_b: number }>
+  results?: Record<string, MatchResultRow>
 ): MatchAnalysis[] {
   const standings = results ? computeGroupStandings(results) : {}
-  return ALL_MATCHES.map(m => {
-    let pressure: { A: TeamPressure; B: TeamPressure } | undefined
-    if (results && m.group) {
-      const remainingMatchIds = GROUP_SCHEDULE
-        .filter(mm => mm.group === m.group && !results[mm.id])
-        .map(mm => mm.id)
-      const pressureA = computePressure(m.teamAId, m.group, standings, remainingMatchIds, results, standings)
-      const pressureB = computePressure(m.teamBId, m.group, standings, remainingMatchIds, results, standings)
-      pressure = { A: pressureA, B: pressureB }
-    }
-    return analyzeMatch(m, squadData, pressure, eloOverrides, eloSources)
-  })
+  const matches = results ? resolveBracket(results) : ALL_MATCHES
+  return matches
+    .filter(m => m.teamAId !== 'tbd' && m.teamBId !== 'tbd')
+    .map(m => {
+      let pressure: { A: TeamPressure; B: TeamPressure } | undefined
+      if (results && m.group) {
+        const remainingMatchIds = GROUP_SCHEDULE
+          .filter(mm => mm.group === m.group && !results[mm.id])
+          .map(mm => mm.id)
+        const pressureA = computePressure(m.teamAId, m.group, standings, remainingMatchIds, results, standings)
+        const pressureB = computePressure(m.teamBId, m.group, standings, remainingMatchIds, results, standings)
+        pressure = { A: pressureA, B: pressureB }
+      }
+      return analyzeMatch(m, squadData, pressure, eloOverrides, eloSources)
+    })
 }
 
 // ─── Tournament Simulation ─────────────────────────────────────────────────────
