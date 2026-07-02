@@ -10,6 +10,15 @@ import { MODEL_META } from '@/lib/model/config'
 
 const GROUPS = ['Alle', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
+type KORound = 'round_of_32' | 'round_of_16' | 'quarterfinal' | 'semifinal' | 'final'
+const KO_ROUNDS: { id: KORound; label: string }[] = [
+  { id: 'round_of_32',  label: 'Sechzehntelfinale' },
+  { id: 'round_of_16',  label: 'Achtelfinale' },
+  { id: 'quarterfinal', label: 'Viertelfinale' },
+  { id: 'semifinal',    label: 'Halbfinale' },
+  { id: 'final',        label: 'Finale' },
+]
+
 // Top N scores within a predicted outcome category
 function topConditionalScores(xgA: number, xgB: number, rho: number, outcome: '1' | 'X' | '2', n = 3): { i: number; j: number; p: number }[] {
   const pmf = (lambda: number, k: number) => {
@@ -392,6 +401,7 @@ function MatchCard({
 export default function Dashboard() {
   const [activeGroup, setActiveGroup] = useState('Alle')
   const [matchday, setMatchday] = useState(0)
+  const [activeRound, setActiveRound] = useState<KORound | null>(null)
   const [filterDate, setFilterDate] = useState<string | null>(null)
   const [showOldResults, setShowOldResults] = useState(false)
   // Server-computed analyses — single source of truth, always matches detail page
@@ -418,15 +428,19 @@ export default function Dashboard() {
   }, [fetchContext])
 
   // In "Alle Gruppen" without any extra filter, hide completed matches older than 1 day
-  const isDefaultView = activeGroup === 'Alle' && matchday === 0 && !filterDate
+  const isDefaultView = activeGroup === 'Alle' && matchday === 0 && activeRound === null && !filterDate
 
   const analyses = useMemo(() => {
     const yesterday = yesterdayStr()
     return allAnalyses
       .filter(a => {
         const match = ALL_MATCHES.find(m => m.id === a.matchId)!
-        if (activeGroup !== 'Alle' && match.group !== activeGroup) return false
-        if (matchday !== 0 && match.matchday !== matchday) return false
+        if (activeRound !== null) {
+          if (match.round !== activeRound) return false
+        } else {
+          if (activeGroup !== 'Alle' && match.group !== activeGroup) return false
+          if (matchday !== 0 && match.matchday !== matchday) return false
+        }
         if (filterDate && match.date !== filterDate) return false
         // In default "Alle" view: hide finished matches older than 1 day (unless toggled)
         if (isDefaultView && !showOldResults && results[a.matchId] && match.date < yesterday) return false
@@ -438,7 +452,7 @@ export default function Dashboard() {
         const d = ma.date.localeCompare(mb.date)
         return d !== 0 ? d : ma.kickoffUTC.localeCompare(mb.kickoffUTC)
       })
-  }, [allAnalyses, activeGroup, matchday, filterDate, isDefaultView, showOldResults, results])
+  }, [allAnalyses, activeGroup, matchday, activeRound, filterDate, isDefaultView, showOldResults, results])
 
   const hiddenCount = useMemo(() => {
     if (!isDefaultView || showOldResults) return 0
@@ -473,7 +487,7 @@ export default function Dashboard() {
       <div className="space-y-2">
         <div className="flex gap-1 flex-wrap">
           <button
-            onClick={() => { setFilterDate(todayStr()); setMatchday(0); setActiveGroup('Alle') }}
+            onClick={() => { setFilterDate(todayStr()); setMatchday(0); setActiveGroup('Alle'); setActiveRound(null) }}
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
               filterDate === todayStr()
                 ? 'bg-yellow-500 text-black'
@@ -485,9 +499,9 @@ export default function Dashboard() {
           {GROUPS.map(g => (
             <button
               key={g}
-              onClick={() => { setActiveGroup(g); setFilterDate(null); setShowOldResults(false) }}
+              onClick={() => { setActiveGroup(g); setActiveRound(null); setFilterDate(null); setShowOldResults(false) }}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                activeGroup === g && !filterDate
+                activeGroup === g && activeRound === null && !filterDate
                   ? 'bg-emerald-500 text-black'
                   : 'bg-gray-800 text-gray-400 hover:text-white'
               }`}
@@ -497,18 +511,32 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {[0, 1, 2, 3].map(d => (
             <button
               key={d}
-              onClick={() => { setMatchday(d); setFilterDate(null) }}
+              onClick={() => { setMatchday(d); setActiveRound(null); setFilterDate(null) }}
               className={`px-3 py-1 rounded-lg text-xs transition-colors ${
-                matchday === d && !filterDate
+                matchday === d && activeRound === null && !filterDate
                   ? 'bg-gray-700 text-white'
                   : 'bg-gray-800 text-gray-500 hover:text-white'
               }`}
             >
               {d === 0 ? 'Alle Spieltage' : `Spieltag ${d}`}
+            </button>
+          ))}
+          <span className="text-gray-700 text-xs px-1 self-center">|</span>
+          {KO_ROUNDS.map(r => (
+            <button
+              key={r.id}
+              onClick={() => { setActiveRound(r.id); setMatchday(0); setActiveGroup('Alle'); setFilterDate(null) }}
+              className={`px-3 py-1 rounded-lg text-xs transition-colors ${
+                activeRound === r.id
+                  ? 'bg-emerald-800 text-emerald-300'
+                  : 'bg-gray-800 text-gray-500 hover:text-white'
+              }`}
+            >
+              {r.label}
             </button>
           ))}
         </div>
