@@ -177,9 +177,9 @@ export const KO_SCHEDULE: ScheduledMatch[] = [
   { id: 'R16_3', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'new_york',     date: '2026-07-05', kickoffUTC: '20:00', teamALabel: 'W R32_2',  teamBLabel: 'W R32_5' },
   { id: 'R16_4', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'mexico_city',  date: '2026-07-06', kickoffUTC: '00:00', teamALabel: 'W R32_7',  teamBLabel: 'W R32_8' },
   { id: 'R16_5', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'dallas',       date: '2026-07-06', kickoffUTC: '19:00', teamALabel: 'W R32_12', teamBLabel: 'W R32_11' },
-  { id: 'R16_6', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'seattle',      date: '2026-07-06', kickoffUTC: '21:00', teamALabel: 'W R32_10', teamBLabel: 'W R32_9' },
-  { id: 'R16_7', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'atlanta',      date: '2026-07-07', kickoffUTC: '16:00', teamALabel: 'W R32_14', teamBLabel: 'W R32_16' },
-  { id: 'R16_8', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'vancouver',    date: '2026-07-07', kickoffUTC: '20:00', teamALabel: 'W R32_13', teamBLabel: 'W R32_15' },
+  { id: 'R16_6', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'seattle',      date: '2026-07-07', kickoffUTC: '00:00', teamALabel: 'W R32_10', teamBLabel: 'W R32_9' },
+  { id: 'R16_7', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'atlanta',      date: '2026-07-07', kickoffUTC: '16:00', teamALabel: 'W R32_15', teamBLabel: 'W R32_14' },
+  { id: 'R16_8', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'vancouver',    date: '2026-07-07', kickoffUTC: '20:00', teamALabel: 'W R32_13', teamBLabel: 'W R32_16' },
 
   // Quarterfinals (4 Spiele)
   { id: 'QF1', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'new_york',    date: '2026-07-14', kickoffUTC: '22:00', teamALabel: 'W R16_1', teamBLabel: 'W R16_2' },
