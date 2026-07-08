@@ -181,18 +181,18 @@ export const KO_SCHEDULE: ScheduledMatch[] = [
   { id: 'R16_7', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'atlanta',      date: '2026-07-07', kickoffUTC: '16:00', teamALabel: 'W R32_15', teamBLabel: 'W R32_14' },
   { id: 'R16_8', round: 'round_of_16', teamAId: 'tbd', teamBId: 'tbd', venueId: 'vancouver',    date: '2026-07-07', kickoffUTC: '20:00', teamALabel: 'W R32_13', teamBLabel: 'W R32_16' },
 
-  // Quarterfinals (4 Spiele)
-  { id: 'QF1', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'new_york',    date: '2026-07-14', kickoffUTC: '22:00', teamALabel: 'W R16_1', teamBLabel: 'W R16_2' },
-  { id: 'QF2', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'dallas',      date: '2026-07-14', kickoffUTC: '19:00', teamALabel: 'W R16_3', teamBLabel: 'W R16_4' },
-  { id: 'QF3', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'los_angeles', date: '2026-07-15', kickoffUTC: '22:00', teamALabel: 'W R16_5', teamBLabel: 'W R16_6' },
-  { id: 'QF4', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'miami',       date: '2026-07-15', kickoffUTC: '19:00', teamALabel: 'W R16_7', teamBLabel: 'W R16_8' },
+  // Quarterfinals (4 Spiele) — echte Termine/Orte (Boston, LA, Miami, Kansas City)
+  { id: 'QF1', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'boston',      date: '2026-07-09', kickoffUTC: '20:00', teamALabel: 'W R16_1', teamBLabel: 'W R16_2' },
+  { id: 'QF2', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'los_angeles', date: '2026-07-10', kickoffUTC: '19:00', teamALabel: 'W R16_5', teamBLabel: 'W R16_6' },
+  { id: 'QF3', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'miami',       date: '2026-07-11', kickoffUTC: '21:00', teamALabel: 'W R16_3', teamBLabel: 'W R16_4' },
+  { id: 'QF4', round: 'quarterfinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'kansas_city', date: '2026-07-12', kickoffUTC: '01:00', teamALabel: 'W R16_7', teamBLabel: 'W R16_8' },
 
-  // Semifinals (2 Spiele)
-  { id: 'SF1', round: 'semifinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'dallas',      date: '2026-07-17', kickoffUTC: '22:00', teamALabel: 'W QF1', teamBLabel: 'W QF2' },
-  { id: 'SF2', round: 'semifinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'los_angeles', date: '2026-07-18', kickoffUTC: '22:00', teamALabel: 'W QF3', teamBLabel: 'W QF4' },
+  // Semifinals (2 Spiele) — Dallas 14.07., Atlanta 15.07.
+  { id: 'SF1', round: 'semifinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'dallas',  date: '2026-07-14', kickoffUTC: '19:00', teamALabel: 'W QF1', teamBLabel: 'W QF2' },
+  { id: 'SF2', round: 'semifinal', teamAId: 'tbd', teamBId: 'tbd', venueId: 'atlanta', date: '2026-07-15', kickoffUTC: '19:00', teamALabel: 'W QF3', teamBLabel: 'W QF4' },
 
-  // Final
-  { id: 'FINAL', round: 'final', teamAId: 'tbd', teamBId: 'tbd', venueId: 'new_york', date: '2026-07-19', kickoffUTC: '22:00', teamALabel: 'W SF1', teamBLabel: 'W SF2' },
+  // Final — MetLife Stadium, 19.07., 15:00 ET
+  { id: 'FINAL', round: 'final', teamAId: 'tbd', teamBId: 'tbd', venueId: 'new_york', date: '2026-07-19', kickoffUTC: '19:00', teamALabel: 'W SF1', teamBLabel: 'W SF2' },
 ]
 
 export const ALL_MATCHES: ScheduledMatch[] = [...GROUP_SCHEDULE, ...KO_SCHEDULE]
