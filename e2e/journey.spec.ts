@@ -14,7 +14,8 @@ const PASSWORD = 'e2e-sehr-sicher-123';
 test.beforeAll(async ({ browser }) => {
   const ctx = await browser.newContext({ ...test.info().project.use });
   page = await ctx.newPage();
-  page.on('pageerror', (e) => { throw new Error(`Seitenfehler: ${e.message}`); });
+  // WebKit meldet beim Seitenwechsel abgebrochene Fetches als Fehler ("due to access control checks"/"Load failed") – harmlos, bereits per .catch behandelt
+  page.on('pageerror', (e) => { if (!/access control checks|Load failed/.test(e.message)) throw new Error(`Seitenfehler: ${e.message}`); });
 });
 test.afterAll(async () => { await page.context().close(); });
 
@@ -233,7 +234,9 @@ test('Erholung: Check-in speichert und liefert Score', async () => {
   await page.getByLabel(/Muskelkater/).selectOption('5');
   await page.getByLabel(/^Energie/).selectOption('1');
   await page.getByTestId('save').click();
-  await expect(page.getByTestId('checkin-row')).toHaveCount(2);
+  // 3 Zeilen: heute, Vortag und der Tag mit dem aus Apple Health importierten Ruhepuls (ohne Score)
+  await expect(page.getByTestId('checkin-row')).toHaveCount(3);
+  await expect(page.getByTestId('checkin-row').filter({ hasText: '05.11.2026' })).toContainText('kein Score');
 });
 
 test('Bestätigungsworkflow: Regelvorschlag wird erst nach Bestätigung übernommen', async () => {

@@ -12,8 +12,12 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure' },
+  // Standard: Chromium-Emulation eines iPhone 13. Mit E2E_BROWSER=webkit läuft derselbe Test in WebKit (Safari-Engine, iPhone-13-Profil);
+  // dafür WebKit separat installieren (PLAYWRIGHT_BROWSERS_PATH=/pfad npx playwright install webkit).
   projects: [
-    { name: 'iphone', use: { ...devices['iPhone 13'], browserName: 'chromium', defaultBrowserType: 'chromium' } },
+    process.env.E2E_BROWSER === 'webkit'
+      ? { name: 'iphone-webkit', use: { ...devices['iPhone 13'] } }
+      : { name: 'iphone', use: { ...devices['iPhone 13'], browserName: 'chromium', defaultBrowserType: 'chromium' } },
   ],
   webServer: {
     command: `npm run build && npx next start -p ${PORT}`,

@@ -34,7 +34,7 @@ Testverweise: **U** = Unit (`tests/unit`), **I** = Integration (`tests/integrati
 | F22 | Import Apple Health (`export.xml`) | ✅ | Gewicht (lb→kg, letzter Wert/Tag), Körperfett, Ruhepuls, Workouts; Streaming in Blöcken | U (inkl. Chunk-Grenzen), E | Manuell, kein Auto-Sync; ZIP muss entpackt werden; keine Leistungsdaten in Apple-Workouts |
 | F23 | Import Gewichts-CSV | ✅ | Trennzeichen-Erkennung, Spaltenzuordnung, Dezimalkomma, `TT.MM.JJJJ`/ISO; ungültige Zeilen werden gezählt und übersprungen | U, E | Mehrdeutige US-Datumsformate werden bewusst abgelehnt |
 | F24 | Datenschutz: Export, Konto löschen | ✅ | JSON-Export aller eigenen Daten (ohne Hashes/fremde Daten); Löschen verlangt Passwort und entfernt alles (CASCADE) | I, E | – |
-| F25 | iPhone-Optimierung | ⚠️ | Viewport inkl. Safe-Area, 44-px-Ziele, 16-px-Eingaben, Bottom-Navigation, Bottom-Sheets, kein horizontales Scrollen, Manifest + Icons (zum Home-Bildschirm) | E (iPhone-13-Emulation in Chromium) | **Kein echter Safari-/iPhone-Test**; kein Service Worker → kein Offline-Betrieb |
+| F25 | iPhone-Optimierung | ⚠️ | Viewport inkl. Safe-Area, 44-px-Ziele, 16-px-Eingaben, Bottom-Navigation, Bottom-Sheets, kein horizontales Scrollen, Manifest + Icons (zum Home-Bildschirm) | E (iPhone-13-Profil: 20/20 in Chromium **und** 20/20 in WebKit/Safari-Engine, Linux-Build) | **Kein Test auf echter iPhone-Hardware/iOS-Safari** (WebKit-Linux ≠ iOS; Kamera-`capture`, Safe-Area-Rendering und Touch-Verhalten nicht verifiziert); kein Service Worker → kein Offline-Betrieb |
 | F26 | Sicherheit & sichere DB-Zugriffe | ✅ | Parametrisierte Queries; `user_id`-Scoping aller Ressourcen; strikte Zod-Schemas (keine Mass-Assignment); CSRF (Origin/Fetch-Metadata); CSP und Security-Header; RLS auf allen Tabellen; HttpOnly/SameSite/Secure-Cookies; `npm audit` ohne Funde | I (Isolation, Injection-Versuch, CSRF, RLS), `npm audit --omit=dev` = 0 | CSP nutzt `'unsafe-inline'` (Next.js ohne Nonce); App-Rolle umgeht RLS (Schutz in der Anwendungsschicht) |
 | F27 | Fehlerbehandlung | ✅ | Einheitliche JSON-Fehler mit deutschen Meldungen und Feldbezug; DB-Fehler gemappt; keine internen Details im 500; Netzwerkfehler im UI verständlich | I, E | – |
 
@@ -55,7 +55,7 @@ Testverweise: **U** = Unit (`tests/unit`), **I** = Integration (`tests/integrati
 
 ## Gesamtstatus Version 1.0
 
-Alle im Auftrag genannten, realisierbaren Funktionen sind implementiert. **Als vollständig abgenommen gelten sie nicht:** F15 und F19 (KI) sind ohne API-Schlüssel nicht live verifiziert, F25 ist nicht auf echter Hardware geprüft, und die Importe wurden nicht mit echten Geräte-Exporten geprüft (siehe `docs/TESTS.md`, Abschnitt „Nicht verifiziert“). Diese Prüfungen sind vor der produktiven Nutzung nachzuholen.
+Alle im Auftrag genannten, realisierbaren Funktionen sind implementiert. **Als vollständig abgenommen gelten sie nicht:** F15 und F19 (KI) sind ohne API-Schlüssel nicht live verifiziert, F25 ist nicht auf echter iPhone-Hardware geprüft (nur Chromium- und WebKit-Linux-Emulation), und die Importe wurden nicht mit echten Geräte-Exporten geprüft (siehe `docs/TESTS.md`, Abschnitt „Nicht verifiziert“). Diese Prüfungen sind vor der produktiven Nutzung nachzuholen.
 
 ## Testergebnis
 
@@ -67,7 +67,9 @@ Letzter vollständiger Lauf (02.11.2026, Node 22, PostgreSQL 16, Chromium/Playwr
 | `next build` | erfolgreich |
 | `npm audit --omit=dev` | 0 Schwachstellen |
 | Unit + Integration (`npm test`) | **186/186 bestanden** in 12 Dateien (barcode 3, body-nutrition 19, cycling-load 15, dates-phases 11, imports 13, planner 17, proposals-rules 9, ai 11, ai-http 4, auth 9, crud 50, flows 25) |
-| E2E (`npm run test:e2e`) | **20/20 bestanden** (iPhone-13-Emulation, Chromium) |
+| E2E (`npm run test:e2e`) | **20/20 bestanden** (iPhone-13-Emulation, Chromium); zusätzlich `E2E_BROWSER=webkit` **20/20** in WebKit (Safari-Engine, Linux) |
 | Live-Abruf Open Food Facts | erfolgreich (siehe `docs/TESTS.md`) |
 
 Beim Entwickeln wurden durch die Tests u. a. folgende echte Fehler gefunden und behoben: Phasengrenzen mitten in der Woche (Spielwoche wurde als Hauptphase geplant), harte Einheiten über die Wochengrenze (So→Mo), ein HTML5-Validierungsfehler im Verfügbarkeitsformular (Mannschaftstraining-Dauer 90 min war wegen `min=1/step=5` ungültig und blockierte das Speichern), und ein zu aggressiver Gewichtstrend bei kurzen Zeiträumen.
+
+Ein zwischenzeitlich beobachteter sporadischer E2E-Fehler im Erholungs-Test war ein Fehler im Test selbst (er zählte 2 statt 3 Check-in-Zeilen und bestand nur, weil er vor dem Nachladen der Liste prüfte); der Test prüft jetzt den vollständigen Zustand inkl. der aus Apple Health importierten Ruhepuls-Zeile. WebKit meldet beim Seitenwechsel abgebrochene Fetches als Seitenfehler; diese harmlose Meldung wird im Test ausgenommen.
