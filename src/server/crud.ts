@@ -134,6 +134,11 @@ export async function updateRow(userId: string, name: string, id: string, body: 
       const merged: Row = {};
       for (const k of known) merged[k] = cur[k];
       Object.assign(merged, body);
+      // Nutzer bestätigt/korrigiert eine KI-Schätzung ausdrücklich als „keine Schätzung“ → Quelle wird manuell
+      if (name === 'food-entries' && (body as Row).is_estimate === false && merged.source === 'ai_estimate') {
+        merged.source = 'manual';
+        if (!patchKeys.includes('source')) patchKeys.push('source');
+      }
       const data = normalize(name, r.schema.parse(merged) as Row);
       // nur geänderte Felder schreiben, abgeleitete Felder neu berechnen
       const changed: Row = {};

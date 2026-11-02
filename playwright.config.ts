@@ -5,6 +5,7 @@ const DB = process.env.E2E_DATABASE_URL ?? 'postgres://rtm:rtm@localhost:5432/rt
 
 export default defineConfig({
   testDir: 'e2e',
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 60000,
@@ -26,6 +27,8 @@ export default defineConfig({
       DATABASE_SSL: 'disable',
       NODE_ENV: 'production',
       COOKIE_SECURE: 'false',
+      APP_ENV_TEST: '1',
+      APP_TODAY: '2026-11-02',
     },
   },
 });

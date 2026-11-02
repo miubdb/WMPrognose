@@ -181,8 +181,9 @@ describe('Trainings-Logik', () => {
     const edit = await api.patch(r.json.row.id, { kcal: 650 });
     expect(edit.json.row.is_estimate).toBe(true);
     expect(edit.json.row.kcal).toBe(650);
-    const manual = await api.patch(r.json.row.id, { source: 'manual', is_estimate: false });
-    expect(manual.json.row.is_estimate).toBe(false);
+    // erst die ausdrückliche Bestätigung des Nutzers entfernt die Markierung (Quelle wird dann manuell)
+    const manual = await api.patch(r.json.row.id, { is_estimate: false });
+    expect(manual.json.row).toMatchObject({ is_estimate: false, source: 'manual' });
   });
   it('Ressourcen-Registry passt zum Datenbankschema', async () => {
     const { RESOURCES } = await import('@/server/resources');
