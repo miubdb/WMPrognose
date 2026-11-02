@@ -4,20 +4,21 @@ import { Encoder, Profile } from '@garmin/fitsdk';
 export function buildFit(opts: { start: Date; seconds: number; watts: (i: number) => number; hr?: (i: number) => number; sport?: string; subSport?: string; ascent?: number }): Uint8Array {
   const enc = new Encoder();
   const { MesgNum } = Profile;
-  enc.onMesg(MesgNum.FILE_ID, { type: 'activity', manufacturer: 'development', product: 1, timeCreated: opts.start, serialNumber: 1234 });
+  const mesg = (m: Record<string, unknown>) => m as never;
+  enc.onMesg(MesgNum.FILE_ID, mesg({ type: 'activity', manufacturer: 'development', product: 1, timeCreated: opts.start, serialNumber: 1234 }));
   let distance = 0;
   for (let i = 0; i < opts.seconds; i++) {
     distance += 8; // 8 m/s
-    enc.onMesg(MesgNum.RECORD, {
+    enc.onMesg(MesgNum.RECORD, mesg({
       timestamp: new Date(opts.start.getTime() + i * 1000),
       power: opts.watts(i),
       heartRate: opts.hr ? opts.hr(i) : 140,
       distance,
       altitude: 100,
-    });
+    }));
   }
   const watts = Array.from({ length: opts.seconds }, (_, i) => opts.watts(i));
-  enc.onMesg(MesgNum.SESSION, {
+  enc.onMesg(MesgNum.SESSION, mesg({
     timestamp: new Date(opts.start.getTime() + opts.seconds * 1000),
     startTime: opts.start,
     totalElapsedTime: opts.seconds,
@@ -30,6 +31,6 @@ export function buildFit(opts: { start: Date; seconds: number; watts: (i: number
     maxHeartRate: 170,
     totalAscent: opts.ascent ?? 120,
     totalCalories: 500,
-  });
+  }));
   return enc.close();
 }
