@@ -1,7 +1,8 @@
 node_modules/
-dist/
-*.js.map
 .next/
 next-env.d.ts
-.env.local
+.env
 .env*.local
+test-results/
+playwright-report/
+*.tsbuildinfo
