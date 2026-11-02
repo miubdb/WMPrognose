@@ -55,10 +55,3 @@ export async function generateForUser(userId: string, body: unknown) {
   });
   return { from, to, created: sessions.length, deleted, unplaced: result.unplaced };
 }
-
-export async function clearGenerated(userId: string, body: unknown) {
-  const { from, to } = z.strictObject({ from: dateStr, to: dateStr }).parse(body);
-  if (from > to) throw badRequest('Das Von-Datum liegt nach dem Bis-Datum.');
-  const rows = await query(`DELETE FROM plan_sessions WHERE user_id = $1 AND date BETWEEN $2 AND $3 AND source = 'generator' AND status = 'planned' RETURNING id`, [userId, from, to]);
-  return { deleted: rows.length };
-}

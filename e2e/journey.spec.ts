@@ -327,6 +327,25 @@ test('Ernährung: Eintrag anlegen/ändern/löschen, eigene Lebensmittel, Zielbil
   await expect(page.getByTestId('kcal-total')).toHaveText(/450 kcal/);
 });
 
+test('Barcode-Suche (UI): Produkt übernehmen und als eigenes Lebensmittel speichern', async () => {
+  // Open Food Facts selbst ist live in docs/TESTS.md verifiziert; hier wird nur das UI-Verhalten mit fester Antwort geprüft.
+  await page.route('**/api/nutrition/barcode?**', (r) => r.fulfill({ json: { product: { barcode: '3017620422003', name: 'Haselnuss-Aufstrich', brand: 'Test', kcal_100g: 539, protein_100g: 6.3, carbs_100g: 57.5, fat_100g: 30.9, serving_g: 15, source: 'openfoodfacts' } } }));
+  await page.goto('/ernaehrung');
+  await page.getByTestId('add-snack').click();
+  await page.getByRole('tab', { name: 'Barcode' }).click();
+  await page.getByLabel('Barcode').fill('3017620422003');
+  await page.getByRole('button', { name: 'Suchen' }).click();
+  await expect(page.getByText('Haselnuss-Aufstrich – Test')).toBeVisible();
+  await page.getByRole('dialog').getByLabel(/^Menge/).fill('20');
+  await page.getByRole('button', { name: 'In meine Lebensmittel' }).click();
+  await expect(page.getByText(/In „Meine Lebensmittel“ gespeichert/)).toBeVisible();
+  await page.getByRole('button', { name: 'Zum Tag hinzufügen' }).click();
+  await expect(page.getByTestId('food-entry').filter({ hasText: 'Haselnuss-Aufstrich' })).toContainText('108 kcal');
+  await page.getByTestId('food-entry').filter({ hasText: 'Haselnuss-Aufstrich' }).click();
+  await confirmDelete();
+  await page.unroute('**/api/nutrition/barcode?**');
+});
+
 test('KI-Funktionen ohne Schlüssel: ehrliche Meldung statt Fake-Antworten', async () => {
   await page.getByTestId('add-mittag').click();
   await page.getByRole('tab', { name: 'Foto (KI)' }).click();
