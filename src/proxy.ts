@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Leitet nicht angemeldete Seitenaufrufe auf /login um. Die eigentliche Prüfung der Sitzung erfolgt in den API-Routen.
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   if (!req.cookies.get('rtm_session')) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { gzipSync } from 'node:zlib';
 import { buildFit } from '../tests/helpers/fitFixture';
 
 // Ende-zu-Ende-Test der wichtigsten Nutzerprozesse auf iPhone-Viewport (Chromium-Emulation, siehe docs/TESTS.md).
@@ -130,6 +131,32 @@ test('FIT-Import (offizielles Garmin-Format) inkl. Duplikaterkennung', async () 
   await expect(alertBox()).toContainText('keine gültige FIT-Datei');
   await page.goto('/training');
   await expect(page.getByTestId('row-workouts').filter({ hasText: 'FIT-Import' })).toContainText('Import FIT');
+});
+
+test('Import: gezippte FIT-Datei (Strava-Export) und Apple-Health-export.xml', async () => {
+  await page.goto('/import');
+  const fit = buildFit({ start: new Date('2026-10-30T18:00:00Z'), seconds: 900, watts: () => 180 });
+  await page.getByTestId('activity-files').setInputFiles({ name: '123456.fit.gz', mimeType: 'application/gzip', buffer: gzipSync(Buffer.from(fit)) });
+  await expect(page.getByTestId('import-row')).toContainText('15 min');
+  await page.getByTestId('run-import').click();
+  await expect(page.getByText('1 importiert, 0 bereits vorhanden')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Apple Health' }).click();
+  const xml = `<?xml version="1.0"?><HealthData>
+<Record type="HKQuantityTypeIdentifierBodyMass" unit="kg" startDate="2026-11-05 07:00:00 +0100" value="90.2"/>
+<Record type="HKQuantityTypeIdentifierRestingHeartRate" unit="count/min" startDate="2026-11-05 07:30:00 +0100" value="54"/>
+<Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" durationUnit="min" totalDistance="5" totalDistanceUnit="km" startDate="2026-11-04 06:30:00 +0100"/>
+</HealthData>`;
+  await page.getByTestId('health-file').setInputFiles({ name: 'export.xml', mimeType: 'text/xml', buffer: Buffer.from(xml) });
+  await expect(page.getByText(/1 Tage mit Gewicht, 1 Tage mit Ruhepuls, 1 Workouts/)).toBeVisible();
+  await page.getByTestId('run-apple').click();
+  await expect(page.getByText(/Gewicht: 1 importiert.*Ruhepuls: 1 Tage.*Workouts: 1 importiert/)).toBeVisible();
+  await page.getByTestId('health-file').setInputFiles({ name: 'leer.xml', mimeType: 'text/xml', buffer: Buffer.from('<HealthData></HealthData>') });
+  await expect(alertBox()).toContainText('keine Gewichts-, Ruhepuls- oder Workout-Daten');
+  await page.goto('/training');
+  await expect(page.getByTestId('row-workouts').filter({ hasText: 'Running (Apple Health)' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Belastung' }).click();
+  await expect(page.getByRole('img', { name: 'CTL, ATL, TSB' })).toBeVisible();
 });
 
 test('Plan: Wochenansicht, Detail, Eigene Einheit anlegen/ändern/löschen, Erledigt-Erfassung', async () => {
@@ -309,6 +336,40 @@ test('KI-Funktionen ohne Schlüssel: ehrliche Meldung statt Fake-Antworten', asy
   await expect(page.getByText(/nicht eingerichtet/).first()).toBeVisible();
   await expect(page.getByLabel('Nachricht an den Coach')).toBeDisabled();
   await expect(page.getByTestId('send-coach')).toBeDisabled();
+});
+
+test('KI-Foto-Erkennung (UI): Schätzung prüfen, korrigieren, als Schätzung speichern', async () => {
+  // Der KI-Endpunkt ist in dieser Umgebung nicht erreichbar (kein API-Schlüssel); hier wird nur das UI-Verhalten mit
+  // einer festen API-Antwort geprüft. Die Serverlogik ist in tests/integration/ai.test.ts abgedeckt.
+  await page.route('**/api/ai/status', (r) => r.fulfill({ json: { configured: true, model: 'stub' } }));
+  await page.route('**/api/ai/food', (r) => r.fulfill({ json: { items: [
+    { name: 'Reis', grams: 180, kcal: 235, protein_g: 4.5, carbs_g: 51, fat_g: 0.5, confidence: 'medium', is_estimate: true, plausible: true },
+    { name: 'Soße', grams: 60, kcal: 100, protein_g: 40, carbs_g: 40, fat_g: 40, confidence: 'low', is_estimate: true, plausible: false },
+  ], dropped: 0, notes: 'Soße nicht genau erkennbar', disclaimer: 'KI-Schätzung' } }));
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await page.goto('/ernaehrung');
+  await page.getByTestId('add-mittag').click();
+  await page.getByRole('tab', { name: 'Foto (KI)' }).click();
+  await page.getByTestId('photo-input').setInputFiles({ name: 'essen.png', mimeType: 'image/png', buffer: png });
+  await expect(page.getByText('Schätzung', { exact: true })).toHaveCount(2);
+  await expect(page.getByText('Werte passen nicht zusammen')).toBeVisible();
+  await expect(page.getByText(/Hinweis der KI: Soße nicht genau erkennbar/)).toBeVisible();
+  await page.getByLabel('Reis kcal').fill('250'); // manuelle Korrektur
+  await page.getByRole('button', { name: 'Entfernen' }).nth(1).click();
+  await page.getByTestId('save-ai').click();
+  const entry = page.getByTestId('food-entry').filter({ hasText: 'Reis' });
+  await expect(entry).toContainText('≈ Schätzung');
+  await expect(entry).toContainText('≈ 250 kcal');
+  await page.getByTestId('kcal-total').waitFor();
+  // Prüfen und Markierung entfernen
+  await entry.click();
+  await page.getByRole('dialog').getByLabel('Schätzung').uncheck();
+  await page.getByTestId('save').click();
+  await expect(page.getByTestId('food-entry').filter({ hasText: 'Reis' })).not.toContainText('Schätzung');
+  await page.getByTestId('food-entry').filter({ hasText: 'Reis' }).click();
+  await confirmDelete();
+  await page.unroute('**/api/ai/status');
+  await page.unroute('**/api/ai/food');
 });
 
 test('Torwart: Übung, Training mit Übungen, Spielanalyse mit Gegentor-Analyse und Statistik', async () => {

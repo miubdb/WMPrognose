@@ -73,26 +73,34 @@ export async function registerUser(email: string, password: string): Promise<Aut
   }
 }
 
-const MAX_FAILED = 8;
+const MAX_FAILED_PER_EMAIL = 8;
+const MAX_FAILED_PER_IP = 40;
 const WINDOW_MIN = 15;
 
+async function failedCount(key: string): Promise<number> {
+  const r = await queryOne<{ n: number }>(`SELECT count(*)::int AS n FROM login_attempts WHERE key = $1 AND at > now() - make_interval(mins => $2)`, [key, WINDOW_MIN]);
+  return r?.n ?? 0;
+}
+
+/**
+ * Anmeldung mit Begrenzung fehlgeschlagener Versuche je E-Mail-Adresse (unabhängig von der IP, da X-Forwarded-For
+ * fälschbar sein kann) und je IP. Nachteil: Ein Angreifer kann ein Konto 15 Minuten lang sperren – bewusst akzeptiert.
+ */
 export async function loginUser(email: string, password: string, ip: string): Promise<AuthUser> {
-  const key = `${email}|${ip}`;
-  const failed = await queryOne<{ n: number }>(
-    `SELECT count(*)::int AS n FROM login_attempts WHERE key = $1 AND at > now() - make_interval(mins => $2)`,
-    [key, WINDOW_MIN],
-  );
-  if ((failed?.n ?? 0) >= MAX_FAILED) {
+  const emailKey = `email:${email}`;
+  const ipKey = `ip:${ip}`;
+  if ((await failedCount(emailKey)) >= MAX_FAILED_PER_EMAIL || (await failedCount(ipKey)) >= MAX_FAILED_PER_IP) {
     throw tooMany(`Zu viele fehlgeschlagene Anmeldeversuche. Bitte in ${WINDOW_MIN} Minuten erneut versuchen.`);
   }
   const row = await queryOne<AuthUser & { password_hash: string }>('SELECT id, email, password_hash FROM users WHERE lower(email) = $1', [email]);
   // Konstante Arbeit auch bei unbekanntem Konto (Timing)
   const ok = row ? await verifyPassword(password, row.password_hash) : (await verifyPassword(password, DUMMY_HASH), false);
   if (!row || !ok) {
-    await query('INSERT INTO login_attempts (key) VALUES ($1)', [key]);
+    await query('INSERT INTO login_attempts (key) VALUES ($1), ($2)', [emailKey, ipKey]);
+    await query(`DELETE FROM login_attempts WHERE at < now() - interval '1 day'`);
     throw unauthorized('E-Mail oder Passwort ist falsch.');
   }
-  await query('DELETE FROM login_attempts WHERE key = $1', [key]);
+  await query('DELETE FROM login_attempts WHERE key = $1', [emailKey]);
   return { id: row.id, email: row.email };
 }
 const DUMMY_HASH = 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$' + Buffer.alloc(64).toString('base64');

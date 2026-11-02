@@ -12,6 +12,8 @@ describe('Gewicht', () => {
   it('Rate nur mit genug Daten', () => {
     expect(weeklyRate(pts.slice(0, 2))).toBeNull();
     expect(weeklyRate([{ date: '2026-11-01', weight_kg: 90 }, { date: '2026-11-02', weight_kg: 90 }, { date: '2026-11-03', weight_kg: 90 }])).toBeNull();
+    // 10 Tage Spanne ist noch zu kurz für einen belastbaren Trend
+    expect(weeklyRate([{ date: '2026-11-01', weight_kg: 91 }, { date: '2026-11-05', weight_kg: 90.5 }, { date: '2026-11-11', weight_kg: 90 }])).toBeNull();
   });
   it('Trend glättet Ausreißer', () => {
     const t = trendSeries([{ date: '2026-11-01', weight_kg: 90 }, { date: '2026-11-02', weight_kg: 90 }, { date: '2026-11-03', weight_kg: 93 }]);

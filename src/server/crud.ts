@@ -44,7 +44,8 @@ export async function listRows(userId: string, name: string, q: { from?: string 
     if (q.from) { if (!isDateStr(q.from)) throw badRequest('Ungültiges Von-Datum.'); params.push(q.from); where += ` AND ${r.dateColumn} >= $${params.length}`; }
     if (q.to) { if (!isDateStr(q.to)) throw badRequest('Ungültiges Bis-Datum.'); params.push(q.to); where += ` AND ${r.dateColumn} <= $${params.length}`; }
   }
-  const limit = Math.min(Math.max(q.limit ?? 1000, 1), 5000);
+  const raw = Number.isFinite(q.limit) ? (q.limit as number) : 1000;
+  const limit = Math.min(Math.max(Math.trunc(raw), 1), 5000);
   return query(`SELECT * FROM ${r.table} WHERE ${where} ORDER BY ${r.order} LIMIT ${limit}`, params);
 }
 

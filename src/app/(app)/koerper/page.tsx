@@ -52,7 +52,7 @@ function WeightView() {
           { name: 'Messwert', color: '#94a3b8', points: s.series.map((x: any) => ({ x: x.date, y: x.weight_kg })) },
           { name: 'Trend', color: '#15803d', points: s.series.map((x: any) => ({ x: x.date, y: x.trend })) },
         ]} />
-        <p className="mt-2 text-sm text-slate-600">{s.rate == null ? 'Für einen Trend werden mindestens 3 Messungen über mindestens 7 Tage benötigt.' : `Trend der letzten 4 Wochen: ${num(s.rate, 2)} kg pro Woche.`} {p.requiredWeeklyKg != null && `Für das Zielgewicht bis zum Hauptziel wären ${num(p.requiredWeeklyKg, 2)} kg/Woche nötig.`}</p>
+        <p className="mt-2 text-sm text-slate-600">{s.rate == null ? 'Für einen Trend werden mindestens 3 Messungen über mindestens 14 Tage benötigt.' : `Trend der letzten 4 Wochen: ${num(s.rate, 2)} kg pro Woche.`} {p.requiredWeeklyKg != null && `Für das Zielgewicht bis zum Hauptziel wären ${num(p.requiredWeeklyKg, 2)} kg/Woche nötig.`}</p>
       </Card>
       <ResourceCrud<any> key={v} resource="weights" title="Gewichtseintrag" addLabel="Gewicht eintragen" emptyText="Noch keine Einträge." fields={WEIGHT_FIELDS} defaults={{ date: today }} onChanged={() => { void stats.reload(); setV(v); }}
         renderRow={(w) => <div className="flex items-center justify-between"><span className="font-semibold">{num(w.weight_kg, 2)} kg {w.body_fat_pct != null && <span className="text-sm font-normal text-slate-500">· {num(w.body_fat_pct)} % KFA</span>}</span><span className="text-sm text-slate-500">{formatDe(w.date, true)} {w.source === 'import' && <Badge tone="blue">Import</Badge>}</span></div>} />

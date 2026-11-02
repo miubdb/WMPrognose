@@ -19,7 +19,7 @@ export function trendSeries(points: WeightPoint[], tauDays = 7): { date: DateStr
   return out;
 }
 
-/** Lineare Regression über die letzten `windowDays` Tage (bis zum letzten Messpunkt) in kg pro Woche. Null bei < 3 Punkten oder < 7 Tagen Spanne. */
+/** Lineare Regression über die letzten `windowDays` Tage (bis zum letzten Messpunkt) in kg pro Woche. Null bei < 3 Punkten oder < 14 Tagen Spanne (kurze Zeiträume sind zu verrauscht). */
 export function weeklyRate(points: WeightPoint[], windowDays = 28): number | null {
   if (points.length < 3) return null;
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
@@ -27,7 +27,7 @@ export function weeklyRate(points: WeightPoint[], windowDays = 28): number | nul
   const win = sorted.filter((p) => diffDays(last, p.date) <= windowDays);
   if (win.length < 3) return null;
   const x = win.map((p) => diffDays(p.date, win[0].date));
-  if (Math.max(...x) < 7) return null;
+  if (Math.max(...x) < 14) return null;
   const n = win.length;
   const mx = x.reduce((a, b) => a + b, 0) / n;
   const my = win.reduce((a, p) => a + p.weight_kg, 0) / n;

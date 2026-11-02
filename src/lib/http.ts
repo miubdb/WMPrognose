@@ -31,7 +31,7 @@ type Opts = { auth?: boolean };
 
 /** Wrapper für Route-Handler: Auth, CSRF-Prüfung, einheitliche Fehlerbehandlung. */
 export function route(handler: Handler, opts: Opts = {}) {
-  return async (req: Request, routeCtx?: { params?: Record<string, string> }): Promise<Response> => {
+  return async (req: Request, routeCtx?: { params?: Record<string, string> | Promise<Record<string, string>> }): Promise<Response> => {
     try {
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) assertSameOrigin(req);
       let user: AuthUser | null = null;
@@ -39,7 +39,8 @@ export function route(handler: Handler, opts: Opts = {}) {
         user = await userFromToken(readCookie(req.headers.get('cookie'), SESSION_COOKIE));
         if (!user) throw unauthorized();
       }
-      const out = await handler({ req, user: user as AuthUser, params: routeCtx?.params ?? {}, url: new URL(req.url) });
+      const params = (await routeCtx?.params) ?? {}; // Next 15+: params ist ein Promise
+      const out = await handler({ req, user: user as AuthUser, params, url: new URL(req.url) });
       return out instanceof Response ? out : json(out);
     } catch (e) {
       return errorResponse(e);
