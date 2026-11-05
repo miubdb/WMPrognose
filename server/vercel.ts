@@ -191,7 +191,8 @@ export async function blobFlowTest(phase = 1, pathArg = '', cookieArg = '') {
   const mkInst = () => new OnlineAdmin(backend, { adminPassword: PW });
   const report: { name: string; ok: boolean; detail?: any }[] = [];
   const extra: any = {};
-  const check = (name: string, ok: boolean, detail?: unknown) => report.push({ name, ok, ...(detail !== undefined ? { detail } : {}) });
+  const t0 = Date.now(); let tl = t0;
+  const check = (name: string, ok: boolean, detail?: unknown) => { const n = Date.now(); report.push({ name, ok, ms: n - tl, ...(detail !== undefined ? { detail } : {}) } as any); tl = n; };
   const call = async (inst: OnlineAdmin, method: string, p: string, body?: unknown, cookie = '') => {
     const u = new URL('http://x' + p); const parts = u.pathname.split('/').filter(Boolean);
     const req: any = Object.assign(Readable.from([]), { headers: { 'x-outplay-admin': '1', 'x-forwarded-proto': 'https', host: 'x', ...(cookie ? { cookie } : {}) }, method, url: p, socket: { remoteAddress: '1.2.3.4' } });
@@ -215,21 +216,28 @@ export async function blobFlowTest(phase = 1, pathArg = '', cookieArg = '') {
     // "Neu laden": frische Instanz (= anderer Kaltstart) sieht alles
     const B = mkInst(); extra.cookie = ck; const fresh = await call(B, 'GET', '/api/admin/questions?q=Kartenfrage', undefined, ck); check('Nach Neuladen (andere Instanz) vorhanden', fresh.status === 200 && fresh.data.length === 1 && fresh.data[0].task.prompt.endsWith('Version 7'), fresh.data?.[0]?.task?.prompt ?? fresh.data);
     const titles = (await call(B, 'GET', '/api/admin/categories/geo-daneben', undefined, ck)).data.title; check('Kategorie-Änderung dauerhaft', titles === 'Geografisch daneben (Test)', titles);
-    } else {
-    const ck = cookieArg; const q1 = { data: { id: '' } as any };
-    { const first = (await call(mkInst(), 'GET', '/api/admin/questions?q=Kartenfrage', undefined, ck)).data; q1.data.id = first?.[0]?.id; }
+    }
+    if (phase === 2) {
+    const ck = cookieArg;
     // veralteter Cache einer zweiten Instanz: Schreiben direkt nach Schreiben einer anderen Instanz
     const C = mkInst(), D = mkInst();
     await call(C, 'GET', '/api/admin/overview', undefined, ck); await call(D, 'GET', '/api/admin/overview', undefined, ck);
     const w1 = await call(C, 'POST', '/api/admin/questions', geo('Instanz C schreibt'), ck); const w2 = await call(D, 'POST', '/api/admin/questions', geo('Instanz D schreibt sofort danach'), ck);
     check('Zweite Instanz schreibt direkt danach (kein 409)', w1.status === 201 && w2.status === 201, [w1.status, w2.status, w2.data?.err]);
-    // echte gleichzeitige Schreibvorgänge über mehrere Instanzen
+    }
+    if (phase === 3) {
+      const ck = cookieArg;
+      // echte gleichzeitige Schreibvorgänge über mehrere Instanzen
     const insts = [mkInst(), mkInst(), mkInst()];
     const results = await Promise.all(Array.from({ length: 9 }, (_, i) => call(insts[i % 3], 'POST', '/api/admin/questions', geo(`Parallel ${i}`), ck)));
     const created = results.filter(r => r.status === 201).length; const E = mkInst();
     const par = (await call(E, 'GET', '/api/admin/questions?q=Parallel', undefined, ck)).data;
     check('9 gleichzeitige Schreibvorgänge: alle gespeichert, keiner verloren', par.length === created && created === 9, { erfolgreich: created, gespeichert: par.length, status: results.map(r => r.status) });
-    // echter Konflikt am selben Datensatz
+    }
+    if (phase === 4) {
+      const ck = cookieArg; const q1 = { data: { id: (await call(mkInst(), 'GET', '/api/admin/questions?q=Kartenfrage', undefined, ck)).data?.[0]?.id } };
+      const E = mkInst();
+      // echter Konflikt am selben Datensatz
     const base = (await call(E, 'GET', '/api/admin/questions/' + q1.data.id, undefined, ck)).data;
     const x1 = await call(mkInst(), 'PUT', '/api/admin/questions/' + q1.data.id, { task: base.task, topic: 'X1', ifUpdated: base.updated }, ck);
     const x2 = await call(mkInst(), 'PUT', '/api/admin/questions/' + q1.data.id, { task: base.task, topic: 'X2', ifUpdated: base.updated }, ck);
@@ -237,7 +245,7 @@ export async function blobFlowTest(phase = 1, pathArg = '', cookieArg = '') {
     check('Standardinhalte unverändert (34 Vorlagen vorhanden)', (await call(mkInst(), 'GET', '/api/admin/questions?topic=Torjäger', undefined, ck)).status === 200);
     }
   } catch (e: any) { check('Unerwarteter Fehler', false, String(e?.stack ?? e).slice(0, 400)); }
-  finally { if (phase === 2) await backend.destroy(); }
+  finally { if (phase === 4) await backend.destroy(); }
   return { phase, path, cookie: extra.cookie ?? '', passed: report.filter(r => r.ok).length, total: report.length, report };
 }
 

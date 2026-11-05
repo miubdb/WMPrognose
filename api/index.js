@@ -36385,7 +36385,13 @@ async function blobFlowTest(phase = 1, pathArg = "", cookieArg = "") {
   const mkInst = () => new OnlineAdmin(backend, { adminPassword: PW });
   const report = [];
   const extra = {};
-  const check = (name, ok, detail) => report.push({ name, ok, ...detail !== void 0 ? { detail } : {} });
+  const t0 = Date.now();
+  let tl = t0;
+  const check = (name, ok, detail) => {
+    const n = Date.now();
+    report.push({ name, ok, ms: n - tl, ...detail !== void 0 ? { detail } : {} });
+    tl = n;
+  };
   const call = async (inst, method, p, body, cookie2 = "") => {
     const u = new URL("http://x" + p);
     const parts = u.pathname.split("/").filter(Boolean);
@@ -36440,25 +36446,29 @@ async function blobFlowTest(phase = 1, pathArg = "", cookieArg = "") {
       check("Nach Neuladen (andere Instanz) vorhanden", fresh.status === 200 && fresh.data.length === 1 && fresh.data[0].task.prompt.endsWith("Version 7"), fresh.data?.[0]?.task?.prompt ?? fresh.data);
       const titles = (await call(B, "GET", "/api/admin/categories/geo-daneben", void 0, ck)).data.title;
       check("Kategorie-\xC4nderung dauerhaft", titles === "Geografisch daneben (Test)", titles);
-    } else {
+    }
+    if (phase === 2) {
       const ck = cookieArg;
-      const q1 = { data: { id: "" } };
-      {
-        const first = (await call(mkInst(), "GET", "/api/admin/questions?q=Kartenfrage", void 0, ck)).data;
-        q1.data.id = first?.[0]?.id;
-      }
       const C = mkInst(), D = mkInst();
       await call(C, "GET", "/api/admin/overview", void 0, ck);
       await call(D, "GET", "/api/admin/overview", void 0, ck);
       const w1 = await call(C, "POST", "/api/admin/questions", geo2("Instanz C schreibt"), ck);
       const w2 = await call(D, "POST", "/api/admin/questions", geo2("Instanz D schreibt sofort danach"), ck);
       check("Zweite Instanz schreibt direkt danach (kein 409)", w1.status === 201 && w2.status === 201, [w1.status, w2.status, w2.data?.err]);
+    }
+    if (phase === 3) {
+      const ck = cookieArg;
       const insts = [mkInst(), mkInst(), mkInst()];
       const results = await Promise.all(Array.from({ length: 9 }, (_, i) => call(insts[i % 3], "POST", "/api/admin/questions", geo2(`Parallel ${i}`), ck)));
       const created = results.filter((r) => r.status === 201).length;
       const E = mkInst();
       const par = (await call(E, "GET", "/api/admin/questions?q=Parallel", void 0, ck)).data;
       check("9 gleichzeitige Schreibvorg\xE4nge: alle gespeichert, keiner verloren", par.length === created && created === 9, { erfolgreich: created, gespeichert: par.length, status: results.map((r) => r.status) });
+    }
+    if (phase === 4) {
+      const ck = cookieArg;
+      const q1 = { data: { id: (await call(mkInst(), "GET", "/api/admin/questions?q=Kartenfrage", void 0, ck)).data?.[0]?.id } };
+      const E = mkInst();
       const base = (await call(E, "GET", "/api/admin/questions/" + q1.data.id, void 0, ck)).data;
       const x1 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X1", ifUpdated: base.updated }, ck);
       const x2 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X2", ifUpdated: base.updated }, ck);
@@ -36468,7 +36478,7 @@ async function blobFlowTest(phase = 1, pathArg = "", cookieArg = "") {
   } catch (e) {
     check("Unerwarteter Fehler", false, String(e?.stack ?? e).slice(0, 400));
   } finally {
-    if (phase === 2) await backend.destroy();
+    if (phase === 4) await backend.destroy();
   }
   return { phase, path, cookie: extra.cookie ?? "", passed: report.filter((r) => r.ok).length, total: report.length, report };
 }
