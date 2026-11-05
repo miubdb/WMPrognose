@@ -117,7 +117,7 @@ await page.getByRole('button', { name: 'Schließen ✕' }).first().click();
 
 // ---- Import/Export
 await page.getByRole('button', { name: '⇅ Import/Export' }).click(); await sleep(600);
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Alles (Backup)' }).click()]);
+const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Alles (Inhalte)' }).click()]);
 check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Datei'); await page.screenshot({ path: `${SHOTS}/14-io.png` });
 
 // ---- Show mit dem Paket starten (Host-Seite zeigt Paketauswahl)
