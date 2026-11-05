@@ -89,7 +89,7 @@ await connect(phones[0], pairsTxt);
 check(await phones[0].locator('.mlines path').count() === 6, 'Matchmaker: Verbindungen sind sichtbar');
 await phones[0].locator('.mitem.linked').first().click(); await sleep(200);                       // Tippen löst die Verbindung wieder
 check(await phones[0].locator('.mlines path').count() === 5, 'Matchmaker: Verbindung lässt sich wieder lösen');
-await connect(phones[0], [pairsTxt[0]]);
+await phones[0].locator('.mcol').nth(1).locator('.mitem', { hasText: pairsTxt[0][1] }).first().click();   // der gelöste linke Begriff ist noch gewählt → Partner antippen
 await shot('match-open');
 await phones[0].getByRole('button', { name: 'Endgültig abgeben' }).click(); await phones[0].waitForSelector('.status.ok');
 check(await phones[0].locator('.mitem[disabled]').count() === 12, 'Matchmaker: nach der Abgabe ist die Eingabe gesperrt');
