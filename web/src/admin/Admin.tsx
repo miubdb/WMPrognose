@@ -123,10 +123,10 @@ function Library({ rev, bump }: { rev: number; bump: () => void }) {
           <div className="qprompt">{x.task.prompt || <i>(ohne Text)</i>}</div>
           <div className="small muted">{x.usedIn.length ? 'In: ' + x.usedIn.map((u: any) => u.title).join(', ') : 'In keiner Kategorie'}</div>
           <div className="row wrap">
-            <button className="btn small" onClick={() => setEdit({ id: x.id, initial: { task: x.task, topic: x.topic } })}>✏️ Bearbeiten</button>
+            <button className="btn small" onClick={() => setEdit({ id: x.id, initial: { task: x.task, topic: x.topic, updated: x.updated } })}>✏️ Bearbeiten</button>
             <button className="btn small gold" disabled={x.problems.length > 0} onClick={() => setPrev(x)}>👀 Vorschau</button>
             <button className="btn small ghost" onClick={() => act(() => adm('POST', `/questions/${x.id}/duplicate`))}>⧉ Duplizieren</button>
-            <button className="btn small ghost" onClick={() => act(() => adm('PUT', '/questions/' + x.id, { archived: !x.archived }))}>{x.archived ? '↩ Aus Archiv' : '🗄 Archivieren'}</button>
+            <button className="btn small ghost" onClick={() => act(() => adm('PUT', '/questions/' + x.id, { archived: !x.archived, ifUpdated: x.updated }))}>{x.archived ? '↩ Aus Archiv' : '🗄 Archivieren'}</button>
             <button className="btn small warn" onClick={() => confirm('Frage endgültig löschen?') && act(() => adm('DELETE', '/questions/' + x.id))}>🗑</button>
           </div>
         </div>))}</div>
@@ -163,7 +163,7 @@ function Categories({ rev, bump }: { rev: number; bump: () => void }) {
           <div className="row wrap">
             <button className="btn small" onClick={() => setEdit(c)}>✏️ Bearbeiten</button>
             <button className="btn small ghost" onClick={() => act(() => adm('POST', `/categories/${c.id}/duplicate`, { copyQuestions: confirm('Auch die Fragen kopieren?\nOK = Fragen kopieren, Abbrechen = dieselben Fragen verwenden') }))}>⧉ Duplizieren</button>
-            <button className="btn small ghost" onClick={() => act(() => adm('PUT', '/categories/' + c.id, { ...c, disabled: !c.disabled }))}>{c.disabled ? '▶ Aktivieren' : '⏸ Deaktivieren'}</button>
+            <button className="btn small ghost" onClick={() => act(() => adm('PUT', '/categories/' + c.id, { ...c, disabled: !c.disabled, ifUpdated: c.updated }))}>{c.disabled ? '▶ Aktivieren' : '⏸ Deaktivieren'}</button>
             <button className="btn small warn" onClick={() => confirm(`Kategorie „${c.title}“ löschen? (Die Fragen bleiben erhalten.)`) && act(() => adm('DELETE', '/categories/' + c.id))}>🗑</button>
           </div>
         </div>))}</div>
@@ -187,7 +187,7 @@ function CategoryEditor({ cat, onClose, onSaved }: { cat: any; onClose: () => vo
   const points = mine.reduce((a: number, x: any) => a + taskMax(x.task), 0);
   const budget = c.kind === 'final' ? 2000 : 1000;
   const move = (i: number, d: number) => { const a = c.taskIds.slice(); const j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; set('taskIds', a); };
-  const save = async () => { const r = c.id ? await adm('PUT', '/categories/' + c.id, c) : await adm('POST', '/categories', c); if (r.ok) onSaved(); else setMsg(errText(r)); };
+  const save = async () => { const r = c.id ? await adm('PUT', '/categories/' + c.id, { ...c, ifUpdated: cat.updated }) : await adm('POST', '/categories', c); if (r.ok) onSaved(); else setMsg(errText(r)); };
   const avail = lib.filter((x: any) => !c.taskIds.includes(x.id) && (!mode || x.mode === mode) && (!qsearch || (x.task.prompt + x.topic).toLowerCase().includes(qsearch.toLowerCase())));
   return (
     <div className="modal" onClick={onClose}>
@@ -265,14 +265,14 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
   const loadVers = useCallback(() => { if (p.id) adm('GET', `/packs/${p.id}/versions`).then(r => r.ok && setVers(r.data)); }, [p.id]);
   useEffect(loadVers, [loadVers]);
   const save = async (): Promise<boolean> => {
-    const r = p.id ? await adm('PUT', '/packs/' + p.id, p) : await adm('POST', '/packs', p);
+    const r = p.id ? await adm('PUT', '/packs/' + p.id, { ...p, ifUpdated: p.updated }) : await adm('POST', '/packs', p);
     if (!r.ok) { setMsg(errText(r)); return false; }
     setP(r.data); setMsg('Entwurf gespeichert ✓'); return true;
   };
   useEffect(() => { if (p.id) adm('GET', `/packs/${p.id}/analysis`).then(r => r.ok && setAna(r.data)); }, [p.id, msg]);
   const doPublish = async () => {
     let id = p.id;
-    const r0 = p.id ? await adm('PUT', '/packs/' + p.id, p) : await adm('POST', '/packs', p);
+    const r0 = p.id ? await adm('PUT', '/packs/' + p.id, { ...p, ifUpdated: p.updated }) : await adm('POST', '/packs', p);
     if (!r0.ok) { setMsg(errText(r0)); return; }
     id = r0.data.id; setP(r0.data);
     const note = prompt('Notiz zu dieser Version (optional):', '') ?? '';

@@ -46,7 +46,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
   const set = (k: string, v: any) => setTask({ ...task, [k]: v });
   const problems = useMemo(() => validateTask(normalizeTask(task), sid => sceneList.some(s => s.id === sid)), [task, sceneList]);
   const save = async () => {
-    const r = id ? await adm('PUT', '/questions/' + id, { task, topic }) : await adm('POST', '/questions', { task, topic });
+    const r = id ? await adm('PUT', '/questions/' + id, { task, topic, ifUpdated: (initial as any)?.updated }) : await adm('POST', '/questions', { task, topic });
     if (r.ok) onSaved(r.data); else setMsg(errText(r));
   };
   const common = (<>
