@@ -1,7 +1,8 @@
 node_modules/
 dist/
-*.js.map
-.next/
-next-env.d.ts
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
 .env.local
-.env*.local
