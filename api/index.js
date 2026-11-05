@@ -36377,13 +36377,14 @@ async function readBodyOf(req, limit) {
     return {};
   }
 }
-async function blobFlowTest() {
+async function blobFlowTest(phase = 1, pathArg = "", cookieArg = "") {
   const { Readable: Readable2 } = await import("node:stream");
-  const path = `outplay/selftest/flow-${Date.now()}.db`;
+  const path = pathArg && /^outplay\/selftest\/flow-\d+\.db$/.test(pathArg) ? pathArg : `outplay/selftest/flow-${Date.now()}.db`;
   const backend = new SdkBlobBackend(path);
   const PW = "selftest-password-1";
   const mkInst = () => new OnlineAdmin(backend, { adminPassword: PW });
   const report = [];
+  const extra = {};
   const check = (name, ok, detail) => report.push({ name, ok, ...detail !== void 0 ? { detail } : {} });
   const call = async (inst, method, p, body, cookie2 = "") => {
     const u = new URL("http://x" + p);
@@ -36408,58 +36409,68 @@ async function blobFlowTest() {
   };
   const geo2 = (prompt) => ({ task: { mode: "geo", prompt, map: "germany", answer: { lat: 51, lon: 10, label: "Mitte" }, seconds: 30, points: 250, explain: "Test." }, topic: "Selbsttest" });
   try {
-    const A = mkInst();
-    const login = await call(A, "POST", "/api/admin/login", { password: PW });
-    check("Login", login.status === 200, login.status);
-    const ck = login.cookie;
-    const list2 = await call(A, "GET", "/api/admin/questions", void 0, ck);
-    check("Erstinitialisierung: 34 Vorlagenfragen", list2.status === 200 && list2.data.length === 34, list2.data?.length ?? list2.data);
-    const q1 = await call(A, "POST", "/api/admin/questions", geo2("Kartenfrage 1"), ck);
-    check("Frage erstellen", q1.status === 201, q1.data?.err ?? q1.status);
-    const cat = (await call(A, "GET", "/api/admin/categories/geo-daneben", void 0, ck)).data;
-    const c1 = await call(A, "PUT", "/api/admin/categories/geo-daneben", { ...cat, ifUpdated: cat.updated }, ck);
-    check("Kategorie ohne \xC4nderung speichern", c1.status === 200, c1.data?.err ?? c1.status);
-    const c2 = await call(A, "PUT", "/api/admin/categories/geo-daneben", { ...c1.data, title: "Geografisch daneben (Test)", ifUpdated: c1.data.updated }, ck);
-    check("Kategorie \xE4ndern", c2.status === 200, c2.data?.err ?? c2.status);
-    let ok = true, last = q1.data;
-    for (let i = 0; i < 6; i++) {
-      const r = await call(A, "PUT", "/api/admin/questions/" + q1.data.id, { task: { ...last.task, prompt: `Kartenfrage 1 \u2013 Version ${i + 2}` }, topic: "Selbsttest", ifUpdated: last.updated }, ck);
-      if (r.status !== 200) {
-        ok = false;
-        check("mehrere Speicherungen nacheinander", false, r.data?.err);
-        break;
+    if (phase === 1) {
+      const A = mkInst();
+      const login = await call(A, "POST", "/api/admin/login", { password: PW });
+      check("Login", login.status === 200, login.status);
+      const ck = login.cookie;
+      const list2 = await call(A, "GET", "/api/admin/questions", void 0, ck);
+      check("Erstinitialisierung: 34 Vorlagenfragen", list2.status === 200 && list2.data.length === 34, list2.data?.length ?? list2.data);
+      const q1 = await call(A, "POST", "/api/admin/questions", geo2("Kartenfrage 1"), ck);
+      check("Frage erstellen", q1.status === 201, q1.data?.err ?? q1.status);
+      const cat = (await call(A, "GET", "/api/admin/categories/geo-daneben", void 0, ck)).data;
+      const c1 = await call(A, "PUT", "/api/admin/categories/geo-daneben", { ...cat, ifUpdated: cat.updated }, ck);
+      check("Kategorie ohne \xC4nderung speichern", c1.status === 200, c1.data?.err ?? c1.status);
+      const c2 = await call(A, "PUT", "/api/admin/categories/geo-daneben", { ...c1.data, title: "Geografisch daneben (Test)", ifUpdated: c1.data.updated }, ck);
+      check("Kategorie \xE4ndern", c2.status === 200, c2.data?.err ?? c2.status);
+      let ok = true, last = q1.data;
+      for (let i = 0; i < 6; i++) {
+        const r = await call(A, "PUT", "/api/admin/questions/" + q1.data.id, { task: { ...last.task, prompt: `Kartenfrage 1 \u2013 Version ${i + 2}` }, topic: "Selbsttest", ifUpdated: last.updated }, ck);
+        if (r.status !== 200) {
+          ok = false;
+          check("mehrere Speicherungen nacheinander", false, r.data?.err);
+          break;
+        }
+        last = r.data;
       }
-      last = r.data;
+      if (ok) check("6 aufeinanderfolgende Speicherungen", true);
+      const B = mkInst();
+      extra.cookie = ck;
+      const fresh = await call(B, "GET", "/api/admin/questions?q=Kartenfrage", void 0, ck);
+      check("Nach Neuladen (andere Instanz) vorhanden", fresh.status === 200 && fresh.data.length === 1 && fresh.data[0].task.prompt.endsWith("Version 7"), fresh.data?.[0]?.task?.prompt ?? fresh.data);
+      const titles = (await call(B, "GET", "/api/admin/categories/geo-daneben", void 0, ck)).data.title;
+      check("Kategorie-\xC4nderung dauerhaft", titles === "Geografisch daneben (Test)", titles);
+    } else {
+      const ck = cookieArg;
+      const q1 = { data: { id: "" } };
+      {
+        const first = (await call(mkInst(), "GET", "/api/admin/questions?q=Kartenfrage", void 0, ck)).data;
+        q1.data.id = first?.[0]?.id;
+      }
+      const C = mkInst(), D = mkInst();
+      await call(C, "GET", "/api/admin/overview", void 0, ck);
+      await call(D, "GET", "/api/admin/overview", void 0, ck);
+      const w1 = await call(C, "POST", "/api/admin/questions", geo2("Instanz C schreibt"), ck);
+      const w2 = await call(D, "POST", "/api/admin/questions", geo2("Instanz D schreibt sofort danach"), ck);
+      check("Zweite Instanz schreibt direkt danach (kein 409)", w1.status === 201 && w2.status === 201, [w1.status, w2.status, w2.data?.err]);
+      const insts = [mkInst(), mkInst(), mkInst()];
+      const results = await Promise.all(Array.from({ length: 9 }, (_, i) => call(insts[i % 3], "POST", "/api/admin/questions", geo2(`Parallel ${i}`), ck)));
+      const created = results.filter((r) => r.status === 201).length;
+      const E = mkInst();
+      const par = (await call(E, "GET", "/api/admin/questions?q=Parallel", void 0, ck)).data;
+      check("9 gleichzeitige Schreibvorg\xE4nge: alle gespeichert, keiner verloren", par.length === created && created === 9, { erfolgreich: created, gespeichert: par.length, status: results.map((r) => r.status) });
+      const base = (await call(E, "GET", "/api/admin/questions/" + q1.data.id, void 0, ck)).data;
+      const x1 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X1", ifUpdated: base.updated }, ck);
+      const x2 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X2", ifUpdated: base.updated }, ck);
+      check("Zwei \xC4nderungen am selben Eintrag: zweite wird als Konflikt gemeldet, nichts \xFCberschrieben", x1.status === 200 && x2.status === 409 && x2.data?.details?.recordConflict === true, [x1.status, x2.status]);
+      check("Standardinhalte unver\xE4ndert (34 Vorlagen vorhanden)", (await call(mkInst(), "GET", "/api/admin/questions?topic=Torj\xE4ger", void 0, ck)).status === 200);
     }
-    if (ok) check("6 aufeinanderfolgende Speicherungen", true);
-    const B = mkInst();
-    const fresh = await call(B, "GET", "/api/admin/questions?q=Kartenfrage", void 0, ck);
-    check("Nach Neuladen (andere Instanz) vorhanden", fresh.status === 200 && fresh.data.length === 1 && fresh.data[0].task.prompt.endsWith("Version 7"), fresh.data?.[0]?.task?.prompt ?? fresh.data);
-    const titles = (await call(B, "GET", "/api/admin/categories/geo-daneben", void 0, ck)).data.title;
-    check("Kategorie-\xC4nderung dauerhaft", titles === "Geografisch daneben (Test)", titles);
-    const C = mkInst(), D = mkInst();
-    await call(C, "GET", "/api/admin/overview", void 0, ck);
-    await call(D, "GET", "/api/admin/overview", void 0, ck);
-    const w1 = await call(C, "POST", "/api/admin/questions", geo2("Instanz C schreibt"), ck);
-    const w2 = await call(D, "POST", "/api/admin/questions", geo2("Instanz D schreibt sofort danach"), ck);
-    check("Zweite Instanz schreibt direkt danach (kein 409)", w1.status === 201 && w2.status === 201, [w1.status, w2.status, w2.data?.err]);
-    const insts = [mkInst(), mkInst(), mkInst()];
-    const results = await Promise.all(Array.from({ length: 9 }, (_, i) => call(insts[i % 3], "POST", "/api/admin/questions", geo2(`Parallel ${i}`), ck)));
-    const created = results.filter((r) => r.status === 201).length;
-    const E = mkInst();
-    const par = (await call(E, "GET", "/api/admin/questions?q=Parallel", void 0, ck)).data;
-    check("9 gleichzeitige Schreibvorg\xE4nge: alle gespeichert, keiner verloren", par.length === created && created === 9, { erfolgreich: created, gespeichert: par.length, status: results.map((r) => r.status) });
-    const base = (await call(E, "GET", "/api/admin/questions/" + q1.data.id, void 0, ck)).data;
-    const x1 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X1", ifUpdated: base.updated }, ck);
-    const x2 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X2", ifUpdated: base.updated }, ck);
-    check("Zwei \xC4nderungen am selben Eintrag: zweite wird als Konflikt gemeldet, nichts \xFCberschrieben", x1.status === 200 && x2.status === 409 && x2.data?.details?.recordConflict === true, [x1.status, x2.status]);
-    check("Standardinhalte unver\xE4ndert (34 Vorlagen vorhanden)", (await call(mkInst(), "GET", "/api/admin/questions?topic=Torj\xE4ger", void 0, ck)).status === 200);
   } catch (e) {
     check("Unerwarteter Fehler", false, String(e?.stack ?? e).slice(0, 400));
   } finally {
-    await backend.destroy();
+    if (phase === 2) await backend.destroy();
   }
-  return { path, passed: report.filter((r) => r.ok).length, total: report.length, report };
+  return { phase, path, cookie: extra.cookie ?? "", passed: report.filter((r) => r.ok).length, total: report.length, report };
 }
 async function handleVercel(req, res, online = getOnline()) {
   res.setHeader("x-content-type-options", "nosniff");
@@ -36469,7 +36480,7 @@ async function handleVercel(req, res, online = getOnline()) {
   if (url.pathname === "/api/health") return sendJson(res, 200, { ok: true, mode: "online", gameshow: false, storage: { configured: st.storage, kind: "vercel-blob" }, admin: { passwordConfigured: st.password } });
   if (url.pathname === "/api/selftest-flow") {
     try {
-      return sendJson(res, 200, await blobFlowTest());
+      return sendJson(res, 200, await blobFlowTest(Number(url.searchParams.get("phase") ?? 1), url.searchParams.get("path") ?? "", url.searchParams.get("cookie") ?? ""));
     } catch (e) {
       return sendJson(res, 500, { err: String(e?.message ?? e) });
     }

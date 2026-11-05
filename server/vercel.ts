@@ -183,13 +183,14 @@ async function readBodyOf(req: any, limit: number): Promise<any> {
 }
 
 /** TEMPORÄRER Selbsttest gegen den ECHTEN Blob-Speicher (eigener Test-Pfad outplay/selftest/…, berührt die echten Inhalte nie). */
-export async function blobFlowTest() {
+export async function blobFlowTest(phase = 1, pathArg = '', cookieArg = '') {
   const { Readable } = await import('node:stream');
-  const path = `outplay/selftest/flow-${Date.now()}.db`;
+  const path = pathArg && /^outplay\/selftest\/flow-\d+\.db$/.test(pathArg) ? pathArg : `outplay/selftest/flow-${Date.now()}.db`;
   const backend = new SdkBlobBackend(path);
   const PW = 'selftest-password-1';
   const mkInst = () => new OnlineAdmin(backend, { adminPassword: PW });
   const report: { name: string; ok: boolean; detail?: any }[] = [];
+  const extra: any = {};
   const check = (name: string, ok: boolean, detail?: unknown) => report.push({ name, ok, ...(detail !== undefined ? { detail } : {}) });
   const call = async (inst: OnlineAdmin, method: string, p: string, body?: unknown, cookie = '') => {
     const u = new URL('http://x' + p); const parts = u.pathname.split('/').filter(Boolean);
@@ -201,6 +202,7 @@ export async function blobFlowTest() {
   };
   const geo = (prompt: string) => ({ task: { mode: 'geo', prompt, map: 'germany', answer: { lat: 51, lon: 10, label: 'Mitte' }, seconds: 30, points: 250, explain: 'Test.' }, topic: 'Selbsttest' });
   try {
+    if (phase === 1) {
     const A = mkInst();
     const login = await call(A, 'POST', '/api/admin/login', { password: PW }); check('Login', login.status === 200, login.status); const ck = login.cookie;
     const list = await call(A, 'GET', '/api/admin/questions', undefined, ck); check('Erstinitialisierung: 34 Vorlagenfragen', list.status === 200 && list.data.length === 34, list.data?.length ?? list.data);
@@ -211,8 +213,11 @@ export async function blobFlowTest() {
     let ok = true, last = q1.data; for (let i = 0; i < 6; i++) { const r = await call(A, 'PUT', '/api/admin/questions/' + q1.data.id, { task: { ...last.task, prompt: `Kartenfrage 1 – Version ${i + 2}` }, topic: 'Selbsttest', ifUpdated: last.updated }, ck); if (r.status !== 200) { ok = false; check('mehrere Speicherungen nacheinander', false, r.data?.err); break; } last = r.data; }
     if (ok) check('6 aufeinanderfolgende Speicherungen', true);
     // "Neu laden": frische Instanz (= anderer Kaltstart) sieht alles
-    const B = mkInst(); const fresh = await call(B, 'GET', '/api/admin/questions?q=Kartenfrage', undefined, ck); check('Nach Neuladen (andere Instanz) vorhanden', fresh.status === 200 && fresh.data.length === 1 && fresh.data[0].task.prompt.endsWith('Version 7'), fresh.data?.[0]?.task?.prompt ?? fresh.data);
+    const B = mkInst(); extra.cookie = ck; const fresh = await call(B, 'GET', '/api/admin/questions?q=Kartenfrage', undefined, ck); check('Nach Neuladen (andere Instanz) vorhanden', fresh.status === 200 && fresh.data.length === 1 && fresh.data[0].task.prompt.endsWith('Version 7'), fresh.data?.[0]?.task?.prompt ?? fresh.data);
     const titles = (await call(B, 'GET', '/api/admin/categories/geo-daneben', undefined, ck)).data.title; check('Kategorie-Änderung dauerhaft', titles === 'Geografisch daneben (Test)', titles);
+    } else {
+    const ck = cookieArg; const q1 = { data: { id: '' } as any };
+    { const first = (await call(mkInst(), 'GET', '/api/admin/questions?q=Kartenfrage', undefined, ck)).data; q1.data.id = first?.[0]?.id; }
     // veralteter Cache einer zweiten Instanz: Schreiben direkt nach Schreiben einer anderen Instanz
     const C = mkInst(), D = mkInst();
     await call(C, 'GET', '/api/admin/overview', undefined, ck); await call(D, 'GET', '/api/admin/overview', undefined, ck);
@@ -230,9 +235,10 @@ export async function blobFlowTest() {
     const x2 = await call(mkInst(), 'PUT', '/api/admin/questions/' + q1.data.id, { task: base.task, topic: 'X2', ifUpdated: base.updated }, ck);
     check('Zwei Änderungen am selben Eintrag: zweite wird als Konflikt gemeldet, nichts überschrieben', x1.status === 200 && x2.status === 409 && x2.data?.details?.recordConflict === true, [x1.status, x2.status]);
     check('Standardinhalte unverändert (34 Vorlagen vorhanden)', (await call(mkInst(), 'GET', '/api/admin/questions?topic=Torjäger', undefined, ck)).status === 200);
+    }
   } catch (e: any) { check('Unerwarteter Fehler', false, String(e?.stack ?? e).slice(0, 400)); }
-  finally { await backend.destroy(); }
-  return { path, passed: report.filter(r => r.ok).length, total: report.length, report };
+  finally { if (phase === 2) await backend.destroy(); }
+  return { phase, path, cookie: extra.cookie ?? '', passed: report.filter(r => r.ok).length, total: report.length, report };
 }
 
 export async function handleVercel(req: IncomingMessage, res: ServerResponse, online: OnlineAdmin = getOnline()) {
@@ -241,7 +247,7 @@ export async function handleVercel(req: IncomingMessage, res: ServerResponse, on
   const parts = url.pathname.split('/').filter(Boolean); // api, ...
   const st = online.status();
   if (url.pathname === '/api/health') return sendJson(res, 200, { ok: true, mode: 'online', gameshow: false, storage: { configured: st.storage, kind: 'vercel-blob' }, admin: { passwordConfigured: st.password } });
-  if (url.pathname === '/api/selftest-flow') { try { return sendJson(res, 200, await blobFlowTest()); } catch (e: any) { return sendJson(res, 500, { err: String(e?.message ?? e) }); } }
+  if (url.pathname === '/api/selftest-flow') { try { return sendJson(res, 200, await blobFlowTest(Number(url.searchParams.get('phase') ?? 1), url.searchParams.get('path') ?? '', url.searchParams.get('cookie') ?? '')); } catch (e: any) { return sendJson(res, 500, { err: String(e?.message ?? e) }); } }
   if (url.pathname === '/api/netinfo') return sendJson(res, 200, { online: true, preferred: null, candidates: [] });
   if (url.pathname === '/api/packs') { try { return sendJson(res, 200, await online.publicPacks()); } catch { return sendJson(res, 200, []); } }
   if (parts[1] === 'admin') {
