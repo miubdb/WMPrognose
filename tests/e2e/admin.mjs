@@ -75,12 +75,12 @@ await page.locator('.modal').last().getByRole('button', { name: 'Schließen ✕'
 
 // DIE VERBINDUNG
 await newQ('DIE VERBINDUNG');
-await fill('Thema', 'Test-E2E'); await fill('Überschrift', 'Welcher Ort wird gesucht?');
+await fill('Thema', 'Test-E2E'); await fill('Überschrift', 'Welche Insel wird gesucht?');
 for (const [i, t] of ['Er liegt auf einer Insel im Mittelmeer.', 'Hier wachsen riesige Zitronen.', 'Die Hauptstadt heißt Valletta.', 'Er besteht aus Malta, Gozo und Comino.'].entries()) await page.locator('.modalbox textarea').nth(1 + i).fill(t);
 await fill('Hauptlösung', 'Malta'); await fill('Lösungserklärung', 'Malta ist ein Inselstaat.');
 await page.screenshot({ path: `${SHOTS}/7b-link-editor.png` });
 await save();
-check(await page.locator('.qcard', { hasText: 'Welcher Ort wird gesucht' }).count() === 1, 'Die Verbindung: Frage gespeichert');
+check(await page.locator('.qcard', { hasText: 'Welche Insel wird gesucht' }).count() === 1, 'Die Verbindung: Frage gespeichert');
 // CODEBREAK ist nicht mehr wählbar
 await page.locator('.newmenu summary').click(); check(await page.locator('.newmenu button', { hasText: 'CODEBREAK' }).count() === 0, 'CODEBREAK fehlt im Menü „Neue Frage“'); await page.locator('.newmenu summary').click();
 

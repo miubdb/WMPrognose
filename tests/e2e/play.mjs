@@ -66,7 +66,7 @@ await tv.waitForSelector('.wall');
 await sleep(1200);
 await tv.screenshot({ path: `${SHOTS}/tv-wall.png` });
 
-// 5. Picker wählt "Geografisch daneben"
+// 5. Picker wählt "Orte mit Geschichte"
 async function pickerPhone() {
   for (const ph of phones) { if (await ph.p.locator('.pickwall').count()) return ph; }
   return null;
@@ -75,7 +75,7 @@ await sleep(500);
 const pk = await pickerPhone();
 check(!!pk, 'Genau ein Handy zeigt die Kategorienwahl');
 await pk.p.screenshot({ path: `${SHOTS}/phone-wall.png` });
-await pk.p.locator('.tile', { hasText: 'Geografisch daneben' }).click();
+await pk.p.locator('.tile', { hasText: 'Orte mit Geschichte' }).click();
 await tv.waitForSelector('.rulecard');
 await sleep(1800);
 await tv.screenshot({ path: `${SHOTS}/tv-rules.png` });
@@ -125,7 +125,7 @@ page: {
   await tv.waitForSelector('.wall');
   await sleep(600);
   const pk2 = await pickerPhone();
-  await pk2.p.locator('.tile', { hasText: 'König Fußball' }).click();
+  await pk2.p.locator('.tile', { hasText: 'Fußball-Zeitreise' }).click();
   await tv.waitForSelector('.rulecard');
   await host.getByText('Aufgabe 1 starten').click();
   await tv.waitForSelector('.curitem');
