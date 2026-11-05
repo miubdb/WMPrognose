@@ -223,7 +223,7 @@ export async function blobFlowTest(phase = 1, pathArg = '', cookieArg = '') {
     const C = mkInst(), D = mkInst();
     await call(C, 'GET', '/api/admin/overview', undefined, ck); await call(D, 'GET', '/api/admin/overview', undefined, ck);
     const w1 = await call(C, 'POST', '/api/admin/questions', geo('Instanz C schreibt'), ck); const w2 = await call(D, 'POST', '/api/admin/questions', geo('Instanz D schreibt sofort danach'), ck);
-    check('Zweite Instanz schreibt direkt danach (kein 409)', w1.status === 201 && w2.status === 201, [w1.status, w2.status, w2.data?.err]);
+    check('Zweite Instanz schreibt direkt danach (kein 409)', w1.status === 201 && w2.status === 201, [w1.status, w2.status, w1.data?.debug ?? w1.data?.err, w2.data?.debug]);
     }
     if (phase === 3) {
       const ck = cookieArg;
