@@ -70,7 +70,7 @@ input:focus, select:focus { border-color: var(--violet); }
 .prhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; } .prhead small { display: block; color: var(--muted); } .prhead b { font-size: 1.15rem; }
 .countdown { position: relative; display: inline-flex; align-items: center; justify-content: center; } .countdown span { position: absolute; font-weight: 900; } .countdown.urgent span { color: var(--red); animation: pulse .5s infinite; }
 .question { font-size: 1.25rem; font-weight: 800; text-align: center; margin: 6px 0 12px; } .question.small { font-size: 1.05rem; }
-.mapwrap { position: relative; border-radius: 18px; overflow: hidden; background: #0d1238; border: 1px solid var(--line); } .mapsvg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; }
+.mapwrap { position: relative; border-radius: 18px; overflow: hidden; background: #aad3df; border: 1px solid var(--line); } .mapsvg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; }
 .phonemap .mapsvg { max-height: 56vh; } .mapctl { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; } .mapctl button { width: 42px; height: 42px; border-radius: 12px; border: 0; background: rgba(10,8,32,.8); font-size: 1.5rem; font-weight: 800; color: #fff; }
 .mappin { animation: drop .6s cubic-bezier(.3,1.6,.5,1) backwards; transform-box: fill-box; transform-origin: 50% 100%; } .mypin { animation: drop .3s ease-out; } .mapanswer { animation: pop 1s cubic-bezier(.3,1.6,.5,1) 1.2s backwards; transform-box: fill-box; transform-origin: center; }
 .maplink { animation: fade .6s ease-out backwards; } .pulse { animation: pulse 1.5s infinite; }
@@ -215,7 +215,7 @@ details summary { cursor: pointer; font-weight: 700; }
 .form2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 14px; } .field small { display: block; margin-top: 3px; }
 .rankno { min-width: 1.8em; text-align: center; color: var(--gold); font-weight: 800; } .ordtext { flex: 1; min-width: 0; } .taskrow { background: var(--panel); border-radius: 12px; padding: 6px 10px; margin: 5px 0; }
 .maxline { text-align: right; color: var(--muted); margin: 8px 0; } .warnbox { background: rgba(245,184,46,.1); border: 1px dashed var(--gold); } .warnbox ul { margin: 6px 0; padding-left: 20px; }
-.adminmap .mapsvg { max-height: 420px; } .catgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.adminmap .mapsvg { max-height: min(72vh, 640px); } .catgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .catcard { --c: var(--violet); background: linear-gradient(160deg, color-mix(in srgb, var(--c) 22%, #14103a), #14103a); border: 2px solid color-mix(in srgb, var(--c) 60%, transparent); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; } .catcard.off { opacity: .55; filter: grayscale(.6); }
 .cathead { display: flex; gap: 12px; align-items: center; } .cathead .ic { font-size: 2.2rem; } .cathead b { display: block; font-size: 1.1rem; } .cathead small { color: var(--muted); }
 .catprev { --c: var(--violet); display: flex; flex-direction: column; align-items: center; padding: 14px; border-radius: 16px; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 25%, #14103a); margin: 10px 0; } .catprev span { font-size: 2rem; } .catprev small { color: var(--muted); }
@@ -236,3 +236,5 @@ details summary { cursor: pointer; font-weight: 700; }
 .joinwarn { margin-top: .8em; color: #ffb4b4; font-size: 1.2em; text-align: center; }
 .modebanner { padding: 10px 14px; border-radius: 12px; margin: 4px 0 12px; font-size: .9rem; } .modebanner.online { background: rgba(56,189,248,.15); border: 1px solid rgba(56,189,248,.4); } .modebanner.local { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.35); }
 .setuplist li { margin: 10px 0; } .setuplist li.done { opacity: .6; } .bigcard { border-color: var(--gold); } .adm hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; } .field.inline { margin: 0; min-width: 240px; } .adm th { text-align: left; color: var(--muted); font-size: .8rem; padding: 4px 8px; }
+
+.maploading { position: absolute; inset: 0; display: grid; place-items: center; color: #3b6f86; font-weight: 700; background: #aad3df; } .mapattr { position: absolute; left: 6px; bottom: 3px; font-size: 9px; color: rgba(40,50,60,.55); pointer-events: none; } .mapctl button.small { font-size: 1.1rem; } .mapctl button { background: rgba(255,255,255,.95); color: #2b2b33; box-shadow: 0 1px 6px rgba(0,0,0,.35); } .pindrag { filter: drop-shadow(0 4px 4px rgba(0,0,0,.35)); }

@@ -210,7 +210,7 @@ function GeoTv({ view, round }: { view: View; round: RoundView }) {
         {rev ? <PointsList view={view} rows={rev.guesses.map((g: any) => ({ pid: g.pid, points: g.points, note: `Platz ${g.place} · ${g.km.toLocaleString('de-DE')} km` }))} /> : <AnswerRow players={view.players} />}
         {rev && <Explain text={rev.explain} />}
       </div>
-      <div className="mapcol"><MapView kind={d.map} mode="show" pins={showPins ? pins : []} answer={rev ? { ...rev.answer } : undefined} fit={showPins} className="tvmap" /></div>
+      <div className="mapcol"><MapView kind={d.map} mode="show" uiScale={1.5} pins={showPins ? pins : []} answer={rev ? { ...rev.answer } : undefined} fit={showPins} className="tvmap" /></div>
     </div>
   );
 }

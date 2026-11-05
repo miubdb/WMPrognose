@@ -1,0 +1,38 @@
+// Screenshots der Karten (Deutschland/Europa/Welt, mehrere Zoomstufen) im Admin-Editor, auf Handy und Desktop; prüft Pin-Setzen & -Verschieben.
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { chromium, devices } = require('playwright');
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const SHOTS = process.env.SHOTS ?? '/tmp/claude-0/shots/maps'; mkdirSync(SHOTS, { recursive: true });
+const PW = 'map-shots-pw-1'; const PORT = 8096; const BASE = `http://localhost:${PORT}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let failures = 0; const check = (c, m) => { if (c) console.log('• ✓', m); else { failures++; console.log('✗ PROBLEM:', m); } };
+const srv = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { env: { ...process.env, PORT: String(PORT), DATA_DIR: mkdtempSync(join(tmpdir(), 'outplay-map-')), ADMIN_PASSWORD: PW }, stdio: 'ignore' });
+for (let i = 0; i < 60; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break; } catch { /* */ } await sleep(250); }
+const browser = await chromium.launch();
+for (const [label, opts] of [['phone', devices['Pixel 7']], ['desktop', { viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 }]]) {
+  const ctx = await browser.newContext(opts); const p = await ctx.newPage(); p.on('pageerror', e => { failures++; console.log('pageerror', e.message); });
+  await p.goto(BASE + '/admin'); await p.getByLabel('Admin-Passwort').fill(PW); await p.getByRole('button', { name: 'Anmelden' }).click(); await p.waitForSelector('.admtop');
+  await p.getByRole('button', { name: /Fragenbibliothek/ }).click(); await p.waitForSelector('.qcard');
+  await p.locator('.newmenu summary').click(); await p.locator('.newmenu button').filter({ hasText: 'WO ZUR' }).click(); await p.waitForSelector('.adminmap svg');
+  for (const kind of ['germany', 'europe', 'world']) {
+    await p.locator('.modalbox select').first().selectOption(kind); await sleep(900);
+    const map = p.locator('.adminmap');
+    await map.scrollIntoViewIfNeeded(); await map.screenshot({ path: `${SHOTS}/${label}-${kind}-1.png` });
+    const plus = p.getByLabel('Vergrößern');
+    for (let z = 2; z <= 4; z++) { await plus.click(); await plus.click(); await sleep(350); await map.screenshot({ path: `${SHOTS}/${label}-${kind}-${z}.png` }); }
+    await p.getByLabel('Ganze Karte').click(); await sleep(200);
+  }
+  // Pin setzen (Deutschland) und verschieben
+  await p.locator('.modalbox select').first().selectOption('germany'); await sleep(700);
+  const box = await p.locator('.adminmap svg').boundingBox();
+  await p.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.6); await sleep(300);
+  const lat1 = await p.getByLabel('Breite (lat)').inputValue(); const lon1 = await p.getByLabel('Länge (lon)').inputValue();
+  check(lat1 && lon1 && +lat1 > 47 && +lat1 < 55.5 && +lon1 > 5 && +lon1 < 16, `${label}: Pin setzt Koordinaten (${lat1}, ${lon1})`);
+  await p.locator('.adminmap').screenshot({ path: `${SHOTS}/${label}-pin.png` });
+  await ctx.close();
+}
+await browser.close(); srv.kill(); console.log(failures ? `\n${failures} PROBLEME` : '\nKarten-Screenshots OK'); process.exit(failures ? 1 : 0);
