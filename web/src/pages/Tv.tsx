@@ -256,7 +256,7 @@ function EstimateTv({ view, round }: { view: View; round: RoundView }) {
           <div className="axis" />
           <div className="answermark" style={{ left: `${pos(rev.answer)}%` }}><div className="flag">🎯 {rev.answer.toLocaleString('de-DE')} {rev.unit}</div><i /></div>
           {guesses.map((g, i) => { const p = pl(view, g.pid)!; return (
-            <div key={g.pid} className={`gmark ${g.best ? 'best' : ''}`} style={{ left: `${pos(g.value)}%`, top: `${(i % 4) * 58 + 150}px`, animationDelay: `${0.3 + i * 0.4}s` }}>
+            <div key={g.pid} className={`gmark ${g.best ? 'best' : ''}`} style={{ left: `${pos(g.value)}%`, top: `${(i % 4) * 2.7 + 7}em`, animationDelay: `${0.3 + i * 0.4}s` }}>
               <Avatar a={p.avatar} size={50} /><b>{g.value.toLocaleString('de-DE')}</b>
             </div>); })}
         </div>
@@ -377,7 +377,7 @@ function CeremonyTv({ view }: { view: View }) {
   return (
     <div className={`ceremonytv ${winner ? 'won' : ''}`}>
       <Header view={view} />
-      <h1>{c.stepTitle}</h1>
+      {!winner && <h1>{c.stepTitle}</h1>}
       <div className="lowerlist">{lower.map((r, i) => { const place = i + 4; const shown = n - place < revealed; return <div key={r.id} className={`lrow ${shown ? 'show' : ''}`}><b>{place}</b><Avatar a={r.avatar} size={54} /><span>{r.name}</span><strong>{shown ? r.score.toLocaleString('de-DE') : '???'}</strong></div>; })}</div>
       <div className="podium">
         {podium.map(({ r, place }) => { const shown = n - place < revealed; return (

@@ -150,7 +150,7 @@ const rank: ModeImpl = {
       prompt: t.prompt, topLabel: t.topLabel, bottomLabel: t.bottomLabel, slots: t.items.length,
       step, steps: t.order.length,
       item: c.round.stage === 'open' ? t.items[t.order[step]].text : null,
-      seen: showItem ? t.order.slice(0, c.round.stage === 'open' ? step + 1 : t.order.length).map(i => t.items[i].text) : [],
+      seen: showItem ? t.order.slice(0, c.round.stage === 'open' ? step : t.order.length).map(i => t.items[i].text) : [],
     };
     if (a.role === 'player' && a.pid) {
       const pm = c.round.pm[a.pid];
