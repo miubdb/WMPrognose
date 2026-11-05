@@ -30,7 +30,7 @@ Browser-E2E (Playwright, Server auf :8091 starten): `node tests/e2e/play.mjs`, `
 - Kachel max. 1.000, Überraschung 1.000, Finale 2.000. Kein negativer Stand; Einsätze ≤ aktuellem Punktestand.
 - Wo zur Hölle: Platzierung nach km (100/80/65/50/35/20/10 % bei 7 Spielern, sonst interpoliert; Gleichstand = gleicher Platz). Spieler ohne Abgabe: 0.
 - Blind Rank: Budget × richtige Paare / 10. Nicht platzierte Begriffe zählen nicht.
-- Setz auf mich: bester Tipp 300 (Platzierung nach |ln(Tipp/Lösung)|, daher fair für große Zahlen), Einsatz 0/100/200 gewinnt +Einsatz, verliert −Einsatz (gedeckelt). Finale: 500 + Einsatz 0/250/500.
+- Setz auf mich (Mindesteinsatz: jeder darf 100 setzen, größere Einsätze nur mit entsprechenden Punkten; ein Verlust ist durch vorhandene Punkte gedeckelt): bester Tipp 300 (Platzierung nach |ln(Tipp/Lösung)|, daher fair für große Zahlen), Einsatz 0/100/200 gewinnt +Einsatz, verliert −Einsatz (gedeckelt). Finale: 500 + Einsatz 0/250/500.
 - Glitch: Treffer 70–100 %, knapp daneben bis 15 %. Zonen werden exakt aus dem Szenenunterschied berechnet.
 - Codebreak: 100/75/50/25 % je nach Hinweisen, 3 Versuche, kein Tempobonus.
 - Einzigartig: 500 einmalig / 150 mehrfach / 0 ungültig; Host kann unklare Antworten freigeben, zuordnen oder verwerfen.
@@ -44,3 +44,6 @@ Benötigt einen dauerhaft laufenden Node-Prozess mit beschreibbarem Datenträger
 
 ## Einschränkungen V1
 Nur 6 Spielmodi; HOCHSTAPLER u. a. nicht umgesetzt. Neue Modi: Eintrag in `server/modes.ts` + UI in `web/src/pages/`. Inhalte: `content/tiles.ts` (9 Kacheln, Überraschung, Finale). Faktenprüfung erfolgte aus gesichertem Wissen, nicht live gegen Webquellen – Aufgaben vor dem Abend gegenlesen. Auf Echt-Geräten (iOS/Android) wurde nur per Playwright-Emulation getestet.
+
+## Spielzeit (aus den hinterlegten Timern berechnet, `shared/timing.ts`)
+Kacheln 5–7,5 min, Überraschung ca. 6,5 min, Finale ca. 10 min, plus Lobby 8 min, Eröffnung, 3 Zwischenstände, Siegerehrung. Jede der 84 möglichen Auswahlen von 6 Kacheln ergibt 60–75 min (Test `tests/timing.test.ts`).

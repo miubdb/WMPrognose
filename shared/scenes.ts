@@ -126,14 +126,14 @@ reg(marketTable('market2', 'TRANSFERS · SOMMER (fiktiv)', [
 reg(pitch('pitch1', 'Taktiktafel', 
   [[110, 300], [250, 120], [250, 240], [250, 360], [250, 480], [420, 160], [420, 300], [420, 440], [600, 150], [620, 300], [600, 450]],
   [[890, 300], [760, 120], [760, 240], [760, 360], [760, 480], [620, 180], [580, 300], [620, 420], [450, 220], [450, 380], [350, 300]],
-  [515, 305], { g4: { x: 760, y: 530 } }));
+  [515, 305], { g4: { x: 760, y: 560 } }));
 
 reg(pitch('pitch2', 'Standardsituation',
   [[110, 300], [300, 140], [300, 260], [300, 340], [300, 460], [430, 200], [430, 400], [560, 300], [640, 180], [640, 420], [700, 300]],
   [[890, 300], [800, 160], [800, 240], [800, 360], [800, 440], [720, 250], [720, 350], [660, 300], [560, 120], [560, 480], [400, 300]],
   [940, 90], { h3: null, ball: { x: 600, y: 330 } }));
 
-reg(emojiGrid('grid1', 'Obstkorb', 8, 5, ['🍎'], { e2_5: { text: '🍅' } }));
+reg(emojiGrid('grid1', 'Uhrenwand', 8, 5, ['🕐'], { e2_5: { text: '🕜' } }));
 
 /** Szene mit Torjubel-Ergebnistafel */
 reg((() => {
@@ -159,7 +159,6 @@ reg((() => {
   return s;
 })());
 
-reg(emojiGrid('grid3', 'FINAL LOCK', 10, 6, ['🔒'], { e2_6: { text: '🔓' } }));
 
 /** Abfahrtstafel (neutrale Szene). */
 reg((() => {
@@ -200,4 +199,47 @@ reg((() => {
   items.push(T('sum', 285, 548, 'SUMME', 32, '#222222', { weight: 800 }));
   items.push(T('sumv', 715, 548, '13,40 €', 32, '#222222', { anchor: 'end', weight: 800, mono: true }));
   return { id: 'receipt1', title: 'Kassenzettel', bg: '#3a3a44', items, changes: { p1: { text: '2,91 €' } } } as Scene;
+})());
+
+/** FINAL LOCK: Tabelle, in der Punkte = 3 x Siege + Unentschieden gilt – eine Zahl ist gefälscht. */
+reg((() => {
+  const rows: [string, number, number, number, string][] = [
+    ['FC Nordstern', 9, 4, 3, '31:14'], ['SV Rheinblick', 8, 5, 3, '27:15'], ['Union Elbe', 7, 6, 3, '25:16'], ['Dynamo Süd', 7, 3, 6, '22:19'],
+    ['Borussia Ost', 6, 5, 5, '21:20'], ['Rot-Weiss Mitte', 5, 6, 5, '18:19'], ['FSV Küste', 4, 5, 7, '15:24'], ['Real Costa II', 2, 6, 8, '11:26'],
+  ];
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#120c2b' },
+    T('title', 40, 56, '🔒 FINAL LOCK · TABELLE (fiktiv)', 32, '#f5b82e', { weight: 800 }),
+    T('h0', 40, 104, 'TEAM', 18, '#9a8fd0'), T('h1', 520, 104, 'SP', 18, '#9a8fd0', { anchor: 'end' }), T('h2', 590, 104, 'S', 18, '#9a8fd0', { anchor: 'end' }),
+    T('h3', 660, 104, 'U', 18, '#9a8fd0', { anchor: 'end' }), T('h4', 730, 104, 'N', 18, '#9a8fd0', { anchor: 'end' }), T('h5', 840, 104, 'TORE', 18, '#9a8fd0', { anchor: 'end' }), T('h6', 960, 104, 'PKT', 18, '#9a8fd0', { anchor: 'end' }),
+  ];
+  rows.forEach(([n, w, d, l, g], i) => {
+    const y = 160 + i * 54;
+    items.push({ id: `bg${i}`, t: 'rect', x: 20, y: y - 34, w: 960, h: 48, fill: i % 2 ? '#1a1340' : '#211852', rx: 8 });
+    items.push(T(`n${i}`, 40, y, `${i + 1}. ${n}`, 26, '#ffffff', { weight: 600 }));
+    items.push(T(`sp${i}`, 520, y, String(w + d + l), 26, '#c9c2ee', { anchor: 'end', mono: true }));
+    items.push(T(`w${i}`, 590, y, String(w), 26, '#c9c2ee', { anchor: 'end', mono: true }));
+    items.push(T(`d${i}`, 660, y, String(d), 26, '#c9c2ee', { anchor: 'end', mono: true }));
+    items.push(T(`l${i}`, 730, y, String(l), 26, '#c9c2ee', { anchor: 'end', mono: true }));
+    items.push(T(`g${i}`, 840, y, g, 26, '#c9c2ee', { anchor: 'end', mono: true }));
+    items.push(T(`p${i}`, 960, y, String(3 * w + d), 28, '#14d9c0', { anchor: 'end', weight: 800, mono: true }));
+  });
+  return { id: 'table1', title: 'Tabelle', bg: '#120c2b', items, changes: { p3: { text: '26' } } } as Scene;
+})());
+
+/** Speisekarte (neutrale Szene). */
+reg((() => {
+  const rows: [string, string][] = [['Käsespätzle', '11,50'], ['Flammkuchen', '9,80'], ['Currywurst mit Pommes', '7,90'], ['Gulaschsuppe', '6,50'], ['Schnitzel Wiener Art', '14,90'], ['Apfelstrudel', '5,20']];
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#2b1d12' },
+    { id: 'frame', t: 'rect', x: 60, y: 30, w: 880, h: 540, fill: '#f3e7cf', rx: 14 },
+    T('title', 500, 100, 'Gasthaus „Zum goldenen Löwen“', 36, '#5a3825', { anchor: 'middle', weight: 800 }),
+    { id: 'sep', t: 'line', x: 140, y: 125, x2: 860, y2: 125, stroke: '#a0522d', sw: 3 },
+  ];
+  rows.forEach((r, i) => {
+    const y = 190 + i * 62;
+    items.push(T(`n${i}`, 140, y, r[0], 30, '#3a2616'));
+    items.push(T(`p${i}`, 860, y, r[1] + ' €', 30, '#3a2616', { anchor: 'end', mono: true, weight: 700 }));
+  });
+  return { id: 'menu1', title: 'Speisekarte', bg: '#2b1d12', items, changes: { p4: { text: '19,40 €' } } } as Scene;
 })());

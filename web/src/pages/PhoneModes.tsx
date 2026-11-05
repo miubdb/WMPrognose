@@ -202,9 +202,9 @@ function EstimatePhone({ round, act, room, d, view, pid }: Props & { d: any }) {
         {!placed ? (
           <>
             <div className="chips">{d.bets.map((b: number) => (
-              <button type="button" key={b} disabled={b > (d.balance ?? 0)} className={`chipbtn ${amount === b ? 'sel' : ''}`} onClick={() => setAmount(b)}>{b === 0 ? 'Kein Einsatz' : `${b} Punkte`}</button>
+              <button type="button" key={b} disabled={b > (d.allowance ?? d.balance ?? 0)} className={`chipbtn ${amount === b ? 'sel' : ''}`} onClick={() => setAmount(b)}>{b === 0 ? 'Kein Einsatz' : `${b} Punkte`}</button>
             ))}</div>
-            <p className="muted center small">Du hast {(d.balance ?? 0).toLocaleString('de-DE')} Punkte. Gewonnen: +Einsatz. Verloren: −Einsatz (nie unter 0).</p>
+            <p className="muted center small">Du hast {(d.balance ?? 0).toLocaleString('de-DE')} Punkte. Gewonnen: +Einsatz. Verloren: −Einsatz, höchstens so viel, wie du besitzt (nie unter 0).</p>
             <button className="btn primary wide" disabled={snd.state === 'sending' || (amount > 0 && !target)}
               onClick={() => snd.send({ k: 'submit', payload: { amount, target: amount > 0 ? target : null } })}>
               {amount === 0 ? 'Ohne Einsatz weiter' : `${amount} Punkte setzen`}

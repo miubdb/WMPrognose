@@ -217,11 +217,11 @@ test('Setz auf mich: Einsatz gewonnen/verloren nachvollziehbar, nie negativ, Min
   eng.recompute(room);
   assert.ok(pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'schaetz-mal' }).ok);
   host({ k: 'h.begin' });
-  // Tipps: 116 exakt (p0), 50 (p1), 400 (p2)
-  pl(0, { k: 'submit', payload: { value: 116 } }); pl(1, { k: 'submit', payload: { value: 50 } }); pl(2, { k: 'submit', payload: { value: '400' } });
+  // Tipps: exakt (p0), 500 (p1), 20000 (p2)
+  pl(0, { k: 'submit', payload: { value: 2680 } }); pl(1, { k: 'submit', payload: { value: 500 } }); pl(2, { k: 'submit', payload: { value: '20.000' } });
   assert.equal(room.round!.stage, 'bet');
-  // p1 (0 Punkte) kann 100 nicht setzen
-  assert.equal(pl(1, { k: 'submit', payload: { amount: 100, target: ids[0] } }).ok, false);
+  // p1 (0 Punkte) darf den Mindesteinsatz 100 setzen, aber nicht 200
+  assert.equal(pl(1, { k: 'submit', payload: { amount: 200, target: ids[0] } }).err, 'not_enough_points');
   assert.ok(pl(1, { k: 'submit', payload: { amount: 0, target: null } }).ok);
   // p2 hat nur 150 Punkte: 200 ist nicht erlaubt, 100 auf sich selbst schon (und geht verloren)
   assert.equal(pl(2, { k: 'submit', payload: { amount: 200, target: ids[2] } }).err, 'not_enough_points');
@@ -280,4 +280,21 @@ test('Einzigartig: Host kann unklare Antwort freigeben, mappen oder verwerfen', 
   assert.equal(room.round!.stage, 'review');
   host({ k: 'h.reveal' });
   assert.equal(room.players[0].score, 150); assert.equal(room.players[1].score, 150); assert.equal(room.players[2].score, 500);
+});
+
+test('Mindesteinsatz: Spieler mit 0 Punkten dürfen 100 setzen; Verlust ist gedeckelt, Stand nie negativ', () => {
+  const g = mkEngine(3);
+  const { room, host, pl, ids } = g;
+  host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
+  pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'schaetz-mal' });
+  host({ k: 'h.begin' });
+  pl(0, { k: 'submit', payload: { value: 2680 } }); pl(1, { k: 'submit', payload: { value: 1000 } }); pl(2, { k: 'submit', payload: { value: 90000 } });
+  assert.ok(pl(1, { k: 'submit', payload: { amount: 100, target: ids[2] } }).ok); // auf den schlechtesten Tipp
+  pl(0, { k: 'submit', payload: { amount: 0, target: null } }); pl(2, { k: 'submit', payload: { amount: 0, target: null } });
+  host({ k: 'h.reveal' });
+  assert.ok(room.players.every(p => p.score >= 0));
+  const loss = room.scoreLog.find(e => e.pid === ids[1] && e.label.startsWith('Einsatz verloren'))!;
+  const own = room.scoreLog.find(e => e.pid === ids[1] && e.label.startsWith('Schätzung'))!.applied;
+  assert.ok(-loss.applied <= own + 0); // Verlust nie größer als vorhandene Punkte
+  assert.equal(room.players[1].score, own - 100); // Platz 2: 120 Punkte, 100 verloren
 });

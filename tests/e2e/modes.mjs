@@ -49,7 +49,7 @@ const shot = async (name, ph = 0) => { await tv.screenshot({ path: `${SHOTS}/tv-
 await H({ k: 'h.adjust', pid: ids[1], delta: 400, note: 'Teststartguthaben' });
 await pickTile('schaetz-mal'); await sleep(1200); await tv.screenshot({ path: `${SHOTS}/tv-est-rules.png` });
 await begin();
-const guesses = ['116', '100', '150', '90', '200', '60'];
+const guesses = ['2680', '2000', '3500', '1500', '5000', '900'];
 for (let i = 0; i < 5; i++) { await phones[i].locator('.inputrow input').fill(guesses[i]); await phones[i].getByRole('button', { name: 'Schätzung abgeben' }).click(); await phones[i].waitForSelector('.status.ok'); }
 await shot('est-open');
 await H({ k: 'h.lock' }); await waitHost(v => v.round.stage === 'bet'); await sleep(1500);
@@ -80,11 +80,11 @@ await H({ k: 'h.next' });
 // ---------- CODEBREAK ----------
 await H({ k: 'h.skipTile' }); await waitHost(v => v.room.phase === 'wall');
 await pickTile('kopfsalat'); await begin();
-await phones[0].locator('.inputrow input').fill('64'); await phones[0].getByRole('button', { name: 'Lösung prüfen' }).click(); await sleep(500);
+await phones[0].locator('.inputrow input').fill('4'); await phones[0].getByRole('button', { name: 'Lösung prüfen' }).click(); await sleep(500);
 check(await phones[0].getByText(/Leider falsch/).count() > 0, 'Codebreak: falsche Antwort wird sofort zurückgemeldet');
 await phones[0].getByText(/Hinweis freischalten/).click(); await sleep(400);
 check(await phones[0].locator('.hint').count() === 1, 'Codebreak: Hinweis wird angezeigt');
-await phones[0].locator('.inputrow input').fill('65'); await phones[0].getByRole('button', { name: 'Lösung prüfen' }).click(); await sleep(400);
+await phones[0].locator('.inputrow input').fill('3'); await phones[0].getByRole('button', { name: 'Lösung prüfen' }).click(); await sleep(400);
 check(await phones[0].getByText(/Gelöst/).count() > 0, 'Codebreak: richtige Antwort erkannt');
 await shot('code-open');
 await H({ k: 'h.reveal' }); await sleep(2500); await shot('code-reveal');
@@ -118,8 +118,9 @@ await tv.screenshot({ path: `${SHOTS}/tv-final-rules.png` });
 check((await phones[0].locator('.topbar small').innerText()).includes('verborgen'), 'Finale: Punktestand auf dem Handy verborgen');
 for (let t = 0; t < 3; t++) {
   await begin();
-  if (t === 0) { await H({ k: 'h.lock' }); await sleep(400); }
-  await H({ k: 'h.reveal' }); await sleep(600); await H({ k: 'h.next' });
+  if (t === 0) { await sleep(500); await tv.screenshot({ path: `${SHOTS}/tv-final-0-view.png` }); await H({ k: 'h.lock' }); await sleep(600); await tv.screenshot({ path: `${SHOTS}/tv-final-0-open.png` }); }
+  if (t === 1) { for (let i = 0; i < 5; i++) { for (let k = 0; k < 4; k++) { await phones[k].locator('.slot:not(.filled)').first().click().catch(() => {}); await phones[k].getByRole('button', { name: /endgültig/ }).click().catch(() => {}); } await sleep(500); if (i === 2) await tv.screenshot({ path: `${SHOTS}/tv-final-1-open.png` }); await H({ k: 'h.lock' }); await sleep(200); } }
+  await H({ k: 'h.reveal' }); await sleep(t === 1 ? 5000 : 2500); await tv.screenshot({ path: `${SHOTS}/tv-final-${t}-reveal.png` }); await H({ k: 'h.next' });
 }
 await waitHost(v => v.room.phase === 'ceremony');
 for (let st = 0; st < 8; st++) { await sleep(1700); if ([0, 4, 7].includes(st)) await tv.screenshot({ path: `${SHOTS}/tv-ceremony-${st}.png` }); if (st < 7) await H({ k: 'h.ceremonyNext' }); }

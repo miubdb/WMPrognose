@@ -146,7 +146,7 @@ function WallTv({ view }: { view: View }) {
 function RoundTv({ view, round, serverNow }: { view: View; round: RoundView; serverNow: () => number }) {
   const timer = round.stage !== 'intro' && round.stage !== 'reveal' && round.deadline !== null || round.pausedLeft !== null;
   return (
-    <div className="roundtv" style={{ ['--accent' as any]: round.color }}>
+    <div className={`roundtv k-${round.kind}`} style={{ ['--accent' as any]: round.color }}>
       <Header view={view} right={timer ? <Countdown round={round} serverNow={serverNow} size={140} onTick={s => { if (s > 0 && s <= 5 && round.pausedLeft === null) play('tick'); }} /> : undefined} />
       <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.title}</b><small>{MODE_NAME[round.mode]}{round.taskCount > 1 ? ` · Aufgabe ${round.taskIndex + 1} von ${round.taskCount}` : ''} · bis zu {round.points} Punkte</small></div></div>
       <div className="roundbody">
@@ -165,9 +165,16 @@ function RoundTv({ view, round, serverNow }: { view: View; round: RoundView; ser
 function RuleCard({ round }: { round: RoundView }) {
   return (
     <div className="rulecard">
+      {round.kind === 'surprise' && <div className="kicker surprise">⚡ ÜBERRASCHUNG ⚡</div>}
+      {round.kind === 'final' && <div className="kicker final">🔒 Rangliste ab jetzt verborgen</div>}
       <div className="flip"><div className="bigic">{round.icon}</div></div>
-      <h1>{MODE_NAME[round.mode]}</h1>
-      <ol>{MODE_RULES[round.mode].map((r, i) => <li key={i} style={{ animationDelay: `${0.4 + i * 0.5}s` }}>{r}</li>)}</ol>
+      {round.kind === 'final' && round.taskIndex === 0 ? <>
+        <h1>FINAL LOCK</h1>
+        <ol><li style={{ animationDelay: '.4s' }}>① Ein visuelles Rätsel – 500 Punkte</li><li style={{ animationDelay: '.9s' }}>② Eine Sortieraufgabe – 500 Punkte</li><li style={{ animationDelay: '1.4s' }}>③ Schätzen mit Einsatz – bis zu 1.000 Punkte</li></ol>
+      </> : <>
+        <h1>{MODE_NAME[round.mode]}</h1>
+        <ol>{MODE_RULES[round.mode].map((r, i) => <li key={i} style={{ animationDelay: `${0.4 + i * 0.5}s` }}>{r}</li>)}</ol>
+      </>}
       <p className="muted">{round.taskCount > 1 ? `${round.taskCount} Aufgaben · ` : ''}insgesamt bis zu {round.kind === 'final' ? '2.000' : '1.000'} Punkte</p>
     </div>
   );
@@ -179,7 +186,7 @@ function PointsList({ view, rows }: { view: View; rows: { pid: string; points: n
   return (
     <div className="pointslist">
       {rows.map((r, i) => { const p = pl(view, r.pid); return p ? (
-        <div key={r.pid} className="prow" style={{ animationDelay: `${0.4 + i * 0.35}s` }}>
+        <div key={r.pid} className="prow" style={{ animationDelay: `${0.4 + (rows.length - 1 - i) * 0.35}s` }}>
           <Avatar a={p.avatar} size={54} /><b>{p.name}</b><span className="note">{r.note}</span><strong className={r.points > 0 ? 'pos' : r.points < 0 ? 'neg' : ''}>{r.points > 0 ? '+' : ''}{r.points}</strong>
         </div>) : null; })}
     </div>
@@ -192,7 +199,7 @@ function Explain({ text }: { text?: string }) { return text ? <div className="ex
 function GeoTv({ view, round }: { view: View; round: RoundView }) {
   const d = round.data; const rev = round.reveal;
   const showPins = round.stage === 'locked' || round.stage === 'reveal';
-  const pins = (rev ? rev.guesses : d.pins ?? []).map((g: any, i: number) => ({ id: g.pid, ll: { lat: g.lat, lon: g.lon }, avatar: pl(view, g.pid)?.avatar, label: rev ? `${g.km.toLocaleString('de-DE')} km` : undefined, delay: i * 0.35, color: rev && g.place === 1 ? '#f5b82e' : '#8b5cf6' }));
+  const pins = (rev ? rev.guesses : d.pins ?? []).map((g: any, i: number) => ({ id: g.pid, ll: { lat: g.lat, lon: g.lon }, avatar: pl(view, g.pid)?.avatar, label: rev ? `${g.km.toLocaleString('de-DE')} km` : undefined, delay: rev ? (rev.guesses.length - 1 - i) * 0.5 : i * 0.35, color: rev && g.place === 1 ? '#f5b82e' : '#8b5cf6' }));
   return (
     <div className="geotv">
       <div className="qcol"><div className="bigq">{d.prompt}</div>
@@ -256,7 +263,7 @@ function EstimateTv({ view, round }: { view: View; round: RoundView }) {
           <div className="axis" />
           <div className="answermark" style={{ left: `${pos(rev.answer)}%` }}><div className="flag">🎯 {rev.answer.toLocaleString('de-DE')} {rev.unit}</div><i /></div>
           {guesses.map((g, i) => { const p = pl(view, g.pid)!; return (
-            <div key={g.pid} className={`gmark ${g.best ? 'best' : ''}`} style={{ left: `${pos(g.value)}%`, top: `${(i % 4) * 2.7 + 7}em`, animationDelay: `${0.3 + i * 0.4}s` }}>
+            <div key={g.pid} className={`gmark ${g.best ? 'best' : ''}`} style={{ left: `${pos(g.value)}%`, top: `${(i % 4) * 2.4 + 5}em`, animationDelay: `${0.3 + i * 0.4}s` }}>
               <Avatar a={p.avatar} size={50} /><b>{g.value.toLocaleString('de-DE')}</b>
             </div>); })}
         </div>
@@ -310,7 +317,7 @@ function CodeTv({ view, round }: { view: View; round: RoundView }) {
     <div className="codetv">
       <div className="bigq">{d.prompt}</div>
       {d.display && <pre className="display">{d.display}</pre>}
-      {!rev && <div className="solvers">{view.players.map(p => <div key={p.id} className={`ans ${d.solvedBy?.includes(p.id) ? 'done' : ''}`}><div className="av"><Avatar a={p.avatar} size="100%" /></div><b>{p.name}</b><i>{d.solvedBy?.includes(p.id) ? '🔓' : '🔒'}</i></div>)}</div>}
+      {!rev && <AnswerRow players={view.players} />}
       {rev && <><div className="solution">Lösung: <b>{rev.answer}</b></div><PointsList view={view} rows={rev.rows.map((r: any) => ({ pid: r.pid, points: r.points, note: r.solved ? (r.hints ? `${r.hints} Hinweis(e)` : 'ohne Hinweis') : 'nicht gelöst' })).sort((a: any, b: any) => b.points - a.points)} /><Explain text={rev.explain} /></>}
     </div>
   );

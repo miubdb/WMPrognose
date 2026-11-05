@@ -192,7 +192,7 @@ const estimate: ModeImpl = {
       const target = String(payload?.target ?? '');
       if (!t.bets.includes(amount)) return err('invalid_bet');
       if (amount > 0) {
-        if (amount > balanceOf(c, pid)) return err('not_enough_points');
+        if (amount > Math.max(balanceOf(c, pid), t.minStake ?? 0)) return err('not_enough_points');
         if (c.round.pm[target]?.guess === undefined) return err('invalid_target');
       }
       const val = { amount, target: amount > 0 ? target : null };
@@ -250,6 +250,7 @@ const estimate: ModeImpl = {
     if (a.role === 'player' && a.pid) {
       base.mine = c.round.pm[a.pid] ?? {};
       base.balance = balanceOf(c, a.pid);
+      base.allowance = Math.max(base.balance, t.minStake ?? 0);
     }
     if (a.role === 'host') base.solution = `${t.answer} ${t.unit}`;
     return base;
@@ -360,7 +361,6 @@ const code: ModeImpl = {
       base.mine = { hints: pm.hints, attempts: pm.attempts, solved: pm.solved, hintTexts: t.hints.slice(0, pm.hints) };
     }
     if (a.role === 'host') base.solution = t.answers[0];
-    if (a.role === 'tv') base.solvedBy = c.players.filter(p => c.round.pm[p.id]?.solved).map(p => p.id);
     return base;
   },
 };

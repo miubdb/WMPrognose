@@ -53,6 +53,8 @@ export interface EstimateTask {
   points: number;
   /** Mögliche Einsätze. */
   bets: number[];
+  /** Jeder darf mindestens so viel setzen (Verlust ist durch vorhandene Punkte gedeckelt, Stand nie < 0). */
+  minStake?: number;
   explain: string;
 }
 export interface GlitchZone { x: number; y: number; r: number }

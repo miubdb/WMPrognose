@@ -45,7 +45,7 @@ for (let i = 0; i < N; i++) {
   p.on('pageerror', e => console.log(`P${i} pageerror`, e.message));
   await p.goto(`${BASE}/play/${code}`);
   await p.getByPlaceholder('z. B. Alex').fill(names[i]);
-  if (i === 0) await p.screenshot({ path: `${SHOTS}/phone-join.png` });
+  if (i === 0) { await p.screenshot({ path: `${SHOTS}/phone-join.png` }); await p.getByRole('button', { name: 'Frisur' }).click(); await sleep(300); await p.screenshot({ path: `${SHOTS}/phone-editor-hair.png` }); }
   await p.getByRole('button', { name: 'Beitreten', exact: true }).click();
   await p.waitForSelector('.topbar');
   phones.push({ p, ctx, name: names[i] });
@@ -138,6 +138,10 @@ page: {
     await ph.p.waitForSelector('.status.ok');
   }
   await phones[0].p.screenshot({ path: `${SHOTS}/phone-rank.png` });
+  for (let k = 0; k < 4; k++) { await host.getByText('Antworten sperren').click(); await sleep(300); for (const ph of phones.slice(0, 3)) { await ph.p.locator('.slot:not(.filled)').first().click().catch(() => {}); await ph.p.getByRole('button', { name: /endgültig/ }).click().catch(() => {}); } await sleep(300); }
+  await host.getByText('Antworten sperren').click().catch(() => {});
+  await host.getByText('Auflösung auf dem TV zeigen').click().catch(() => {});
+  await sleep(5500); await tv.screenshot({ path: `${SHOTS}/tv-rank-reveal.png` });
   check(true, 'Blind Rank: Platzierung auf Handys funktioniert');
 }
 
