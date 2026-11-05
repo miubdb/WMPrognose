@@ -36345,12 +36345,70 @@ async function readBodyOf(req, limit) {
     return {};
   }
 }
+async function blobDiagnostics() {
+  const b = await Promise.resolve().then(() => (init_dist(), dist_exports));
+  const path = `outplay/selftest/diag-${Date.now()}.bin`;
+  const out = { path, steps: [] };
+  const step = async (name, fn) => {
+    try {
+      out.steps.push({ name, ok: true, ...await fn() });
+    } catch (e) {
+      out.steps.push({ name, ok: false, err: `${e?.constructor?.name}: ${String(e?.message ?? e).slice(0, 200)}` });
+    }
+  };
+  let r1, h1, g1, h2;
+  await step("put#1", async () => {
+    r1 = await b.put(path, Buffer.from("A"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream" });
+    return { keys: Object.keys(r1), putEtag: r1.etag ?? null };
+  });
+  await step("head#1", async () => {
+    h1 = await b.head(path);
+    return { etag: h1.etag, size: h1.size };
+  });
+  await step("get#1(useCache:false)", async () => {
+    g1 = await b.get(path, { access: "private", useCache: false });
+    return { statusCode: g1?.statusCode, blobEtag: g1?.blob?.etag, headerEtag: g1?.headers?.get("etag"), size: g1?.blob?.size };
+  });
+  await step("put#2 ifMatch=head.etag", async () => {
+    const r = await b.put(path, Buffer.from("B"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream", ifMatch: h1.etag });
+    return { putEtag: r.etag ?? null };
+  });
+  await step("head#2", async () => {
+    h2 = await b.head(path);
+    return { etag: h2.etag, changed: h2.etag !== h1.etag };
+  });
+  await step("put#3 ifMatch=get.blob.etag(alt,stale)", async () => {
+    const r = await b.put(path, Buffer.from("C"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream", ifMatch: g1?.blob?.etag });
+    return { note: "sollte Konflikt sein (veralteter ETag)", putEtag: r.etag ?? null };
+  });
+  await step("head#3", async () => {
+    const h = await b.head(path);
+    return { etag: h.etag };
+  });
+  await step("get#2 + put ifMatch=get.blob.etag", async () => {
+    const g = await b.get(path, { access: "private", useCache: false });
+    const r = await b.put(path, Buffer.from("D"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream", ifMatch: g.blob.etag });
+    return { blobEtag: g.blob.etag, putEtag: r.etag ?? null };
+  });
+  await step("del", async () => {
+    await b.del(path);
+    return {};
+  });
+  return out;
+}
 async function handleVercel(req, res, online = getOnline()) {
   res.setHeader("x-content-type-options", "nosniff");
   const url = new URL(req.url ?? "/", "http://x");
   const parts = url.pathname.split("/").filter(Boolean);
   const st = online.status();
   if (url.pathname === "/api/health") return sendJson(res, 200, { ok: true, mode: "online", gameshow: false, storage: { configured: st.storage, kind: "vercel-blob" }, admin: { passwordConfigured: st.password } });
+  if (url.pathname === "/api/selftest-diag") {
+    try {
+      return sendJson(res, 200, await blobDiagnostics());
+    } catch (e) {
+      return sendJson(res, 500, { err: String(e?.message ?? e) });
+    }
+  }
   if (url.pathname === "/api/netinfo") return sendJson(res, 200, { online: true, preferred: null, candidates: [] });
   if (url.pathname === "/api/packs") {
     try {
