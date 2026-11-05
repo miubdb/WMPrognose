@@ -111,9 +111,9 @@ test('Online: Voll-Backup (SQLite) ist eine gültige, vollständige Datenbank', 
   const db = new DatabaseSync(f); assert.equal((db.prepare('SELECT COUNT(*) n FROM questions').get() as any).n, 35); assert.equal((db.prepare('PRAGMA integrity_check').get() as any).integrity_check, 'ok'); db.close(); rmSync(f);
 });
 
-test('Die eingecheckte Vercel-Function (api/[...path].js) entspricht dem aktuellen Quellcode', async () => {
+test('Die eingecheckte Vercel-Function (api/index.js) entspricht dem aktuellen Quellcode', async () => {
   const out = join(mkdtempSync(join(tmpdir(), 'bundle-')), 'x.js');
   await build({ entryPoints: ['api-src/handler.ts'], outfile: out, bundle: true, platform: 'node', format: 'esm', target: 'node22', external: ['node:*'], sourcemap: false, legalComments: 'none', logLevel: 'silent',
     banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" } });
-  assert.equal(readFileSync(out, 'utf8'), readFileSync('api/[...path].js', 'utf8'), 'Bitte "npm run bundle:api" ausführen und api/[...path].js einchecken');
+  assert.equal(readFileSync(out, 'utf8'), readFileSync('api/index.js', 'utf8'), 'Bitte "npm run bundle:api" ausführen und api/index.js einchecken');
 });

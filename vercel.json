@@ -4,12 +4,34 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": { "api/[...path].js": { "maxDuration": 30 } },
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
-    { "source": "/(admin|host|tv|play)", "destination": "/index.html" },
-    { "source": "/(admin|host|tv|play)/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/(admin|host|tv|play)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(admin|host|tv|play)/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
-    { "source": "/api/(.*)", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
   ]
 }
