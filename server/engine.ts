@@ -584,7 +584,7 @@ export class Engine {
     }
     if (aud.role === 'host') {
       view.host = {
-        pin: room.hostPin, log: room.log.slice(-40), scoreLog: room.scoreLog.slice(-60),
+        pin: room.hostPin, recoveries: Object.fromEntries(active.map(p => [p.id, p.recovery])), log: room.log.slice(-40), scoreLog: room.scoreLog.slice(-60),
         tilesLeft: Object.entries(room.tileStatus).filter(([, s]) => s === 'open').map(([id]) => id),
         planNext: this.planNextLabel(room),
       };
@@ -624,7 +624,7 @@ export class Engine {
     const data = r.stage === 'intro' ? { preview: true } : mode.view(c, aud);
     const reveal = r.stage === 'reveal' ? this.revealView(r.result?.reveal, aud) : null;
     return {
-      tileId: tile.id, title: tile.title, topic: tile.topic, icon: tile.icon, color: tile.color, mode: c.task.mode, kind: tile.kind,
+      rid: `${tile.id}#${r.taskIndex}#${r.attempt}`, tileId: tile.id, title: tile.title, topic: tile.topic, icon: tile.icon, color: tile.color, mode: c.task.mode, kind: tile.kind,
       blurb: tile.blurb, taskIndex: r.taskIndex, taskCount: tile.tasks.length, stage: r.stage,
       deadline: r.deadline, pausedLeft: r.pausedLeft, stageSeconds: r.stageSeconds,
       points: mode.maxPoints(c.task), data, reveal,

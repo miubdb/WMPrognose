@@ -31,7 +31,7 @@ export class Client {
   kicked: string | null = null;
   closed = false;
   n = 0;
-  constructor(public env: TestEnv, public role: 'tv' | 'host' | 'player', public room: string, public key?: string, public name = role) {}
+  constructor(public env: TestEnv, public role: 'tv' | 'host' | 'player', public room: string, public key?: string, public name: string = role) {}
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {

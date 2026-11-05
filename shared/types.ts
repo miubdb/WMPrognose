@@ -136,6 +136,7 @@ export interface TileView {
 }
 
 export interface RoundView {
+  rid: string;
   tileId: string;
   title: string;
   topic: string;
@@ -184,7 +185,7 @@ export interface View {
   scoreboard: ScoreboardView | null;
   ceremony: null | { step: number; steps: number; stepTitle: string; standings: { id: string; score: number; delta: number; place: number }[] };
   me?: { id: string; recovery: string; score: number | null; rank: number | null };
-  host?: { pin: string; log: LogLine[]; scoreLog: ScoreEntry[]; tilesLeft: string[]; planNext: string };
+  host?: { pin: string; recoveries: Record<string, string>; log: LogLine[]; scoreLog: ScoreEntry[]; tilesLeft: string[]; planNext: string };
   isPicker?: boolean;
 }
 

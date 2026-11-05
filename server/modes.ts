@@ -75,6 +75,9 @@ const geo: ModeImpl = {
     const t = c.task as GeoTask;
     const base: any = { prompt: t.prompt, map: t.map };
     if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid] ?? null;
+    if (c.round.stage === 'locked' || c.round.stage === 'reveal') {
+      base.pins = c.players.filter(p => c.round.pm[p.id]).map(p => ({ pid: p.id, ...c.round.pm[p.id] }));
+    }
     if (a.role === 'host') base.solution = t.answer.label;
     return base;
   },

@@ -7,6 +7,7 @@ import type { Action, View, TaskDef } from '../shared/types';
 import { AV } from './helpers';
 import { glitchZones } from '../server/modes';
 import { rng } from '../shared/util';
+import type { Room } from '../server/model';
 
 function mkEngine(n = 7, seedNo = 1) {
   const eng = new Engine(BOOK);
@@ -20,8 +21,8 @@ function mkEngine(n = 7, seedNo = 1) {
     if (r.ok) { toks.push(r.token); ids.push(r.player.id); }
   }
   let rq = 0;
-  const host = (a: Action) => { const r = eng.act(room, { role: 'host' }, `h${++rq}`, a, now); return r; };
-  const pl = (i: number, a: Action) => eng.act(room, { role: 'player', pid: ids[i] }, `p${i}-${++rq}`, a, now);
+  const host = (a: Action): any => { const r = eng.act(room, { role: 'host' }, `h${++rq}`, a, now); return r; };
+  const pl = (i: number, a: Action): any => eng.act(room, { role: 'player', pid: ids[i] }, `p${i}-${++rq}`, a, now);
   const view = (i: number | 'host' | 'tv'): View => eng.buildView(room, i === 'host' ? { role: 'host' } : i === 'tv' ? { role: 'tv' } : { role: 'player', pid: ids[i] }, now);
   const advance = (ms: number) => { now += ms; eng.tick(room, now); };
   void hostKey; void seedNo;
@@ -78,18 +79,20 @@ function botSubmit(g: ReturnType<typeof mkEngine>, task: TaskDef, rand: () => nu
 test('Komplette Show: alle Modi, Zwischenstände, Finale (verborgen), Siegerehrung – ohne Hänger, Punkte konsistent', () => {
   const g = mkEngine(7);
   const rand = rng(42);
-  const { room, eng, host, view } = g;
+  const { eng, host, view } = g;
+  const room: Room = g.room;
   assert.ok(host({ k: 'h.startShow' }).ok);
   assert.equal(room.phase, 'intro');
   assert.ok(host({ k: 'h.introDone' }).ok);
+  const phase = () => room.phase as string;
   const modesSeen = new Set<string>();
   const pickers = new Set<string>();
   let tiles = 0;
   const maxTileScore: Record<string, number> = {};
   let guard = 0;
 
-  while (room.phase !== 'ceremony' && guard++ < 400) {
-    if (room.phase === 'wall') {
+  while (phase() !== 'ceremony' && guard++ < 400) {
+    if (phase() === 'wall') {
       pickers.add(room.pickerId!);
       const open = Object.entries(room.tileStatus).filter(([, s]) => s === 'open').map(([id]) => id);
       // Picker wählt selbst (über Spieleraktion)
@@ -99,13 +102,13 @@ test('Komplette Show: alle Modi, Zwischenstände, Finale (verborgen), Siegerehru
       tiles++;
       continue;
     }
-    if (room.phase === 'scoreboard') {
+    if (phase() === 'scoreboard') {
       const v = view('tv');
       assert.equal(v.scoreboard!.standings.length, 7);
       assert.ok(host({ k: 'h.continue' }).ok);
       continue;
     }
-    assert.equal(room.phase, 'round');
+    assert.equal(phase(), 'round');
     const task = eng.curTask(room)!;
     modesSeen.add(task.mode);
     const tile = eng.curTile(room)!;
@@ -138,7 +141,7 @@ test('Komplette Show: alle Modi, Zwischenstände, Finale (verborgen), Siegerehru
       assert.ok(got <= max);
     }
     assert.ok(host({ k: 'h.next' }).ok);
-    if (room.phase !== 'round' || room.round?.tileId !== tile.id) {
+    if (phase() !== 'round' || room.round?.tileId !== tile.id) {
       const id = tile.id;
       for (const p of eng.active(room)) {
         const total = room.scoreLog.filter(e => e.key.startsWith(id + '#') && e.pid === p.id).reduce((a, e) => a + e.applied, 0);
@@ -154,7 +157,7 @@ test('Komplette Show: alle Modi, Zwischenstände, Finale (verborgen), Siegerehru
       assert.equal(pv.me!.score, null);
     }
   }
-  assert.equal(room.phase, 'ceremony');
+  assert.equal(phase(), 'ceremony');
   assert.ok(guard < 400);
   assert.equal(tiles, 6, 'sechs Kategorien');
   assert.deepEqual([...modesSeen].sort(), ['codebreak', 'estimate', 'geo', 'glitch', 'rank', 'unique'].filter(m => modesSeen.has(m)).sort());
@@ -184,7 +187,7 @@ test('Komplette Show: alle Modi, Zwischenstände, Finale (verborgen), Siegerehru
   for (const p of eng.active(room)) assert.equal(p.score, room.scoreLog.filter(e => e.pid === p.id).reduce((a, e) => a + e.applied, 0));
   assert.equal(view(0).players.every(p => p.score !== null), true, 'am Ende sehen alle die Punkte');
   assert.ok(host({ k: 'h.end' }).ok);
-  assert.equal(room.phase, 'ended');
+  assert.equal(phase(), 'ended');
 });
 
 test('Gleichstand-Regel: mehr Finalpunkte, dann frühere Anmeldung', () => {
