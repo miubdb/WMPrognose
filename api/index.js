@@ -36167,7 +36167,11 @@ var SdkBlobBackend = class {
       const r = await b.put(this.pathname, bytes2, opts);
       return r.etag ?? (await b.head(this.pathname)).etag;
     } catch (e) {
-      if (e instanceof b.BlobPreconditionFailedError || /already exists/i.test(String(e?.message))) throw new ConflictError("etag");
+      if (e instanceof b.BlobPreconditionFailedError || /already exists/i.test(String(e?.message))) {
+        const c = new ConflictError("etag");
+        c.detail = `${e?.constructor?.name}: ${String(e?.message).slice(0, 120)} | ifMatch=${ifMatch}`;
+        throw c;
+      }
       throw e;
     }
   }
@@ -36262,6 +36266,7 @@ var OnlineAdmin = class {
       const wrote = method !== "GET" || parts[2] === "login";
       const body = method === "GET" ? {} : await readBody(8 * 1024 * 1024);
       let lastConflict = false;
+      const dbg = [];
       for (let attempt = 0; attempt < 6; attempt++) {
         let live;
         try {
@@ -36291,6 +36296,7 @@ var OnlineAdmin = class {
         } catch (e) {
           if (e instanceof ConflictError) {
             lastConflict = true;
+            dbg.push({ attempt, etag: live.etag, msg: e.detail ?? e.message });
             this.close();
             continue;
           }
@@ -36298,7 +36304,7 @@ var OnlineAdmin = class {
         }
       }
       void lastConflict;
-      return sendJson(res, 409, { err: "Der Speicher wird gerade von mehreren Seiten gleichzeitig ver\xE4ndert. Bitte in ein paar Sekunden erneut speichern \u2013 es ging nichts verloren.", conflict: true });
+      return sendJson(res, 409, { err: "Der Speicher wird gerade von mehreren Seiten gleichzeitig ver\xE4ndert. Bitte in ein paar Sekunden erneut speichern \u2013 es ging nichts verloren.", conflict: true, debug: dbg });
     };
     const p = this.chain.then(run, run);
     this.chain = p.catch(() => {

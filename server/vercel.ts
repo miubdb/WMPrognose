@@ -58,7 +58,7 @@ export class SdkBlobBackend implements BlobBackend {
       const r: any = await b.put(this.pathname, bytes, opts);
       return (r.etag as string) ?? (await b.head(this.pathname)).etag;
     } catch (e: any) {
-      if (e instanceof b.BlobPreconditionFailedError || /already exists/i.test(String(e?.message))) throw new ConflictError('etag');
+      if (e instanceof b.BlobPreconditionFailedError || /already exists/i.test(String(e?.message))) { const c: any = new ConflictError('etag'); c.detail = `${e?.constructor?.name}: ${String(e?.message).slice(0, 120)} | ifMatch=${ifMatch}`; throw c; }
       throw e;
     }
   }
@@ -119,7 +119,7 @@ export class OnlineAdmin {
       const method = req.method ?? 'GET';
       const wrote = method !== 'GET' || parts[2] === 'login';
       const body = method === 'GET' ? {} : await readBody(8 * 1024 * 1024);          // einmal lesen, bei Wiederholung wiederverwenden
-      let lastConflict = false;
+      let lastConflict = false; const dbg: any[] = [];
       for (let attempt = 0; attempt < 6; attempt++) {
         let live: Live;
         try { live = await this.ensure(); } catch (e: any) { return sendJson(res, 503, { err: 'Speicher nicht erreichbar: ' + String(e?.message ?? e).slice(0, 200), setup: 'blob-error' }); }
@@ -130,12 +130,12 @@ export class OnlineAdmin {
         if (!wrote || buffered.status >= 500 || failed) { buffered.flushTo(res); return; }
         try { await this.persist(); buffered.flushTo(res); return; }
         catch (e) {
-          if (e instanceof ConflictError) { lastConflict = true; this.close(); continue; }   // ein anderer Schreibvorgang war schneller: Anfrage auf dem neuen Stand wiederholen
+          if (e instanceof ConflictError) { lastConflict = true; dbg.push({ attempt, etag: (live as any).etag, msg: (e as any).detail ?? (e as any).message }); this.close(); continue; }   // ein anderer Schreibvorgang war schneller: Anfrage auf dem neuen Stand wiederholen
           return sendJson(res, 503, { err: 'Speichern fehlgeschlagen – Änderung NICHT gesichert: ' + String((e as any)?.message ?? e).slice(0, 160) });
         }
       }
       void lastConflict;
-      return sendJson(res, 409, { err: 'Der Speicher wird gerade von mehreren Seiten gleichzeitig verändert. Bitte in ein paar Sekunden erneut speichern – es ging nichts verloren.', conflict: true });
+      return sendJson(res, 409, { err: 'Der Speicher wird gerade von mehreren Seiten gleichzeitig verändert. Bitte in ein paar Sekunden erneut speichern – es ging nichts verloren.', conflict: true, debug: dbg });
     };
     const p = this.chain.then(run, run); this.chain = p.catch(() => {});
     return p as Promise<void>;
