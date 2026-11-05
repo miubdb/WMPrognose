@@ -1,9 +1,11 @@
 // Die sechs Spielmodi: Eingabe-Validierung, Stage-Übergänge, Wertung, Sichten.
-import type { Stage, TaskDef, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, GlitchZone } from '../shared/types';
+import type { Stage, TaskDef, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, GlitchZone } from '../shared/types';
 import type { PlayerRec, Room, RoundState } from './model';
 import {
   scoreGeo, scoreRank, scoreEstimate, scoreGlitch, scoreCode, codeMatches, groupUnique, scoreUnique, rankPairs,
+  scoreMatch, validMatching, MATCH_PAIRS, MATCH_PAIR_POINTS, LINK_POINTS, linkMatch,
 } from '../shared/scoring';
+import { normText } from '../shared/util';
 import { SCENES, diffZones, variantItems, type Scene } from '../shared/scenes';
 import { parseNumber } from '../shared/util';
 
@@ -33,6 +35,8 @@ export interface ModeImpl {
   maxPoints(t: TaskDef): number;
   /** wird auf allen Spielern erwartet, damit "alle fertig" gilt */
   complete?(c: Ctx): boolean;
+  /** true = Auflösung noch nicht erlaubt (z. B. unklare Antworten warten auf die Host-Prüfung) */
+  blockReveal?(c: Ctx): boolean;
 }
 
 const err = (e: string): SubmitResult => ({ ok: false, err: e });
@@ -418,5 +422,130 @@ const unique: ModeImpl = {
   },
 };
 
-export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique };
+// =====================================================================
+// MATCHMAKER
+// =====================================================================
+const blankPairs = () => new Array(MATCH_PAIRS).fill(-1) as number[];
+const match: ModeImpl = {
+  maxPoints: () => MATCH_PAIRS * MATCH_PAIR_POINTS,
+  begin(c) { c.setStage('open', (c.task as MatchTask).seconds); },
+  advance(c) { c.setStage('locked', null); },
+  submit(c, pid, payload) {
+    if (c.round.stage !== 'open') return err('closed');
+    const pairs = payload?.pairs;
+    if (!validMatching(pairs)) return err('invalid');
+    const fin = payload?.final === true;
+    const pm = (c.round.pm[pid] ??= { pairs: blankPairs(), final: false });
+    if (pm.final) return fin && sameJson(pm.pairs, pairs) ? { ok: true, dup: true } : err('already_submitted');
+    if (!fin && sameJson(pm.pairs, pairs)) return { ok: true, dup: true };
+    pm.pairs = pairs.slice();
+    if (fin) pm.final = true;
+    return OK;
+  },
+  answered: (c, pid) => !!c.round.pm[pid]?.final,
+  complete(c) { return c.round.stage === 'open' && c.players.length > 0 && c.players.every(p => !!c.round.pm[p.id]?.final); },
+  score(c) {
+    const t = c.task as MatchTask;
+    const rows = c.players.map(p => {
+      const pm = c.round.pm[p.id];
+      const r = scoreMatch(pm?.pairs, t.order);
+      return { pid: p.id, submitted: !!pm && pm.pairs.some((x: number) => x >= 0), final: !!pm?.final, pairs: (pm?.pairs ?? blankPairs()) as number[], marks: r.rows, correct: r.correct, points: r.points };
+    });
+    return {
+      entries: rows.filter(r => r.submitted).map(r => ({ pid: r.pid, delta: r.points, label: `${r.correct} von ${MATCH_PAIRS} Paaren richtig` })),
+      reveal: { pairs: t.pairs, order: t.order, right: t.order.map(i => t.pairs[i].right), explain: t.explain, rows, pointsPerPair: MATCH_PAIR_POINTS },
+    };
+  },
+  view(c, a) {
+    const t = c.task as MatchTask;
+    // Die rechte Spalte wird nur in gemischter Anzeigereihenfolge ausgeliefert; die Zuordnung (order) bleibt auf dem Server.
+    const base: any = { prompt: t.prompt, left: t.pairs.map(p => p.left), right: t.order.map(i => t.pairs[i].right), n: MATCH_PAIRS, pointsPerPair: MATCH_PAIR_POINTS };
+    if (a.role === 'player' && a.pid) { const pm = c.round.pm[a.pid]; base.mine = { pairs: pm?.pairs ?? blankPairs(), final: !!pm?.final }; }
+    if (a.role === 'host') base.solution = t.pairs.map(p => `${p.left} = ${p.right}`);
+    return base;
+  },
+};
+
+// =====================================================================
+// DIE VERBINDUNG
+// =====================================================================
+/** Verbindliche Hinweisstufe zum Zeitpunkt c.now (berücksichtigt, dass der Tick wenige Millisekunden hinterherhinken kann). null = Abgabefenster geschlossen. */
+function linkLevel(c: Ctx): number | null {
+  const t = c.task as LinkTask; const r = c.round;
+  let lvl = (r.m?.level as number) ?? 0;
+  if (r.deadline !== null && r.pausedLeft === null && c.now >= r.deadline) lvl += 1 + Math.floor((c.now - r.deadline) / (t.clueSeconds * 1000));
+  return lvl > 3 ? null : lvl;
+}
+function linkGroups(c: Ctx) {
+  const t = c.task as LinkTask;
+  const ov: Record<string, any> = c.round.m?.overrides ?? {};
+  const groups = new Map<string, { key: string; label: string; state: 'valid' | 'unknown' | 'invalid'; members: string[]; raw: Record<string, string> }>();
+  for (const p of c.players) {
+    const raw = c.round.pm[p.id]?.answer as string | undefined; if (!raw) continue;
+    const n = normText(raw); if (!n) continue;
+    const v = linkMatch(raw, t.answer, t.accept);
+    let key: string, label: string, state: 'valid' | 'unknown' | 'invalid';
+    if (v === 'exact') { key = 'v:' + normText(t.answer); label = t.answer; state = 'valid'; }
+    else {
+      key = 'u:' + n; label = raw.trim(); state = v === 'close' ? 'unknown' : 'invalid';
+      const o = ov[key];
+      if (o === 'valid' || (o && typeof o === 'object')) state = 'valid'; else if (o === 'invalid') state = 'invalid';
+    }
+    const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
+    g.members.push(p.id); g.raw[p.id] = raw; groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+const link: ModeImpl = {
+  maxPoints: () => LINK_POINTS[0],
+  begin(c) { c.round.m = { level: 0, overrides: {} }; c.setStage('open', (c.task as LinkTask).clueSeconds); },
+  advance(c) {
+    const t = c.task as LinkTask;
+    const lvl = (c.round.m.level as number) ?? 0;
+    if (c.round.stage === 'open' && lvl < 3) { c.round.m.level = lvl + 1; c.setStage('open', t.clueSeconds); return; }
+    // letzter Hinweis abgelaufen: nur wenn Antworten nicht eindeutig sind, braucht der Host eine Prüfung
+    const needs = linkGroups(c).some(g => g.state === 'unknown' || (g.state === 'invalid' && g.key.startsWith('u:')));
+    c.setStage(needs ? 'review' : 'locked', null);
+  },
+  submit(c, pid, payload) {
+    if (c.round.stage !== 'open') return err('closed');
+    const lvl = linkLevel(c);
+    if (lvl === null) return err('closed');
+    const answer = String(payload?.answer ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+    if (!normText(answer)) return err('invalid');
+    const cur = c.round.pm[pid];
+    if (cur) return cur.answer === answer ? { ok: true, dup: true } : err('already_submitted');   // genau eine endgültige Antwort
+    c.round.pm[pid] = { answer, level: lvl, at: c.now };
+    return OK;
+  },
+  answered: (c, pid) => !!c.round.pm[pid]?.answer,
+  complete(c) { return c.round.stage === 'open' && c.players.length > 0 && c.players.every(p => !!c.round.pm[p.id]?.answer); },
+  blockReveal(c) { return linkGroups(c).some(g => g.state === 'unknown'); },
+  score(c) {
+    const t = c.task as LinkTask;
+    const groups = linkGroups(c);
+    const rows = c.players.map(p => {
+      const pm = c.round.pm[p.id];
+      const g = groups.find(x => x.members.includes(p.id));
+      const correct = g?.state === 'valid';
+      return { pid: p.id, answer: pm?.answer ?? null, level: pm ? (pm.level as number) : null, correct, points: correct ? LINK_POINTS[pm.level] : 0 };
+    });
+    return {
+      entries: rows.filter(r => r.answer).map(r => ({ pid: r.pid, delta: r.points, label: r.correct ? `Richtig nach Hinweis ${r.level! + 1}` : 'Falsch' })),
+      reveal: { answer: t.answer, clues: t.clues, explain: t.explain, rows, points: LINK_POINTS },
+    };
+  },
+  view(c, a) {
+    const t = c.task as LinkTask; const st = c.round.stage;
+    const shown = st === 'open' ? (c.round.m?.level ?? 0) + 1 : 4;
+    const base: any = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: t.clueSeconds };
+    if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid] ? { answer: c.round.pm[a.pid].answer, level: c.round.pm[a.pid].level } : null;
+    // Antworten bleiben bis zur Auflösung verborgen – nur der Showmaster sieht sie zur Prüfung
+    if ((st === 'review' || st === 'locked') && a.role === 'host') base.groups = linkGroups(c);
+    if (a.role === 'host') { base.solution = t.answer; base.validNames = [t.answer]; }
+    return base;
+  },
+};
+
+export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique, match, link };
 export { rankPairs };

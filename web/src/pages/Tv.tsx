@@ -8,7 +8,7 @@ import { initAudio, play, setSoundEnabled } from '../ui/audio';
 import type { PlayerPublic, RoundView, View } from '../../../shared/types';
 
 export const MODE_NAME: Record<string, string> = {
-  geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG',
+  geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG',
 };
 const MODE_RULES: Record<string, string[]> = {
   geo: ['Setze auf deinem Handy einen Pin auf die Karte.', 'Du kannst ihn bis zum Absenden verschieben.', 'Gewertet wird die Platzierung nach Entfernung.'],
@@ -17,6 +17,8 @@ const MODE_RULES: Record<string, string[]> = {
   glitch: ['Merk dir das Bild genau.', 'Dann ändert sich etwas.', 'Tippe auf deinem Handy auf die veränderte Stelle.'],
   codebreak: ['Knacke das Rätsel mit Logik.', 'Hinweise helfen – kosten aber Punkte.', 'Drei Versuche, Tempo zählt kaum.'],
   unique: ['Nenne eine gültige Antwort.', 'Nur einzigartige Antworten bringen volle Punkte.', 'Doppelte zählen weniger, Ungültige gar nicht.'],
+  match: ['Sechs Begriffe links, sechs Partner rechts.', 'Verbinde auf dem Handy, was zusammengehört.', '50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.'],
+  link: ['Vier Hinweise erscheinen nacheinander.', 'Je früher du die Lösung nennst, desto mehr Punkte.', 'Nur ein Versuch – die Antwort bleibt geheim.'],
 };
 
 export function Tv({ code }: { code: string }) {
@@ -160,6 +162,8 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
           round.mode === 'estimate' ? <EstimateTv view={view} round={round} /> :
           round.mode === 'glitch' ? <GlitchTv view={view} round={round} /> :
           round.mode === 'codebreak' ? <CodeTv view={view} round={round} /> :
+          round.mode === 'match' ? <MatchTv view={view} round={round} /> :
+          round.mode === 'link' ? <LinkTv view={view} round={round} /> :
           <UniqueTv view={view} round={round} />}
       </div>
     </div>
@@ -174,7 +178,7 @@ function RuleCard({ round }: { round: RoundView }) {
       <div className="flip"><div className="bigic">{round.icon}</div></div>
       {round.kind === 'final' && round.taskIndex === 0 ? <>
         <h1>FINAL LOCK</h1>
-        <ol><li style={{ animationDelay: '.4s' }}>① Ein visuelles Rätsel – 500 Punkte</li><li style={{ animationDelay: '.9s' }}>② Eine Sortieraufgabe – 500 Punkte</li><li style={{ animationDelay: '1.4s' }}>③ Schätzen mit Einsatz – bis zu 1.000 Punkte</li></ol>
+        <ol><li style={{ animationDelay: '.4s' }}>① Ein Ort auf der Karte – 400 Punkte</li><li style={{ animationDelay: '.8s' }}>② Eine gemeinsame Lösung – bis 300 Punkte</li><li style={{ animationDelay: '1.2s' }}>③ Eine Sortieraufgabe – 500 Punkte</li><li style={{ animationDelay: '1.6s' }}>④ Schätzen mit Einsatz – bis zu 800 Punkte</li></ol>
       </> : <>
         <h1>{MODE_NAME[round.mode]}</h1>
         <ol>{MODE_RULES[round.mode].map((r, i) => <li key={i} style={{ animationDelay: `${0.4 + i * 0.5}s` }}>{r}</li>)}</ol>
@@ -346,6 +350,57 @@ function UniqueTv({ view, round }: { view: View; round: RoundView }) {
         </div>
       )}
       {rev && <Explain text={rev.explain} />}
+    </div>
+  );
+}
+
+
+// ---- MATCHMAKER
+function MatchTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal;
+  return (
+    <div className="matchtv">
+      <div className="bigq">{d.prompt}</div>
+      {!rev && (
+        <>
+          <div className="mtcols"><div>{d.left.map((t: string, i: number) => <div key={i} className="mtitem">{t}</div>)}</div><div className="mtmid">⇄</div><div>{d.right.map((t: string, i: number) => <div key={i} className="mtitem">{t}</div>)}</div></div>
+          <AnswerRow players={view.players} />
+        </>
+      )}
+      {rev && (
+        <div className="mtreveal">
+          <div className="mtpairs">{rev.pairs.map((p: any, i: number) => <div key={i} className="mtpair" style={{ animationDelay: `${i * 0.45}s` }}><span>{p.left}</span><i>→</i><b>{p.right}</b></div>)}</div>
+          <PointsList view={view} rows={rev.rows.filter((r: any) => r.submitted).map((r: any) => ({ pid: r.pid, points: r.points, note: `${r.correct} von 6 richtig` })).sort((a: any, b: any) => b.points - a.points)} />
+          <Explain text={rev.explain} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- DIE VERBINDUNG
+function LinkTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal;
+  const clues: string[] = rev ? rev.clues : d.clues;
+  const total = 4;
+  return (
+    <div className="linktv">
+      <div className="bigq">{d.prompt}</div>
+      <div className="lclues">
+        {Array.from({ length: total }).map((_, i) => i < clues.length
+          ? <div key={i} className={`lclue ${!rev && round.stage === 'open' && i === d.level ? 'new' : ''}`}><b className="ln">{i + 1}</b><span>{clues[i]}</span><em>{(rev?.points ?? d.points)[i]} P.</em></div>
+          : <div key={i} className="lclue hidden"><b className="ln">{i + 1}</b><span>?</span><em>{d.points[i]} P.</em></div>)}
+      </div>
+      {!rev && round.stage === 'open' && <div className="lnow">Jetzt richtig: <b>{d.points[d.level]} Punkte</b></div>}
+      {!rev && round.stage !== 'open' && <div className="lnow">{round.stage === 'review' ? 'Der Showmaster prüft die Antworten …' : 'Alle Antworten sind drin!'}</div>}
+      {!rev && <AnswerRow players={view.players} />}
+      {rev && (
+        <div className="lreveal">
+          <div className="lanswer">Gesucht war: <b>{rev.answer}</b></div>
+          <PointsList view={view} rows={rev.rows.filter((r: any) => r.answer).map((r: any) => ({ pid: r.pid, points: r.points, note: r.correct ? `„${r.answer}“ · nach Hinweis ${r.level + 1}` : `„${r.answer}“ · falsch` })).sort((a: any, b: any) => b.points - a.points)} />
+          <Explain text={rev.explain} />
+        </div>
+      )}
     </div>
   );
 }

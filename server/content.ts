@@ -1,7 +1,7 @@
 // Inhaltsverwaltung: Fragen-Bibliothek, Kategorien, Spielepakete (Entwurf -> Veröffentlichung -> unveränderliche Version), Szenen, Import/Export.
 import { createHash, randomBytes } from 'node:crypto';
 import type { Book, PackRules, TaskDef, TileDef } from '../shared/types';
-import { BUDGET, MODES, normalizeCategory, normalizeTask, taskMax, validateCategory, validateTask, type CategoryData } from '../shared/validate';
+import { ACTIVE_MODES, BUDGET, MODES, normalizeCategory, normalizeTask, taskMax, validateCategory, validateTask, type CategoryData } from '../shared/validate';
 import { buildScene, validateTemplate, type SceneTemplate } from '../shared/sceneTemplates';
 import { analyzeBook } from '../shared/analysis';
 import type { Scene } from '../shared/scenes';
@@ -41,8 +41,8 @@ export function normalizePack(raw: any): PackData {
 
 export class ContentService {
   private cache = new Map<string, Book>();
-  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene> }, private now: () => number = Date.now) {
-    if (!this.setting('seeded')) { this.importBuiltins(); this.setSetting('seeded', '1'); this.wasSeeded = true; }
+  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene>; pack?: { id: string; name: string; description: string } }, private now: () => number = Date.now) {
+    if (!this.setting('seeded')) { this.installSeed(); this.setSetting('seeded', '1'); this.wasSeeded = true; }
   }
   private get db() { return this.store.db; }
   private setting(k: string): string | null { return (this.db.prepare('SELECT value FROM settings WHERE key=?').get(k) as any)?.value ?? null; }
@@ -55,29 +55,53 @@ export class ContentService {
   }
 
   // ------------------------------------------------------------- Initiale Vorlagen
+  /** Kennung des mitgelieferten Standardpakets (neue Inhalte: standard-2; ältere Datenbanken enthalten noch standard-1). */
+  get seedPack() { return this.seed.pack ?? { id: 'standard-2', name: 'Standardpaket – Spieleabend', description: 'Neun Kategorien, Überraschungsrunde und Finale.' }; }
   /** Importiert die fest codierten Inhalte als bearbeitbare Vorlagen (ohne Vorhandenes zu überschreiben). */
-  importBuiltins() {
+  importBuiltins() { this.installSeed(); }
+
+  /**
+   * Legt das mitgelieferte Standardpaket an – idempotent und nicht-destruktiv: vorhandene Szenen, Fragen, Kategorien und Pakete
+   * mit gleicher ID werden NIE verändert (INSERT OR IGNORE). Mehrfaches Ausführen erzeugt keine Duplikate.
+   * Bei archiveOlder werden ältere mitgelieferte Standardpakete archiviert (nicht gelöscht), aber nur beim erstmaligen Anlegen.
+   */
+  installSeed(opts: { archiveOlder?: boolean } = {}) {
     const t = this.now();
+    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [] as string[], ref: '' };
     this.tx(() => {
-      for (const [id, sc] of Object.entries(this.seed.scenes)) this.db.prepare('INSERT OR IGNORE INTO scenes(id,data,builtin,updated) VALUES(?,?,1,?)').run(id, JSON.stringify({ ...sc, builtin: true }), t);
+      const pk = this.seedPack;
+      const had = !!this.db.prepare('SELECT 1 FROM packs WHERE id=?').get(pk.id);
+      const run = (sql: string, ...args: any[]) => Number((this.db.prepare(sql).run(...args) as any).changes);
+      for (const [id, sc] of Object.entries(this.seed.scenes)) report.created.scenes += run('INSERT OR IGNORE INTO scenes(id,data,builtin,updated) VALUES(?,?,1,?)', id, JSON.stringify({ ...sc, builtin: true }), t);
       const ids: string[] = []; let surprise = '', final = '';
       for (const tile of this.seed.tiles) {
         const taskIds: string[] = [];
         tile.tasks.forEach((task, i) => {
           const qid = `${tile.id}-${i + 1}`;
-          this.db.prepare('INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)').run(qid, task.mode, tile.topic, JSON.stringify(task), t, t);
+          report.created.questions += run('INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)', qid, task.mode, tile.topic, JSON.stringify(task), t, t);
           taskIds.push(qid);
         });
         const cat: CategoryData = { title: tile.title, topic: tile.topic, icon: tile.icon, color: tile.color, kind: tile.kind, football: tile.football, blurb: tile.blurb, taskIds };
-        this.db.prepare('INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)').run(tile.id, JSON.stringify(cat), t, t);
+        report.created.categories += run('INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)', tile.id, JSON.stringify(cat), t, t);
         if (tile.kind === 'tile') ids.push(tile.id); else if (tile.kind === 'surprise') surprise = tile.id; else final = tile.id;
       }
-      if (!this.db.prepare('SELECT 1 FROM packs WHERE id=?').get('standard-1')) {
-        const pack: PackData = { name: 'Standardpaket – Abend 1', description: 'Die ursprünglichen OUTPLAY-Inhalte (9 Kategorien, Überraschung, Finale).', categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
-        this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES('standard-1',?,'draft',NULL,?,?)").run(JSON.stringify(pack), t, t);
-        this.publish('standard-1', 'Initiale Vorlage (aus content/tiles.ts)');
-      }
+      if (!had) {
+        const pack: PackData = { name: pk.name, description: pk.description, categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
+        this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pk.id, JSON.stringify(pack), t, t);
+        const pub = this.publish(pk.id, 'Mitgeliefertes Standardpaket (aus content/tiles.ts)');
+        report.created.packs = 1; report.ref = pub.ref;
+        if (opts.archiveOlder) {
+          for (const old of this.listPacks()) if (old.id !== pk.id && /^standard-\d+$/.test(old.id) && old.status !== 'archived') { this.setPackStatus(old.id, 'archived'); report.archived.push(old.id); }
+        }
+      } else { report.alreadyInstalled = true; const row = this.listPacks().find(p => p.id === pk.id); report.ref = row?.currentVersion ? `${pk.id}@${row.currentVersion}` : ''; }
     });
+    return report;
+  }
+  /** Status für die Admin-Oberfläche: ist das mitgelieferte Standardpaket schon vorhanden? */
+  seedStatus() {
+    const pk = this.seedPack;
+    const row = this.listPacks().find(p => p.id === pk.id);
+    return { id: pk.id, name: pk.name, installed: !!row, status: row?.status ?? null, olderPacks: this.listPacks().filter(p => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== 'archived').map(p => ({ id: p.id, name: p.data.name })) };
   }
 
   // ------------------------------------------------------------- Szenen
@@ -129,8 +153,9 @@ export class ContentService {
     if (!raw || !MODES.includes(raw.mode)) throw new ApiError(422, 'Unbekannter Spielmodus');
     return normalizeTask(raw);
   }
-  createQuestion(raw: { task: any; topic?: string }, id?: string) {
+  createQuestion(raw: { task: any; topic?: string }, id?: string, opts: { allowLegacy?: boolean } = {}) {
     const task = this.cleanTask(raw.task);
+    if (!opts.allowLegacy && !ACTIVE_MODES.includes(task.mode)) throw new ApiError(422, 'Dieser Spielmodus wird nicht mehr verwendet (CODEBREAK). Bitte einen der sieben aktiven Modi wählen.');
     const qid = id ?? nid('q_'), t = this.now();
     this.db.prepare('INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)').run(qid, task.mode, String(raw.topic ?? '').trim().slice(0, 60), JSON.stringify(task), t, t);
     return this.getQuestion(qid);
@@ -172,6 +197,7 @@ export class ContentService {
     const budget = BUDGET[c.data.kind];
     if (points > budget) problems.push(`Punkte (${points}) überschreiten das Budget von ${budget}`);
     if (!tasks.length) problems.push('Keine Fragen zugeordnet');
+    if (modes.includes('codebreak')) problems.push('Enthält CODEBREAK-Fragen – dieser Modus wird nicht mehr verwendet. Bitte durch Fragen eines aktiven Modus ersetzen.');
     return { id: c.id, ...c.data, mode: modes[0] ?? null, taskCount: tasks.length, points, budget, problems, updated: c.updated };
   }
   listCategories() {
@@ -313,10 +339,12 @@ export class ContentService {
   listPublished() {
     return this.listPacks().filter(p => p.status === 'published' && p.currentVersion !== null).map(p => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion!, ref: `${p.id}@${p.currentVersion}` }));
   }
-  defaultRef(): string { return this.listPublished()[0]?.ref ?? 'standard-1@1'; }
+  defaultRef(): string { return this.listPublished()[0]?.ref ?? this.legacyRef(); }
+  /** Ältere Räume ohne Paketangabe (bookId 'legacy') laufen mit dem ersten mitgelieferten Stand, der in dieser Datenbank existiert. */
+  private legacyRef(): string { for (const id of ['standard-1', 'standard-2']) if (this.db.prepare('SELECT 1 FROM pack_versions WHERE id=?').get(id + '@1')) return id + '@1'; return this.seedPack.id + '@1'; }
   /** Fester Stand für einen Raum (Cache, da unveränderlich). */
   resolveBook(ref: string): Book {
-    if (ref === 'legacy' || !ref) ref = 'standard-1@1';
+    if (ref === 'legacy' || !ref) ref = this.legacyRef();
     const hit = this.cache.get(ref); if (hit) return hit;
     const r = this.db.prepare('SELECT book FROM pack_versions WHERE id=?').get(ref) as any;
     if (!r) throw new ApiError(404, 'Paketversion nicht gefunden');

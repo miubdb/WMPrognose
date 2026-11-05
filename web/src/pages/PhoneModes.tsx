@@ -13,7 +13,7 @@ interface Props { view: View; round: RoundView; act: Act; serverNow: () => numbe
 const ERR: Record<string, string> = {
   closed: 'Die Zeit ist abgelaufen – keine Abgabe mehr möglich.', already_submitted: 'Du hast bereits abgegeben.', invalid: 'Ungültige Eingabe.', paused: 'Die Show ist pausiert.',
   not_enough_points: 'Dafür hast du nicht genug Punkte.', wrong_step: 'Dieser Begriff ist schon vorbei.', slot_taken: 'Dieser Platz ist schon belegt.', no_attempts_left: 'Keine Versuche mehr.',
-  session_replaced: 'Dieses Gerät wurde abgemeldet.', invalid_target: 'Diese Schätzung kann man nicht wählen.', invalid_bet: 'Ungültiger Einsatz.',
+  session_replaced: 'Dieses Gerät wurde abgemeldet.', review_needed: 'Bitte zuerst die unklaren Antworten prüfen.', invalid_target: 'Diese Schätzung kann man nicht wählen.', invalid_bet: 'Ungültiger Einsatz.',
 };
 export const errText = (e?: string) => (e && ERR[e]) || (e ? `Fehler: ${e}` : 'Fehler');
 
@@ -68,6 +68,8 @@ const MODE_TXT: Record<string, string> = {
   glitch: 'Merk dir das Bild auf dem Fernseher. Danach tippst du auf die veränderte Stelle.',
   codebreak: 'Knack das Rätsel. Hinweise helfen, kosten aber Punkte. Drei Versuche.',
   unique: 'Nenne eine gültige Antwort – aber bloß keine, die auch andere nennen!',
+  match: 'Verbinde links und rechts, was zusammengehört. 6 Paare, 50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.',
+  link: 'Vier Hinweise erscheinen nacheinander. Je früher du die gemeinsame Lösung nennst, desto mehr Punkte – aber du hast nur einen Versuch!',
 };
 function PhoneIntro({ round }: { round: RoundView }) {
   return (
@@ -90,6 +92,8 @@ function PhoneBody(p: Props & { me?: PlayerPublic }) {
     case 'glitch': return <GlitchPhone {...p} d={d} />;
     case 'codebreak': return <CodePhone {...p} d={d} />;
     case 'unique': return <UniquePhone {...p} d={d} />;
+    case 'match': return <MatchPhone {...p} d={d} />;
+    case 'link': return <LinkPhone {...p} d={d} />;
   }
 }
 
@@ -288,6 +292,106 @@ function UniquePhone({ round, act, room, d }: Props & { d: any }) {
   return <Waiting text={mine ? 'Antworten werden geprüft' : 'Zeit abgelaufen'} sub="Der Showmaster prüft unklare Antworten." />;
 }
 
+
+// ---------------------------------------------------------------- MATCHMAKER
+const PAIR_COLORS = ['#14d9c0', '#f5b82e', '#ec4899', '#38bdf8', '#a3e635', '#fb923c'];
+function MatchPhone({ round, act, d }: Props & { d: any }) {
+  const n: number = d.n;
+  const serverPairs: number[] = d.mine?.pairs ?? new Array(n).fill(-1);
+  const final: boolean = !!d.mine?.final;
+  const [pairs, setPairs] = useState<number[]>(serverPairs);
+  const [sel, setSel] = useState<{ side: 'L' | 'R'; i: number } | null>(null);
+  const [confirmMsg, setConfirmMsg] = useState('');
+  const snd = useSender(act);
+  const dirty = useRef(false);
+  useEffect(() => { setPairs(d.mine?.pairs ?? new Array(n).fill(-1)); dirty.current = false; /* eslint-disable-next-line */ }, [round.rid]);
+  // Entwurf laufend beim Server sichern – bei Zeitablauf oder Reload zählt der letzte Stand
+  useEffect(() => {
+    if (!dirty.current || final || round.stage !== 'open') return;
+    const t = setTimeout(() => { void act({ k: 'submit', payload: { pairs, final: false } }); dirty.current = false; }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line
+  }, [pairs]);
+  const locked = final || round.stage !== 'open';
+  const colorOf = (li: number) => PAIR_COLORS[li % PAIR_COLORS.length];
+  const owner = (ri: number) => pairs.findIndex(p => p === ri);
+  const link = (li: number, ri: number) => {
+    const next = pairs.map(p => (p === ri ? -1 : p)); next[li] = ri;   // nur 1:1: alte Verbindungen der beiden Enden lösen
+    dirty.current = true; setPairs(next); setSel(null);
+  };
+  const tapL = (li: number) => {
+    if (locked) return;
+    if (sel?.side === 'R') { link(li, sel.i); return; }
+    if (sel?.side === 'L' && sel.i === li) { setSel(null); return; }
+    if (pairs[li] >= 0) { const next = pairs.slice(); next[li] = -1; dirty.current = true; setPairs(next); }   // verbundenen Begriff antippen = lösen und neu wählen
+    setSel({ side: 'L', i: li });
+  };
+  const tapR = (ri: number) => {
+    if (locked) return;
+    if (sel?.side === 'L') { link(sel.i, ri); return; }
+    if (sel?.side === 'R' && sel.i === ri) { setSel(null); return; }
+    const o = owner(ri);
+    if (o >= 0) { const next = pairs.slice(); next[o] = -1; dirty.current = true; setPairs(next); }
+    setSel({ side: 'R', i: ri });
+  };
+  const done = pairs.filter(x => x >= 0).length;
+  const ROW = 68, GAP = 10;
+  const y = (i: number) => i * (ROW + GAP) + ROW / 2;
+  const H = n * ROW + (n - 1) * GAP;
+  const submit = async () => {
+    if (done < n && !confirmMsg) { setConfirmMsg(`Nur ${done} von ${n} verbunden. Nochmal tippen zum Abgeben.`); return; }
+    setConfirmMsg('');
+    await snd.send({ k: 'submit', payload: { pairs, final: true } });
+  };
+  return (
+    <div className="match">
+      <div className="question small">{d.prompt}</div>
+      <div className="matchgrid" style={{ ['--rowh' as any]: ROW + 'px', ['--gap' as any]: GAP + 'px' }}>
+        <div className="mcol">{d.left.map((t: string, i: number) => (
+          <button type="button" key={i} disabled={locked} className={`mitem ${pairs[i] >= 0 ? 'linked' : ''} ${sel?.side === 'L' && sel.i === i ? 'sel' : ''}`} style={pairs[i] >= 0 ? { ['--pc' as any]: colorOf(i) } : undefined} onClick={() => tapL(i)}>{t}</button>))}</div>
+        <svg className="mlines" viewBox={`0 0 60 ${H}`} preserveAspectRatio="none" aria-hidden>
+          {pairs.map((ri, i) => ri >= 0 ? <path key={i} d={`M0 ${y(i)} C30 ${y(i)} 30 ${y(ri)} 60 ${y(ri)}`} fill="none" stroke={colorOf(i)} strokeWidth="5" strokeLinecap="round" vectorEffect="non-scaling-stroke" /> : null)}
+        </svg>
+        <div className="mcol">{d.right.map((t: string, ri: number) => { const o = owner(ri); return (
+          <button type="button" key={ri} disabled={locked} className={`mitem ${o >= 0 ? 'linked' : ''} ${sel?.side === 'R' && sel.i === ri ? 'sel' : ''}`} style={o >= 0 ? { ['--pc' as any]: colorOf(o) } : undefined} onClick={() => tapR(ri)}>{t}</button>); })}</div>
+      </div>
+      {final ? <div className="status ok">✓ Abgegeben – Eingabe gesperrt</div>
+        : round.stage !== 'open' ? <div className="status warn">Zeit abgelaufen – deine letzte Zuordnung wird gewertet</div>
+        : <div className="status">{snd.msg || confirmMsg || (sel ? 'Jetzt den passenden Begriff auf der anderen Seite antippen' : `${done} von ${n} verbunden – Begriff antippen, dann den Partner`)}</div>}
+      {!locked && <button className="btn primary wide" disabled={done === 0 || snd.state === 'sending'} onClick={submit}>{done === n ? 'Endgültig abgeben' : done ? `Abgeben (${done} von ${n})` : 'Verbinde zuerst Paare'}</button>}
+      {final && <p className="muted center">Warte auf die anderen …</p>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- DIE VERBINDUNG
+function LinkPhone({ round, act, room, d }: Props & { d: any }) {
+  const snd = useSender(act);
+  const mine = d.mine;
+  const [draft, setDraft, clear] = useDraft<string>(`${room}.${round.rid}.link`, '');
+  const [armed, setArmed] = useState(false);
+  useEffect(() => { if (mine) clear(); /* eslint-disable-next-line */ }, [!!mine]);
+  const now = d.points[d.level];
+  const next = d.points[d.level + 1];
+  return (
+    <div className="link">
+      <div className="question small">{d.prompt}</div>
+      <div className="clues">{d.clues.map((c: string, i: number) => <div key={i} className={`clue ${i === d.level ? 'new' : ''}`}><b>{i + 1}</b><span>{c}</span></div>)}
+        {Array.from({ length: d.total - d.clues.length }).map((_, i) => <div key={'x' + i} className="clue locked"><b>{d.clues.length + i + 1}</b><span>noch verborgen · {d.points[d.clues.length + i]} Punkte</span></div>)}</div>
+      {round.stage === 'open' && !mine && <div className="center linkpts"><b>{now} Punkte</b> für eine richtige Antwort jetzt{next !== undefined ? <> · mit dem nächsten Hinweis nur noch {next}</> : ' (letzter Hinweis)'}</div>}
+      {round.stage === 'open' && !mine ? (
+        <>
+          <div className="inputrow"><input autoComplete="off" autoCapitalize="words" placeholder="Deine Lösung" value={draft} maxLength={80} onChange={e => { setDraft(e.target.value); setArmed(false); }} /></div>
+          <Status sent={false} draft={!!draft} sending={snd.state === 'sending'} msg={snd.msg} />
+          <button className={`btn wide ${armed ? 'gold' : 'primary'}`} disabled={!draft.trim() || snd.state === 'sending'} onClick={async () => { if (!armed) { setArmed(true); return; } await snd.send({ k: 'submit', payload: { answer: draft } }); setArmed(false); }}>
+            {armed ? 'Wirklich endgültig abgeben? (nur ein Versuch!)' : 'Lösung abgeben'}</button>
+        </>
+      ) : mine ? <><Status sent draft={false} /><div className="bignum">{mine.answer}</div><p className="muted center">Abgegeben nach Hinweis {mine.level + 1}. Die Antwort bleibt bis zur Auflösung verborgen.</p></>
+        : <Waiting text="Zeit abgelaufen" sub="Gleich kommt die Auflösung." />}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Auflösung
 function PhoneReveal({ round, view, pid }: Props) {
   const rev = round.reveal;
@@ -297,6 +401,8 @@ function PhoneReveal({ round, view, pid }: Props) {
       <small>{info.title}</small>
       <div className={`pts ${info.points > 0 ? 'pos' : info.points < 0 ? 'neg' : ''}`}>{info.points > 0 ? '+' : ''}{info.points}</div>
       <p>{info.text}</p>
+      {round.mode === 'match' && rev?.rows && <div className="mreveal">{rev.pairs.map((pr: any, i: number) => { const r = rev.rows.find((x: any) => x.pid === pid); return <div key={i} className={`mr ${r?.marks?.[i] ? 'ok' : 'no'}`}>{r?.marks?.[i] ? '✓' : '✗'} {pr.left} → <b>{pr.right}</b></div>; })}</div>}
+      {round.mode === 'link' && rev && <p><b>Lösung: {rev.answer}</b></p>}
       <p className="muted small">{rev?.explain}</p>
     </div>
   );
@@ -315,6 +421,8 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
     }
     case 'glitch': { const r = rev.rows.find((x: any) => x.pid === pid); return r?.tap ? { points: r.points, title: r.hit ? 'Treffer!' : 'Daneben', text: r.hit ? 'Genau erkannt.' : r.points ? 'Knapp daneben.' : 'Nicht getroffen.' } : none; }
     case 'codebreak': { const r = rev.rows.find((x: any) => x.pid === pid); return r ? { points: r.points, title: `Lösung: ${rev.answer}`, text: r.solved ? (r.hints ? `Gelöst mit ${r.hints} Hinweis(en)` : 'Gelöst ohne Hinweis!') : 'Nicht gelöst.' } : none; }
+    case 'match': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.submitted ? { points: r.points, title: 'MATCHMAKER', text: `${r.correct} von 6 Paaren richtig` } : none; }
+    case 'link': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? `Richtig nach Hinweis ${r.level + 1}!` : 'Leider falsch', text: `Deine Antwort: ${r.answer}` } : none; }
     case 'unique': { const r = rev.results[pid]; return r ? { points: r.points, title: r.kind === 'unique' ? 'EINZIGARTIG! ✨' : r.kind === 'shared' ? 'Mehrfach genannt' : 'Ungültig', text: rev.groups.find((g: any) => g.members.includes(pid))?.label ?? '' } : none; }
   }
   void view;

@@ -11,7 +11,7 @@ import { handleAdmin, type AdminCtx } from './admin';
 import { AdminAuth } from './auth';
 import { ContentService } from './content';
 import { Store } from './store';
-import { TILES } from '../content/tiles';
+import { TILES, SEED_PACK } from '../content/tiles';
 import { SCENES } from '../shared/scenes';
 
 export interface BlobBackend {
@@ -19,6 +19,8 @@ export interface BlobBackend {
   get(): Promise<{ bytes: Buffer; etag: string } | null>;
   /** schreibt; ifMatch=null bedeutet "Blob darf noch nicht existieren/egal beim ersten Mal". Wirft 'conflict' bei abweichendem ETag. */
   put(bytes: Buffer, ifMatch: string | null): Promise<string>;
+  /** optional: zusätzliche, unveränderte Sicherungskopie unter eigenem Namen (vor riskanten Änderungen) */
+  snapshot?(bytes: Buffer, label: string): Promise<string>;
 }
 export class ConflictError extends Error {}
 
@@ -28,6 +30,7 @@ export class FileBlobBackend implements BlobBackend {
   private etag(b: Buffer) { return createHash('sha1').update(b).digest('hex'); }
   async head() { return existsSync(this.file) ? { etag: this.etag(readFileSync(this.file)) } : null; }
   async get() { if (!existsSync(this.file)) return null; const bytes = readFileSync(this.file); return { bytes, etag: this.etag(bytes) }; }
+  async snapshot(bytes: Buffer, label: string) { const f = join(this.file, '..', `snapshot-${label}.db`); writeFileSync(f, bytes); return f; }
   async put(bytes: Buffer, ifMatch: string | null) {
     const cur = existsSync(this.file) ? this.etag(readFileSync(this.file)) : null;
     if (ifMatch !== null && cur !== ifMatch) throw new ConflictError('etag');
@@ -73,6 +76,11 @@ export class SdkBlobBackend implements BlobBackend {
       throw e;
     }
   }
+  async snapshot(bytes: Buffer, label: string) {
+    const b = await this.sdk(); const name = `outplay/backups/${label}.db`;
+    await b.put(name, bytes, { access: 'private', addRandomSuffix: false, allowOverwrite: false, contentType: 'application/octet-stream' } as any);
+    return name;
+  }
   async destroy() { const b = await this.sdk(); try { await b.del(this.pathname); } catch { /* */ } }
 }
 
@@ -102,7 +110,7 @@ export class OnlineAdmin {
     let etag: string | null = null;
     if (head) { const got = await b.get(); if (got) { writeFileSync(file, got.bytes); etag = got.etag; } }
     const store = new Store(file, { wal: false });
-    const content = new ContentService(store, { tiles: TILES, scenes: SCENES }, this.now);
+    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK }, this.now);
     const auth = new AdminAuth(store, this.opts.adminPassword, this.now, { passwordRequiredFromEnv: true });
     this.live = { store, content, auth, etag, checkedAt: this.now(), file };
     if (content.wasSeeded) {                               // erste Initialisierung (Vorlagen) sofort sichern; scheitert, falls eine andere Instanz schneller war
@@ -134,6 +142,10 @@ export class OnlineAdmin {
       for (let attempt = 0; attempt < 6; attempt++) {
         let live: Live;
         try { live = await this.ensure(); } catch (e: any) { return sendJson(res, 503, { err: 'Speicher nicht erreichbar: ' + String(e?.message ?? e).slice(0, 200), setup: 'blob-error' }); }
+        if (method === 'POST' && parts[2] === 'standard' && this.backend!.snapshot) {   // vor dem Installieren des Standardpakets: unveränderte Kopie des gesamten Bestands
+          try { const f = join(this.dir, 'pre.db'); if (existsSync(f)) rmSync(f); live.store.backupTo(f); const bytes = readFileSync(f); rmSync(f, { force: true }); await this.backend!.snapshot(bytes, 'vor-standardpaket-' + new Date(this.now()).toISOString().replace(/[:.]/g, '-')); }
+          catch (e: any) { return sendJson(res, 503, { err: 'Sicherung vor der Installation fehlgeschlagen – nichts wurde verändert: ' + String(e?.message ?? e).slice(0, 160) }); }
+        }
         const buffered = new Buffered();
         const ctx: AdminCtx = { auth: live.auth, content: live.content, roomCount: () => 0, mode: 'online', backup: () => { const f = join(this.dir, 'bk.db'); if (existsSync(f)) rmSync(f); live.store.backupTo(f); const bt = readFileSync(f); rmSync(f, { force: true }); return bt; } };
         await handleAdmin(ctx, req, buffered as any, parts, url, async () => body);

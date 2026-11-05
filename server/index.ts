@@ -1,11 +1,12 @@
 import { writeFileSync } from 'node:fs';
 import { App } from './app';
-import { BOOK } from '../content';
+import { BOOK, SEED_PACK } from '../content';
 
 const port = Number(process.env.PORT ?? 8080);
 const dataDir = process.env.DATA_DIR ?? './data';
 const app = new App({
   book: BOOK,
+  seedPack: SEED_PACK,
   dbFile: `${dataDir}/outplay.db`,
   backupDir: `${dataDir}/backups`,
   staticDir: process.env.STATIC_DIR ?? 'dist',

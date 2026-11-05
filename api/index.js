@@ -1703,11 +1703,11 @@ var require_shebang_command = __commonJS({
     "use strict";
     var shebangRegex = require_shebang_regex();
     module.exports = (string = "") => {
-      const match = string.match(shebangRegex);
-      if (!match) {
+      const match2 = string.match(shebangRegex);
+      if (!match2) {
         return null;
       }
-      const [path, argument] = match[0].replace(/#! ?/, "").split(" ");
+      const [path, argument] = match2[0].replace(/#! ?/, "").split(" ");
       const binary = path.split("/").pop();
       if (binary === "env") {
         return argument;
@@ -4558,8 +4558,8 @@ var require_dist2 = __commonJS({
     function floatSafeRemainder(val, step) {
       let valDecCount = (val.toString().split(".")[1] || "").length, stepString = step.toString(), stepDecCount = (stepString.split(".")[1] || "").length;
       if (stepDecCount === 0 && /\d?e-\d?/.test(stepString)) {
-        let match = stepString.match(/\d?e-(\d?)/);
-        match?.[1] && (stepDecCount = Number.parseInt(match[1]));
+        let match2 = stepString.match(/\d?e-(\d?)/);
+        match2?.[1] && (stepDecCount = Number.parseInt(match2[1]));
       }
       let decCount = valDecCount > stepDecCount ? valDecCount : stepDecCount, valInt = Number.parseInt(val.toFixed(decCount).replace(".", "")), stepInt = Number.parseInt(step.toFixed(decCount).replace(".", ""));
       return valInt % stepInt / 10 ** decCount;
@@ -22209,15 +22209,15 @@ var require_mock_utils = __commonJS({
         isPromise
       }
     } = __require("node:util");
-    function matchValue(match, value) {
-      if (typeof match === "string") {
-        return match === value;
+    function matchValue(match2, value) {
+      if (typeof match2 === "string") {
+        return match2 === value;
       }
-      if (match instanceof RegExp) {
-        return match.test(value);
+      if (match2 instanceof RegExp) {
+        return match2.test(value);
       }
-      if (typeof match === "function") {
-        return match(value) === true;
+      if (typeof match2 === "function") {
+        return match2(value) === true;
       }
       return false;
     }
@@ -33348,14 +33348,287 @@ import { tmpdir } from "node:os";
 // server/content.ts
 import { createHash, randomBytes } from "node:crypto";
 
+// shared/util.ts
+var EARTH_KM = 6371.0088;
+var rad = (d2) => d2 * Math.PI / 180;
+function haversineKm(a, b2) {
+  const dLat = rad(b2.lat - a.lat);
+  const dLon = rad(b2.lon - a.lon);
+  const h2 = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b2.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_KM * Math.asin(Math.min(1, Math.sqrt(h2)));
+}
+function normText(s) {
+  return s.toLowerCase().replace(/ß/g, "ss").replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+}
+function levenshtein(a, b2) {
+  if (a === b2) return 0;
+  if (!a.length) return b2.length;
+  if (!b2.length) return a.length;
+  let prev = Array.from({ length: b2.length + 1 }, (_2, i2) => i2);
+  for (let i2 = 1; i2 <= a.length; i2++) {
+    const cur = [i2];
+    for (let j2 = 1; j2 <= b2.length; j2++) {
+      cur[j2] = Math.min(prev[j2] + 1, cur[j2 - 1] + 1, prev[j2 - 1] + (a[i2 - 1] === b2[j2 - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b2.length];
+}
+function fuzzyLimit(len) {
+  return len >= 9 ? 2 : len >= 5 ? 1 : 0;
+}
+function parseNumber(input) {
+  if (typeof input === "number") return Number.isFinite(input) ? input : null;
+  let s = String(input).trim().replace(/\s/g, "").replace(/[’']/g, "");
+  if (!s) return null;
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
+  else s = s.replace(",", ".");
+  if (!/^-?\d+(\.\d+)?(e-?\d+)?$/i.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = a + 1831565813 >>> 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hashSeed(s) {
+  let h2 = 2166136261;
+  for (let i2 = 0; i2 < s.length; i2++) {
+    h2 ^= s.charCodeAt(i2);
+    h2 = Math.imul(h2, 16777619);
+  }
+  return h2 >>> 0;
+}
+function shuffled(arr, rand) {
+  const a = arr.slice();
+  for (let i2 = a.length - 1; i2 > 0; i2--) {
+    const j2 = Math.floor(rand() * (i2 + 1));
+    [a[i2], a[j2]] = [a[j2], a[i2]];
+  }
+  return a;
+}
+
+// shared/scoring.ts
+var GEO_TABLE = [1, 0.8, 0.65, 0.5, 0.35, 0.2, 0.1];
+var EST_TABLE = [1, 0.75, 0.55, 0.4, 0.28, 0.18, 0.1];
+function placeFactor(table, place, n) {
+  if (n <= 1) return table[0];
+  const pos = (place - 1) * (table.length - 1) / (n - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.min(table.length - 1, Math.ceil(pos));
+  const f = pos - lo;
+  return table[lo] * (1 - f) + table[hi] * f;
+}
+function rankAscending(items, eps = 0) {
+  const sorted = items.slice().sort((a, b2) => a.value - b2.value);
+  const out = [];
+  sorted.forEach((it, i2) => {
+    let place = i2 + 1;
+    if (i2 > 0 && Math.abs(it.value - sorted[i2 - 1].value) <= eps) place = out[i2 - 1].place;
+    out.push({ pid: it.pid, value: it.value, place });
+  });
+  return out;
+}
+function scoreGeo(guesses, answer, budget, nPlayers) {
+  const dists = Object.entries(guesses).map(([pid, g]) => ({ pid, value: Math.round(haversineKm(g, answer)) }));
+  const ranked = rankAscending(dists, 0);
+  const result = {};
+  for (const r of ranked) {
+    const pts = Math.round(budget * placeFactor(GEO_TABLE, r.place, Math.max(nPlayers, ranked.length)));
+    result[r.pid] = { km: r.value, place: r.place, points: pts };
+  }
+  return result;
+}
+function rankPairs(slots) {
+  const n = slots.length;
+  const pos = new Array(n).fill(-1);
+  slots.forEach((item, slot) => {
+    if (item >= 0) pos[item] = slot;
+  });
+  let correct = 0;
+  let total = 0;
+  for (let i2 = 0; i2 < n; i2++) for (let j2 = i2 + 1; j2 < n; j2++) {
+    total++;
+    if (pos[i2] >= 0 && pos[j2] >= 0 && pos[i2] < pos[j2]) correct++;
+  }
+  return { correct, total };
+}
+function scoreRank(slots, budget) {
+  if (!slots) return { correct: 0, total: 10, points: 0 };
+  const { correct, total } = rankPairs(slots);
+  return { correct, total, points: Math.round(budget * correct / total) };
+}
+function estimateError(guess, answer) {
+  if (guess > 0 && answer > 0) return Math.abs(Math.log(guess / answer));
+  const scale = Math.max(Math.abs(answer), 1);
+  const base = Math.abs(guess - answer) / scale;
+  return guess > 0 && answer > 0 ? base : 50 + base;
+}
+function scoreEstimate(guesses, answer, budget, nPlayers) {
+  const errs = Object.entries(guesses).map(([pid, g]) => ({ pid, value: estimateError(g, answer) }));
+  const ranked = rankAscending(errs, 1e-9);
+  const out = {};
+  for (const r of ranked) {
+    out[r.pid] = {
+      err: r.value,
+      place: r.place,
+      points: Math.round(budget * placeFactor(EST_TABLE, r.place, Math.max(nPlayers, ranked.length))),
+      best: r.place === 1
+    };
+  }
+  return out;
+}
+function scoreGlitch(tap, zones, budget) {
+  if (!tap) return { hit: false, points: 0, dist: null, accuracy: 0 };
+  let best = null;
+  for (const z2 of zones) {
+    const d2 = Math.hypot(tap.x - z2.x, tap.y - z2.y);
+    if (!best || d2 / z2.r < best.d / best.r) best = { d: d2, r: z2.r };
+  }
+  if (!best) return { hit: false, points: 0, dist: null, accuracy: 0 };
+  const ratio = best.d / best.r;
+  if (ratio <= 1) {
+    const accuracy = 1 - ratio;
+    return { hit: true, points: Math.round(budget * (0.7 + 0.3 * accuracy)), dist: best.d, accuracy };
+  }
+  if (ratio <= 2) {
+    return { hit: false, points: Math.round(budget * 0.15 * (2 - ratio)), dist: best.d, accuracy: 0 };
+  }
+  return { hit: false, points: 0, dist: best.d, accuracy: 0 };
+}
+var HINT_FACTORS = [1, 0.75, 0.5, 0.25];
+function scoreCode(correct, hintsUsed, budget) {
+  if (!correct) return 0;
+  const f = HINT_FACTORS[Math.min(hintsUsed, HINT_FACTORS.length - 1)];
+  return Math.round(budget * f);
+}
+function codeMatches(input, answers) {
+  const n = normText(input);
+  if (!n) return false;
+  return answers.some((a) => normText(a) === n);
+}
+var MATCH_PAIR_POINTS = 50;
+var MATCH_PAIRS = 6;
+function scoreMatch(pairs, order) {
+  const rows = [];
+  let correct = 0;
+  for (let i2 = 0; i2 < MATCH_PAIRS; i2++) {
+    const pos = pairs?.[i2] ?? -1;
+    const ok = Number.isInteger(pos) && pos >= 0 && pos < order.length && order[pos] === i2;
+    rows.push(ok);
+    if (ok) correct++;
+  }
+  return { correct, points: correct * MATCH_PAIR_POINTS, rows };
+}
+function validMatching(pairs, n = MATCH_PAIRS) {
+  if (!Array.isArray(pairs) || pairs.length !== n) return false;
+  const used = /* @__PURE__ */ new Set();
+  for (const p of pairs) {
+    if (!Number.isInteger(p) || p < -1 || p >= n) return false;
+    if (p >= 0) {
+      if (used.has(p)) return false;
+      used.add(p);
+    }
+  }
+  return true;
+}
+var LINK_POINTS = [300, 225, 150, 75];
+function linkMatch(input, answer, accept = []) {
+  const n = normText(input);
+  if (!n) return "none";
+  const forms = [answer, ...accept].map(normText).filter(Boolean);
+  if (forms.includes(n)) return "exact";
+  const lim = fuzzyLimit(n.length);
+  if (lim > 0 && forms.some((f) => f.length >= 5 && levenshtein(n, f) <= lim)) return "close";
+  return "none";
+}
+function matchValid(input, valid) {
+  const n = normText(input);
+  if (!n) return null;
+  for (const v2 of valid) {
+    for (const form of [v2.name, ...v2.variants]) if (normText(form) === n) return v2.name;
+  }
+  const lim = fuzzyLimit(n.length);
+  if (lim > 0) {
+    let best = null;
+    for (const v2 of valid) for (const form of [v2.name, ...v2.variants]) {
+      const f = normText(form);
+      if (f.length < 5) continue;
+      const d2 = levenshtein(n, f);
+      if (d2 <= lim && (!best || d2 < best.d)) best = { name: v2.name, d: d2 };
+    }
+    if (best) return best.name;
+  }
+  return null;
+}
+function groupUnique(answers, valid, overrides = {}) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const [pid, raw] of Object.entries(answers)) {
+    const n = normText(raw);
+    if (!n) continue;
+    let key, label, state;
+    const m = matchValid(raw, valid);
+    if (m) {
+      key = "v:" + normText(m);
+      label = m;
+      state = "valid";
+    } else {
+      key = "u:" + n;
+      label = raw.trim();
+      state = "unknown";
+      const ov = overrides[key];
+      if (ov === "valid") state = "valid";
+      else if (ov === "invalid") state = "invalid";
+      else if (ov && typeof ov === "object") {
+        const target = valid.find((v2) => v2.name === ov.mapTo);
+        if (target) {
+          key = "v:" + normText(target.name);
+          label = target.name;
+          state = "valid";
+        }
+      }
+    }
+    const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
+    g.members.push(pid);
+    g.raw[pid] = raw;
+    groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+function scoreUnique(groups, pointsUnique, pointsShared) {
+  const out = {};
+  for (const g of groups) {
+    for (const pid of g.members) {
+      if (g.state === "valid") out[pid] = g.members.length === 1 ? { points: pointsUnique, kind: "unique" } : { points: pointsShared, kind: "shared" };
+      else out[pid] = { points: 0, kind: g.state === "unknown" ? "unknown" : "invalid" };
+    }
+  }
+  return out;
+}
+function applyClamped(balance, requested) {
+  if (requested >= 0) return requested;
+  return -Math.min(balance, -requested);
+}
+
 // shared/validate.ts
-var MODES = ["geo", "rank", "estimate", "glitch", "codebreak", "unique"];
+var MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "codebreak"];
+var ACTIVE_MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link"];
 function taskMax(t) {
   switch (t.mode) {
     case "estimate":
       return t.points + Math.max(0, ...t.bets);
     case "unique":
       return t.pointsUnique;
+    case "match":
+      return MATCH_PAIRS * MATCH_PAIR_POINTS;
+    case "link":
+      return LINK_POINTS[0];
     default:
       return t.points;
   }
@@ -33430,6 +33703,21 @@ function normalizeTask(raw) {
         explain: str(r.explain, 500),
         valid: (Array.isArray(r.valid) ? r.valid : []).slice(0, 60).map((v2) => ({ name: str(v2?.name, 60), variants: strList(v2?.variants, 12, 60) }))
       };
+    case "match": {
+      const pairs = (Array.isArray(r.pairs) ? r.pairs : []).slice(0, MATCH_PAIRS).map((p) => ({ left: str(p?.left, 50), right: str(p?.right, 50) }));
+      return { mode: "match", prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x3) => num(x3)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) };
+    }
+    case "link":
+      return {
+        mode: "link",
+        prompt: str(r.prompt, 200),
+        clues: (Array.isArray(r.clues) ? r.clues : []).slice(0, 4).map((c) => str(c, 220)),
+        answer: str(r.answer, 80),
+        accept: strList(r.accept, 12, 80),
+        clueSeconds: num(r.clueSeconds, 12),
+        points: LINK_POINTS[0],
+        explain: str(r.explain, 500)
+      };
     default:
       return r;
   }
@@ -33438,8 +33726,8 @@ var inRange = (v2, a, b2) => Number.isFinite(v2) && v2 >= a && v2 <= b2;
 function validateTask(t, sceneExists = () => true) {
   const e = [];
   if (!t || !MODES.includes(t.mode)) return ["Unbekannter Spielmodus"];
-  if (!t.prompt) e.push("Fragetext fehlt");
-  if (!inRange(t.mode === "unique" ? 1 : t.points, 1, 1e3) && t.mode !== "unique") e.push("Punkte m\xFCssen zwischen 1 und 1000 liegen");
+  if (!t.prompt) e.push(t.mode === "link" ? "\xDCberschrift fehlt (z. B. \u201EWer oder was wird gesucht?\u201C)" : "Fragetext fehlt");
+  if (t.mode !== "unique" && t.mode !== "match" && t.mode !== "link" && !inRange(t.points, 1, 1e3)) e.push("Punkte m\xFCssen zwischen 1 und 1000 liegen");
   if (!t.explain) e.push("Eine L\xF6sungserkl\xE4rung (f\xFCr die TV-Aufl\xF6sung) fehlt");
   switch (t.mode) {
     case "geo":
@@ -33470,6 +33758,24 @@ function validateTask(t, sceneExists = () => true) {
     case "codebreak":
       if (!t.answers.length) e.push("Mindestens eine richtige Antwort eintragen");
       if (!inRange(t.seconds, 20, 300)) e.push("Zeitlimit 20\u2013300 Sekunden");
+      break;
+    case "match": {
+      const filled = t.pairs.length === MATCH_PAIRS && t.pairs.every((p) => p.left && p.right);
+      if (!filled) e.push("Genau sechs vollst\xE4ndige Paare eintragen (links und rechts)");
+      else {
+        const L2 = t.pairs.map((p) => p.left.toLowerCase()), R3 = t.pairs.map((p) => p.right.toLowerCase());
+        if (new Set(L2).size !== MATCH_PAIRS) e.push("Die linken Begriffe m\xFCssen sich unterscheiden");
+        if (new Set(R3).size !== MATCH_PAIRS) e.push("Die rechten Begriffe m\xFCssen sich unterscheiden (sonst g\xE4be es mehrere richtige Zuordnungen)");
+      }
+      if (!(t.order.length === MATCH_PAIRS && [...t.order].sort((a, b2) => a - b2).join() === "0,1,2,3,4,5")) e.push("Die Mischung der rechten Spalte ist ung\xFCltig \u2013 bitte neu mischen");
+      else if (t.order.every((v2, i2) => v2 === i2)) e.push("Die rechte Spalte darf nicht schon in der richtigen Reihenfolge stehen \u2013 bitte neu mischen");
+      if (!inRange(t.seconds, 30, 120)) e.push("Zeitlimit 30\u2013120 Sekunden");
+      break;
+    }
+    case "link":
+      if (t.clues.length !== 4 || t.clues.some((c) => !c)) e.push("Genau vier Hinweise eintragen");
+      if (!t.answer) e.push("Hauptl\xF6sung fehlt");
+      if (!inRange(t.clueSeconds, 5, 30)) e.push("Zeit je Hinweis 5\u201330 Sekunden");
       break;
     case "unique":
       if (t.valid.length < 3 || t.valid.some((v2) => !v2.name)) e.push("Mindestens drei g\xFCltige Antworten eintragen");
@@ -33647,6 +33953,10 @@ function taskSeconds(t, m = "expected") {
       return { play: t.viewSeconds + t.seconds * a, reveal: rv(32) };
     case "codebreak":
       return { play: t.seconds * a, reveal: rv(38) };
+    case "match":
+      return { play: t.seconds * (m === "max" ? 1 : 0.9), reveal: rv(45) };
+    case "link":
+      return { play: t.clues.length * t.clueSeconds * (m === "max" ? 1 : 0.8) + (m === "max" ? 40 : 15), reveal: rv(45) };
     case "unique":
       return { play: t.seconds * a + (m === "max" ? 60 : 30), reveal: rv(50) };
   }
@@ -33783,7 +34093,7 @@ var ContentService = class {
     this.seed = seed;
     this.now = now;
     if (!this.setting("seeded")) {
-      this.importBuiltins();
+      this.installSeed();
       this.setSetting("seeded", "1");
       this.wasSeeded = true;
     }
@@ -33823,32 +34133,67 @@ var ContentService = class {
     }
   }
   // ------------------------------------------------------------- Initiale Vorlagen
+  /** Kennung des mitgelieferten Standardpakets (neue Inhalte: standard-2; ältere Datenbanken enthalten noch standard-1). */
+  get seedPack() {
+    return this.seed.pack ?? { id: "standard-2", name: "Standardpaket \u2013 Spieleabend", description: "Neun Kategorien, \xDCberraschungsrunde und Finale." };
+  }
   /** Importiert die fest codierten Inhalte als bearbeitbare Vorlagen (ohne Vorhandenes zu überschreiben). */
   importBuiltins() {
+    this.installSeed();
+  }
+  /**
+   * Legt das mitgelieferte Standardpaket an – idempotent und nicht-destruktiv: vorhandene Szenen, Fragen, Kategorien und Pakete
+   * mit gleicher ID werden NIE verändert (INSERT OR IGNORE). Mehrfaches Ausführen erzeugt keine Duplikate.
+   * Bei archiveOlder werden ältere mitgelieferte Standardpakete archiviert (nicht gelöscht), aber nur beim erstmaligen Anlegen.
+   */
+  installSeed(opts = {}) {
     const t = this.now();
+    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [], ref: "" };
     this.tx(() => {
-      for (const [id, sc] of Object.entries(this.seed.scenes)) this.db.prepare("INSERT OR IGNORE INTO scenes(id,data,builtin,updated) VALUES(?,?,1,?)").run(id, JSON.stringify({ ...sc, builtin: true }), t);
+      const pk = this.seedPack;
+      const had = !!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get(pk.id);
+      const run = (sql, ...args) => Number(this.db.prepare(sql).run(...args).changes);
+      for (const [id, sc] of Object.entries(this.seed.scenes)) report.created.scenes += run("INSERT OR IGNORE INTO scenes(id,data,builtin,updated) VALUES(?,?,1,?)", id, JSON.stringify({ ...sc, builtin: true }), t);
       const ids = [];
       let surprise = "", final = "";
       for (const tile of this.seed.tiles) {
         const taskIds = [];
         tile.tasks.forEach((task, i2) => {
           const qid = `${tile.id}-${i2 + 1}`;
-          this.db.prepare("INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)").run(qid, task.mode, tile.topic, JSON.stringify(task), t, t);
+          report.created.questions += run("INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)", qid, task.mode, tile.topic, JSON.stringify(task), t, t);
           taskIds.push(qid);
         });
         const cat = { title: tile.title, topic: tile.topic, icon: tile.icon, color: tile.color, kind: tile.kind, football: tile.football, blurb: tile.blurb, taskIds };
-        this.db.prepare("INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)").run(tile.id, JSON.stringify(cat), t, t);
+        report.created.categories += run("INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)", tile.id, JSON.stringify(cat), t, t);
         if (tile.kind === "tile") ids.push(tile.id);
         else if (tile.kind === "surprise") surprise = tile.id;
         else final = tile.id;
       }
-      if (!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get("standard-1")) {
-        const pack = { name: "Standardpaket \u2013 Abend 1", description: "Die urspr\xFCnglichen OUTPLAY-Inhalte (9 Kategorien, \xDCberraschung, Finale).", categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
-        this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES('standard-1',?,'draft',NULL,?,?)").run(JSON.stringify(pack), t, t);
-        this.publish("standard-1", "Initiale Vorlage (aus content/tiles.ts)");
+      if (!had) {
+        const pack = { name: pk.name, description: pk.description, categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
+        this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pk.id, JSON.stringify(pack), t, t);
+        const pub = this.publish(pk.id, "Mitgeliefertes Standardpaket (aus content/tiles.ts)");
+        report.created.packs = 1;
+        report.ref = pub.ref;
+        if (opts.archiveOlder) {
+          for (const old of this.listPacks()) if (old.id !== pk.id && /^standard-\d+$/.test(old.id) && old.status !== "archived") {
+            this.setPackStatus(old.id, "archived");
+            report.archived.push(old.id);
+          }
+        }
+      } else {
+        report.alreadyInstalled = true;
+        const row = this.listPacks().find((p) => p.id === pk.id);
+        report.ref = row?.currentVersion ? `${pk.id}@${row.currentVersion}` : "";
       }
     });
+    return report;
+  }
+  /** Status für die Admin-Oberfläche: ist das mitgelieferte Standardpaket schon vorhanden? */
+  seedStatus() {
+    const pk = this.seedPack;
+    const row = this.listPacks().find((p) => p.id === pk.id);
+    return { id: pk.id, name: pk.name, installed: !!row, status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
   }
   // ------------------------------------------------------------- Szenen
   sceneRow(r) {
@@ -33917,8 +34262,9 @@ var ContentService = class {
     if (!raw || !MODES.includes(raw.mode)) throw new ApiError(422, "Unbekannter Spielmodus");
     return normalizeTask(raw);
   }
-  createQuestion(raw, id) {
+  createQuestion(raw, id, opts = {}) {
     const task = this.cleanTask(raw.task);
+    if (!opts.allowLegacy && !ACTIVE_MODES.includes(task.mode)) throw new ApiError(422, "Dieser Spielmodus wird nicht mehr verwendet (CODEBREAK). Bitte einen der sieben aktiven Modi w\xE4hlen.");
     const qid = id ?? nid("q_"), t = this.now();
     this.db.prepare("INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)").run(qid, task.mode, String(raw.topic ?? "").trim().slice(0, 60), JSON.stringify(task), t, t);
     return this.getQuestion(qid);
@@ -33959,6 +34305,7 @@ var ContentService = class {
     const budget = BUDGET[c.data.kind];
     if (points > budget) problems.push(`Punkte (${points}) \xFCberschreiten das Budget von ${budget}`);
     if (!tasks.length) problems.push("Keine Fragen zugeordnet");
+    if (modes.includes("codebreak")) problems.push("Enth\xE4lt CODEBREAK-Fragen \u2013 dieser Modus wird nicht mehr verwendet. Bitte durch Fragen eines aktiven Modus ersetzen.");
     return { id: c.id, ...c.data, mode: modes[0] ?? null, taskCount: tasks.length, points, budget, problems, updated: c.updated };
   }
   listCategories() {
@@ -34127,11 +34474,16 @@ var ContentService = class {
     return this.listPacks().filter((p) => p.status === "published" && p.currentVersion !== null).map((p) => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion, ref: `${p.id}@${p.currentVersion}` }));
   }
   defaultRef() {
-    return this.listPublished()[0]?.ref ?? "standard-1@1";
+    return this.listPublished()[0]?.ref ?? this.legacyRef();
+  }
+  /** Ältere Räume ohne Paketangabe (bookId 'legacy') laufen mit dem ersten mitgelieferten Stand, der in dieser Datenbank existiert. */
+  legacyRef() {
+    for (const id of ["standard-1", "standard-2"]) if (this.db.prepare("SELECT 1 FROM pack_versions WHERE id=?").get(id + "@1")) return id + "@1";
+    return this.seedPack.id + "@1";
   }
   /** Fester Stand für einen Raum (Cache, da unveränderlich). */
   resolveBook(ref) {
-    if (ref === "legacy" || !ref) ref = "standard-1@1";
+    if (ref === "legacy" || !ref) ref = this.legacyRef();
     const hit = this.cache.get(ref);
     if (hit) return hit;
     const r = this.db.prepare("SELECT book FROM pack_versions WHERE id=?").get(ref);
@@ -34375,239 +34727,6 @@ var AVATAR_LIMITS = {
   bg: 8
 };
 
-// shared/util.ts
-var EARTH_KM = 6371.0088;
-var rad = (d2) => d2 * Math.PI / 180;
-function haversineKm(a, b2) {
-  const dLat = rad(b2.lat - a.lat);
-  const dLon = rad(b2.lon - a.lon);
-  const h2 = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b2.lat)) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_KM * Math.asin(Math.min(1, Math.sqrt(h2)));
-}
-function normText(s) {
-  return s.toLowerCase().replace(/ß/g, "ss").replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
-}
-function levenshtein(a, b2) {
-  if (a === b2) return 0;
-  if (!a.length) return b2.length;
-  if (!b2.length) return a.length;
-  let prev = Array.from({ length: b2.length + 1 }, (_2, i2) => i2);
-  for (let i2 = 1; i2 <= a.length; i2++) {
-    const cur = [i2];
-    for (let j2 = 1; j2 <= b2.length; j2++) {
-      cur[j2] = Math.min(prev[j2] + 1, cur[j2 - 1] + 1, prev[j2 - 1] + (a[i2 - 1] === b2[j2 - 1] ? 0 : 1));
-    }
-    prev = cur;
-  }
-  return prev[b2.length];
-}
-function fuzzyLimit(len) {
-  return len >= 9 ? 2 : len >= 5 ? 1 : 0;
-}
-function parseNumber(input) {
-  if (typeof input === "number") return Number.isFinite(input) ? input : null;
-  let s = String(input).trim().replace(/\s/g, "").replace(/[’']/g, "");
-  if (!s) return null;
-  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
-  else s = s.replace(",", ".");
-  if (!/^-?\d+(\.\d+)?(e-?\d+)?$/i.test(s)) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
-function rng(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = a + 1831565813 >>> 0;
-    let t = a;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-function hashSeed(s) {
-  let h2 = 2166136261;
-  for (let i2 = 0; i2 < s.length; i2++) {
-    h2 ^= s.charCodeAt(i2);
-    h2 = Math.imul(h2, 16777619);
-  }
-  return h2 >>> 0;
-}
-function shuffled(arr, rand) {
-  const a = arr.slice();
-  for (let i2 = a.length - 1; i2 > 0; i2--) {
-    const j2 = Math.floor(rand() * (i2 + 1));
-    [a[i2], a[j2]] = [a[j2], a[i2]];
-  }
-  return a;
-}
-
-// shared/scoring.ts
-var GEO_TABLE = [1, 0.8, 0.65, 0.5, 0.35, 0.2, 0.1];
-var EST_TABLE = [1, 0.75, 0.55, 0.4, 0.28, 0.18, 0.1];
-function placeFactor(table, place, n) {
-  if (n <= 1) return table[0];
-  const pos = (place - 1) * (table.length - 1) / (n - 1);
-  const lo = Math.floor(pos);
-  const hi = Math.min(table.length - 1, Math.ceil(pos));
-  const f = pos - lo;
-  return table[lo] * (1 - f) + table[hi] * f;
-}
-function rankAscending(items, eps = 0) {
-  const sorted = items.slice().sort((a, b2) => a.value - b2.value);
-  const out = [];
-  sorted.forEach((it, i2) => {
-    let place = i2 + 1;
-    if (i2 > 0 && Math.abs(it.value - sorted[i2 - 1].value) <= eps) place = out[i2 - 1].place;
-    out.push({ pid: it.pid, value: it.value, place });
-  });
-  return out;
-}
-function scoreGeo(guesses, answer, budget, nPlayers) {
-  const dists = Object.entries(guesses).map(([pid, g]) => ({ pid, value: Math.round(haversineKm(g, answer)) }));
-  const ranked = rankAscending(dists, 0);
-  const result = {};
-  for (const r of ranked) {
-    const pts = Math.round(budget * placeFactor(GEO_TABLE, r.place, Math.max(nPlayers, ranked.length)));
-    result[r.pid] = { km: r.value, place: r.place, points: pts };
-  }
-  return result;
-}
-function rankPairs(slots) {
-  const n = slots.length;
-  const pos = new Array(n).fill(-1);
-  slots.forEach((item, slot) => {
-    if (item >= 0) pos[item] = slot;
-  });
-  let correct = 0;
-  let total = 0;
-  for (let i2 = 0; i2 < n; i2++) for (let j2 = i2 + 1; j2 < n; j2++) {
-    total++;
-    if (pos[i2] >= 0 && pos[j2] >= 0 && pos[i2] < pos[j2]) correct++;
-  }
-  return { correct, total };
-}
-function scoreRank(slots, budget) {
-  if (!slots) return { correct: 0, total: 10, points: 0 };
-  const { correct, total } = rankPairs(slots);
-  return { correct, total, points: Math.round(budget * correct / total) };
-}
-function estimateError(guess, answer) {
-  if (guess > 0 && answer > 0) return Math.abs(Math.log(guess / answer));
-  const scale = Math.max(Math.abs(answer), 1);
-  const base = Math.abs(guess - answer) / scale;
-  return guess > 0 && answer > 0 ? base : 50 + base;
-}
-function scoreEstimate(guesses, answer, budget, nPlayers) {
-  const errs = Object.entries(guesses).map(([pid, g]) => ({ pid, value: estimateError(g, answer) }));
-  const ranked = rankAscending(errs, 1e-9);
-  const out = {};
-  for (const r of ranked) {
-    out[r.pid] = {
-      err: r.value,
-      place: r.place,
-      points: Math.round(budget * placeFactor(EST_TABLE, r.place, Math.max(nPlayers, ranked.length))),
-      best: r.place === 1
-    };
-  }
-  return out;
-}
-function scoreGlitch(tap, zones, budget) {
-  if (!tap) return { hit: false, points: 0, dist: null, accuracy: 0 };
-  let best = null;
-  for (const z2 of zones) {
-    const d2 = Math.hypot(tap.x - z2.x, tap.y - z2.y);
-    if (!best || d2 / z2.r < best.d / best.r) best = { d: d2, r: z2.r };
-  }
-  if (!best) return { hit: false, points: 0, dist: null, accuracy: 0 };
-  const ratio = best.d / best.r;
-  if (ratio <= 1) {
-    const accuracy = 1 - ratio;
-    return { hit: true, points: Math.round(budget * (0.7 + 0.3 * accuracy)), dist: best.d, accuracy };
-  }
-  if (ratio <= 2) {
-    return { hit: false, points: Math.round(budget * 0.15 * (2 - ratio)), dist: best.d, accuracy: 0 };
-  }
-  return { hit: false, points: 0, dist: best.d, accuracy: 0 };
-}
-var HINT_FACTORS = [1, 0.75, 0.5, 0.25];
-function scoreCode(correct, hintsUsed, budget) {
-  if (!correct) return 0;
-  const f = HINT_FACTORS[Math.min(hintsUsed, HINT_FACTORS.length - 1)];
-  return Math.round(budget * f);
-}
-function codeMatches(input, answers) {
-  const n = normText(input);
-  if (!n) return false;
-  return answers.some((a) => normText(a) === n);
-}
-function matchValid(input, valid) {
-  const n = normText(input);
-  if (!n) return null;
-  for (const v2 of valid) {
-    for (const form of [v2.name, ...v2.variants]) if (normText(form) === n) return v2.name;
-  }
-  const lim = fuzzyLimit(n.length);
-  if (lim > 0) {
-    let best = null;
-    for (const v2 of valid) for (const form of [v2.name, ...v2.variants]) {
-      const f = normText(form);
-      if (f.length < 5) continue;
-      const d2 = levenshtein(n, f);
-      if (d2 <= lim && (!best || d2 < best.d)) best = { name: v2.name, d: d2 };
-    }
-    if (best) return best.name;
-  }
-  return null;
-}
-function groupUnique(answers, valid, overrides = {}) {
-  const groups = /* @__PURE__ */ new Map();
-  for (const [pid, raw] of Object.entries(answers)) {
-    const n = normText(raw);
-    if (!n) continue;
-    let key, label, state;
-    const m = matchValid(raw, valid);
-    if (m) {
-      key = "v:" + normText(m);
-      label = m;
-      state = "valid";
-    } else {
-      key = "u:" + n;
-      label = raw.trim();
-      state = "unknown";
-      const ov = overrides[key];
-      if (ov === "valid") state = "valid";
-      else if (ov === "invalid") state = "invalid";
-      else if (ov && typeof ov === "object") {
-        const target = valid.find((v2) => v2.name === ov.mapTo);
-        if (target) {
-          key = "v:" + normText(target.name);
-          label = target.name;
-          state = "valid";
-        }
-      }
-    }
-    const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
-    g.members.push(pid);
-    g.raw[pid] = raw;
-    groups.set(key, g);
-  }
-  return [...groups.values()];
-}
-function scoreUnique(groups, pointsUnique, pointsShared) {
-  const out = {};
-  for (const g of groups) {
-    for (const pid of g.members) {
-      if (g.state === "valid") out[pid] = g.members.length === 1 ? { points: pointsUnique, kind: "unique" } : { points: pointsShared, kind: "shared" };
-      else out[pid] = { points: 0, kind: g.state === "unknown" ? "unknown" : "invalid" };
-    }
-  }
-  return out;
-}
-function applyClamped(balance, requested) {
-  if (requested >= 0) return requested;
-  return -Math.min(balance, -requested);
-}
-
 // shared/scenes.ts
 function bbox(it) {
   switch (it.t) {
@@ -34846,6 +34965,55 @@ reg((() => {
     items.push(T4(`p${i2}`, 860, y2, r[1] + " \u20AC", 30, "#3a2616", { anchor: "end", mono: true, weight: 700 }));
   });
   return { id: "menu1", title: "Speisekarte", bg: "#2b1d12", items, changes: { p4: { text: "19,40 \u20AC" } } };
+})());
+reg((() => {
+  const msgs = [
+    [false, "Mia", "Wer bringt die Getr\xE4nke mit?", "18:02"],
+    [true, "", "Ich! Cola und Wasser hole ich.", "18:04"],
+    [false, "Tom", "Treffpunkt ist um 19:30 am Nordeingang.", "18:07"],
+    [true, "", "Alles klar, ich komme mit dem Rad.", "18:09"],
+    [false, "Mia", "Und die Tickets nicht vergessen!", "18:10"],
+    [true, "", "Liegen schon in meiner Tasche.", "18:11"]
+  ];
+  const items = [
+    { id: "bg", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#0f1b1a" },
+    { id: "head", t: "rect", x: 0, y: 0, w: 1e3, h: 64, fill: "#1f3b36" },
+    T4("title", 30, 42, "Samstag-Crew \u{1F37B}", 30, "#e8fff9", { weight: 800 })
+  ];
+  msgs.forEach(([mine, who, text, time], i2) => {
+    const y2 = 84 + i2 * 84, w2 = Math.max(300, text.length * 15.5 + 40), x3 = mine ? 960 - w2 : 40;
+    items.push({ id: `b${i2}`, t: "rect", x: x3, y: y2, w: w2, h: 66, fill: mine ? "#0e6b5c" : "#2a3a44", rx: 18 });
+    if (who) items.push(T4(`w${i2}`, x3 + 18, y2 + 22, who, 16, "#7fe3cf", { weight: 700 }));
+    items.push(T4(`m${i2}`, x3 + 18, y2 + (who ? 48 : 38), text, 24, "#ffffff"));
+    items.push(T4(`t${i2}`, x3 + w2 - 14, y2 + 58, time, 14, "#9fb8b2", { anchor: "end" }));
+  });
+  return { id: "chat1", title: "Chatverlauf", bg: "#0f1b1a", items, changes: { m2: { text: "Treffpunkt ist um 19:30 am S\xFCdeingang." } } };
+})());
+reg((() => {
+  const items = [
+    { id: "bg", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#241a3a" },
+    { id: "tk", t: "rect", x: 50, y: 70, w: 900, h: 460, fill: "#f8f0d8", rx: 26 },
+    { id: "band", t: "rect", x: 50, y: 70, w: 900, h: 90, fill: "#c2185b", rx: 26 },
+    T4("title", 90, 130, "FESTHALLE LIVE", 44, "#ffffff", { weight: 800 }),
+    T4("sub", 910, 130, "EINTRITTSKARTE", 22, "#ffd1e3", { anchor: "end", weight: 700 }),
+    T4("l1", 90, 215, "DATUM", 16, "#8a7a5a"),
+    T4("v1", 90, 255, "Sa, 14.11.", 36, "#2a2016", { weight: 800 }),
+    T4("l2", 360, 215, "EINLASS", 16, "#8a7a5a"),
+    T4("v2", 360, 255, "18:30 Uhr", 36, "#2a2016", { weight: 800 }),
+    T4("l3", 660, 215, "BEGINN", 16, "#8a7a5a"),
+    T4("v3", 660, 255, "20:00 Uhr", 36, "#2a2016", { weight: 800 }),
+    T4("l4", 90, 335, "BLOCK", 16, "#8a7a5a"),
+    T4("v4", 90, 375, "C", 44, "#2a2016", { weight: 800 }),
+    T4("l5", 260, 335, "REIHE", 16, "#8a7a5a"),
+    T4("v5", 260, 375, "12", 44, "#2a2016", { weight: 800, mono: true }),
+    T4("l6", 430, 335, "PLATZ", 16, "#8a7a5a"),
+    T4("v6", 430, 375, "27", 44, "#2a2016", { weight: 800, mono: true }),
+    T4("l7", 660, 335, "PREIS", 16, "#8a7a5a"),
+    T4("v7", 660, 375, "49,00 \u20AC", 44, "#2a2016", { weight: 800, mono: true }),
+    { id: "perf", t: "line", x: 90, y: 440, x2: 910, y2: 440, stroke: "#b9a982", sw: 3 },
+    T4("foot", 90, 490, "Nr. 004 817 392 \xB7 Kein Umtausch \xB7 Nicht \xFCbertragbar", 20, "#6e6040")
+  ];
+  return { id: "ticket1", title: "Eintrittskarte", bg: "#241a3a", items, changes: { v5: { text: "21" } } };
 })());
 
 // server/modes.ts
@@ -35242,7 +35410,155 @@ var unique = {
     return base;
   }
 };
-var MODES2 = { geo, rank, estimate, glitch, codebreak: code, unique };
+var blankPairs = () => new Array(MATCH_PAIRS).fill(-1);
+var match = {
+  maxPoints: () => MATCH_PAIRS * MATCH_PAIR_POINTS,
+  begin(c) {
+    c.setStage("open", c.task.seconds);
+  },
+  advance(c) {
+    c.setStage("locked", null);
+  },
+  submit(c, pid, payload) {
+    if (c.round.stage !== "open") return err2("closed");
+    const pairs = payload?.pairs;
+    if (!validMatching(pairs)) return err2("invalid");
+    const fin = payload?.final === true;
+    const pm = c.round.pm[pid] ??= { pairs: blankPairs(), final: false };
+    if (pm.final) return fin && sameJson(pm.pairs, pairs) ? { ok: true, dup: true } : err2("already_submitted");
+    if (!fin && sameJson(pm.pairs, pairs)) return { ok: true, dup: true };
+    pm.pairs = pairs.slice();
+    if (fin) pm.final = true;
+    return OK;
+  },
+  answered: (c, pid) => !!c.round.pm[pid]?.final,
+  complete(c) {
+    return c.round.stage === "open" && c.players.length > 0 && c.players.every((p) => !!c.round.pm[p.id]?.final);
+  },
+  score(c) {
+    const t = c.task;
+    const rows = c.players.map((p) => {
+      const pm = c.round.pm[p.id];
+      const r = scoreMatch(pm?.pairs, t.order);
+      return { pid: p.id, submitted: !!pm && pm.pairs.some((x3) => x3 >= 0), final: !!pm?.final, pairs: pm?.pairs ?? blankPairs(), marks: r.rows, correct: r.correct, points: r.points };
+    });
+    return {
+      entries: rows.filter((r) => r.submitted).map((r) => ({ pid: r.pid, delta: r.points, label: `${r.correct} von ${MATCH_PAIRS} Paaren richtig` })),
+      reveal: { pairs: t.pairs, order: t.order, right: t.order.map((i2) => t.pairs[i2].right), explain: t.explain, rows, pointsPerPair: MATCH_PAIR_POINTS }
+    };
+  },
+  view(c, a) {
+    const t = c.task;
+    const base = { prompt: t.prompt, left: t.pairs.map((p) => p.left), right: t.order.map((i2) => t.pairs[i2].right), n: MATCH_PAIRS, pointsPerPair: MATCH_PAIR_POINTS };
+    if (a.role === "player" && a.pid) {
+      const pm = c.round.pm[a.pid];
+      base.mine = { pairs: pm?.pairs ?? blankPairs(), final: !!pm?.final };
+    }
+    if (a.role === "host") base.solution = t.pairs.map((p) => `${p.left} = ${p.right}`);
+    return base;
+  }
+};
+function linkLevel(c) {
+  const t = c.task;
+  const r = c.round;
+  let lvl = r.m?.level ?? 0;
+  if (r.deadline !== null && r.pausedLeft === null && c.now >= r.deadline) lvl += 1 + Math.floor((c.now - r.deadline) / (t.clueSeconds * 1e3));
+  return lvl > 3 ? null : lvl;
+}
+function linkGroups(c) {
+  const t = c.task;
+  const ov = c.round.m?.overrides ?? {};
+  const groups = /* @__PURE__ */ new Map();
+  for (const p of c.players) {
+    const raw = c.round.pm[p.id]?.answer;
+    if (!raw) continue;
+    const n = normText(raw);
+    if (!n) continue;
+    const v2 = linkMatch(raw, t.answer, t.accept);
+    let key, label, state;
+    if (v2 === "exact") {
+      key = "v:" + normText(t.answer);
+      label = t.answer;
+      state = "valid";
+    } else {
+      key = "u:" + n;
+      label = raw.trim();
+      state = v2 === "close" ? "unknown" : "invalid";
+      const o = ov[key];
+      if (o === "valid" || o && typeof o === "object") state = "valid";
+      else if (o === "invalid") state = "invalid";
+    }
+    const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
+    g.members.push(p.id);
+    g.raw[p.id] = raw;
+    groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+var link = {
+  maxPoints: () => LINK_POINTS[0],
+  begin(c) {
+    c.round.m = { level: 0, overrides: {} };
+    c.setStage("open", c.task.clueSeconds);
+  },
+  advance(c) {
+    const t = c.task;
+    const lvl = c.round.m.level ?? 0;
+    if (c.round.stage === "open" && lvl < 3) {
+      c.round.m.level = lvl + 1;
+      c.setStage("open", t.clueSeconds);
+      return;
+    }
+    const needs = linkGroups(c).some((g) => g.state === "unknown" || g.state === "invalid" && g.key.startsWith("u:"));
+    c.setStage(needs ? "review" : "locked", null);
+  },
+  submit(c, pid, payload) {
+    if (c.round.stage !== "open") return err2("closed");
+    const lvl = linkLevel(c);
+    if (lvl === null) return err2("closed");
+    const answer = String(payload?.answer ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
+    if (!normText(answer)) return err2("invalid");
+    const cur = c.round.pm[pid];
+    if (cur) return cur.answer === answer ? { ok: true, dup: true } : err2("already_submitted");
+    c.round.pm[pid] = { answer, level: lvl, at: c.now };
+    return OK;
+  },
+  answered: (c, pid) => !!c.round.pm[pid]?.answer,
+  complete(c) {
+    return c.round.stage === "open" && c.players.length > 0 && c.players.every((p) => !!c.round.pm[p.id]?.answer);
+  },
+  blockReveal(c) {
+    return linkGroups(c).some((g) => g.state === "unknown");
+  },
+  score(c) {
+    const t = c.task;
+    const groups = linkGroups(c);
+    const rows = c.players.map((p) => {
+      const pm = c.round.pm[p.id];
+      const g = groups.find((x3) => x3.members.includes(p.id));
+      const correct = g?.state === "valid";
+      return { pid: p.id, answer: pm?.answer ?? null, level: pm ? pm.level : null, correct, points: correct ? LINK_POINTS[pm.level] : 0 };
+    });
+    return {
+      entries: rows.filter((r) => r.answer).map((r) => ({ pid: r.pid, delta: r.points, label: r.correct ? `Richtig nach Hinweis ${r.level + 1}` : "Falsch" })),
+      reveal: { answer: t.answer, clues: t.clues, explain: t.explain, rows, points: LINK_POINTS }
+    };
+  },
+  view(c, a) {
+    const t = c.task;
+    const st = c.round.stage;
+    const shown = st === "open" ? (c.round.m?.level ?? 0) + 1 : 4;
+    const base = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: t.clueSeconds };
+    if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid] ? { answer: c.round.pm[a.pid].answer, level: c.round.pm[a.pid].level } : null;
+    if ((st === "review" || st === "locked") && a.role === "host") base.groups = linkGroups(c);
+    if (a.role === "host") {
+      base.solution = t.answer;
+      base.validNames = [t.answer];
+    }
+    return base;
+  }
+};
+var MODES2 = { geo, rank, estimate, glitch, codebreak: code, unique, match, link };
 
 // server/engine.ts
 var ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -35686,6 +36002,7 @@ var Engine = class {
     if (r.stage === "reveal") return { ok: true, dup: true };
     if (r.stage === "intro") return { ok: false, err: "not_started" };
     this.forceLock(c);
+    if (MODES2[c.task.mode].blockReveal?.(c)) return { ok: false, err: "review_needed" };
     const res = MODES2[c.task.mode].score(c);
     r.result = res;
     const key = this.scoreKey(room);
@@ -35831,7 +36148,8 @@ var Engine = class {
       }
       case "h.lock": {
         if (!["view", "open", "bet"].includes(r.stage)) return { ok: true, dup: true };
-        mode.advance(c);
+        if (c.task.mode === "link") this.forceLock(c);
+        else mode.advance(c);
         this.afterSubmit(room, c);
         return ok;
       }
@@ -35875,7 +36193,7 @@ var Engine = class {
         this.finishTile(room, now);
         return ok;
       case "h.review": {
-        if (c.task.mode !== "unique" || r.stage !== "review" && r.stage !== "locked") return bad("wrong_phase");
+        if (c.task.mode !== "unique" && c.task.mode !== "link" || r.stage !== "review" && r.stage !== "locked") return bad("wrong_phase");
         r.m.overrides ??= {};
         r.m.overrides[a.groupKey] = a.decision;
         return ok;
@@ -36063,6 +36381,8 @@ var FORMULAS = {
   estimate: "Beste Sch\xE4tzung = volles Budget, danach nach Platz abgestuft (100/75/55/40/28/18/10 %); Rangfolge nach |ln(Tipp/L\xF6sung)|. Einsatz: +Einsatz bei Treffer auf den besten Tipp, sonst \u2212Einsatz (h\xF6chstens so viel, wie man besitzt).",
   glitch: "Treffer in der Zone: 70\u2013100 % (je genauer), knapp daneben (bis 2\xD7 Zonenradius) bis 15 %, sonst 0.",
   codebreak: "Ohne Hinweis 100 %, mit 1/2/3 Hinweisen 75/50/25 %. Falsch = 0. Geschwindigkeit z\xE4hlt nicht.",
+  match: "50 Punkte je richtig verbundenem Paar, h\xF6chstens 300. Keine Minuspunkte, kein Zeitbonus \u2013 nur die Richtigkeit z\xE4hlt. Die Zuordnung z\xE4hlt, wie sie bei Ablauf der Zeit (oder bei der endg\xFCltigen Abgabe) steht.",
+  link: "Eine endg\xFCltige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.",
   unique: "Einzigartige g\xFCltige Antwort = Punkte \u201Eeinzigartig\u201C, mehrfach genannte g\xFCltige Antwort = Punkte \u201Emehrfach\u201C, ung\xFCltig = 0."
 };
 function buildPreview(rawTask, scenes, meta = {}) {
@@ -36175,6 +36495,35 @@ function buildPreview(rawTask, scenes, meta = {}) {
       for (let i2 = 0; i2 < 3; i2++) P2(2, { k: "submit", payload: { answer: "x" + i2 } });
       H3({ k: "h.lock" });
       snap("Gesperrt");
+      break;
+    }
+    case "match": {
+      snap("Aufgabe l\xE4uft");
+      const posOf = (i2) => t.order.indexOf(i2);
+      P2(0, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map(posOf), final: true } });
+      P2(1, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map((i2, k2) => k2 < 3 ? posOf(i2) : posOf((i2 + 1) % 6)), final: true } });
+      P2(2, { k: "submit", payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
+      snap("Antworten abgegeben");
+      H3({ k: "h.lock" });
+      snap("Gesperrt");
+      break;
+    }
+    case "link": {
+      snap("Hinweis 1");
+      P2(0, { k: "submit", payload: { answer: t.answer } });
+      now += (t.clueSeconds + 1) * 1e3;
+      eng.tick(room, now);
+      snap("Hinweis 2");
+      now += (t.clueSeconds + 1) * 1e3;
+      eng.tick(room, now);
+      snap("Hinweis 3");
+      P2(1, { k: "submit", payload: { answer: t.accept[0] ?? t.answer } });
+      P2(2, { k: "submit", payload: { answer: "Phantasiewort" } });
+      now += (t.clueSeconds + 1) * 1e3;
+      eng.tick(room, now);
+      snap("Hinweis 4");
+      H3({ k: "h.lock" });
+      snap("Pr\xFCfung (Host)");
       break;
     }
     case "unique": {
@@ -36308,6 +36657,11 @@ async function handleAdmin(app, req, res, parts, url, readBody) {
         if (method !== "POST") break;
         const body = await readBody(256 * 1024);
         return json(200, buildPreview(body.task, C2.sceneMap(), body.meta ?? {}));
+      }
+      case "standard": {
+        if (method === "GET") return json(200, C2.seedStatus());
+        if (method === "POST") return json(200, C2.installSeed({ archiveOlder: true }));
+        break;
       }
       case "backup": {
         if (method !== "GET") break;
@@ -36494,180 +36848,142 @@ var GO = "#f5b82e";
 var PK = "#ec4899";
 var OR = "#fb923c";
 var GR = "#22c55e";
-var RD = "#ef4444";
 var CY = "#38bdf8";
+var SEED_PACK = {
+  id: "standard-2",
+  name: "Standardpaket \u2013 Spieleabend",
+  description: "Neun Kategorien mit sechs Spielmodi, \xDCberraschungsrunde EINZIGARTIG und Finale (alle sieben Modi)."
+};
+var GEO_BLURB = "Setze deinen Pin auf der Karte \u2013 du kannst zoomen und ihn verschieben. Gewertet wird die Platzierung nach Entfernung.";
+var RANK_BLURB = "F\xFCnf Begriffe erscheinen nacheinander. Setze jeden SOFORT auf einen freien Rangplatz \u2013 endg\xFCltig!";
+var EST_BLURB = "Erst sch\xE4tzt jeder geheim. Dann sehen alle die Tipps \u2013 und du setzt Punkte auf die Sch\xE4tzung, der du am meisten vertraust.";
 var TILES = [
-  // ---------------------------------------------------------------- 1
+  // ---------------------------------------------------------------- 1 · WO ZUR HÖLLE? (Fußball)
   {
-    id: "geo-daneben",
-    title: "Geografisch daneben",
-    topic: "Orte, die es wirklich gibt",
-    icon: "\u{1F9ED}",
-    color: TE,
+    id: "v2-heimspiel",
+    title: "Heimspiel",
+    topic: "Fu\xDFball-Orte",
+    icon: "\u{1F3DF}\uFE0F",
+    color: GR,
     mode: "geo",
     kind: "tile",
-    football: false,
-    blurb: "Setze deinen Pin auf der Karte. Je n\xE4her, desto besser \u2013 gewertet wird die Platzierung.",
+    football: true,
+    blurb: GEO_BLURB,
     tasks: [
       {
         mode: "geo",
-        map: "world",
-        seconds: 35,
-        points: 250,
-        prompt: "Timbuktu klingt wie ein Ort aus dem M\xE4rchen \u2013 aber es gibt ihn wirklich. Wo liegt die Stadt?",
-        answer: { lat: 16.7735, lon: -3.0074, label: "Timbuktu, Mali" },
-        explain: "Timbuktu liegt im Norden von Mali, am s\xFCdlichen Rand der Sahara \u2013 und war im Mittelalter ein Zentrum des Handels und der Gelehrsamkeit."
+        map: "germany",
+        seconds: 30,
+        points: 200,
+        prompt: "Wo steht die Allianz Arena?",
+        answer: { lat: 48.2188, lon: 11.6247, label: "Allianz Arena, M\xFCnchen" },
+        explain: "Die Allianz Arena steht im M\xFCnchner Norden, in Fr\xF6ttmaning, direkt an der Autobahn A9."
       },
       {
         mode: "geo",
         map: "europe",
         seconds: 35,
         points: 250,
-        prompt: "Wo liegt T\xF3rshavn, die Hauptstadt der F\xE4r\xF6er-Inseln?",
-        answer: { lat: 62.0097, lon: -6.7716, label: "T\xF3rshavn, F\xE4r\xF6er" },
-        explain: "Die F\xE4r\xF6er liegen im Nordatlantik zwischen Schottland, Island und Norwegen. T\xF3rshavn hat nur rund 14.000 Einwohner."
+        prompt: "Wo fand das Champions-League-Finale 2025 zwischen Paris Saint-Germain und Inter Mailand statt?",
+        answer: { lat: 48.2188, lon: 11.6247, label: "Allianz Arena, M\xFCnchen" },
+        explain: "Wieder die Allianz Arena! Dort gewann PSG am 31. Mai 2025 mit 5:0 \u2013 der h\xF6chste Sieg in einem Champions-League-Finale."
       },
       {
         mode: "geo",
-        map: "germany",
-        seconds: 30,
+        map: "europe",
+        seconds: 35,
         points: 250,
-        prompt: "Es gibt sie angeblich nicht \u2013 aber wo liegt Bielefeld?",
-        answer: { lat: 52.0302, lon: 8.5325, label: "Bielefeld, NRW" },
-        explain: "Bielefeld liegt in Ostwestfalen am Teutoburger Wald \u2013 und die \u201EBielefeld-Verschw\xF6rung\u201C ist ein Internet-Scherz seit 1994."
+        prompt: "Wo liegt Bod\xF8, die Heimat des norwegischen Klubs Bod\xF8/Glimt?",
+        answer: { lat: 67.2804, lon: 14.4049, label: "Bod\xF8, Norwegen" },
+        explain: "Bod\xF8 liegt in Nordnorwegen, rund 80 km n\xF6rdlich des Polarkreises \u2013 hier wird im Winter bei Dunkelheit und im Sommer bei Mitternachtssonne gespielt."
       },
       {
         mode: "geo",
         map: "world",
         seconds: 40,
-        points: 250,
-        prompt: "Der Ort gilt als k\xE4ltester dauerhaft bewohnter Ort der Erde: Wo liegt Oimjakon (Oymyakon)?",
-        answer: { lat: 63.4608, lon: 142.7858, label: "Oimjakon, Sibirien" },
-        explain: "Oimjakon liegt in der russischen Republik Sacha (Jakutien) im Nordosten Sibiriens. Dort wurden rund \u221268 \xB0C gemessen."
+        points: 300,
+        prompt: "1930 fand die allererste Fu\xDFball-Weltmeisterschaft statt. Wo stand das Finalstadion, das Estadio Centenario?",
+        answer: { lat: -34.8946, lon: -56.1527, label: "Montevideo, Uruguay" },
+        explain: "Das Estadio Centenario in Montevideo wurde zum 100. Jahrestag der uruguayischen Verfassung gebaut. Im Finale gewann Gastgeber Uruguay 4:2 gegen Argentinien."
       }
     ]
   },
-  // ---------------------------------------------------------------- 2
+  // ---------------------------------------------------------------- 2 · BLIND RANK (Pop & Marken)
   {
-    id: "koenig-fussball",
-    title: "K\xF6nig Fu\xDFball",
-    topic: "Bundesliga & Legenden",
-    icon: "\u26BD",
-    color: GR,
+    id: "v2-wer-war-zuerst",
+    title: "Wer war zuerst?",
+    topic: "Marken, Technik & Zeitreisen",
+    icon: "\u23F3",
+    color: PK,
     mode: "rank",
     kind: "tile",
-    football: true,
-    blurb: "F\xFCnf Begriffe, f\xFCnf Pl\xE4tze: Du siehst sie nacheinander und musst SOFORT einsortieren. Endg\xFCltig!",
+    football: false,
+    blurb: RANK_BLURB,
     tasks: [
       {
         mode: "rank",
         secondsPerItem: 12,
         points: 340,
-        prompt: "Gr\xFCndungsjahr des Vereins \u2013 \xE4ltester zuerst",
-        topLabel: "\xE4ltester Verein",
-        bottomLabel: "j\xFCngster Verein",
+        prompt: "Was gibt es schon am l\xE4ngsten? \u2013 die \xE4lteste Marke zuerst",
+        topLabel: "am \xE4ltesten",
+        bottomLabel: "am j\xFCngsten",
         items: [
-          { text: "VfB Stuttgart", value: "1893" },
-          { text: "Werder Bremen", value: "1899" },
-          { text: "FC Schalke 04", value: "1904" },
-          { text: "Borussia Dortmund", value: "1909" },
-          { text: "1. FC K\xF6ln", value: "1948" }
+          { text: "Coca-Cola", value: "1886 (erfunden)" },
+          { text: "Nintendo", value: "1889 (Spielkarten)" },
+          { text: "LEGO", value: "1932" },
+          { text: "PlayStation", value: "1994 (Japan)" },
+          { text: "Netflix", value: "1997" }
         ],
-        order: [2, 4, 0, 3, 1],
-        explain: "Stuttgart (1893), Bremen (1899), Schalke (1904), Dortmund (1909) und der 1. FC K\xF6ln (1948, durch Fusion)."
+        order: [3, 0, 4, 2, 1],
+        explain: "Coca-Cola (1886), Nintendo (1889), LEGO (1932), PlayStation (1994) und Netflix (1997). Nintendo war schon \xFCber 100 Jahre alt, als die PlayStation erschien!"
       },
       {
         mode: "rank",
         secondsPerItem: 12,
         points: 330,
-        prompt: "Legend\xE4re WM-Momente \u2013 was geschah zuerst?",
+        prompt: "Was geschah zuerst? \u2013 das \xE4lteste Ereignis zuerst",
         topLabel: "am l\xE4ngsten her",
         bottomLabel: "am j\xFCngsten",
         items: [
-          { text: "Das Wunder von Bern (Finale Deutschland\u2013Ungarn)", value: "1954" },
-          { text: "Das Wembley-Tor", value: "1966" },
-          { text: "Maradonas \u201EHand Gottes\u201C", value: "1986" },
-          { text: "Zidanes Kopfsto\xDF im Finale", value: "2006" },
-          { text: "G\xF6tzes Siegtor im Finale", value: "2014" }
+          { text: "Er\xF6ffnung des Suezkanals", value: "1869" },
+          { text: "Erste Olympische Spiele der Neuzeit", value: "1896" },
+          { text: "Erster Motorflug der Br\xFCder Wright", value: "1903" },
+          { text: "Untergang der Titanic", value: "1912" },
+          { text: "Gagarin fliegt als erster Mensch ins All", value: "1961" }
         ],
-        order: [3, 1, 4, 0, 2],
-        explain: "Bern 1954, Wembley 1966, Hand Gottes 1986, Zidane 2006 und G\xF6tze 2014."
+        order: [2, 4, 1, 3, 0],
+        explain: "Suezkanal (1869), Olympia in Athen (1896), Wright-Flug (1903), Titanic (1912), Gagarin (1961). Zwischen dem ersten Motorflug und dem ersten Menschen im All liegen nur 58 Jahre."
       },
       {
         mode: "rank",
         secondsPerItem: 12,
         points: 330,
-        prompt: "Die meisten Bundesliga-Tore aller Zeiten",
-        topLabel: "meiste Tore",
-        bottomLabel: "wenigste Tore",
+        prompt: "Wie hoch ist es? \u2013 das h\xF6chste Bauwerk zuerst",
+        topLabel: "am h\xF6chsten",
+        bottomLabel: "am niedrigsten",
         items: [
-          { text: "Gerd M\xFCller", value: "365 Tore" },
-          { text: "Robert Lewandowski", value: "312 Tore" },
-          { text: "Klaus Fischer", value: "268 Tore" },
-          { text: "Jupp Heynckes", value: "220 Tore" },
-          { text: "Manfred Burgsm\xFCller", value: "213 Tore" }
+          { text: "Burj Khalifa (Dubai)", value: "828 m" },
+          { text: "Eiffelturm (Paris)", value: "ca. 330 m" },
+          { text: "K\xF6lner Dom", value: "157 m" },
+          { text: "Big Ben (Elizabeth Tower)", value: "96 m" },
+          { text: "Schiefer Turm von Pisa", value: "56 m" }
         ],
-        order: [3, 1, 4, 0, 2],
-        explain: "Gerd M\xFCller (365) f\xFChrt vor Lewandowski (312), Klaus Fischer (268), Jupp Heynckes (220) und Manfred Burgsm\xFCller (213) \u2013 die letzten beiden trennen nur sieben Tore."
+        order: [3, 0, 4, 1, 2],
+        explain: "Burj Khalifa (828 m), Eiffelturm (ca. 330 m), K\xF6lner Dom (157 m), Big Ben (96 m) und der Schiefe Turm von Pisa (56 m)."
       }
     ]
   },
-  // ---------------------------------------------------------------- 3
+  // ---------------------------------------------------------------- 3 · SETZ AUF MICH (Wahnsinnszahlen)
   {
-    id: "kopfsalat",
-    title: "Kopfsalat",
-    topic: "Logik & R\xE4tsel",
-    icon: "\u{1F9E9}",
-    color: PU,
-    mode: "codebreak",
-    kind: "tile",
-    football: false,
-    blurb: "Knackt den Code! Du hast drei Versuche. Hinweise helfen \u2013 kosten aber Punkte.",
-    tasks: [
-      {
-        mode: "codebreak",
-        input: "number",
-        seconds: 70,
-        points: 300,
-        prompt: "Der 7. November 2026 ist ein Samstag. Wie viele Freitage, die auf einen 13. fallen, gibt es im Jahr 2026 insgesamt?",
-        answers: ["3"],
-        hints: ["Der 1. Januar 2026 war ein Donnerstag.", "Z\xE4hle mod 7: Wie viele Tage liegen zwischen dem 13. Januar und dem 13. des jeweiligen Monats?", "Im Februar (28 Tage) und im M\xE4rz klappt es \u2013 und ein dritter Monat ist dir heute Abend schon begegnet."],
-        explain: "Freitag, der 13. f\xE4llt 2026 auf den 13. Februar, den 13. M\xE4rz und den 13. November \u2013 also dreimal. Februar und M\xE4rz h\xE4ngen zusammen, weil der Februar genau 28 Tage hat."
-      },
-      {
-        mode: "codebreak",
-        input: "number",
-        seconds: 90,
-        points: 300,
-        prompt: "Welche dreistellige Zahl ist gesucht?",
-        display: "Die drei Ziffern bilden eine Reihe mit gleichem Abstand\n(z. B. 9-6-3).  Quersumme: 15.\nDie Zahl ist durch 4 teilbar.",
-        answers: ["852"],
-        hints: ["Bei gleichem Abstand ist die mittlere Ziffer der Durchschnitt der beiden \xE4u\xDFeren.", "Die mittlere Ziffer muss 5 sein (Quersumme 15 geteilt durch 3).", "Kandidaten: 654, 753, 852, 951 \u2013 nur eine ist durch 4 teilbar (letzte zwei Ziffern!)."],
-        explain: "Mittlere Ziffer 5, also 654, 753, 852 oder 951. Durch 4 teilbar ist nur 852 (52 ist durch 4 teilbar)."
-      },
-      {
-        mode: "codebreak",
-        input: "number",
-        seconds: 120,
-        points: 400,
-        prompt: "Zwei gleich lange Kerzen werden gleichzeitig angez\xFCndet. Kerze A brennt in 4 Stunden ab, Kerze B in 3 Stunden. Nach wie vielen MINUTEN ist Kerze A genau doppelt so lang wie Kerze B?",
-        answers: ["144"],
-        hints: ["Rechne mit der L\xE4nge 1: Nach t Stunden ist A noch 1 \u2212 t/4 lang, B noch 1 \u2212 t/3.", "Gesucht: 1 \u2212 t/4 = 2 \xB7 (1 \u2212 t/3).", "Das ergibt t = 2,4 Stunden."],
-        explain: "Aus 1 \u2212 t/4 = 2 \u2212 2t/3 folgt t = 2,4 Stunden = 144 Minuten. Dann ist A noch 40 % lang, B noch 20 %."
-      }
-    ]
-  },
-  // ---------------------------------------------------------------- 4
-  {
-    id: "schaetz-mal",
-    title: "Sch\xE4tz mal!",
-    topic: "Zahlen & Wetten",
-    icon: "\u{1F3AF}",
-    color: GO,
+    id: "v2-wahnsinnszahlen",
+    title: "Wahnsinnszahlen",
+    topic: "Bauwerke & Zahlen",
+    icon: "\u{1F3B2}",
+    color: OR,
     mode: "estimate",
     kind: "tile",
     football: false,
-    blurb: "Erst sch\xE4tzt jeder geheim. Dann sehen alle die Tipps \u2013 und du setzt Punkte auf die Sch\xE4tzung, der du am meisten vertraust.",
+    blurb: EST_BLURB,
     tasks: [
       {
         mode: "estimate",
@@ -36675,46 +36991,36 @@ var TILES = [
         betSeconds: 35,
         points: 300,
         bets: [0, 100, 200],
-        prompt: "Wie viele Kilometer betr\xE4gt die Luftlinie zwischen M\xFCnchen und Reykjavik?",
-        unit: "km",
-        answer: 2680,
-        explain: "M\xFCnchen\u2013Reykjavik sind rund 2.680 km Luftlinie \u2013 weniger als M\xFCnchen\u2013Moskau (rund 2.800 km)."
+        prompt: "Wie viele Stufen f\xFChren im K\xF6lner Dom auf die Aussichtsplattform des S\xFCdturms?",
+        unit: "Stufen",
+        answer: 533,
+        explain: "533 Stufen \u2013 ganz ohne Aufzug. Die Plattform liegt in rund 97 m H\xF6he."
       },
       {
         mode: "estimate",
-        seconds: 50,
+        seconds: 45,
         betSeconds: 35,
         points: 300,
         bets: [0, 100, 200],
-        prompt: "Wie viele Fu\xDFballfelder (105 \xD7 68 m) passen auf die Fl\xE4che des Saarlands (rund 2.570 km\xB2)?",
-        unit: "Fu\xDFballfelder",
-        answer: 36e4,
-        explain: "Ein Feld hat 7.140 m\xB2. Das Saarland hat rund 2.570.000.000 m\xB2 \u2013 das sind etwa 360.000 Fu\xDFballfelder."
+        prompt: "Wie viele Nieten halten den Eiffelturm zusammen?",
+        unit: "Nieten",
+        answer: 25e5,
+        explain: "Rund 2,5 Millionen Nieten verbinden die gut 18.000 Eisenteile \u2013 etwa eine Million davon wurde erst auf der Baustelle gesetzt."
       }
     ]
   },
-  // ---------------------------------------------------------------- 5
+  // ---------------------------------------------------------------- 4 · GLITCH
   {
-    id: "alles-im-blick",
+    id: "v2-alles-im-blick",
     title: "Alles im Blick",
-    topic: "Beobachtung",
+    topic: "Alltag & Beobachtung",
     icon: "\u{1F441}\uFE0F",
     color: CY,
     mode: "glitch",
     kind: "tile",
     football: false,
-    blurb: "Merk dir das Bild auf dem Fernseher. Danach hat sich etwas ver\xE4ndert \u2013 tippe auf dem Handy genau auf die Stelle!",
+    blurb: "Schau genau hin: Du siehst ein Bild, dann ver\xE4ndert sich etwas. Tippe auf dem Handy auf die ver\xE4nderte Stelle.",
     tasks: [
-      {
-        mode: "glitch",
-        scene: "timetable1",
-        viewSeconds: 12,
-        seconds: 25,
-        points: 250,
-        viewPrompt: "Merk dir die Abfahrtstafel!",
-        prompt: "Was hat sich ge\xE4ndert? Tippe darauf.",
-        explain: "Der Zug nach Dresden f\xE4hrt jetzt von Gleis 12 statt Gleis 7."
-      },
       {
         mode: "glitch",
         scene: "menu1",
@@ -36722,213 +37028,28 @@ var TILES = [
         seconds: 25,
         points: 250,
         viewPrompt: "Merk dir die Speisekarte!",
-        prompt: "Welcher Preis wurde ver\xE4ndert?",
-        explain: "Das Schnitzel kostete vorher 14,90 \u20AC, jetzt steht dort 19,40 \u20AC."
+        prompt: "Welcher Preis wurde ver\xE4ndert? Tippe darauf.",
+        explain: "Das Schnitzel Wiener Art kostete vorher 14,90 \u20AC, jetzt stehen dort 19,40 \u20AC."
       },
       {
         mode: "glitch",
-        scene: "receipt1",
-        viewSeconds: 12,
-        seconds: 30,
+        scene: "chat1",
+        viewSeconds: 14,
+        seconds: 25,
         points: 250,
-        viewPrompt: "Merk dir den Kassenzettel!",
-        prompt: "Welcher Preis wurde ver\xE4ndert? (Die Summe unten stimmt nur mit dem echten Preis.)",
-        explain: "Die Butter kostete vorher 2,19 \u20AC, jetzt steht dort 2,91 \u20AC \u2013 nur mit 2,19 \u20AC ergibt sich die Summe von 13,40 \u20AC."
+        viewPrompt: "Lies den Gruppenchat \u2013 gleich \xE4ndert sich etwas!",
+        prompt: "Welche Nachricht wurde ver\xE4ndert? Tippe darauf.",
+        explain: "Aus dem \u201ENordeingang\u201C wurde der \u201ES\xFCdeingang\u201C \u2013 wer hier nicht aufpasst, steht am falschen Tor."
       },
       {
         mode: "glitch",
-        scene: "grid1",
-        viewSeconds: 5,
-        seconds: 30,
-        points: 250,
-        viewPrompt: "Gleich wird es knifflig \u2026",
-        prompt: "Eine Uhr geht anders als alle anderen. Tippe darauf!",
-        explain: "Zwischen 40 Uhren, die 1 Uhr zeigen, versteckte sich eine, die 1:30 Uhr zeigt."
-      }
-    ]
-  },
-  // ---------------------------------------------------------------- 6
-  {
-    id: "damals-wars",
-    title: "Damals war\u2019s",
-    topic: "Pop, Technik & Zocken",
-    icon: "\u{1F4FC}",
-    color: PK,
-    mode: "rank",
-    kind: "tile",
-    football: false,
-    blurb: "F\xFCnf Begriffe, f\xFCnf Pl\xE4tze: Du siehst sie nacheinander und musst SOFORT einsortieren. Endg\xFCltig!",
-    tasks: [
-      {
-        mode: "rank",
-        secondsPerItem: 12,
-        points: 340,
-        prompt: "Was war zuerst da? \u2013 \xE4ltestes Ereignis zuerst",
-        topLabel: "am l\xE4ngsten her",
-        bottomLabel: "am j\xFCngsten",
-        items: [
-          { text: "Erster Tatort im Fernsehen", value: "1970" },
-          { text: "Fall der Berliner Mauer", value: "1989" },
-          { text: "Erster Harry-Potter-Roman erscheint", value: "1997" },
-          { text: "Euro-Bargeld wird eingef\xFChrt", value: "2002" },
-          { text: "Erstes iPhone kommt auf den Markt", value: "2007" }
-        ],
-        order: [3, 0, 4, 2, 1],
-        explain: "Tatort (1970), Mauerfall (1989), Harry Potter (1997), Euro-Bargeld (2002), iPhone (2007)."
-      },
-      {
-        mode: "rank",
-        secondsPerItem: 12,
-        points: 330,
-        prompt: "Zocker-Zeitreise \u2013 welches Spiel bzw. welche Konsole kam zuerst?",
-        topLabel: "am l\xE4ngsten her",
-        bottomLabel: "am j\xFCngsten",
-        items: [
-          { text: "Pac-Man", value: "1980" },
-          { text: "Super Mario Bros.", value: "1985" },
-          { text: "Pok\xE9mon Rot/Gr\xFCn (Japan)", value: "1996" },
-          { text: "Die Sims", value: "2000" },
-          { text: "Nintendo Wii", value: "2006" }
-        ],
-        order: [2, 4, 0, 3, 1],
-        explain: "Pac-Man (1980), Super Mario Bros. (1985), Pok\xE9mon (1996), Die Sims (2000) und die Wii (2006)."
-      },
-      {
-        mode: "rank",
-        secondsPerItem: 12,
-        points: 330,
-        prompt: "Erfindungen \u2013 wann wurden sie patentiert bzw. entdeckt? \xC4lteste zuerst",
-        topLabel: "\xE4lteste",
-        bottomLabel: "j\xFCngste",
-        items: [
-          { text: "Telefon (Patent Bell)", value: "1876" },
-          { text: "Benz Patent-Motorwagen (Patent)", value: "1886" },
-          { text: "Entdeckung des Penicillins", value: "1928" },
-          { text: "Transistor", value: "1947" },
-          { text: "Erste SMS wird verschickt", value: "1992" }
-        ],
-        order: [2, 4, 1, 3, 0],
-        explain: "Telefon (1876), Motorwagen (1886), Penicillin (1928), Transistor (1947), SMS (1992)."
-      }
-    ]
-  },
-  // ---------------------------------------------------------------- 7
-  {
-    id: "halbwissen",
-    title: "Gef\xE4hrliches Halbwissen",
-    topic: "Zahlen & Fakten",
-    icon: "\u{1F3B2}",
-    color: OR,
-    mode: "estimate",
-    kind: "tile",
-    football: false,
-    blurb: "Erst sch\xE4tzt jeder geheim. Dann sehen alle die Tipps \u2013 und du setzt Punkte auf die Sch\xE4tzung, der du am meisten vertraust.",
-    tasks: [
-      {
-        mode: "estimate",
-        seconds: 45,
-        betSeconds: 35,
-        points: 300,
-        bets: [0, 100, 200],
-        prompt: "Wie viele Sekunden braucht das Licht von der Sonne bis zur Erde?",
-        unit: "Sekunden",
-        answer: 499,
-        explain: "Sonnenlicht ist rund 8 Minuten und 19 Sekunden unterwegs \u2013 also etwa 499 Sekunden. Die Sonne, die du siehst, ist 8 Minuten alt."
-      },
-      {
-        mode: "estimate",
-        seconds: 45,
-        betSeconds: 35,
-        points: 300,
-        bets: [0, 100, 200],
-        prompt: "Wie viele Bundesligaspiele hat Karl-Heinz K\xF6rbel (Eintracht Frankfurt) absolviert \u2013 bis heute Rekord?",
-        unit: "Spiele",
-        answer: 602,
-        explain: "Karl-Heinz K\xF6rbel bestritt zwischen 1972 und 1991 genau 602 Bundesligaspiele \u2013 alle f\xFCr die Eintracht."
-      }
-    ]
-  },
-  // ---------------------------------------------------------------- 8
-  {
-    id: "auswaertsspiel",
-    title: "Ausw\xE4rtsspiel",
-    topic: "Fu\xDFball-Orte",
-    icon: "\u{1F3DF}\uFE0F",
-    color: BL,
-    mode: "geo",
-    kind: "tile",
-    football: true,
-    blurb: "Setze deinen Pin auf der Karte. Je n\xE4her, desto besser \u2013 gewertet wird die Platzierung.",
-    tasks: [
-      {
-        mode: "geo",
-        map: "germany",
-        seconds: 30,
-        points: 250,
-        prompt: "Wo liegt die Heimat des 1. FC Heidenheim (Voith-Arena)?",
-        answer: { lat: 48.676, lon: 10.152, label: "Heidenheim an der Brenz" },
-        explain: "Heidenheim an der Brenz liegt auf der Schw\xE4bischen Alb in Baden-W\xFCrttemberg."
-      },
-      {
-        mode: "geo",
-        map: "germany",
-        seconds: 30,
-        points: 250,
-        prompt: "Wo steht die \u201EAlte F\xF6rsterei\u201C, das Stadion von Union Berlin?",
-        answer: { lat: 52.457, lon: 13.568, label: "Berlin-K\xF6penick" },
-        explain: "Die Alte F\xF6rsterei liegt im Berliner Stadtteil K\xF6penick, mitten im Wald an der Spree."
-      },
-      {
-        mode: "geo",
-        map: "europe",
-        seconds: 35,
-        points: 250,
-        prompt: "Wo spielt Bod\xF8/Glimt? Der Verein sitzt n\xF6rdlich des Polarkreises.",
-        answer: { lat: 67.2804, lon: 14.4049, label: "Bod\xF8, Norwegen" },
-        explain: "Bod\xF8 liegt in Nordnorwegen, etwa 70 km n\xF6rdlich des Polarkreises \u2013 einer der n\xF6rdlichsten Profi-Standorte Europas."
-      },
-      {
-        mode: "geo",
-        map: "world",
-        seconds: 40,
-        points: 250,
-        prompt: "Wo liegt \u201ELa Bombonera\u201C, das Stadion der Boca Juniors?",
-        answer: { lat: -34.6356, lon: -58.3647, label: "Buenos Aires, Argentinien" },
-        explain: "La Bombonera steht im Hafenviertel La Boca in Buenos Aires."
-      }
-    ]
-  },
-  // ---------------------------------------------------------------- 9
-  {
-    id: "taeuschend-echt",
-    title: "T\xE4uschend echt",
-    topic: "F\xE4lschungen entlarven",
-    icon: "\u{1F575}\uFE0F",
-    color: RD,
-    mode: "glitch",
-    kind: "tile",
-    football: true,
-    blurb: "Merk dir das Bild auf dem Fernseher. Danach hat sich etwas ver\xE4ndert \u2013 tippe auf dem Handy genau auf die Stelle!",
-    tasks: [
-      {
-        mode: "glitch",
-        scene: "market1",
+        scene: "ticket1",
         viewSeconds: 12,
         seconds: 25,
         points: 250,
-        viewPrompt: "Merk dir die Marktwerte! (alle Daten fiktiv)",
-        prompt: "Welcher Wert wurde gef\xE4lscht? Tippe darauf.",
-        explain: "Der Marktwert des dritten Spielers wurde von 32,5 auf 28,0 Mio. \u20AC ge\xE4ndert."
-      },
-      {
-        mode: "glitch",
-        scene: "board1",
-        viewSeconds: 10,
-        seconds: 25,
-        points: 250,
-        viewPrompt: "Merk dir die Ergebnisse! (alle Spiele fiktiv)",
-        prompt: "Welches Ergebnis wurde ver\xE4ndert?",
-        explain: "Beim Spiel Dynamo S\xFCd \u2013 Borussia Ost stand vorher 1 : 4, jetzt 4 : 1."
+        viewPrompt: "Merk dir die Eintrittskarte!",
+        prompt: "Welche Angabe wurde ver\xE4ndert? Tippe darauf.",
+        explain: "Die Reihe war vorher 12, jetzt steht dort 21."
       },
       {
         mode: "glitch",
@@ -36937,24 +37058,286 @@ var TILES = [
         seconds: 25,
         points: 250,
         viewPrompt: "Merk dir die Aufstellung!",
-        prompt: "Welcher Spieler hat sich bewegt?",
+        prompt: "Welcher Spieler hat sich bewegt? Tippe darauf.",
         explain: "Ein blauer Spieler (rechts unten) stand vorher deutlich weiter oben auf dem Feld."
+      }
+    ]
+  },
+  // ---------------------------------------------------------------- 5 · MATCHMAKER
+  {
+    id: "v2-passt-zusammen",
+    title: "Passt zusammen",
+    topic: "Firmen, Erfinder & Filme",
+    icon: "\u{1F9F2}",
+    color: PU,
+    mode: "match",
+    kind: "tile",
+    football: false,
+    blurb: "Links sechs Begriffe, rechts die passenden Partner \u2013 gemischt. Verbinde sie auf dem Handy. Jedes richtige Paar bringt 50 Punkte, \xC4ndern geht bis zur Abgabe.",
+    tasks: [
+      {
+        mode: "match",
+        seconds: 60,
+        points: 300,
+        prompt: "Was haben diese Unternehmen urspr\xFCnglich hergestellt oder verkauft?",
+        pairs: [
+          { left: "Nintendo", right: "Spielkarten" },
+          { left: "BMW", right: "Flugzeugmotoren" },
+          { left: "Nokia", right: "Papier" },
+          { left: "Toyota", right: "Webst\xFChle" },
+          { left: "Samsung", right: "Trockenfisch & Nudeln" },
+          { left: "LEGO", right: "Holzspielzeug" }
+        ],
+        order: [3, 5, 0, 4, 2, 1],
+        explain: "Nintendo begann 1889 mit Hanafuda-Spielkarten, BMW 1916 mit Flugzeugmotoren, Nokia 1865 als Papierfabrik, Toyota mit automatischen Webst\xFChlen, Samsung 1938 mit Trockenfisch und Nudeln und LEGO 1932 mit Holzspielzeug."
       },
       {
-        mode: "glitch",
-        scene: "pitch2",
-        viewSeconds: 12,
-        seconds: 25,
+        mode: "match",
+        seconds: 60,
+        points: 300,
+        prompt: "Wer hat\u2019s erfunden? Erfinder aus Deutschland und ihre Erfindung",
+        pairs: [
+          { left: "Johannes Gutenberg", right: "Buchdruck mit beweglichen Lettern" },
+          { left: "Wilhelm Conrad R\xF6ntgen", right: "R\xF6ntgenstrahlen" },
+          { left: "Melitta Bentz", right: "Kaffeefilter" },
+          { left: "Karl Drais", right: "Laufmaschine (Fahrrad-Vorl\xE4ufer)" },
+          { left: "Konrad Zuse", right: "Computer Z3" },
+          { left: "Rudolf Diesel", right: "Dieselmotor" }
+        ],
+        order: [4, 2, 5, 0, 3, 1],
+        explain: "Gutenberg (Buchdruck, um 1450), R\xF6ntgen (1895), Melitta Bentz (Kaffeefilter, 1908), Drais (Laufmaschine, 1817), Zuse (Z3, 1941) und Diesel (Dieselmotor, 1890er)."
+      },
+      {
+        mode: "match",
+        seconds: 60,
+        points: 300,
+        prompt: "Wer hat\u2019s gedreht? Regisseurinnen, Regisseure und ihre Filme",
+        pairs: [
+          { left: "Steven Spielberg", right: "Jurassic Park" },
+          { left: "Christopher Nolan", right: "Inception" },
+          { left: "Quentin Tarantino", right: "Pulp Fiction" },
+          { left: "James Cameron", right: "Titanic" },
+          { left: "Peter Jackson", right: "Der Herr der Ringe" },
+          { left: "Greta Gerwig", right: "Barbie" }
+        ],
+        order: [2, 4, 5, 1, 0, 3],
+        explain: "Spielberg (Jurassic Park, 1993), Nolan (Inception, 2010), Tarantino (Pulp Fiction, 1994), Cameron (Titanic, 1997 \u2013 elf Oscars), Jackson (Herr der Ringe) und Gerwig (Barbie, 2023)."
+      }
+    ]
+  },
+  // ---------------------------------------------------------------- 6 · WO ZUR HÖLLE? (Orte mit Geschichte)
+  {
+    id: "v2-orte-mit-geschichte",
+    title: "Orte mit Geschichte",
+    topic: "M\xE4rchen, Metal & Weihnachtsmann",
+    icon: "\u{1F9ED}",
+    color: TE,
+    mode: "geo",
+    kind: "tile",
+    football: false,
+    blurb: GEO_BLURB,
+    tasks: [
+      {
+        mode: "geo",
+        map: "germany",
+        seconds: 30,
+        points: 200,
+        prompt: "Wo steht Schloss Neuschwanstein, das Vorbild f\xFCr das M\xE4rchenschloss von Disney?",
+        answer: { lat: 47.5576, lon: 10.7498, label: "Schloss Neuschwanstein, Allg\xE4u" },
+        explain: "Neuschwanstein steht bei F\xFCssen im Allg\xE4u, direkt an der Grenze zu \xD6sterreich. K\xF6nig Ludwig II. lie\xDF es ab 1869 bauen."
+      },
+      {
+        mode: "geo",
+        map: "germany",
+        seconds: 35,
         points: 250,
-        viewPrompt: "Merk dir die Szene!",
-        prompt: "Was hat sich ver\xE4ndert? Tippe auf EINE ver\xE4nderte Stelle!",
-        explain: "Der Ball wurde verschoben und ein rotes M\xE4nnchen ist verschwunden. Beide Stellen z\xE4hlen."
+        prompt: "Ein Dorf mit rund 2.000 Einwohnern, in dem einmal im Jahr bis zu 85.000 Metal-Fans feiern: Wo liegt Wacken?",
+        answer: { lat: 54.02, lon: 9.3775, label: "Wacken, Schleswig-Holstein" },
+        explain: "Wacken liegt im Kreis Steinburg in Schleswig-Holstein, nordwestlich von Itzehoe \u2013 mitten im flachen Land."
+      },
+      {
+        mode: "geo",
+        map: "europe",
+        seconds: 35,
+        points: 250,
+        prompt: "Hier wohnt \u2013 offiziell \u2013 der Weihnachtsmann: Wo liegt das Santa-Claus-Dorf bei Rovaniemi?",
+        answer: { lat: 66.5436, lon: 25.8473, label: "Rovaniemi, Finnland" },
+        explain: "Rovaniemi liegt in Finnisch-Lappland, genau am Polarkreis. Das Weihnachtsmanndorf erh\xE4lt jedes Jahr hunderttausende Besucher."
+      },
+      {
+        mode: "geo",
+        map: "world",
+        seconds: 40,
+        points: 300,
+        prompt: "Timbuktu klingt wie ein Ort aus dem M\xE4rchen \u2013 aber es gibt ihn wirklich. Wo liegt die Stadt?",
+        answer: { lat: 16.7735, lon: -3.0074, label: "Timbuktu, Mali" },
+        explain: "Timbuktu liegt im Norden von Mali, am s\xFCdlichen Rand der Sahara \u2013 und war im Mittelalter ein Zentrum des Handels und der Gelehrsamkeit."
+      }
+    ]
+  },
+  // ---------------------------------------------------------------- 7 · BLIND RANK (Fußball-Zeitreise)
+  {
+    id: "v2-fussball-zeitreise",
+    title: "Fu\xDFball-Zeitreise",
+    topic: "Vereine, Regeln & Rekorde",
+    icon: "\u26BD",
+    color: GR,
+    mode: "rank",
+    kind: "tile",
+    football: true,
+    blurb: RANK_BLURB,
+    tasks: [
+      {
+        mode: "rank",
+        secondsPerItem: 12,
+        points: 340,
+        prompt: "Gr\xFCndungsjahr des Klubs \u2013 der \xE4lteste zuerst",
+        topLabel: "\xE4ltester Klub",
+        bottomLabel: "j\xFCngster Klub",
+        items: [
+          { text: "Manchester United", value: "1878 (als Newton Heath)" },
+          { text: "Juventus Turin", value: "1897" },
+          { text: "FC Barcelona", value: "1899" },
+          { text: "FC Bayern M\xFCnchen", value: "1900" },
+          { text: "Real Madrid", value: "1902" }
+        ],
+        order: [3, 0, 4, 1, 2],
+        explain: "Manchester United (1878), Juventus (1897), Barcelona (1899), Bayern (1900) \u2013 und ausgerechnet Real Madrid (1902) ist der j\xFCngste dieser f\xFCnf Giganten."
+      },
+      {
+        mode: "rank",
+        secondsPerItem: 12,
+        points: 330,
+        prompt: "Was geschah zuerst? \u2013 Fu\xDFball-Geschichte, das \xE4lteste Ereignis zuerst",
+        topLabel: "am l\xE4ngsten her",
+        bottomLabel: "am j\xFCngsten",
+        items: [
+          { text: "Die erste Europameisterschaft", value: "1960" },
+          { text: "Start der Bundesliga", value: "1963" },
+          { text: "Die erste Frauen-Weltmeisterschaft", value: "1991" },
+          { text: "Die R\xFCckpassregel f\xFCr Torh\xFCter", value: "1992" },
+          { text: "Der Videobeweis in der Bundesliga", value: "2017" }
+        ],
+        order: [2, 4, 1, 3, 0],
+        explain: "EM (1960), Bundesliga-Start (1963), Frauen-WM (1991), R\xFCckpassregel (1992) und Videobeweis (2017). Die R\xFCckpassregel ist erst gut 30 Jahre alt!"
+      },
+      {
+        mode: "rank",
+        secondsPerItem: 12,
+        points: 330,
+        prompt: "L\xE4nderspiele f\xFCr Deutschland \u2013 die meisten zuerst",
+        topLabel: "meiste L\xE4nderspiele",
+        bottomLabel: "wenigste L\xE4nderspiele",
+        items: [
+          { text: "Lothar Matth\xE4us", value: "150" },
+          { text: "Miroslav Klose", value: "137" },
+          { text: "Lukas Podolski", value: "130" },
+          { text: "Bastian Schweinsteiger", value: "121" },
+          { text: "Philipp Lahm", value: "113" }
+        ],
+        order: [2, 4, 0, 3, 1],
+        explain: "Matth\xE4us (150), Klose (137), Podolski (130), Schweinsteiger (121) und Lahm (113) \u2013 die letzten drei trennen nur wenige Spiele."
+      }
+    ]
+  },
+  // ---------------------------------------------------------------- 8 · DIE VERBINDUNG
+  {
+    id: "v2-wer-oder-was",
+    title: "Wer oder was?",
+    topic: "Die gemeinsame L\xF6sung",
+    icon: "\u{1F517}",
+    color: BL,
+    mode: "link",
+    kind: "tile",
+    football: false,
+    blurb: "Vier Hinweise erscheinen nacheinander \u2013 alle f\xFChren zur selben L\xF6sung. Je fr\xFCher du sie nennst, desto mehr Punkte (300 / 225 / 150 / 75). Du hast nur einen Versuch!",
+    tasks: [
+      {
+        mode: "link",
+        prompt: "Welcher Ort wird gesucht?",
+        clueSeconds: 12,
+        points: 300,
+        clues: [
+          "Unsichtbar unter ihr steckt ein riesiger Wald aus Holzpf\xE4hlen im Schlamm \u2013 ohne ihn w\xFCrde sie versinken.",
+          "Ihre ber\xFChmteste Stra\xDFe ist ein rund 3,8 Kilometer langer, S-f\xF6rmiger Wasserlauf.",
+          "Jedes Jahr im Februar tragen hier Tausende Menschen aufwendige Masken.",
+          "Man f\xE4hrt Gondel und die Seufzerbr\xFCcke f\xFChrt zum Dogenpalast."
+        ],
+        answer: "Venedig",
+        accept: ["Venice", "Venezia"],
+        explain: "Venedig steht auf Holzpf\xE4hlen in der Lagune. Der Canal Grande ist rund 3,8 km lang; die Seufzerbr\xFCcke verbindet Dogenpalast und Gef\xE4ngnis."
+      },
+      {
+        mode: "link",
+        prompt: "Welcher Alltagsgegenstand wird gesucht?",
+        clueSeconds: 12,
+        points: 300,
+        clues: [
+          "Er entstand aus einem Fehlschlag: Ein Chemiker wollte 1968 einen besonders starken Kleber \u2013 und erfand das Gegenteil.",
+          "Ein Kollege suchte Lesezeichen, die im Gesangbuch halten, ohne beim Umbl\xE4ttern herauszufallen.",
+          "Dass er gelb ist, war Zufall: Im Labor lag gerade gelbes Notizpapier herum.",
+          "Er klebt an Monitoren und K\xFChlschrankt\xFCren und l\xE4sst sich einfach wieder abziehen."
+        ],
+        answer: "Post-it",
+        accept: ["Haftnotiz", "Haftnotizen", "Haftzettel", "Klebezettel", "Post it"],
+        explain: "3M-Chemiker Spencer Silver entwickelte 1968 einen Kleber, der kaum haftete. Kollege Art Fry erkannte Jahre sp\xE4ter den Nutzen \u2013 f\xFCr sein Gesangbuch im Kirchenchor."
+      },
+      {
+        mode: "link",
+        prompt: "Welche Person wird gesucht?",
+        clueSeconds: 12,
+        points: 300,
+        clues: [
+          "Ihre Notizb\xFCcher aus dem 19. Jahrhundert lagern bis heute in Bleikisten, weil sie noch immer strahlen.",
+          "Als erste Person \xFCberhaupt gewann sie zwei Nobelpreise.",
+          "Eines ihrer entdeckten Elemente benannte sie nach ihrer Heimat: Polonium.",
+          "Die in Warschau Geborene forschte in Paris gemeinsam mit ihrem Mann Pierre am Radium."
+        ],
+        answer: "Marie Curie",
+        accept: ["Curie", "Madame Curie", "Marie Sk\u0142odowska-Curie", "Maria Sk\u0142odowska-Curie"],
+        explain: "Marie Curie erhielt 1903 den Physik- und 1911 den Chemie-Nobelpreis. Ihre Notizb\xFCcher liegen in Bleikisten in der Pariser Nationalbibliothek."
+      }
+    ]
+  },
+  // ---------------------------------------------------------------- 9 · SETZ AUF MICH (Sport & Pop)
+  {
+    id: "v2-sport-und-pop",
+    title: "Sport & Pop",
+    topic: "Tore, T\xF6ne & Tempo",
+    icon: "\u{1F3AF}",
+    color: GO,
+    mode: "estimate",
+    kind: "tile",
+    football: false,
+    blurb: EST_BLURB,
+    tasks: [
+      {
+        mode: "estimate",
+        seconds: 45,
+        betSeconds: 35,
+        points: 300,
+        bets: [0, 100, 200],
+        prompt: "Wie viele Tore fielen insgesamt bei der Fu\xDFball-WM 2014 in Brasilien (64 Spiele)?",
+        unit: "Tore",
+        answer: 171,
+        explain: "171 Tore, im Schnitt 2,67 pro Spiel \u2013 damals WM-Rekord, bis 2022 mit 172 Toren knapp \xFCbertroffen wurde."
+      },
+      {
+        mode: "estimate",
+        seconds: 45,
+        betSeconds: 35,
+        points: 300,
+        bets: [0, 100, 200],
+        prompt: "Wie viele Sekunden dauert \u201EBohemian Rhapsody\u201C von Queen in der Originalversion?",
+        unit: "Sekunden",
+        answer: 355,
+        explain: "5 Minuten und 55 Sekunden, also 355 Sekunden \u2013 f\xFCr eine Single war das 1975 ungew\xF6hnlich lang."
       }
     ]
   },
   // ================================================================ ÜBERRASCHUNG
   {
-    id: "einzigartig",
+    id: "v2-einzigartig",
     title: "EINZIGARTIG",
     topic: "\xDCberraschungsrunde",
     icon: "\u2728",
@@ -36966,91 +37349,120 @@ var TILES = [
     tasks: [
       {
         mode: "unique",
-        seconds: 50,
+        seconds: 45,
         pointsUnique: 500,
         pointsShared: 150,
-        placeholder: "Land mit S \u2026",
-        prompt: "Nenne einen Staat in Europa, der Mitglied der UNO ist und dessen Name mit \u201ES\u201C beginnt.",
+        placeholder: "Ein Donauland \u2026",
+        prompt: "Nenne ein Land, durch das die Donau flie\xDFt.",
         valid: [
-          { name: "Schweden", variants: ["Sweden"] },
-          { name: "Schweiz", variants: ["Switzerland", "Suisse"] },
-          { name: "Spanien", variants: ["Spain", "Espana"] },
-          { name: "Serbien", variants: ["Serbia"] },
+          { name: "Deutschland", variants: ["Germany"] },
+          { name: "\xD6sterreich", variants: ["Oesterreich", "Austria"] },
           { name: "Slowakei", variants: ["Slovakia", "Slowakische Republik"] },
-          { name: "Slowenien", variants: ["Slovenia"] },
-          { name: "San Marino", variants: [] }
+          { name: "Ungarn", variants: ["Hungary"] },
+          { name: "Kroatien", variants: ["Croatia"] },
+          { name: "Serbien", variants: ["Serbia"] },
+          { name: "Rum\xE4nien", variants: ["Rumaenien", "Romania"] },
+          { name: "Bulgarien", variants: ["Bulgaria"] },
+          { name: "Moldau", variants: ["Moldawien", "Republik Moldau", "Moldova"] },
+          { name: "Ukraine", variants: [] }
         ],
-        explain: "G\xFCltig (UNO-Mitglieder): Schweden, Schweiz, Spanien, Serbien, Slowakei, Slowenien und San Marino. Schottland ist kein eigener UNO-Staat."
+        explain: "Die Donau flie\xDFt durch zehn L\xE4nder \u2013 mehr als jeder andere Fluss der Erde: Deutschland, \xD6sterreich, Slowakei, Ungarn, Kroatien, Serbien, Rum\xE4nien, Bulgarien, Moldau und Ukraine."
       },
       {
         mode: "unique",
-        seconds: 50,
+        seconds: 45,
         pointsUnique: 500,
         pointsShared: 150,
-        placeholder: "Zwerg \u2026",
-        prompt: "Nenne einen der sieben Zwerge aus \u201ESchneewittchen\u201C (Disney-Film, deutsche Namen).",
+        placeholder: "Ein Gastgeberland \u2026",
+        prompt: "Nenne ein Land, das schon einmal eine Fu\xDFball-Weltmeisterschaft ausgerichtet hat.",
         valid: [
-          { name: "Chef", variants: [] },
-          { name: "Happy", variants: [] },
-          { name: "Hatschi", variants: [] },
-          { name: "Brummb\xE4r", variants: ["Brummbaer"] },
-          { name: "Schlafm\xFCtz", variants: ["Schlafm\xFCtze", "Schlafmuetz"] },
-          { name: "Pummel", variants: [] },
-          { name: "Seppl", variants: [] }
+          { name: "Uruguay", variants: [] },
+          { name: "Italien", variants: ["Italy"] },
+          { name: "Frankreich", variants: ["France"] },
+          { name: "Brasilien", variants: ["Brazil"] },
+          { name: "Schweiz", variants: ["Switzerland"] },
+          { name: "Schweden", variants: ["Sweden"] },
+          { name: "Chile", variants: [] },
+          { name: "England", variants: [] },
+          { name: "Mexiko", variants: ["Mexico"] },
+          { name: "Deutschland", variants: ["Germany", "BRD"] },
+          { name: "Argentinien", variants: ["Argentina"] },
+          { name: "Spanien", variants: ["Spain"] },
+          { name: "USA", variants: ["Vereinigte Staaten", "Amerika", "United States"] },
+          { name: "S\xFCdkorea", variants: ["Suedkorea", "Korea", "South Korea"] },
+          { name: "Japan", variants: [] },
+          { name: "S\xFCdafrika", variants: ["Suedafrika", "South Africa"] },
+          { name: "Russland", variants: ["Russia"] },
+          { name: "Katar", variants: ["Qatar"] },
+          { name: "Kanada", variants: ["Canada"] }
         ],
-        explain: "Die sieben Zwerge: Chef, Happy, Hatschi, Brummb\xE4r, Schlafm\xFCtz, Pummel und Seppl."
+        explain: "Bisherige Gastgeber: Uruguay, Italien, Frankreich, Brasilien, Schweiz, Schweden, Chile, England, Mexiko, Deutschland, Argentinien, Spanien, USA, S\xFCdkorea, Japan, S\xFCdafrika, Russland, Katar und (2026) Kanada."
       }
     ]
   },
   // ================================================================ FINALE
   {
-    id: "final-lock",
+    id: "v2-final",
     title: "FINAL LOCK",
     topic: "Das gro\xDFe Finale",
     icon: "\u{1F512}",
     color: GO,
-    mode: "glitch",
+    mode: "geo",
     kind: "final",
     football: false,
-    blurb: "Drei Aufgaben, 2.000 Punkte, die Rangliste bleibt verborgen. Erst bei der Siegerehrung zeigt sich, wer wirklich vorne liegt.",
+    blurb: "Vier Aufgaben, 2.000 Punkte, die Rangliste bleibt verborgen. Erst bei der Siegerehrung zeigt sich, wer wirklich vorne liegt.",
     tasks: [
       {
-        mode: "glitch",
-        scene: "table1",
-        viewSeconds: 20,
-        seconds: 60,
-        points: 500,
-        viewPrompt: "Die Tabelle stimmt \u2013 noch. Pr\xE4gt sie euch ein!",
-        prompt: "Eine Punktzahl wurde gef\xE4lscht! Tipp: In jeder Zeile gilt Punkte = 3 \xD7 Siege + Unentschieden.",
-        explain: "Der Tabellenvierte hat 7 Siege und 3 Unentschieden \u2013 das sind 24 Punkte, nicht 26."
+        mode: "geo",
+        map: "world",
+        seconds: 45,
+        points: 400,
+        prompt: "Der abgelegenste dauerhaft bewohnte Ort der Welt: Wo liegt die Insel Tristan da Cunha?",
+        answer: { lat: -37.1122, lon: -12.2822, label: "Tristan da Cunha, S\xFCdatlantik" },
+        explain: "Tristan da Cunha liegt mitten im S\xFCdatlantik: rund 2.400 km bis zur n\xE4chsten bewohnten Insel (St. Helena) und gut 2.700 km bis Kapstadt. Nur per Schiff erreichbar, etwa 250 Einwohner."
+      },
+      {
+        mode: "link",
+        prompt: "Welches Spiel wird gesucht?",
+        clueSeconds: 12,
+        points: 300,
+        clues: [
+          "Erfunden wurde es 1984 in Moskau von einem Informatiker \u2013 urspr\xFCnglich, um einen neuen Computer zu testen.",
+          "Der Name verbindet das griechische Wort f\xFCr \u201Evier\u201C mit einer Ballsportart.",
+          "Seine Melodie ist ein russisches Volkslied und wurde \xFCber den Game Boy weltber\xFChmt.",
+          "Bunte Steine aus je vier Quadraten fallen herab \u2013 volle Reihen verschwinden."
+        ],
+        answer: "Tetris",
+        accept: [],
+        explain: "Alexei Paschitnow entwickelte Tetris 1984. Der Name entsteht aus \u201Etetra\u201C (vier) und \u201ETennis\u201C; die Musik \u201EKorobeiniki\u201C ist ein russisches Volkslied."
       },
       {
         mode: "rank",
-        secondsPerItem: 16,
+        secondsPerItem: 14,
         points: 500,
-        prompt: "Luftlinie ab Berlin \u2013 die n\xE4chste Stadt zuerst",
-        topLabel: "am n\xE4chsten",
-        bottomLabel: "am weitesten",
+        prompt: "Zu Gast bei Freunden \u2013 die Fu\xDFball-WM in \u2026 Das fr\xFCheste Turnier zuerst",
+        topLabel: "am l\xE4ngsten her",
+        bottomLabel: "am j\xFCngsten",
         items: [
-          { text: "Athen", value: "ca. 1.800 km" },
-          { text: "Lissabon", value: "ca. 2.310 km" },
-          { text: "Reykjavik", value: "ca. 2.390 km" },
-          { text: "Kairo", value: "ca. 2.890 km" },
-          { text: "Dubai", value: "ca. 4.630 km" }
+          { text: "Schweden", value: "1958" },
+          { text: "England", value: "1966" },
+          { text: "Argentinien", value: "1978" },
+          { text: "USA", value: "1994" },
+          { text: "S\xFCdafrika", value: "2010" }
         ],
-        order: [2, 4, 0, 1, 3],
-        explain: "Von Berlin aus: Athen, Lissabon (2.310 km), Reykjavik (2.390 km \u2013 nur 80 km weiter!), Kairo und Dubai."
+        order: [2, 4, 0, 3, 1],
+        explain: "Die WM war zu Gast in Schweden (1958), England (1966), Argentinien (1978), den USA (1994) und S\xFCdafrika (2010 \u2013 das erste Turnier in Afrika)."
       },
       {
         mode: "estimate",
         seconds: 45,
         betSeconds: 35,
-        points: 500,
+        points: 300,
         bets: [0, 250, 500],
-        prompt: "Wie viele Tore fielen insgesamt bei der Fu\xDFball-WM 2014 in Brasilien (64 Spiele)?",
-        unit: "Tore",
-        answer: 171,
-        explain: "Bei der WM 2014 fielen 171 Tore \u2013 damals ein Rekord (bis die WM 2022 mit 172 knapp \xFCbertraf)."
+        prompt: "Wie viele Kilometer betr\xE4gt die Luftlinie von Berlin nach Sydney?",
+        unit: "km",
+        answer: 16095,
+        explain: "Rund 16.100 km Luftlinie \u2013 rund 40 % des Erdumfangs (40.075 km) und nur etwa 4.000 km weniger als die gr\xF6\xDFtm\xF6gliche Entfernung auf der Erde."
       }
     ]
   }
@@ -37110,6 +37522,12 @@ var SdkBlobBackend = class {
       throw e;
     }
   }
+  async snapshot(bytes2, label) {
+    const b2 = await this.sdk();
+    const name = `outplay/backups/${label}.db`;
+    await b2.put(name, bytes2, { access: "private", addRandomSuffix: false, allowOverwrite: false, contentType: "application/octet-stream" });
+    return name;
+  }
   async destroy() {
     const b2 = await this.sdk();
     try {
@@ -37159,7 +37577,7 @@ var OnlineAdmin = class {
       }
     }
     const store = new Store(file, { wal: false });
-    const content = new ContentService(store, { tiles: TILES, scenes: SCENES }, this.now);
+    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK }, this.now);
     const auth = new AdminAuth(store, this.opts.adminPassword, this.now, { passwordRequiredFromEnv: true });
     this.live = { store, content, auth, etag, checkedAt: this.now(), file };
     if (content.wasSeeded) {
@@ -37207,6 +37625,18 @@ var OnlineAdmin = class {
           live = await this.ensure();
         } catch (e) {
           return sendJson(res, 503, { err: "Speicher nicht erreichbar: " + String(e?.message ?? e).slice(0, 200), setup: "blob-error" });
+        }
+        if (method === "POST" && parts[2] === "standard" && this.backend.snapshot) {
+          try {
+            const f = join(this.dir, "pre.db");
+            if (existsSync3(f)) rmSync2(f);
+            live.store.backupTo(f);
+            const bytes2 = readFileSync(f);
+            rmSync2(f, { force: true });
+            await this.backend.snapshot(bytes2, "vor-standardpaket-" + new Date(this.now()).toISOString().replace(/[:.]/g, "-"));
+          } catch (e) {
+            return sendJson(res, 503, { err: "Sicherung vor der Installation fehlgeschlagen \u2013 nichts wurde ver\xE4ndert: " + String(e?.message ?? e).slice(0, 160) });
+          }
         }
         const buffered = new Buffered();
         const ctx = { auth: live.auth, content: live.content, roomCount: () => 0, mode: "online", backup: () => {

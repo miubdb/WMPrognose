@@ -375,6 +375,7 @@ export class Engine {
     if (r.stage === 'reveal') return { ok: true, dup: true };
     if (r.stage === 'intro') return { ok: false, err: 'not_started' };
     this.forceLock(c);
+    if (MODES[c.task.mode].blockReveal?.(c)) return { ok: false, err: 'review_needed' };
     const res = MODES[c.task.mode].score(c);
     r.result = res;
     const key = this.scoreKey(room);
@@ -497,7 +498,8 @@ export class Engine {
       }
       case 'h.lock': {
         if (!(['view', 'open', 'bet'] as string[]).includes(r.stage)) return { ok: true, dup: true };
-        mode.advance(c); this.afterSubmit(room, c); return ok;
+        if (c.task.mode === 'link') this.forceLock(c); else mode.advance(c);
+        this.afterSubmit(room, c); return ok;
       }
       case 'h.reveal': return this.doReveal(room, c, now);
       case 'h.next': {
@@ -529,7 +531,7 @@ export class Engine {
       }
       case 'h.skipTile': this.finishTile(room, now); return ok;
       case 'h.review': {
-        if (c.task.mode !== 'unique' || (r.stage !== 'review' && r.stage !== 'locked')) return bad('wrong_phase');
+        if ((c.task.mode !== 'unique' && c.task.mode !== 'link') || (r.stage !== 'review' && r.stage !== 'locked')) return bad('wrong_phase');
         r.m.overrides ??= {};
         r.m.overrides[a.groupKey] = a.decision;
         return ok;

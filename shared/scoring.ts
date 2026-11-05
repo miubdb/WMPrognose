@@ -122,6 +122,46 @@ export function codeMatches(input: string, answers: string[]): boolean {
   return answers.some(a => normText(a) === n);
 }
 
+// ---------- MATCHMAKER ----------
+export const MATCH_PAIR_POINTS = 50;
+export const MATCH_PAIRS = 6;
+/** pairs[i] = Anzeigeposition in der rechten Spalte, die der Spieler dem linken Begriff i zugeordnet hat (-1 = keine). order[pos] = Index des richtigen linken Begriffs. */
+export function scoreMatch(pairs: number[] | undefined, order: number[]) {
+  const rows: boolean[] = [];
+  let correct = 0;
+  for (let i = 0; i < MATCH_PAIRS; i++) {
+    const pos = pairs?.[i] ?? -1;
+    const ok = Number.isInteger(pos) && pos >= 0 && pos < order.length && order[pos] === i;
+    rows.push(ok); if (ok) correct++;
+  }
+  return { correct, points: correct * MATCH_PAIR_POINTS, rows };
+}
+/** Prüft Form und Eindeutigkeit (1:1) einer Zuordnung. */
+export function validMatching(pairs: unknown, n = MATCH_PAIRS): pairs is number[] {
+  if (!Array.isArray(pairs) || pairs.length !== n) return false;
+  const used = new Set<number>();
+  for (const p of pairs) {
+    if (!Number.isInteger(p) || p < -1 || p >= n) return false;
+    if (p >= 0) { if (used.has(p)) return false; used.add(p); }
+  }
+  return true;
+}
+
+// ---------- DIE VERBINDUNG ----------
+/** Punkte nach Hinweisstufe (0 = Hinweis 1 sichtbar … 3 = Hinweis 4). */
+export const LINK_POINTS = [300, 225, 150, 75];
+export type LinkVerdict = 'exact' | 'close' | 'none';
+/** exact: gleiche Schreibweise (normalisiert, inkl. hinterlegter Varianten); close: Tippfehler-Abstand → Host entscheidet; none: sonst. */
+export function linkMatch(input: string, answer: string, accept: string[] = []): LinkVerdict {
+  const n = normText(input);
+  if (!n) return 'none';
+  const forms = [answer, ...accept].map(normText).filter(Boolean);
+  if (forms.includes(n)) return 'exact';
+  const lim = fuzzyLimit(n.length);
+  if (lim > 0 && forms.some(f => f.length >= 5 && levenshtein(n, f) <= lim)) return 'close';
+  return 'none';
+}
+
 // ---------- EINZIGARTIG ----------
 export interface UniqueGroup {
   key: string;

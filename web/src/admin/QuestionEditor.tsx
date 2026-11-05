@@ -8,7 +8,7 @@ import { Preview } from './Preview';
 import { SceneBuilder, ScenePair } from './SceneBuilder';
 import { SceneView, sceneVariant } from '../ui/SceneView';
 
-export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨' };
+export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨', match: '🧲', link: '🔗' };
 export const MODE_HELP: Record<string, string> = {
   geo: 'Spieler setzen einen Pin auf der Karte. Gewertet wird die Platzierung nach Entfernung.',
   rank: 'Fünf Begriffe erscheinen nacheinander; jeder muss sofort auf einen Rangplatz. Gewertet werden richtig angeordnete Paare.',
@@ -16,6 +16,8 @@ export const MODE_HELP: Record<string, string> = {
   glitch: 'Ein Bild wird kurz gezeigt, dann verändert. Spieler tippen auf die veränderte Stelle.',
   codebreak: 'Ein Rätsel mit eindeutiger Lösung. Hinweise kosten Punkte, drei Versuche.',
   unique: 'Alle nennen eine gültige Antwort – nur einzigartige Antworten bringen volle Punkte.',
+  match: 'Sechs Paare verbinden: je richtigem Paar 50 Punkte, höchstens 300. Keine Minuspunkte.',
+  link: 'Vier Hinweise erscheinen nacheinander (alle 12 s) – je früher die richtige Lösung, desto mehr Punkte (300/225/150/75).',
 };
 
 export function newTask(mode: Mode): any {
@@ -25,6 +27,8 @@ export function newTask(mode: Mode): any {
     case 'estimate': return { mode, prompt: '', unit: '', answer: '', seconds: 45, betSeconds: 30, points: 300, bets: [0, 100, 200], explain: '' };
     case 'glitch': return { mode, prompt: '', viewPrompt: 'Merk dir das Bild!', scene: '', viewSeconds: 12, seconds: 25, points: 250, explain: '' };
     case 'codebreak': return { mode, prompt: '', display: '', input: 'number', answers: [], hints: ['', '', ''], seconds: 90, points: 300, explain: '' };
+    case 'match': return { mode, prompt: '', pairs: [0, 1, 2, 3, 4, 5].map(() => ({ left: '', right: '' })), order: [2, 4, 0, 5, 1, 3], seconds: 60, points: 300, explain: '' };
+    case 'link': return { mode, prompt: 'Was oder wer wird gesucht?', clues: ['', '', '', ''], answer: '', accept: [], clueSeconds: 12, points: 300, explain: '' };
     case 'unique': return { mode, prompt: '', placeholder: '', valid: [0, 1, 2].map(() => ({ name: '', variants: [] })), seconds: 45, pointsUnique: 500, pointsShared: 150, explain: '' };
   }
 }
@@ -59,12 +63,18 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
   const m = task.mode as Mode;
   const pinOk = m === 'geo' && Number.isFinite(norm.answer?.lat) && Number.isFinite(norm.answer?.lon);
   const sec = (label: string, key: string, ph?: string) => <Field label={label}><input inputMode="numeric" value={task[key]} placeholder={ph} onChange={num(set, key)} /></Field>;
+  if (m === 'codebreak') return (
+    <div className="modal" onClick={onClose}><div className="modalbox editor" onClick={e => e.stopPropagation()}>
+      <h2>🧩 CODEBREAK (veraltet)</h2>
+      <div className="card warnbox"><b>CODEBREAK wird nicht mehr verwendet.</b><p className="small">Diese Frage bleibt gespeichert (z. B. in älteren Paketen und Backups), kann aber nicht mehr bearbeitet und nicht in neue Pakete übernommen werden.</p><p className="small muted">{task.prompt}</p></div>
+      <div className="actionbar"><span className="spacer" /><button className="btn" onClick={onClose}>Schließen</button></div></div></div>
+  );
   return (
     <div className="modal" onClick={onClose}>
       <div className="modalbox wide editor" onClick={e => e.stopPropagation()}>
         <div className="row between sticky-top"><h2>{MODE_ICON[m]} {id ? 'Frage bearbeiten' : 'Neue Frage'} <span className="muted modename">{MODE_LABEL[m]}</span></h2><button className="btn small ghost" onClick={onClose}>Schließen ✕</button></div>
 
-        {m !== 'glitch' && <Field label="Fragetext"><textarea rows={2} value={task.prompt} maxLength={300} placeholder="Was soll gefragt werden?" onChange={e => set('prompt', e.target.value)} /></Field>}
+        {m !== 'glitch' && <Field label={m === 'link' ? 'Überschrift' : 'Fragetext'}><textarea rows={2} value={task.prompt} maxLength={300} placeholder={m === 'link' ? 'z. B. Wer oder was wird gesucht?' : m === 'match' ? 'z. B. Was haben diese Unternehmen ursprünglich hergestellt?' : 'Was soll gefragt werden?'} onChange={e => set('prompt', e.target.value)} /></Field>}
 
         {m === 'geo' && <>
           <Field label="Ortsname (für die Auflösung)"><input value={task.answer.label} maxLength={80} placeholder="z. B. Timbuktu, Mali" onChange={e => set('answer', { ...task.answer, label: e.target.value })} /></Field>
@@ -91,9 +101,29 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
             <p className="small muted">{diffZones(sceneList.find(s => s.id === task.scene)!).length} Unterschied(e), jeder zählt als Treffer.</p></details>}
         </>}
 
-        {m === 'codebreak' && <>
-          <Field label="Richtige Antwort(en) – eine pro Zeile"><textarea rows={2} value={(task.answers ?? []).join('\n')} placeholder="z. B. 42" onChange={e => set('answers', e.target.value.split('\n'))} /></Field>
-          <Field label="Rätsel-Darstellung (optional)"><textarea rows={2} className="mono" value={task.display ?? ''} placeholder="Zahlenfolge, Raster …" onChange={e => set('display', e.target.value)} /></Field>
+        {m === 'match' && <>
+          <b>Sechs Paare (links gehört zu rechts)</b>
+          {task.pairs.map((p: any, i: number) => (
+            <div className="row" key={i}>
+              <span className="rankno">{i + 1}</span>
+              <input value={p.left} placeholder={`Links ${i + 1}`} maxLength={50} onChange={e => set('pairs', task.pairs.map((x: any, j: number) => j === i ? { ...x, left: e.target.value } : x))} />
+              <span className="muted">=</span>
+              <input value={p.right} placeholder={`Passend rechts ${i + 1}`} maxLength={50} onChange={e => set('pairs', task.pairs.map((x: any, j: number) => j === i ? { ...x, right: e.target.value } : x))} />
+            </div>))}
+          <details className="more"><summary>Mischung der rechten Spalte</summary>
+            <p className="small muted">So sehen die Spieler die rechte Spalte (von oben nach unten):</p>
+            <ol>{task.order.map((o: number, k: number) => <li key={k}>{task.pairs[o]?.right || <i className="muted">(leer)</i>}</li>)}</ol>
+            <button className="btn small" onClick={() => { let o: number[]; do { o = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5); } while (o.every((v, i) => v === i)); set('order', o); }}>🔀 Neu mischen</button>
+          </details>
+        </>}
+
+        {m === 'link' && <>
+          <b>Vier Hinweise – von schwer (1) zu leicht (4)</b>
+          {task.clues.map((c: string, i: number) => <Field key={i} label={`Hinweis ${i + 1}${i === 0 ? ' (erscheint sofort, 300 Punkte)' : i === 1 ? ' (nach 12 s, 225)' : i === 2 ? ' (nach 24 s, 150)' : ' (nach 36 s, 75)'}`}><textarea rows={2} maxLength={220} value={c} onChange={e => set('clues', task.clues.map((x: string, j: number) => j === i ? e.target.value : x))} /></Field>)}
+          <div className="form2">
+            <Field label="Hauptlösung"><input value={task.answer} maxLength={80} onChange={e => set('answer', e.target.value)} /></Field>
+            <Field label="Weitere gültige Schreibweisen (eine pro Zeile)"><textarea rows={2} value={(task.accept ?? []).join('\n')} onChange={e => set('accept', e.target.value.split('\n'))} /></Field>
+          </div>
         </>}
 
         {m === 'unique' && <>
@@ -123,14 +153,12 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
             {m === 'glitch' && <>
               <Field label="Hinweis beim Betrachten"><input value={task.viewPrompt} maxLength={120} onChange={e => set('viewPrompt', e.target.value)} /></Field>
               {sec('Betrachtungszeit (Sek.)', 'viewSeconds')}{sec('Suchzeit (Sek.)', 'seconds')}{sec('Punkte', 'points')}</>}
-            {m === 'codebreak' && <>
-              <Field label="Antwortart"><select value={task.input} onChange={e => set('input', e.target.value)}><option value="number">Zahl</option><option value="text">Text</option></select></Field>
-              {sec('Zeit (Sek.)', 'seconds')}{sec('Punkte', 'points')}</>}
+            {m === 'match' && <>{sec('Zeit (Sek.)', 'seconds')}<p className="small muted">Fest: 50 Punkte je richtigem Paar (max. 300), keine Minuspunkte.</p></>}
+            {m === 'link' && <>{sec('Sekunden je Hinweis', 'clueSeconds')}<p className="small muted">Fest: 300 / 225 / 150 / 75 Punkte, eine endgültige Antwort je Spieler.</p></>}
             {m === 'unique' && <>
               <Field label="Platzhalter im Eingabefeld"><input value={task.placeholder} maxLength={40} onChange={e => set('placeholder', e.target.value)} /></Field>
               {sec('Zeit (Sek.)', 'seconds')}{sec('Punkte einzigartig', 'pointsUnique')}{sec('Punkte mehrfach genannt', 'pointsShared')}</>}
           </div>
-          {m === 'codebreak' && [0, 1, 2].map(i => <Field key={i} label={`Hinweis ${i + 1} (optional, kostet Punkte)`}><input value={task.hints[i] ?? ''} onChange={e => { const h = [...task.hints]; while (h.length < 3) h.push(''); h[i] = e.target.value; set('hints', h); }} /></Field>)}
         </details>
 
         {msg && <div className="status bad">{msg}</div>}

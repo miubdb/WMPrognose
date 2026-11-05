@@ -1,13 +1,20 @@
 // Validierung und Normalisierung von Aufgaben/Kategorien (Server UND Admin-Oberfläche verwenden dieselben Regeln).
-import type { TaskDef, Mode, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask } from './types';
+import type { TaskDef, Mode, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask } from './types';
+import { LINK_POINTS, MATCH_PAIRS, MATCH_PAIR_POINTS } from './scoring';
 
-export const MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'codebreak', 'unique'];
-export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG' };
+/** Alle Modi, die gespeicherte Inhalte enthalten dürfen (inkl. Altmodus). */
+export const MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link', 'codebreak'];
+/** Die sieben aktiven Modi (Auswahl im Editor, neue Pakete). */
+export const ACTIVE_MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link'];
+export const isLegacyMode = (m: string) => m === 'codebreak';
+export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', codebreak: 'CODEBREAK (veraltet)' };
 
 export function taskMax(t: TaskDef): number {
   switch (t.mode) {
     case 'estimate': return t.points + Math.max(0, ...t.bets);
     case 'unique': return t.pointsUnique;
+    case 'match': return MATCH_PAIRS * MATCH_PAIR_POINTS;
+    case 'link': return LINK_POINTS[0];
     default: return t.points;
   }
 }
@@ -32,6 +39,12 @@ export function normalizeTask(raw: any): TaskDef {
       answers: strList(r.answers, 8), hints: strList(r.hints, 3, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 500) } as CodeTask;
     case 'unique': return { mode: 'unique', prompt: str(r.prompt, 300), placeholder: str(r.placeholder, 40), seconds: num(r.seconds), pointsUnique: num(r.pointsUnique), pointsShared: num(r.pointsShared), explain: str(r.explain, 500),
       valid: (Array.isArray(r.valid) ? r.valid : []).slice(0, 60).map((v: any) => ({ name: str(v?.name, 60), variants: strList(v?.variants, 12, 60) })) } as UniqueTask;
+    case 'match': {
+      const pairs = (Array.isArray(r.pairs) ? r.pairs : []).slice(0, MATCH_PAIRS).map((p: any) => ({ left: str(p?.left, 50), right: str(p?.right, 50) }));
+      return { mode: 'match', prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x: unknown) => num(x)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) } as MatchTask;
+    }
+    case 'link': return { mode: 'link', prompt: str(r.prompt, 200), clues: (Array.isArray(r.clues) ? r.clues : []).slice(0, 4).map((c: unknown) => str(c, 220)), answer: str(r.answer, 80), accept: strList(r.accept, 12, 80),
+      clueSeconds: num(r.clueSeconds, 12), points: LINK_POINTS[0], explain: str(r.explain, 500) } as LinkTask;
     default: return r;
   }
 }
@@ -42,8 +55,8 @@ const inRange = (v: number, a: number, b: number) => Number.isFinite(v) && v >= 
 export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = () => true): string[] {
   const e: string[] = [];
   if (!t || !MODES.includes(t.mode)) return ['Unbekannter Spielmodus'];
-  if (!t.prompt) e.push('Fragetext fehlt');
-  if (!inRange(t.mode === 'unique' ? 1 : (t as any).points, 1, 1000) && t.mode !== 'unique') e.push('Punkte müssen zwischen 1 und 1000 liegen');
+  if (!t.prompt) e.push(t.mode === 'link' ? 'Überschrift fehlt (z. B. „Wer oder was wird gesucht?“)' : 'Fragetext fehlt');
+  if (t.mode !== 'unique' && t.mode !== 'match' && t.mode !== 'link' && !inRange((t as any).points, 1, 1000)) e.push('Punkte müssen zwischen 1 und 1000 liegen');
   if (!t.explain) e.push('Eine Lösungserklärung (für die TV-Auflösung) fehlt');
   switch (t.mode) {
     case 'geo':
@@ -74,6 +87,24 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
     case 'codebreak':
       if (!t.answers.length) e.push('Mindestens eine richtige Antwort eintragen');
       if (!inRange(t.seconds, 20, 300)) e.push('Zeitlimit 20–300 Sekunden');
+      break;
+    case 'match': {
+      const filled = t.pairs.length === MATCH_PAIRS && t.pairs.every(p => p.left && p.right);
+      if (!filled) e.push('Genau sechs vollständige Paare eintragen (links und rechts)');
+      else {
+        const L = t.pairs.map(p => p.left.toLowerCase()), R = t.pairs.map(p => p.right.toLowerCase());
+        if (new Set(L).size !== MATCH_PAIRS) e.push('Die linken Begriffe müssen sich unterscheiden');
+        if (new Set(R).size !== MATCH_PAIRS) e.push('Die rechten Begriffe müssen sich unterscheiden (sonst gäbe es mehrere richtige Zuordnungen)');
+      }
+      if (!(t.order.length === MATCH_PAIRS && [...t.order].sort((a, b) => a - b).join() === '0,1,2,3,4,5')) e.push('Die Mischung der rechten Spalte ist ungültig – bitte neu mischen');
+      else if (t.order.every((v, i) => v === i)) e.push('Die rechte Spalte darf nicht schon in der richtigen Reihenfolge stehen – bitte neu mischen');
+      if (!inRange(t.seconds, 30, 120)) e.push('Zeitlimit 30–120 Sekunden');
+      break;
+    }
+    case 'link':
+      if (t.clues.length !== 4 || t.clues.some(c => !c)) e.push('Genau vier Hinweise eintragen');
+      if (!t.answer) e.push('Hauptlösung fehlt');
+      if (!inRange(t.clueSeconds, 5, 30)) e.push('Zeit je Hinweis 5–30 Sekunden');
       break;
     case 'unique':
       if (t.valid.length < 3 || t.valid.some(v => !v.name)) e.push('Mindestens drei gültige Antworten eintragen');

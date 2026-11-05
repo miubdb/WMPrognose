@@ -243,3 +243,49 @@ reg((() => {
   });
   return { id: 'menu1', title: 'Speisekarte', bg: '#2b1d12', items, changes: { p4: { text: '19,40 €' } } } as Scene;
 })());
+
+/** Chatverlauf (neutrale Szene): ein Wort einer Nachricht wurde geändert. */
+reg((() => {
+  const msgs: [boolean, string, string, string][] = [
+    [false, 'Mia', 'Wer bringt die Getränke mit?', '18:02'],
+    [true, '', 'Ich! Cola und Wasser hole ich.', '18:04'],
+    [false, 'Tom', 'Treffpunkt ist um 19:30 am Nordeingang.', '18:07'],
+    [true, '', 'Alles klar, ich komme mit dem Rad.', '18:09'],
+    [false, 'Mia', 'Und die Tickets nicht vergessen!', '18:10'],
+    [true, '', 'Liegen schon in meiner Tasche.', '18:11'],
+  ];
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#0f1b1a' },
+    { id: 'head', t: 'rect', x: 0, y: 0, w: 1000, h: 64, fill: '#1f3b36' },
+    T('title', 30, 42, 'Samstag-Crew 🍻', 30, '#e8fff9', { weight: 800 }),
+  ];
+  msgs.forEach(([mine, who, text, time], i) => {
+    const y = 84 + i * 84, w = Math.max(300, text.length * 15.5 + 40), x = mine ? 960 - w : 40;
+    items.push({ id: `b${i}`, t: 'rect', x, y, w, h: 66, fill: mine ? '#0e6b5c' : '#2a3a44', rx: 18 });
+    if (who) items.push(T(`w${i}`, x + 18, y + 22, who, 16, '#7fe3cf', { weight: 700 }));
+    items.push(T(`m${i}`, x + 18, y + (who ? 48 : 38), text, 24, '#ffffff'));
+    items.push(T(`t${i}`, x + w - 14, y + 58, time, 14, '#9fb8b2', { anchor: 'end' }));
+  });
+  return { id: 'chat1', title: 'Chatverlauf', bg: '#0f1b1a', items, changes: { m2: { text: 'Treffpunkt ist um 19:30 am Südeingang.' } } } as Scene;
+})());
+
+/** Eintrittskarte (neutrale Szene): eine Angabe wurde geändert. */
+reg((() => {
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#241a3a' },
+    { id: 'tk', t: 'rect', x: 50, y: 70, w: 900, h: 460, fill: '#f8f0d8', rx: 26 },
+    { id: 'band', t: 'rect', x: 50, y: 70, w: 900, h: 90, fill: '#c2185b', rx: 26 },
+    T('title', 90, 130, 'FESTHALLE LIVE', 44, '#ffffff', { weight: 800 }),
+    T('sub', 910, 130, 'EINTRITTSKARTE', 22, '#ffd1e3', { anchor: 'end', weight: 700 }),
+    T('l1', 90, 215, 'DATUM', 16, '#8a7a5a'), T('v1', 90, 255, 'Sa, 14.11.', 36, '#2a2016', { weight: 800 }),
+    T('l2', 360, 215, 'EINLASS', 16, '#8a7a5a'), T('v2', 360, 255, '18:30 Uhr', 36, '#2a2016', { weight: 800 }),
+    T('l3', 660, 215, 'BEGINN', 16, '#8a7a5a'), T('v3', 660, 255, '20:00 Uhr', 36, '#2a2016', { weight: 800 }),
+    T('l4', 90, 335, 'BLOCK', 16, '#8a7a5a'), T('v4', 90, 375, 'C', 44, '#2a2016', { weight: 800 }),
+    T('l5', 260, 335, 'REIHE', 16, '#8a7a5a'), T('v5', 260, 375, '12', 44, '#2a2016', { weight: 800, mono: true }),
+    T('l6', 430, 335, 'PLATZ', 16, '#8a7a5a'), T('v6', 430, 375, '27', 44, '#2a2016', { weight: 800, mono: true }),
+    T('l7', 660, 335, 'PREIS', 16, '#8a7a5a'), T('v7', 660, 375, '49,00 €', 44, '#2a2016', { weight: 800, mono: true }),
+    { id: 'perf', t: 'line', x: 90, y: 440, x2: 910, y2: 440, stroke: '#b9a982', sw: 3 },
+    T('foot', 90, 490, 'Nr. 004 817 392 · Kein Umtausch · Nicht übertragbar', 20, '#6e6040'),
+  ];
+  return { id: 'ticket1', title: 'Eintrittskarte', bg: '#241a3a', items, changes: { v5: { text: '21' } } } as Scene;
+})());

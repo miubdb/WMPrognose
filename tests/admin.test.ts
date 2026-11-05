@@ -56,8 +56,8 @@ test('Initiale Vorlagen: alle bisherigen Inhalte sind im Admin sichtbar (Fragen,
   assert.ok(qs.every((q: any) => q.problems.length === 0), 'alle Vorlagen-Fragen sind gültig');
   const cats = (await a.get('/categories')).data; assert.equal(cats.length, TILES.length);
   assert.ok(cats.every((c: any) => c.problems.length === 0), JSON.stringify(cats.filter((c: any) => c.problems.length)));
-  const packs = (await a.get('/packs')).data; assert.equal(packs[0].id, 'standard-1'); assert.equal(packs[0].currentVersion, 1); assert.equal(packs[0].status, 'published');
-  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[])[0].ref, 'standard-1@1');
+  const packs = (await a.get('/packs')).data; assert.equal(packs[0].id, 'standard-2'); assert.equal(packs[0].currentVersion, 1); assert.equal(packs[0].status, 'published');
+  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[])[0].ref, 'standard-2@1');
   // Filter & Suche
   assert.ok((await a.get('/questions?mode=geo')).data.every((q: any) => q.mode === 'geo'));
   assert.ok((await a.get('/questions?q=timbuktu')).data.length === 1);
@@ -99,8 +99,8 @@ test('Kategorien: anlegen, bearbeiten, duplizieren, deaktivieren, löschen; Budg
   assert.equal((await a.del('/categories/' + d.id)).status, 200);
   assert.equal((await a.get('/categories/' + d.id)).status, 404);
   // In Paket verwendete Kategorie ist geschützt
-  const std = (await a.get('/categories/geo-daneben')).data; assert.ok(std.usedInPacks.length === 1);
-  assert.equal((await a.del('/categories/geo-daneben')).status, 409);
+  const std = (await a.get('/categories/v2-orte-mit-geschichte')).data; assert.ok(std.usedInPacks.length === 1);
+  assert.equal((await a.del('/categories/v2-orte-mit-geschichte')).status, 409);
 });
 
 /** Baut ein vollständiges eigenes Paket (6 neue Kategorien + Überraschung + Finale) und veröffentlicht es. */

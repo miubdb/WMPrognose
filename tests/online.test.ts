@@ -92,8 +92,8 @@ test('Online: normale Einzelbenutzer-Abfolge (Frage erstellen, Kategorie speiche
   const blob = newBlob(); const a = await boot(new OnlineAdmin(blob, { adminPassword: PW }));
   await a.call('POST', '/api/admin/login', { password: PW });
   const c = await a.call('POST', '/api/admin/questions', q); assert.equal(c.status, 201);
-  const cat = (await a.call('GET', '/api/admin/categories/geo-daneben')).data;
-  for (let i = 0; i < 4; i++) { const r = await a.call('PUT', '/api/admin/categories/geo-daneben', { ...cat, ifUpdated: (await a.call('GET', '/api/admin/categories/geo-daneben')).data.updated }); assert.equal(r.status, 200, JSON.stringify(r.data)); }
+  const cat = (await a.call('GET', '/api/admin/categories/v2-orte-mit-geschichte')).data;
+  for (let i = 0; i < 4; i++) { const r = await a.call('PUT', '/api/admin/categories/v2-orte-mit-geschichte', { ...cat, ifUpdated: (await a.call('GET', '/api/admin/categories/v2-orte-mit-geschichte')).data.updated }); assert.equal(r.status, 200, JSON.stringify(r.data)); }
   let last = c.data; for (let i = 0; i < 5; i++) { const r = await a.call('PUT', '/api/admin/questions/' + c.data.id, { task: { ...q.task, prompt: 'V' + i }, topic: 'Online', ifUpdated: last.updated }); assert.equal(r.status, 200, JSON.stringify(r.data)); last = r.data; }
   const b = await boot(new OnlineAdmin(blob, { adminPassword: PW })); b.setCookie(a.getCookie());
   assert.equal((await b.call('GET', '/api/admin/questions/' + c.data.id)).data.task.prompt, 'V4');
@@ -127,7 +127,7 @@ test('Online: Sicherheit – nicht angemeldet = 401, CSRF-Header Pflicht, Gamesh
   await a.call('POST', '/api/admin/login', { password: PW });
   assert.equal((await a.call('POST', '/api/admin/questions', q, { 'x-outplay-admin': '0' })).status, 403);
   assert.equal((await a.call('POST', '/api/rooms', {})).status, 501);
-  assert.equal((await a.call('GET', '/api/packs')).data[0].ref, 'standard-1@1');
+  assert.equal((await a.call('GET', '/api/packs')).data[0].ref, 'standard-2@1');
 });
 
 test('Online: Voll-Backup (SQLite) ist eine gültige, vollständige Datenbank', async () => {

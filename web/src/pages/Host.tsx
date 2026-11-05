@@ -66,7 +66,7 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
   const run = async (a: Action) => {
     if (busy) return; setBusy(true);
     const r = await act(a); setBusy(false);
-    if (!r.ok) { setToast(`Aktion nicht möglich (${r.err})`); setTimeout(() => setToast(''), 3500); }
+    if (!r.ok) { setToast(r.err === 'review_needed' ? 'Bitte zuerst die unklaren Antworten prüfen (✓ gültig / ✗ ungültig).' : `Aktion nicht möglich (${r.err})`); setTimeout(() => setToast(''), 3500); }
   };
   if (conn === 'denied' || conn === 'kicked') return (
     <div className="hostlogin"><div className="card center"><h2>{conn === 'kicked' ? 'Auf anderem Gerät übernommen' : 'Kein Zugang'}</h2><p className="muted">{reason}</p>

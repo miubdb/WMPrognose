@@ -66,6 +66,19 @@ function botSubmit(g: ReturnType<typeof mkEngine>, task: TaskDef, rand: () => nu
         pl(i, { k: 'submit', payload: { answer: i === 1 ? 'falsch' : task.answers[0] } });
         break;
       }
+      case 'match': {
+        const pos = (k: number) => task.order.indexOf(k);
+        const perfect = [0, 1, 2, 3, 4, 5].map(pos);
+        const pairs = i === 0 ? perfect : i === 1 ? perfect.map((p, k) => (k < 3 ? p : -1)) : [0, 1, 2, 3, 4, 5].map(k => (k + i) % 6);
+        const clean = pairs.map((p, k) => (pairs.indexOf(p) === k ? p : -1));
+        if (i !== 3) pl(i, { k: 'submit', payload: { pairs: clean, final: true } });   // Spieler 3 gibt nichts ab
+        break;
+      }
+      case 'link': {
+        if (i === 6) return;                                                          // keine Abgabe
+        pl(i, { k: 'submit', payload: { answer: i % 2 === 0 ? task.answer : 'Phantasie' + i } });
+        break;
+      }
       case 'unique': {
         const names = task.valid.map(v => v.name);
         pl(i, { k: 'submit', payload: { answer: i < 2 ? names[0] : i === 2 ? 'Atlantis' : names[i % names.length] } });
@@ -122,6 +135,10 @@ test('Komplette Show: alle Modi, Zwischenstände, Finale (verborgen), Siegerehru
         host({ k: 'h.lock' });
       }
     }
+    if (task.mode === 'link') {
+      assert.equal(room.round!.stage, 'review', 'falsche Antworten brauchen die Host-Prüfung');
+      assert.ok(view('tv').round!.data.groups === undefined, 'TV sieht Antworten erst bei der Auflösung');
+    }
     if (task.mode === 'unique') {
       assert.equal(room.round!.stage, 'review');
       const groups = view('host').round!.data.groups;
@@ -160,13 +177,13 @@ test('Komplette Show: alle Modi, Zwischenstände, Finale (verborgen), Siegerehru
   assert.equal(phase(), 'ceremony');
   assert.ok(guard < 400);
   assert.equal(tiles, 6, 'sechs Kategorien');
-  assert.deepEqual([...modesSeen].sort(), ['codebreak', 'estimate', 'geo', 'glitch', 'rank', 'unique'].filter(m => modesSeen.has(m)).sort());
-  assert.ok(modesSeen.has('unique') && modesSeen.has('glitch') && modesSeen.has('rank') && modesSeen.has('estimate'));
+  assert.ok(!modesSeen.has('codebreak'), 'CODEBREAK kommt im neuen Paket nicht mehr vor');
+  for (const m of ['unique', 'geo', 'link', 'rank', 'estimate']) assert.ok(modesSeen.has(m), 'Modus ' + m + ' (Überraschung/Finale garantieren diese Modi)');
   assert.ok(pickers.size >= 6, 'Auswahl wechselt reihum: ' + pickers.size);
 
   // Siegerehrung
   const steps = eng.ceremonySteps(room);
-  assert.equal(steps, 1 + 3 + 4);
+  assert.equal(steps, 1 + 4 + 4);
   const hidden = view(0);
   assert.equal(hidden.players.every(p => p.score === null), true);
   assert.deepEqual(hidden.ceremony!.standings, []); // Handys sehen vor dem Ende keine Plätze
@@ -215,10 +232,10 @@ test('Setz auf mich: Einsatz gewonnen/verloren nachvollziehbar, nie negativ, Min
   room.scoreLog.push({ id: 99, key: 'bonus#0', pid: ids[2], requested: 150, applied: 150, label: '', at: 0 });
   room.scoreLog.push({ id: 98, key: 'bonus#0', pid: ids[0], requested: 100, applied: 100, label: '', at: 0 });
   eng.recompute(room);
-  assert.ok(pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'schaetz-mal' }).ok);
+  assert.ok(pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'v2-wahnsinnszahlen' }).ok);
   host({ k: 'h.begin' });
   // Tipps: exakt (p0), 500 (p1), 20000 (p2)
-  pl(0, { k: 'submit', payload: { value: 2680 } }); pl(1, { k: 'submit', payload: { value: 500 } }); pl(2, { k: 'submit', payload: { value: '20.000' } });
+  pl(0, { k: 'submit', payload: { value: 533 } }); pl(1, { k: 'submit', payload: { value: 150 } }); pl(2, { k: 'submit', payload: { value: '20.000' } });
   assert.equal(room.round!.stage, 'bet');
   // p1 (0 Punkte) darf den Mindesteinsatz 100 setzen, aber nicht 200
   assert.equal(pl(1, { k: 'submit', payload: { amount: 200, target: ids[0] } }).err, 'not_enough_points');
@@ -245,7 +262,7 @@ test('Blind Rank: Platzierung ist endgültig, nur gerade geöffneter Begriff, fe
   const g = mkEngine(2);
   const { room, host, pl, ids } = g;
   host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
-  pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'koenig-fussball' });
+  pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'v2-fussball-zeitreise' });
   host({ k: 'h.begin' });
   assert.equal(room.round!.m.step, 0);
   const task: any = g.eng.curTask(room);
@@ -272,10 +289,10 @@ test('Einzigartig: Host kann unklare Antwort freigeben, mappen oder verwerfen', 
   const { room, host, pl, ids } = g;
   room.plan = ['surprise', 'board', 'final']; // direkt zur Überraschung
   host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
-  assert.equal(room.round!.tileId, 'einzigartig');
+  assert.equal(room.round!.tileId, 'v2-einzigartig');
   host({ k: 'h.begin' });
-  pl(0, { k: 'submit', payload: { answer: 'Schweden' } });
-  pl(1, { k: 'submit', payload: { answer: 'sweden' } });     // Synonym → gleiche Gruppe
+  pl(0, { k: 'submit', payload: { answer: 'Ungarn' } });
+  pl(1, { k: 'submit', payload: { answer: 'Hungary' } });     // Synonym → gleiche Gruppe
   pl(2, { k: 'submit', payload: { answer: 'Slowakai' } });   // Tippfehler → Slowakei
   assert.equal(room.round!.stage, 'review');
   host({ k: 'h.reveal' });
@@ -291,9 +308,9 @@ test('Einsatz nur aus vorhandenen Punkten: 0 Punkte = kein positiver Einsatz, Ve
   // Spieler 1 verliert per Host-Korrektur alles
   host({ k: 'h.adjust', pid: ids[1], delta: -500, note: 'Test' });
   assert.equal(room.players[1].score, 0);
-  pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'schaetz-mal' });
+  pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'v2-wahnsinnszahlen' });
   host({ k: 'h.begin' });
-  pl(0, { k: 'submit', payload: { value: 2680 } }); pl(1, { k: 'submit', payload: { value: 1000 } }); pl(2, { k: 'submit', payload: { value: 90000 } });
+  pl(0, { k: 'submit', payload: { value: 533 } }); pl(1, { k: 'submit', payload: { value: 1000 } }); pl(2, { k: 'submit', payload: { value: 90000 } });
   assert.equal(pl(1, { k: 'submit', payload: { amount: 100, target: ids[2] } }).err, 'not_enough_points'); // 0 Punkte: kein Einsatz
   assert.ok(pl(1, { k: 'submit', payload: { amount: 0, target: null } }).ok);                            // aber schätzen darf er
   assert.equal(pl(2, { k: 'submit', payload: { amount: 300, target: ids[0] } }).err, 'invalid_bet');       // nicht erlaubter Betrag
@@ -313,11 +330,51 @@ test('Verteilungsregeln: Fußball- und Modus-Limit sperren Kacheln, aber nie all
   host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
   const pickerIdx = () => room.players.findIndex(p => p.id === room.pickerId);
   const play = (id: string) => { const r = pl(pickerIdx(), { k: 'pick', tileId: id }); host({ k: 'h.skipTile' }); return r; };
-  assert.ok(play('koenig-fussball').ok);                              // 1. Fußball-Kachel
-  assert.equal(eng.blockedTiles(room).has('auswaertsspiel'), true);    // weitere Fußball-Kacheln gesperrt
-  assert.equal(pl(pickerIdx(), { k: 'pick', tileId: 'auswaertsspiel' }).err, 'tile_limited');
-  assert.ok(play('geo-daneben').ok); assert.ok(play('damals-wars').ok);
+  assert.ok(play('v2-fussball-zeitreise').ok);                              // 1. Fußball-Kachel
+  assert.equal(eng.blockedTiles(room).has('v2-heimspiel'), true);    // weitere Fußball-Kacheln gesperrt
+  assert.equal(pl(pickerIdx(), { k: 'pick', tileId: 'v2-heimspiel' }).err, 'tile_limited');
+  assert.ok(play('v2-orte-mit-geschichte').ok); assert.ok(play('v2-wer-war-zuerst').ok);
   // geo-daneben (1 von 2 geo) ok; zweite Rank-Kachel? 'koenig' + 'damals' = 2 rank -> keine weitere rank-Kachel
   const view = eng.buildView(room, { role: 'tv' }, 0);
   assert.equal(view.wall, null); // Board nach 3 Kacheln
+});
+
+
+test('Alle neun Kategorien einzeln durchgespielt (sieben Spieler): jeder Modus läuft ohne Hänger, Punkte nie negativ, Budget eingehalten', () => {
+  const g = mkEngine(7);
+  const { eng, room, host, view } = g;
+  (eng as any).src = { ...BOOK, rules: { startCredit: 200, maxFootball: 9, maxPerMode: 9 } };
+  room.plan = [...Array(9).fill('wall'), 'surprise', 'final'];
+  const rand = rng(7);
+  host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
+  const seen = new Set<string>();
+  let guard = 0;
+  while (room.phase !== 'ceremony' && guard++ < 300) {
+    if (room.phase === 'wall') {
+      const open = Object.entries(room.tileStatus).filter(([, st]) => st === 'open').map(([id]) => id);
+      assert.ok(g.pl(g.ids.indexOf(room.pickerId!), { k: 'pick', tileId: open[0] }).ok);
+      continue;
+    }
+    if (room.phase === 'scoreboard') { host({ k: 'h.continue' }); continue; }
+    const task = eng.curTask(room)!;
+    seen.add(task.mode);
+    host({ k: 'h.begin' });
+    for (let step = 0; step < 14 && ['view', 'open', 'bet'].includes(room.round!.stage); step++) {
+      if (room.round!.stage === 'view') { g.advance(room.round!.deadline! - g.now + 1); continue; }
+      botSubmit(g, task, rand);
+      if (['view', 'open', 'bet'].includes(room.round!.stage) && !['rank', 'estimate'].includes(task.mode)) host({ k: 'h.lock' });
+    }
+    if (room.round!.stage === 'review') {
+      const groups = view('host').round!.data.groups ?? [];
+      for (const gr of groups) if (gr.state === 'unknown') host({ k: 'h.review', groupKey: gr.key, decision: 'valid' });
+    }
+    assert.ok(host({ k: 'h.reveal' }).ok, 'reveal ' + task.mode);
+    for (const p of room.players) assert.ok(p.score >= 0);
+    const rv = room.round!.result!.reveal;
+    assert.ok(rv);
+    host({ k: 'h.next' });
+  }
+  for (const m of ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link']) assert.ok(seen.has(m), 'Modus fehlt: ' + m);
+  assert.ok(!seen.has('codebreak'));
+  assert.equal(room.phase, 'ceremony');
 });

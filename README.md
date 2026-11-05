@@ -34,7 +34,9 @@ Windows: `OUTPLAY-STARTEN.bat` (prüft Node, installiert/baut bei Bedarf, wählt
 - **Setz auf mich:** bester Tipp bis 300 Punkte (Rangfolge nach |ln(Tipp/Lösung)|, fair auch bei großen Zahlen), danach Einsatz 0/100/200 (Finale 500 + 0/250/500).
 - **Einsätze (SETZ AUF MICH):** nur bis zum **tatsächlichen Punktestand**. Wer 0 Punkte hat, schätzt weiter mit, kann aber nichts setzen. Gewonnen: +Einsatz, verloren: −Einsatz. Der Stand wird nie negativ. (Einen früheren „Mindesteinsatz von 100“ gibt es nicht mehr.) Finale: Einsatz ≤ vorhandene Punkte (max. 500).
 - **Wo zur Hölle:** Platzierung nach Entfernung (100/80/65/50/35/20/10 % bei 7 Spielern, sonst interpoliert; Gleichstand = gleicher Platz).
-- **Blind Rank:** Budget × richtige Paare ÷ 10. **Glitch:** Treffer 70–100 %, knapp daneben bis 15 %. **Codebreak:** 100/75/50/25 % je nach Hinweisen, 3 Versuche. **Einzigartig:** 500 einmalig / 150 mehrfach / 0 ungültig (Host entscheidet bei Unklarem).
+- **Matchmaker:** 6 Paare, 50 Punkte je richtigem Paar (max. 300), keine Minuspunkte, kein Zeitbonus, 60 s; Antippen verbindet, Ändern bis zur endgültigen Abgabe (der zuletzt gespeicherte Stand zählt bei Zeitablauf).
+- **Die Verbindung:** 4 Hinweise (sofort, dann alle 12 s), eine endgültige Antwort je Spieler; richtig nach Hinweis 1/2/3/4 = 300/225/150/75, falsch/keine = 0. Der Server bestimmt Zeit und Hinweisstufe; unklare Antworten (Tippfehler) entscheidet der Host.
+- **Blind Rank:** Budget × richtige Paare ÷ 10. **Glitch:** Treffer 70–100 %, knapp daneben bis 15 %. **Einzigartig:** 500 einmalig / 150 mehrfach / 0 ungültig (Host entscheidet bei Unklarem).
 - Gleichstand am Ende: mehr Finalpunkte, dann frühere Anmeldung.
 - Verteilung bei freier Wahl: pro Paket max. Fußball-Kacheln (Standard 2) und max. Kacheln je Modus (Standard 2).
 
@@ -42,7 +44,7 @@ Windows: `OUTPLAY-STARTEN.bat` (prüft Node, installiert/baut bei Bedarf, wählt
 Gleicher Browser: automatisch. Anderes Gerät: `/play/CODE` → „Platz wiederherstellen“ → 6-stelliger Code (unten im Controller; der Host sieht alle) – oder der Host gibt den Platz frei (📱).
 
 ## Admin (`/admin`)
-Fragenbibliothek (6 Modus-Editoren, Suche, Filter, Duplizieren, Archiv), Kategorien, Spielepakete (Prüfung, Analyse Spielzeit erwartet/maximal, Fußballanteil, Veröffentlichen als unveränderliche Version, Rollback), Szenen-Vorlagen für Glitch, **👀 Vorschau** (echte Engine, TV + Handy + Auflösung + Punkteberechnung), Import/Export, Backup. Ein laufender Raum behält seinen Paketstand (`bookId`), egal was im Admin geändert wird.
+Fragenbibliothek (7 Modus-Editoren, Suche, Filter, Duplizieren, Archiv), Kategorien, Spielepakete (Prüfung, Analyse Spielzeit erwartet/maximal, Fußballanteil, Veröffentlichen als unveränderliche Version, Rollback), Szenen-Vorlagen für Glitch, **👀 Vorschau** (echte Engine, TV + Handy + Auflösung + Punkteberechnung), Import/Export, Backup. Ein laufender Raum behält seinen Paketstand (`bookId`), egal was im Admin geändert wird.
 
 ### Sicherheit
 Serverseitig geprüfte Anmeldung (Passwort nur als Hash bzw. Konstantzeit-Vergleich), zufällige Sitzungstoken in **HttpOnly + SameSite=Strict (+ Secure bei HTTPS)** Cookies, CSRF-Header + Herkunftsprüfung für alle Schreib-APIs, Fehlversuch-Sperre (8 / 10 min, in der Datenbank), Pakete sind erst nach Veröffentlichung für Räume sichtbar; die öffentliche Paketliste enthält keine Lösungen. Keine Zugangsdaten im Repository; `data/`, `.env` und Backups sind gitignoriert und werden nie ausgeliefert (Tests).
@@ -60,3 +62,9 @@ Lokal: keine. Online-Admin: Vercel Hobby (kostenlos) + Vercel Blob (im Hobby-Tar
 
 ## Karte
 Vektorkarte auf OpenStreetMap-Basis, offline-fähig: siehe [docs/KARTE.md](docs/KARTE.md). Vorbereitung einmalig mit `OUTPLAY-KARTE-LADEN.bat`. Ohne diese Datei läuft eine einfache SVG-Karte (Natural Earth, gemeinfrei; GeoNames CC BY 4.0).
+
+## Spielmodi (aktiv) und Altbestand
+Aktiv sind sieben Modi: WO ZUR HÖLLE?, BLIND RANK, SETZ AUF MICH, GLITCH, EINZIGARTIG, MATCHMAKER, DIE VERBINDUNG. **CODEBREAK wird nicht mehr angeboten.** Bereits gespeicherte CODEBREAK-Fragen, ältere Pakete und Backups bleiben erhalten (lesbar, in alten Paketversionen spielbar), lassen sich aber nicht neu anlegen oder in neu veröffentlichte Pakete übernehmen.
+
+## Neues Standardpaket in einer bestehenden Datenbank aktivieren
+Das mitgelieferte Paket „Standardpaket – Spieleabend“ (`standard-2`) ist bei einer **frischen** Datenbank sofort vorhanden. In einer **bestehenden** (online oder lokal) passiert beim Deployen nichts automatisch. Aktivierung: Admin → **Daten** → Hinweis „Neues Standardpaket verfügbar“ → (empfohlen) „Zuerst Voll-Backup laden“ → „Neues Standardpaket installieren“. Es werden nur fehlende Fragen/Kategorien/Szenen/Paket angelegt (nie überschrieben, keine Duplikate bei Wiederholung); das bisherige Standardpaket wird **archiviert**, nicht gelöscht (jederzeit wieder aktivierbar). Online wird vor der Installation zusätzlich automatisch eine Kopie unter `outplay/backups/` im Blob-Speicher abgelegt. Inhalte und Quellen: [docs/INHALTE-REDAKTION.md](docs/INHALTE-REDAKTION.md).

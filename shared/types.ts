@@ -1,6 +1,7 @@
 // Gemeinsame Typen für Server, Inhalte und Client.
 
-export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique';
+/** 'codebreak' ist ein Altmodus: wird nicht mehr angeboten, bestehende Inhalte/Pakete bleiben aber les- und spielbar. */
+export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique' | 'match' | 'link';
 export type MapKind = 'world' | 'europe' | 'germany';
 
 // ---------- Avatar ----------
@@ -93,7 +94,30 @@ export interface UniqueTask {
   pointsShared: number;
   explain: string;
 }
-export type TaskDef = GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask;
+/** MATCHMAKER: sechs Paare verbinden. pairs[i].right gehört zu pairs[i].left; order = Anzeigereihenfolge der rechten Spalte (Permutation). */
+export interface MatchTask {
+  mode: 'match';
+  prompt: string;
+  pairs: { left: string; right: string }[];
+  order: number[];
+  seconds: number;
+  /** abgeleitet: 6 × 50 */
+  points: number;
+  explain: string;
+}
+/** DIE VERBINDUNG: vier nacheinander erscheinende Hinweise, eine gemeinsame Lösung. */
+export interface LinkTask {
+  mode: 'link';
+  prompt: string;
+  clues: string[];
+  answer: string;
+  accept: string[];
+  clueSeconds: number;
+  /** abgeleitet: maximal erreichbare Punkte (Hinweis 1) */
+  points: number;
+  explain: string;
+}
+export type TaskDef = GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask;
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
 export interface PackRules { startCredit?: number; maxFootball?: number; maxPerMode?: number }

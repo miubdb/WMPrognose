@@ -44,6 +44,7 @@ export interface AppOptions {
   backupEveryMin?: number;
   /** MBTiles-Datei der Offline-Karte (Standard: <Datenordner>/maps/outplay-karte.mbtiles) */
   mapFile?: string;
+  seedPack?: { id: string; name: string; description: string };
 }
 
 const MIME: Record<string, string> = {
@@ -86,7 +87,7 @@ export class App {
     this.tiles = new LocalTiles(opts.mapFile ?? join(dirname(opts.dbFile), 'maps', 'outplay-karte.mbtiles'));
     this.clock = opts.clock ?? Date.now;
     this.store = new Store(opts.dbFile);
-    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES }, this.clock);
+    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack }, this.clock);
     this.auth = new AdminAuth(this.store, opts.adminPassword, this.clock);
     this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer() };
     this.engine = new Engine((id: string) => this.content.resolveBook(id));

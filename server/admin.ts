@@ -110,6 +110,11 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
         const body = await readBody(256 * 1024);
         return json(200, buildPreview(body.task, C.sceneMap(), body.meta ?? {}));
       }
+      case 'standard': {   // mitgeliefertes Standardpaket: Status / sicher installieren (nicht-destruktiv, mit Archivierung des Vorgängers)
+        if (method === 'GET') return json(200, C.seedStatus());
+        if (method === 'POST') return json(200, C.installSeed({ archiveOlder: true }));
+        break;
+      }
       case 'backup': {
         if (method !== 'GET') break;
         const buf = app.backup();

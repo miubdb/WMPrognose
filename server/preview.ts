@@ -14,6 +14,8 @@ export const FORMULAS: Record<string, string> = {
   estimate: 'Beste Schätzung = volles Budget, danach nach Platz abgestuft (100/75/55/40/28/18/10 %); Rangfolge nach |ln(Tipp/Lösung)|. Einsatz: +Einsatz bei Treffer auf den besten Tipp, sonst −Einsatz (höchstens so viel, wie man besitzt).',
   glitch: 'Treffer in der Zone: 70–100 % (je genauer), knapp daneben (bis 2× Zonenradius) bis 15 %, sonst 0.',
   codebreak: 'Ohne Hinweis 100 %, mit 1/2/3 Hinweisen 75/50/25 %. Falsch = 0. Geschwindigkeit zählt nicht.',
+  match: '50 Punkte je richtig verbundenem Paar, höchstens 300. Keine Minuspunkte, kein Zeitbonus – nur die Richtigkeit zählt. Die Zuordnung zählt, wie sie bei Ablauf der Zeit (oder bei der endgültigen Abgabe) steht.',
+  link: 'Eine endgültige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.',
   unique: 'Einzigartige gültige Antwort = Punkte „einzigartig“, mehrfach genannte gültige Antwort = Punkte „mehrfach“, ungültig = 0.',
 };
 
@@ -87,6 +89,23 @@ export function buildPreview(rawTask: unknown, scenes: Record<string, Scene>, me
       if (t.hints.length) { P(1, { k: 'hint' }); P(1, { k: 'submit', payload: { answer: t.answers[0] } }); }
       for (let i = 0; i < 3; i++) P(2, { k: 'submit', payload: { answer: 'x' + i } });
       H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'match': {
+      snap('Aufgabe läuft');
+      const posOf = (i: number) => t.order.indexOf(i);
+      P(0, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5].map(posOf), final: true } });
+      P(1, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5].map((i, k) => (k < 3 ? posOf(i) : posOf((i + 1) % 6))), final: true } });
+      P(2, { k: 'submit', payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
+      snap('Antworten abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'link': {
+      snap('Hinweis 1');
+      P(0, { k: 'submit', payload: { answer: t.answer } });
+      now += (t.clueSeconds + 1) * 1000; eng.tick(room, now); snap('Hinweis 2');
+      now += (t.clueSeconds + 1) * 1000; eng.tick(room, now); snap('Hinweis 3');
+      P(1, { k: 'submit', payload: { answer: t.accept[0] ?? t.answer } }); P(2, { k: 'submit', payload: { answer: 'Phantasiewort' } });
+      now += (t.clueSeconds + 1) * 1000; eng.tick(room, now); snap('Hinweis 4');
+      H({ k: 'h.lock' }); snap('Prüfung (Host)'); break;
     }
     case 'unique': {
       snap('Aufgabe läuft');

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Mode } from '../../../shared/types';
-import { MODES, MODE_LABEL, taskMax } from '../../../shared/validate';
+import { ACTIVE_MODES as MODES, MODE_LABEL, taskMax } from '../../../shared/validate';
 import type { Scene } from '../../../shared/scenes';
 import { adm, download, errText } from './api';
 import { MODE_HELP, MODE_ICON, QuestionEditor } from './QuestionEditor';
@@ -389,9 +389,25 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
     } catch { setErr('Backup fehlgeschlagen.'); }
   };
   const pub = packs.filter((p: any) => p.versions > 0);
+  const [std, setStd] = useState<any>(null); const [stdMsg, setStdMsg] = useState('');
+  const loadStd = useCallback(() => { adm('GET', '/standard').then(r => r.ok && setStd(r.data)); }, []);
+  useEffect(loadStd, [loadStd]);
+  const installStd = async () => {
+    if (!confirm('Neues Standardpaket jetzt installieren?\n\nBestehende Fragen, Kategorien und Pakete bleiben unverändert. Das bisherige Standardpaket wird nur archiviert (nicht gelöscht) und lässt sich jederzeit wieder aktivieren.')) return;
+    const r = await adm('POST', '/standard', {});
+    if (r.ok) { setStdMsg(r.data.alreadyInstalled ? 'Bereits installiert – nichts geändert.' : `Installiert: ${r.data.created.questions} Fragen, ${r.data.created.categories} Kategorien, Paket ${r.data.ref}${r.data.archived.length ? ' · archiviert: ' + r.data.archived.join(', ') : ''}`); bump(); loadStd(); } else setStdMsg(errText(r));
+  };
   return (
     <div>
       <h2>Daten</h2>
+      {std && !std.installed && (
+        <div className="card warnbox">
+          <h3>🆕 Neues Standardpaket verfügbar</h3>
+          <p className="small">„{std.name}“ ist in diesem Bestand noch nicht vorhanden. Beim Installieren wird nichts überschrieben oder gelöscht – ein gelaufenes Standardpaket wird nur archiviert.</p>
+          <div className="row wrap"><button className="btn" onClick={backup}>🔒 Zuerst Voll-Backup laden</button><button className="btn primary" onClick={installStd}>Neues Standardpaket installieren</button></div>
+          {stdMsg && <div className="status ok">{stdMsg}</div>}
+        </div>)}
+      {std?.installed && stdMsg && <div className="status ok">{stdMsg}</div>}
       <div className="card bigcard">
         <h3>📤 Spieleabend exportieren</h3>
         <div className="row wrap">

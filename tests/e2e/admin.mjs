@@ -63,10 +63,26 @@ await newQ('SETZ AUF MICH');
 await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Wie viele Stufen hat der Kölner Dom Südturm?'); await fill('Richtiger Wert', '533'); await fill('Einheit', 'Stufen'); await fill('Lösungserklärung', 'Es sind 533 Stufen.');
 await save();
 
-// CODEBREAK
-await newQ('CODEBREAK');
-await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Welche Zahl folgt: 1, 4, 9, 16, ?'); await fill('Richtige Antwort(en)', '25', 'textarea'); await fill('Hinweis 1', 'Quadratzahlen'); await fill('Lösungserklärung', '5 mal 5.');
+// MATCHMAKER
+await newQ('MATCHMAKER');
+await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Welche Stadt gehört zu welchem Land?');
+const pr = [['Paris', 'Frankreich'], ['Rom', 'Italien'], ['Madrid', 'Spanien'], ['Wien', 'Österreich'], ['Bern', 'Schweiz'], ['Lissabon', 'Portugal']];
+for (let i = 0; i < 6; i++) { await page.locator('.modalbox input[placeholder="Links ' + (i + 1) + '"]').fill(pr[i][0]); await page.locator('.modalbox input[placeholder="Passend rechts ' + (i + 1) + '"]').fill(pr[i][1]); }
+await fill('Lösungserklärung', 'Sechs Hauptstädte.');
+await page.locator('.modalbox button', { hasText: '👀' }).last().click(); await page.waitForSelector('.frametabs'); await sleep(1200);
+check((await page.locator('.scoretab td.pos').count()) > 0, 'Matchmaker: Vorschau mit Punkteberechnung');
+await page.locator('.modal').last().getByRole('button', { name: 'Schließen ✕' }).first().click(); await sleep(300); await save();
+
+// DIE VERBINDUNG
+await newQ('DIE VERBINDUNG');
+await fill('Thema', 'Test-E2E'); await fill('Überschrift', 'Welcher Ort wird gesucht?');
+for (const [i, t] of ['Er liegt auf einer Insel im Mittelmeer.', 'Hier wachsen riesige Zitronen.', 'Die Hauptstadt heißt Valletta.', 'Er besteht aus Malta, Gozo und Comino.'].entries()) await page.locator('.modalbox textarea').nth(1 + i).fill(t);
+await fill('Hauptlösung', 'Malta'); await fill('Lösungserklärung', 'Malta ist ein Inselstaat.');
+await page.screenshot({ path: `${SHOTS}/7b-link-editor.png` });
 await save();
+check(await page.locator('.qcard', { hasText: 'Welcher Ort wird gesucht' }).count() === 1, 'Die Verbindung: Frage gespeichert');
+// CODEBREAK ist nicht mehr wählbar
+await page.locator('.newmenu summary').click(); check(await page.locator('.newmenu button', { hasText: 'CODEBREAK' }).count() === 0, 'CODEBREAK fehlt im Menü „Neue Frage“'); await page.locator('.newmenu summary').click();
 
 // UNIQUE
 await newQ('EINZIGARTIG');

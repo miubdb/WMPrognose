@@ -47,9 +47,9 @@ const shot = async (name, ph = 0) => { await tv.screenshot({ path: `${SHOTS}/tv-
 
 // ---------- SETZ AUF MICH ----------
 await H({ k: 'h.adjust', pid: ids[1], delta: 400, note: 'Teststartguthaben' });
-await pickTile('schaetz-mal'); await sleep(1200); await tv.screenshot({ path: `${SHOTS}/tv-est-rules.png` });
+await pickTile('v2-wahnsinnszahlen'); await sleep(1200); await tv.screenshot({ path: `${SHOTS}/tv-est-rules.png` });
 await begin();
-const guesses = ['2680', '2000', '3500', '1500', '5000', '900'];
+const guesses = ['533', '400', '700', '300', '1000', '150'];
 for (let i = 0; i < 5; i++) { await phones[i].locator('.inputrow input').fill(guesses[i]); await phones[i].getByRole('button', { name: 'Schätzung abgeben' }).click(); await phones[i].waitForSelector('.status.ok'); }
 await shot('est-open');
 await H({ k: 'h.lock' }); await waitHost(v => v.round.stage === 'bet'); await sleep(1500);
@@ -67,7 +67,7 @@ await begin(); await H({ k: 'h.reveal' }); await H({ k: 'h.next' }); // zweite A
 await waitHost(v => v.room.phase === 'wall');
 
 // ---------- GLITCH ----------
-await pickTile('alles-im-blick'); await begin();
+await pickTile('v2-alles-im-blick'); await begin();
 await sleep(700); await shot('glitch-view');
 check(await phones[0].getByText('Schau auf den Fernseher').count() > 0, 'Glitch: Handys zeigen während der Betrachtung nur den Hinweis');
 await H({ k: 'h.lock' }); await phones[0].waitForSelector('.phonescene');
@@ -77,27 +77,34 @@ await phones[0].getByRole('button', { name: 'Markierung abgeben' }).click(); awa
 await shot('glitch-open');
 await H({ k: 'h.reveal' }); await sleep(2500); await shot('glitch-reveal');
 await H({ k: 'h.next' });
-// ---------- CODEBREAK ----------
+// ---------- MATCHMAKER ----------
 await H({ k: 'h.skipTile' }); await waitHost(v => v.room.phase === 'wall');
-await pickTile('kopfsalat'); await begin();
-await phones[0].locator('.inputrow input').fill('4'); await phones[0].getByRole('button', { name: 'Lösung prüfen' }).click(); await sleep(500);
-check(await phones[0].getByText(/Leider falsch/).count() > 0, 'Codebreak: falsche Antwort wird sofort zurückgemeldet');
-await phones[0].getByText(/Hinweis freischalten/).click(); await sleep(400);
-check(await phones[0].locator('.hint').count() === 1, 'Codebreak: Hinweis wird angezeigt');
-await phones[0].locator('.inputrow input').fill('3'); await phones[0].getByRole('button', { name: 'Lösung prüfen' }).click(); await sleep(400);
-check(await phones[0].getByText(/Gelöst/).count() > 0, 'Codebreak: richtige Antwort erkannt');
-await shot('code-open');
-await H({ k: 'h.reveal' }); await sleep(2500); await shot('code-reveal');
-check(hostView.players.find(p => p.id === ids[0]).score > 0, 'Codebreak: Punkte (mit Hinweis reduziert) gutgeschrieben');
+await pickTile('v2-passt-zusammen'); await begin();
+const pairsTxt = hostView.round.data.solution.map(x => x.split(' = '));
+const connect = async (ph, list) => { for (const [l, r] of list) { await ph.locator('.mcol').nth(0).locator('.mitem', { hasText: l }).first().click(); await ph.locator('.mcol').nth(1).locator('.mitem', { hasText: r }).first().click(); } };
+check(await phones[0].locator('.mitem').count() === 12, 'Matchmaker: zwei Spalten mit je sechs Begriffen');
+const before = id => hostView.players.find(p => p.id === id).score;
+const b0 = before(ids[0]), b1 = before(ids[1]);
+await connect(phones[0], pairsTxt);
+check(await phones[0].locator('.mlines path').count() === 6, 'Matchmaker: Verbindungen sind sichtbar');
+await phones[0].locator('.mitem.linked').first().click(); await sleep(200);                       // Tippen löst die Verbindung wieder
+check(await phones[0].locator('.mlines path').count() === 5, 'Matchmaker: Verbindung lässt sich wieder lösen');
+await connect(phones[0], [pairsTxt[0]]);
+await shot('match-open');
+await phones[0].getByRole('button', { name: 'Endgültig abgeben' }).click(); await phones[0].waitForSelector('.status.ok');
+check(await phones[0].locator('.mitem[disabled]').count() === 12, 'Matchmaker: nach der Abgabe ist die Eingabe gesperrt');
+await connect(phones[1], pairsTxt.slice(0, 3)); await phones[1].getByRole('button', { name: /Abgeben \(3 von 6\)/ }).click(); await sleep(150); await phones[1].getByRole('button', { name: /Abgeben \(3 von 6\)/ }).click(); await phones[1].waitForSelector('.status.ok');
+await H({ k: 'h.reveal' }); await sleep(3500); await shot('match-reveal');
+check(before(ids[0]) - b0 === 300 && before(ids[1]) - b1 === 150, 'Matchmaker: 6 richtige Paare = 300, 3 richtige = 150 Punkte');
 await H({ k: 'h.skipTile' });
 
 // ---------- Zwischenstand nach Akt 1, dann Überraschung ----------
 await waitHost(v => v.room.phase === 'scoreboard');
 await sleep(2500); await tv.screenshot({ path: `${SHOTS}/tv-board.png` });
-await H({ k: 'h.continue' }); await waitHost(v => v.round?.tileId === 'einzigartig');
+await H({ k: 'h.continue' }); await waitHost(v => v.round?.tileId === 'v2-einzigartig');
 await sleep(1500); await tv.screenshot({ path: `${SHOTS}/tv-unique-rules.png` });
 await begin();
-const ans = ['Schweden', 'Sweden', 'Serbien', 'Slowenien', 'Peru', 'Spanien'];
+const ans = ['Deutschland', 'Germany', 'Serbien', 'Ukraine', 'Peru', 'Ungarn'];
 for (let i = 0; i < 6; i++) { await phones[i].locator('.inputrow input').fill(ans[i]); await phones[i].getByRole('button', { name: 'Antwort abgeben' }).click(); if (i < 5) await phones[i].waitForSelector('.status.ok'); }
 await waitHost(v => v.round.stage === 'review'); await sleep(1200);
 await shot('unique-review');
@@ -111,21 +118,40 @@ await H({ k: 'h.next' }); await H({ k: 'h.skipTask' });
 
 // ---------- Finale ----------
 await waitHost(v => v.room.phase === 'scoreboard'); await H({ k: 'h.continue' });
-for (const id of ['halbwissen', 'damals-wars', 'auswaertsspiel']) { await waitHost(v => v.room.phase === 'wall'); await H({ k: 'h.pick', tileId: id }); await H({ k: 'h.skipTile' }); }
+// ---------- DIE VERBINDUNG ----------
+await waitHost(v => v.room.phase === 'wall'); await pickTile('v2-wer-oder-was'); await begin();
+check(await phones[0].locator('.clue:not(.locked)').count() === 1, 'Die Verbindung: zu Beginn nur Hinweis 1');
+await shot('link-open');
+const L0 = before(ids[0]), L1 = before(ids[1]), L2 = before(ids[2]);
+await phones[0].locator('.inputrow input').fill('Venedig'); await phones[0].getByRole('button', { name: 'Lösung abgeben' }).click(); await sleep(150);
+await phones[0].getByRole('button', { name: /Wirklich endgültig/ }).click(); await phones[0].waitForSelector('.status.ok');
+await sleep(12500);
+check(await phones[1].locator('.clue:not(.locked)').count() === 2, 'Die Verbindung: nach 12 Sekunden erscheint Hinweis 2');
+await phones[1].locator('.inputrow input').fill('Venice'); await phones[1].getByRole('button', { name: 'Lösung abgeben' }).click(); await sleep(150);
+await phones[1].getByRole('button', { name: /Wirklich endgültig/ }).click(); await phones[1].waitForSelector('.status.ok');
+await phones[2].locator('.inputrow input').fill('Phantasiestadt'); await phones[2].getByRole('button', { name: 'Lösung abgeben' }).click(); await sleep(150);
+await phones[2].getByRole('button', { name: /Wirklich endgültig/ }).click(); await phones[2].waitForSelector('.status.ok');
+check(await phones[0].getByText('Phantasiestadt').count() === 0 && (await tv.content()).includes('Phantasiestadt') === false, 'Die Verbindung: Antworten anderer bleiben bis zur Auflösung verborgen');
+await H({ k: 'h.lock' }); await waitHost(v => v.round.stage === 'review'); await sleep(1000);
+await shot('link-review');
+await H({ k: 'h.reveal' }); await sleep(3500); await shot('link-reveal');
+check(before(ids[0]) - L0 === 300 && before(ids[1]) - L1 === 225 && before(ids[2]) - L2 === 0, 'Die Verbindung: 300 (Hinweis 1), 225 (Hinweis 2), falsch = 0');
+await H({ k: 'h.skipTile' });
+for (const id of ['v2-sport-und-pop', 'v2-fussball-zeitreise']) { await waitHost(v => v.room.phase === 'wall'); await H({ k: 'h.pick', tileId: id }); await H({ k: 'h.skipTile' }); }
 await waitHost(v => v.room.phase === 'scoreboard'); await H({ k: 'h.continue' });
 await waitHost(v => v.round?.kind === 'final'); await sleep(1800);
 await tv.screenshot({ path: `${SHOTS}/tv-final-rules.png` });
 check((await phones[0].locator('.topbar small').innerText()).includes('verborgen'), 'Finale: Punktestand auf dem Handy verborgen');
-for (let t = 0; t < 3; t++) {
+for (let t = 0; t < 4; t++) {
   await begin();
   if (t === 0) { await sleep(500); await tv.screenshot({ path: `${SHOTS}/tv-final-0-view.png` }); await H({ k: 'h.lock' }); await sleep(600); await tv.screenshot({ path: `${SHOTS}/tv-final-0-open.png` }); }
-  if (t === 1) { for (let i = 0; i < 5; i++) { for (let k = 0; k < 4; k++) { await phones[k].locator('.slot:not(.filled)').first().click().catch(() => {}); await phones[k].getByRole('button', { name: /endgültig/ }).click().catch(() => {}); } await sleep(500); if (i === 2) await tv.screenshot({ path: `${SHOTS}/tv-final-1-open.png` }); await H({ k: 'h.lock' }); await sleep(200); } }
-  await H({ k: 'h.reveal' }); await sleep(t === 1 ? 5000 : 2500); await tv.screenshot({ path: `${SHOTS}/tv-final-${t}-reveal.png` }); await H({ k: 'h.next' });
+  if (t === 2) { for (let i = 0; i < 5; i++) { for (let k = 0; k < 4; k++) { await phones[k].locator('.slot:not(.filled)').first().click().catch(() => {}); await phones[k].getByRole('button', { name: /endgültig/ }).click().catch(() => {}); } await sleep(500); if (i === 2) await tv.screenshot({ path: `${SHOTS}/tv-final-1-open.png` }); await H({ k: 'h.lock' }); await sleep(200); } }
+  await H({ k: 'h.reveal' }); await sleep(t === 2 ? 5000 : 2500); await tv.screenshot({ path: `${SHOTS}/tv-final-${t}-reveal.png` }); await H({ k: 'h.next' });
 }
 await waitHost(v => v.room.phase === 'ceremony');
 for (let st = 0; st < 8; st++) { await sleep(1700); if ([0, 4, 7].includes(st)) await tv.screenshot({ path: `${SHOTS}/tv-ceremony-${st}.png` }); if (st < 7) await H({ k: 'h.ceremonyNext' }); }
 await phones[0].screenshot({ path: `${SHOTS}/phone-end.png` });
-check(hostView.room.phase === 'ceremony' && hostView.ceremony.step === 7, 'Siegerehrung bis zum Sieger durchgespielt');
+check(hostView.room.phase === 'ceremony' && hostView.ceremony.step === 8, 'Siegerehrung bis zum Sieger durchgespielt');
 
 hws.close(); await browser.close();
 console.log(failures ? `\n${failures} FEHLER` : '\nE2E-2 OK'); process.exit(failures ? 1 : 0);
