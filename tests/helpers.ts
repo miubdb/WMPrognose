@@ -10,10 +10,10 @@ export const AV: Avatar = { face: 0, skin: 0, hair: 0, hairColor: 0, hat: 0, shi
 
 export interface TestEnv { app: App; port: number; url: string; clock: { now: number }; dbFile: string; close(): Promise<void> }
 
-export async function startEnv(opts: { dbFile?: string; book?: any } = {}): Promise<TestEnv> {
+export async function startEnv(opts: { dbFile?: string; book?: any; adminPassword?: string } = {}): Promise<TestEnv> {
   const dbFile = opts.dbFile ?? join(mkdtempSync(join(tmpdir(), 'outplay-')), 'test.db');
   const clock = { now: 1_800_000_000_000 };
-  const app = new App({ book: opts.book ?? BOOK, dbFile, clock: () => clock.now, tickMs: 40 });
+  const app = new App({ book: opts.book ?? BOOK, dbFile, clock: () => clock.now, tickMs: 40, adminPassword: opts.adminPassword });
   const port = await app.listen(0, '127.0.0.1');
   return { app, port, url: `http://127.0.0.1:${port}`, clock, dbFile, close: () => app.close() };
 }
@@ -102,3 +102,28 @@ export async function setupShow(env: TestEnv, n = 6, startShow = true): Promise<
   return { env, code, host, tv, players, ids, tokens, recov, hostKey, hostPin };
 }
 export const closeAll = (s: Setup) => { [s.host, s.tv, ...s.players].forEach(c => { try { c.ws.terminate(); } catch { /* */ } }); };
+
+/** Admin-Client mit Cookie-Verwaltung (wie ein Browser). */
+export class Admin {
+  cookie = '';
+  constructor(public env: TestEnv, public password = 'test-admin-pw') {}
+  async login(pw = this.password) {
+    const r = await fetch(this.env.url + '/api/admin/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    const sc = r.headers.get('set-cookie');
+    if (r.status === 200 && sc) this.cookie = sc.split(';')[0];
+    return { status: r.status, setCookie: sc ?? '' };
+  }
+  async req(method: string, path: string, body?: unknown, opts: { csrf?: boolean; cookie?: boolean } = {}) {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (opts.csrf !== false) headers['x-outplay-admin'] = '1';
+    if (opts.cookie !== false && this.cookie) headers.cookie = this.cookie;
+    const r = await fetch(this.env.url + '/api/admin' + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    const text = await r.text();
+    let data: any = null; try { data = JSON.parse(text); } catch { data = text; }
+    return { status: r.status, data };
+  }
+  get = (p: string) => this.req('GET', p);
+  post = (p: string, b?: unknown) => this.req('POST', p, b ?? {});
+  put = (p: string, b: unknown) => this.req('PUT', p, b);
+  del = (p: string) => this.req('DELETE', p);
+}

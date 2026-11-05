@@ -8,7 +8,7 @@ export type Item =
   | { id: string; t: 'line'; x: number; y: number; x2: number; y2: number; stroke: string; sw?: number }
   | { id: string; t: 'text'; x: number; y: number; text: string; size: number; fill: string; anchor?: 'start' | 'middle' | 'end'; weight?: number; mono?: boolean };
 
-export interface Scene { id: string; title: string; bg: string; items: Item[]; changes: Record<string, Partial<Item> | null> }
+export interface Scene { id: string; title: string; bg: string; items: Item[]; changes: Record<string, Partial<Item> | null>; template?: any; builtin?: boolean }
 
 export function bbox(it: Item): { x0: number; y0: number; x1: number; y1: number } {
   switch (it.t) {

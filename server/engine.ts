@@ -1,15 +1,17 @@
 // Autoritative Spiel-Engine: State-Machine, Aktionen, Wertung, Sichten.
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import type {
-  Action, Avatar, PlayerPublic, Phase, RoundView, ScoreEntry, TaskDef, TileDef, TileView, View,
+  Book, Action, Avatar, PlayerPublic, Phase, RoundView, ScoreEntry, TaskDef, TileDef, TileView, View,
 } from '../shared/types';
 import { AVATAR_LIMITS } from '../shared/types';
 import { applyClamped } from '../shared/scoring';
 import { hashSeed, rng, shuffled } from '../shared/util';
 import type { PlanStep, PlayerRec, Room, RoundState } from './model';
 import { MODES, type Audience, type Ctx } from './modes';
+import { SCENES } from '../shared/scenes';
 
-export interface Book { tiles: TileDef[] }
+export type { Book };
+export type BookSource = Book | ((bookId: string) => Book);
 export type Actor = { role: 'tv' | 'host' | 'player'; pid?: string };
 export type ActResult = { ok: true; dup?: boolean; info?: any } | { ok: false; err: string };
 
@@ -23,17 +25,20 @@ const MAX_PROCESSED = 600;
 export const DEFAULT_PLAN: PlanStep[] = ['wall', 'wall', 'wall', 'board', 'surprise', 'board', 'wall', 'wall', 'wall', 'board', 'final'];
 
 export class Engine {
-  constructor(public book: Book) {}
+  constructor(public src: BookSource) {}
+  /** Fester Inhaltsstand des Raums (Paketversion) – ändert sich nach Raumerstellung nie. */
+  bk(room: Room): Book { return typeof this.src === 'function' ? this.src(room.bookId ?? 'legacy') : this.src; }
 
   // ---------------------------------------------------------------- Räume
-  newRoom(code: string, now: number): { room: Room; hostKey: string } {
+  newRoom(code: string, now: number, bookId = 'legacy'): { room: Room; hostKey: string } {
+    const book = typeof this.src === 'function' ? this.src(bookId) : this.src;
     const hostKey = randomBytes(24).toString('base64url');
     const pin = String(randomInt(100000, 999999));
     const room: Room = {
       code, createdAt: now, hostKeyHash: sha(hostKey), hostPin: pin, hostPinHash: sha(pin),
       phase: 'lobby', joinOpen: true, showPaused: false, frozen: false, sound: true, reduced: false, hideScores: false,
       players: [], nextPlayerNo: 1, seq: 1, plan: DEFAULT_PLAN.slice(), planIdx: 0,
-      tileStatus: Object.fromEntries(this.book.tiles.filter(t => t.kind === 'tile').map(t => [t.id, 'open' as const])),
+      bookId, tileStatus: Object.fromEntries(book.tiles.filter(t => t.kind === 'tile').map(t => [t.id, 'open' as const])),
       pickOrder: [], pickNo: 0, pickerId: null, round: null, scoreLog: [], scoreSeq: 1, scoreboard: null, lastBoard: {},
       ceremonyStep: 0, tilesPlayed: 0, log: [], processed: {}, processedOrder: [], seed: hashSeed(code + now),
     };
@@ -125,8 +130,8 @@ export class Engine {
     room.log.push({ at: now, text });
     if (room.log.length > MAX_LOG) room.log.splice(0, room.log.length - MAX_LOG);
   }
-  tile(id: string): TileDef | undefined { return this.book.tiles.find(t => t.id === id); }
-  curTile(room: Room): TileDef | null { return room.round ? this.tile(room.round.tileId) ?? null : null; }
+  tile(room: Room, id: string): TileDef | undefined { return this.bk(room).tiles.find(t => t.id === id); }
+  curTile(room: Room): TileDef | null { return room.round ? this.tile(room, room.round.tileId) ?? null : null; }
   curTask(room: Room): TaskDef | null {
     const t = this.curTile(room);
     return t && room.round ? t.tasks[room.round.taskIndex] ?? null : null;
@@ -135,7 +140,7 @@ export class Engine {
     const round = room.round, task = this.curTask(room);
     if (!round || !task) return null;
     return {
-      room, round, task, now, players: this.active(room),
+      room, round, task, now, players: this.active(room), scenes: this.bk(room).scenes ?? SCENES,
       setStage: (stage, seconds) => {
         round.stage = stage; round.stageStartedAt = now; round.stageSeconds = seconds;
         if (seconds == null) { round.deadline = null; round.pausedLeft = null; }
@@ -147,7 +152,7 @@ export class Engine {
   scoreKey(room: Room): string { return `${room.round!.tileId}#${room.round!.taskIndex}`; }
 
   sortedPlayers(room: Room, opts: { throughFinalTask?: number } = {}): { p: PlayerRec; score: number; finalPts: number }[] {
-    const finalId = this.book.tiles.find(t => t.kind === 'final')?.id;
+    const finalId = this.bk(room).tiles.find(t => t.kind === 'final')?.id;
     const totals = new Map<string, { score: number; finalPts: number }>();
     for (const p of this.active(room)) totals.set(p.id, { score: 0, finalPts: 0 });
     for (const e of room.scoreLog) {
@@ -261,11 +266,28 @@ export class Engine {
   }
 
   // ---------------------------------------------------------------- Ablaufsteuerung
+  /** Kacheln, die wegen der Verteilungsregeln (Fußball-/Modus-Limit) gerade nicht wählbar sind. Nie alle auf einmal. */
+  blockedTiles(room: Room): Set<string> {
+    const rules = this.bk(room).rules;
+    const out = new Set<string>();
+    if (!rules || (rules.maxFootball === undefined && rules.maxPerMode === undefined)) return out;
+    const tiles = this.bk(room).tiles.filter(t => t.kind === 'tile');
+    const chosen = tiles.filter(t => room.tileStatus[t.id] === 'selected' || room.tileStatus[t.id] === 'played');
+    const f = chosen.filter(t => t.football).length;
+    const open = tiles.filter(t => room.tileStatus[t.id] === 'open');
+    for (const t of open) {
+      const m = chosen.filter(c => c.mode === t.mode).length;
+      if ((t.football && rules.maxFootball !== undefined && f >= rules.maxFootball) || (rules.maxPerMode !== undefined && m >= rules.maxPerMode)) out.add(t.id);
+    }
+    if (open.length && open.every(t => out.has(t.id))) out.clear();
+    return out;
+  }
   private pickTile(room: Room, tileId: string, now: number): ActResult {
     if (room.phase !== 'wall') return { ok: false, err: 'wrong_phase' };
-    const t = this.tile(tileId);
+    const t = this.tile(room, tileId);
     if (!t || t.kind !== 'tile') return { ok: false, err: 'unknown_tile' };
     if (room.tileStatus[tileId] !== 'open') return { ok: false, err: 'tile_used' };
+    if (this.blockedTiles(room).has(tileId)) return { ok: false, err: 'tile_limited' };
     room.tileStatus[tileId] = 'selected';
     this.startRound(room, t, now);
     const picker = room.players.find(p => p.id === room.pickerId);
@@ -297,12 +319,12 @@ export class Engine {
         break;
       }
       case 'surprise': {
-        const t = this.book.tiles.find(x => x.kind === 'surprise')!;
+        const t = this.bk(room).tiles.find(x => x.kind === 'surprise')!;
         this.startRound(room, t, now);
         break;
       }
       case 'final': {
-        const t = this.book.tiles.find(x => x.kind === 'final')!;
+        const t = this.bk(room).tiles.find(x => x.kind === 'final')!;
         room.hideScores = true;
         this.startRound(room, t, now);
         break;
@@ -373,6 +395,13 @@ export class Engine {
         if (room.phase !== 'lobby') return { ok: true, dup: true };
         if (this.active(room).length < 1) return bad('no_players');
         room.joinOpen = false; room.phase = 'intro';
+        // Identisches Startguthaben für alle (Einsätze gibt es nur aus vorhandenen Punkten)
+        const credit = this.bk(room).rules?.startCredit ?? 0;
+        if (credit > 0 && !room.scoreLog.some(e => e.key === 'start')) {
+          for (const p of this.active(room)) this.addEntry(room, 'start', p.id, credit, 'Startguthaben', now);
+          this.recompute(room);
+          room.lastBoard = Object.fromEntries(this.active(room).map(p => [p.id, p.score]));
+        }
         room.pickOrder = shuffled(this.active(room).map(p => p.id), rng(room.seed));
         this.log(room, now, 'Show gestartet');
         return ok;
@@ -510,7 +539,7 @@ export class Engine {
   }
 
   ceremonySteps(room: Room): number {
-    const k = this.book.tiles.find(t => t.kind === 'final')?.tasks.length ?? 0;
+    const k = this.bk(room).tiles.find(t => t.kind === 'final')?.tasks.length ?? 0;
     return 1 + k + 4; // Stand davor, je Finalaufgabe, Platz n..4, 3, 2, 1
   }
 
@@ -533,8 +562,7 @@ export class Engine {
       connected: this.liveSet.has(room.code + ':' + p.id),
       answered: answeredFor(p.id), seatReleased: p.released, joinedOrder: p.joinedOrder,
     }));
-    const total = this.book.tiles.filter(t => t.kind === 'tile').length;
-    const planStep = room.plan[room.planIdx];
+        const planStep = room.plan[room.planIdx];
     const view: View = {
       v: 1, seq: room.seq, now,
       room: {
@@ -545,12 +573,13 @@ export class Engine {
       },
       players, wall: null, round: null, scoreboard: null, ceremony: null,
     };
-    void total; void planStep;
+    void planStep;
     if (room.phase === 'wall') {
       const picker = aud.role === 'player' && aud.pid === room.pickerId;
+      const blocked = this.blockedTiles(room);
       view.wall = {
-        tiles: this.book.tiles.filter(t => t.kind === 'tile').map<TileView>(t => ({
-          id: t.id, title: t.title, topic: t.topic, icon: t.icon, color: t.color, kind: t.kind, status: room.tileStatus[t.id] ?? 'open',
+        tiles: this.bk(room).tiles.filter(t => t.kind === 'tile').map<TileView>(t => ({
+          id: t.id, title: t.title, topic: t.topic, icon: t.icon, color: t.color, kind: t.kind, status: room.tileStatus[t.id] ?? 'open', ...(blocked.has(t.id) ? { blocked: true } : {}),
           ...(room.tileStatus[t.id] === 'played' ? { mode: t.tasks[0].mode } : {}),
         })),
         pickerId: room.pickerId, pickNo: room.pickNo, pickerMayPick: !!picker,

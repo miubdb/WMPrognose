@@ -8,6 +8,7 @@ const envs: TestEnv[] = [];
 const env = async (o?: any) => { const e = await startEnv(o); envs.push(e); return e; };
 after(async () => { for (const e of envs) await e.close().catch(() => {}); });
 
+const START = 200; // Startguthaben des Standardpakets
 const geoTile = TILES.find(t => t.id === 'geo-daneben')!;
 
 async function pickAndBegin(s: Awaited<ReturnType<typeof setupShow>>, tileId: string) {
@@ -74,13 +75,13 @@ test('A1–A20: Raum, Lobby, 6 echte Clients, Kategorienwand, Geo-Runde, Wertung
   assert.equal(g[0].pid, s.ids[0]); assert.equal(g[0].points, 250);
   assert.equal(g[0].km, 0);
   // Punkte serverseitig gespeichert, Rangliste aktuell
-  const me = await s.players[0].waitFor(v => v.me?.score === 250);
+  const me = await s.players[0].waitFor(v => v.me?.score === START + 250);
   assert.equal(me.me!.rank, 1);
   const p6 = s.players[5].view!.me!;
-  assert.equal(p6.score, 0);
+  assert.equal(p6.score, START);
   // Doppelte Auflösung erzeugt keine doppelten Punkte
   assert.ok((await s.host.act({ k: 'h.reveal' })).ok);
-  assert.equal(s.host.view!.players.find(p => p.id === s.ids[0])!.score, 250);
+  assert.equal(s.host.view!.players.find(p => p.id === s.ids[0])!.score, START + 250);
   // weiter: nächste Aufgabe derselben Kachel
   assert.ok((await s.host.act({ k: 'h.next' })).ok);
   const nxt = await s.tv.waitFor(v => v.round?.taskIndex === 1);
@@ -107,8 +108,8 @@ test('Doppelte Antwortübertragung: gleiche reqId und gleicher Inhalt → keine 
   await s.host.act({ k: 'h.reveal' });
   await s.host.waitFor(v => v.round?.stage === 'reveal');
   const sc = s.host.view!.players.find(x => x.id === s.ids[0])!.score;
-  assert.equal(sc, 250);
-  assert.equal(s.host.view!.host!.scoreLog.filter(x => x.pid === s.ids[0]).length, 1);
+  assert.equal(sc, START + 250);
+  assert.equal(s.host.view!.host!.scoreLog.filter(x => x.pid === s.ids[0] && x.key !== 'start').length, 1);
   closeAll(s);
 });
 
@@ -145,7 +146,7 @@ test('Verbindungsausfall NACH bestätigter Abgabe: Antwort bleibt gültig, Wiede
   await s.host.act({ k: 'h.reveal' });
   const p2 = new Client(e, 'player', s.code, s.tokens[0]); await p2.connect();
   await p2.waitFor(v => v.round?.stage === 'reveal');
-  assert.equal(p2.view!.me!.score, 250);
+  assert.equal(p2.view!.me!.score, START + 250);
   closeAll(s); p2.disconnect();
 });
 
@@ -228,13 +229,13 @@ test('Gerätewechsel: Wiederherstellungscode übernimmt Identität (Avatar, Punk
   await pickAndBegin(s, geoTile.id);
   await s.players[0].act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } });
   await s.host.act({ k: 'h.reveal' });
-  await s.players[0].waitFor(v => v.me?.score === 250);
+  await s.players[0].waitFor(v => v.me?.score === START + 250);
   const wrong = await post(e, `/api/rooms/${s.code}/recover`, { code: 'ZZZZZZ' });
   assert.equal(wrong.status, 400);
   const rec = await post(e, `/api/rooms/${s.code}/recover`, { code: s.recov[0].toLowerCase() });
   assert.equal(rec.status, 200); assert.equal(rec.body.playerId, s.ids[0]);
   const n = new Client(e, 'player', s.code, rec.body.token); await n.connect();
-  assert.equal(n.view!.me!.score, 250);
+  assert.equal(n.view!.me!.score, START + 250);
   assert.equal(n.view!.players.length, 3);
   await s.players[0].waitFor(() => s.players[0].kicked === 'replaced' || s.players[0].closed, 2000);
   // altes Token ist ungültig
@@ -267,17 +268,17 @@ test('Fehlende Spielerantwort = 0 Punkte; Host-Korrektur (auch negativ, nie unte
   await s.host.act({ k: 'h.reveal' });
   await s.host.waitFor(v => v.round?.stage === 'reveal');
   const score = (i: number) => s.host.view!.players.find(p => p.id === s.ids[i])!.score;
-  assert.equal(score(0), 250); assert.equal(score(1), 0); assert.equal(score(2), 0);
+  assert.equal(score(0), START + 250); assert.equal(score(1), START); assert.equal(score(2), START);
   await s.host.act({ k: 'h.adjust', pid: s.ids[1], delta: 100, note: 'Verbindungsproblem' });
-  await s.host.waitFor(v => v.players.find(p => p.id === s.ids[1])!.score === 100);
+  await s.host.waitFor(v => v.players.find(p => p.id === s.ids[1])!.score === START + 100);
   await s.host.act({ k: 'h.adjust', pid: s.ids[1], delta: -500, note: 'Test' });
   await s.host.waitFor(() => score(1) === 0);
-  assert.equal(score(1), 0); // nie negativ
+  assert.equal(score(1), 0); // nie negativ (Abzug wird auf den vorhandenen Stand gedeckelt)
   assert.ok(s.host.view!.host!.scoreLog.some(x => x.manual && x.label.includes('Verbindungsproblem')));
   // Neustart der Aufgabe: Auswertung wird verworfen
   await s.host.act({ k: 'h.restartTask' });
   await s.host.waitFor(v => v.round?.stage === 'intro');
-  assert.equal(score(0), 0);
+  assert.equal(score(0), START);
   await s.host.act({ k: 'h.begin' });
   const r = await s.players[0].act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } });
   assert.ok(r.ok, 'nach Neustart kann erneut abgegeben werden');
@@ -307,15 +308,15 @@ test('Serverneustart: Raum, Spieler, Punkte, Phase und Timer werden aus SQLite w
   assert.ok((await p2.act({ k: 'submit', payload: { lat: 3, lon: 3 } })).ok);
   await h.act({ k: 'h.reveal' });
   await h.waitFor(v => v.round?.stage === 'reveal');
-  assert.equal(h.view!.players.find(x => x.id === ids[0])!.score, 250);
+  assert.equal(h.view!.players.find(x => x.id === ids[0])!.score, START + 250);
   assert.equal(e2.app.store.eventCount(code) > 0, true);
   h.disconnect(); p.disconnect(); p2.disconnect();
 });
 
-test('Admin-Passwort schützt die Raumerstellung (optional)', async () => {
+test('Host-Passwort schützt die Raumerstellung (optional)', async () => {
   const e = await startEnv();
   envs.push(e);
-  e.app.opts.adminPassword = 'geheim';
+  e.app.opts.hostPassword = 'geheim';
   assert.equal((await post(e, '/api/rooms', {})).status, 403);
   assert.equal((await post(e, '/api/rooms', { password: 'geheim' })).status, 200);
 });

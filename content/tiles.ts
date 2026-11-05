@@ -70,9 +70,9 @@ export const TILES: TileDef[] = [
     id: 'schaetz-mal', title: 'Schätz mal!', topic: 'Zahlen & Wetten', icon: '🎯', color: GO, mode: 'estimate', kind: 'tile', football: false,
     blurb: 'Erst schätzt jeder geheim. Dann sehen alle die Tipps – und du setzt Punkte auf die Schätzung, der du am meisten vertraust.',
     tasks: [
-      { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], minStake: 100, prompt: 'Wie viele Kilometer beträgt die Luftlinie zwischen München und Reykjavik?', unit: 'km', answer: 2680,
+      { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], prompt: 'Wie viele Kilometer beträgt die Luftlinie zwischen München und Reykjavik?', unit: 'km', answer: 2680,
         explain: 'München–Reykjavik sind rund 2.680 km Luftlinie – weniger als München–Moskau (rund 2.800 km).' },
-      { mode: 'estimate', seconds: 50, betSeconds: 35, points: 300, bets: [0, 100, 200], minStake: 100, prompt: 'Wie viele Fußballfelder (105 × 68 m) passen auf die Fläche des Saarlands (rund 2.570 km²)?', unit: 'Fußballfelder', answer: 360000,
+      { mode: 'estimate', seconds: 50, betSeconds: 35, points: 300, bets: [0, 100, 200], prompt: 'Wie viele Fußballfelder (105 × 68 m) passen auf die Fläche des Saarlands (rund 2.570 km²)?', unit: 'Fußballfelder', answer: 360000,
         explain: 'Ein Feld hat 7.140 m². Das Saarland hat rund 2.570.000.000 m² – das sind etwa 360.000 Fußballfelder.' },
     ],
   },
@@ -121,9 +121,9 @@ export const TILES: TileDef[] = [
     id: 'halbwissen', title: 'Gefährliches Halbwissen', topic: 'Zahlen & Fakten', icon: '🎲', color: OR, mode: 'estimate', kind: 'tile', football: false,
     blurb: 'Erst schätzt jeder geheim. Dann sehen alle die Tipps – und du setzt Punkte auf die Schätzung, der du am meisten vertraust.',
     tasks: [
-      { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], minStake: 100, prompt: 'Wie viele Sekunden braucht das Licht von der Sonne bis zur Erde?', unit: 'Sekunden', answer: 499,
+      { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], prompt: 'Wie viele Sekunden braucht das Licht von der Sonne bis zur Erde?', unit: 'Sekunden', answer: 499,
         explain: 'Sonnenlicht ist rund 8 Minuten und 19 Sekunden unterwegs – also etwa 499 Sekunden. Die Sonne, die du siehst, ist 8 Minuten alt.' },
-      { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], minStake: 100, prompt: 'Wie viele Bundesligaspiele hat Karl-Heinz Körbel (Eintracht Frankfurt) absolviert – bis heute Rekord?', unit: 'Spiele', answer: 602,
+      { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], prompt: 'Wie viele Bundesligaspiele hat Karl-Heinz Körbel (Eintracht Frankfurt) absolviert – bis heute Rekord?', unit: 'Spiele', answer: 602,
         explain: 'Karl-Heinz Körbel bestritt zwischen 1972 und 1991 genau 602 Bundesligaspiele – alle für die Eintracht.' },
     ],
   },

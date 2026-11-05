@@ -7,6 +7,10 @@ import type { Action, ClientMsg, ServerMsg } from '../shared/types';
 import { Engine, type Actor, type Book } from './engine';
 import type { Room } from './model';
 import { Store } from './store';
+import { ContentService, ApiError } from './content';
+import { AdminAuth } from './auth';
+import { handleAdmin } from './admin';
+import { SCENES } from '../shared/scenes';
 
 interface Conn {
   ws: WebSocket;
@@ -22,6 +26,9 @@ export interface AppOptions {
   book: Book;
   dbFile: string;
   staticDir?: string;
+  /** optional: Passwort zum Erstellen von Räumen (Host-Zugang) */
+  hostPassword?: string;
+  /** optional: Admin-Passwort (sonst wird beim ersten Start eines erzeugt) */
   adminPassword?: string;
   clock?: () => number;
   tickMs?: number;
@@ -36,6 +43,8 @@ const MIME: Record<string, string> = {
 export class App {
   engine: Engine;
   store: Store;
+  content: ContentService;
+  auth: AdminAuth;
   rooms = new Map<string, Room>();
   conns = new Set<Conn>();
   http: Server;
@@ -46,11 +55,13 @@ export class App {
 
   constructor(public opts: AppOptions) {
     this.clock = opts.clock ?? Date.now;
-    this.engine = new Engine(opts.book);
     this.store = new Store(opts.dbFile);
+    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES }, this.clock);
+    this.auth = new AdminAuth(this.store, opts.adminPassword, this.clock);
+    this.engine = new Engine((id: string) => this.content.resolveBook(id));
     for (const r of this.store.loadAll()) this.rooms.set(r.code, r);
     this.store.deleteOlderThan(this.clock() - 14 * 24 * 3600 * 1000);
-    this.http = createHttp((req, res) => { this.handleHttp(req, res).catch(e => { console.error(e); this.json(res, 500, { err: 'server_error' }); }); });
+    this.http = createHttp((req, res) => { this.handleHttp(req, res).catch(e => { if (e instanceof ApiError) return this.json(res, e.status, { err: e.message }); console.error(e); this.json(res, 500, { err: 'server_error' }); }); });
     this.wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
     this.http.on('upgrade', (req, socket, head) => {
       if (!req.url?.startsWith('/ws')) { socket.destroy(); return; }
@@ -179,14 +190,15 @@ export class App {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     res.end(JSON.stringify(body));
   }
-  private async body(req: IncomingMessage): Promise<any> {
+  private async body(req: IncomingMessage, limit = 32 * 1024): Promise<any> {
     const chunks: Buffer[] = [];
     let size = 0;
-    for await (const ch of req) { size += (ch as Buffer).length; if (size > 32 * 1024) throw new Error('too_big'); chunks.push(ch as Buffer); }
+    for await (const ch of req) { size += (ch as Buffer).length; if (size > limit) throw new ApiError(413, 'Anfrage zu groß'); chunks.push(ch as Buffer); }
     if (!chunks.length) return {};
     try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return {}; }
   }
   private async handleHttp(req: IncomingMessage, res: ServerResponse) {
+    res.setHeader('x-content-type-options', 'nosniff');
     const url = new URL(req.url ?? '/', 'http://x');
     const path = url.pathname;
     if (path.startsWith('/api/')) return this.handleApi(req, res, path, url);
@@ -196,15 +208,20 @@ export class App {
     const now = this.clock();
     const parts = path.split('/').filter(Boolean); // api, rooms, CODE, action
     if (path === '/api/health') return this.json(res, 200, { ok: true, rooms: this.rooms.size, now });
+    if (parts[1] === 'admin') return handleAdmin(this, req, res, parts, _url, limit => this.body(req, limit));
+    if (path === '/api/packs' && req.method === 'GET') return this.json(res, 200, this.content.listPublished());
     if (parts[1] !== 'rooms') return this.json(res, 404, { err: 'not_found' });
     if (req.method === 'POST' && parts.length === 2) {
       const b = await this.body(req);
-      if (this.opts.adminPassword && b.password !== this.opts.adminPassword) return this.json(res, 403, { err: 'bad_password' });
+      if (this.opts.hostPassword && b.password !== this.opts.hostPassword) return this.json(res, 403, { err: 'bad_password' });
+      const published = this.content.listPublished();
+      const pick = b.pack ? published.find(p => p.id === b.pack || p.ref === b.pack) : published.find(p => p.ref === this.content.defaultRef());
+      if (!pick) return this.json(res, 400, { err: 'unknown_pack' });
       const code = Engine.newCode(c => this.rooms.has(c));
-      const { room, hostKey } = this.engine.newRoom(code, now);
+      const { room, hostKey } = this.engine.newRoom(code, now, pick.ref);
       this.rooms.set(code, room);
       this.persist(room);
-      return this.json(res, 200, { code, hostKey, hostPin: room.hostPin });
+      return this.json(res, 200, { code, hostKey, hostPin: room.hostPin, pack: pick.name, version: pick.version });
     }
     const code = String(parts[2] ?? '').toUpperCase();
     const room = this.rooms.get(code);

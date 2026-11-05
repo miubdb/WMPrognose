@@ -282,19 +282,42 @@ test('Einzigartig: Host kann unklare Antwort freigeben, mappen oder verwerfen', 
   assert.equal(room.players[0].score, 150); assert.equal(room.players[1].score, 150); assert.equal(room.players[2].score, 500);
 });
 
-test('Mindesteinsatz: Spieler mit 0 Punkten dürfen 100 setzen; Verlust ist gedeckelt, Stand nie negativ', () => {
+test('Einsatz nur aus vorhandenen Punkten: 0 Punkte = kein positiver Einsatz, Verlust exakt der Einsatz', () => {
   const g = mkEngine(3);
-  const { room, host, pl, ids } = g;
+  const { room, host, pl, ids, eng } = g;
+  (eng as any).src = { ...BOOK, rules: { startCredit: 200 } };
   host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
+  assert.ok(room.players.every(p => p.score === 200), 'identisches Startguthaben');
+  // Spieler 1 verliert per Host-Korrektur alles
+  host({ k: 'h.adjust', pid: ids[1], delta: -500, note: 'Test' });
+  assert.equal(room.players[1].score, 0);
   pl(room.players.findIndex(p => p.id === room.pickerId), { k: 'pick', tileId: 'schaetz-mal' });
   host({ k: 'h.begin' });
   pl(0, { k: 'submit', payload: { value: 2680 } }); pl(1, { k: 'submit', payload: { value: 1000 } }); pl(2, { k: 'submit', payload: { value: 90000 } });
-  assert.ok(pl(1, { k: 'submit', payload: { amount: 100, target: ids[2] } }).ok); // auf den schlechtesten Tipp
-  pl(0, { k: 'submit', payload: { amount: 0, target: null } }); pl(2, { k: 'submit', payload: { amount: 0, target: null } });
+  assert.equal(pl(1, { k: 'submit', payload: { amount: 100, target: ids[2] } }).err, 'not_enough_points'); // 0 Punkte: kein Einsatz
+  assert.ok(pl(1, { k: 'submit', payload: { amount: 0, target: null } }).ok);                            // aber schätzen darf er
+  assert.equal(pl(2, { k: 'submit', payload: { amount: 300, target: ids[0] } }).err, 'invalid_bet');       // nicht erlaubter Betrag
+  assert.ok(pl(2, { k: 'submit', payload: { amount: 200, target: ids[1] } }).ok);                         // 200 von 200 vorhanden: erlaubt
+  pl(0, { k: 'submit', payload: { amount: 0, target: null } });
   host({ k: 'h.reveal' });
+  const bet = room.scoreLog.find(e => e.pid === ids[2] && e.label.startsWith('Einsatz verloren'))!;
+  assert.equal(bet.applied, -200); // verliert genau den Einsatz – nie mehr, nie weniger
   assert.ok(room.players.every(p => p.score >= 0));
-  const loss = room.scoreLog.find(e => e.pid === ids[1] && e.label.startsWith('Einsatz verloren'))!;
-  const own = room.scoreLog.find(e => e.pid === ids[1] && e.label.startsWith('Schätzung'))!.applied;
-  assert.ok(-loss.applied <= own + 0); // Verlust nie größer als vorhandene Punkte
-  assert.equal(room.players[1].score, own - 100); // Platz 2: 120 Punkte, 100 verloren
+  assert.equal(room.players[1].score, room.scoreLog.filter(e => e.pid === ids[1]).reduce((a, e) => a + e.applied, 0));
+});
+
+test('Verteilungsregeln: Fußball- und Modus-Limit sperren Kacheln, aber nie alle', () => {
+  const g = mkEngine(3);
+  const { room, host, pl, eng } = g;
+  (eng as any).src = { ...BOOK, rules: { maxFootball: 1, maxPerMode: 2 } };
+  host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
+  const pickerIdx = () => room.players.findIndex(p => p.id === room.pickerId);
+  const play = (id: string) => { const r = pl(pickerIdx(), { k: 'pick', tileId: id }); host({ k: 'h.skipTile' }); return r; };
+  assert.ok(play('koenig-fussball').ok);                              // 1. Fußball-Kachel
+  assert.equal(eng.blockedTiles(room).has('auswaertsspiel'), true);    // weitere Fußball-Kacheln gesperrt
+  assert.equal(pl(pickerIdx(), { k: 'pick', tileId: 'auswaertsspiel' }).err, 'tile_limited');
+  assert.ok(play('geo-daneben').ok); assert.ok(play('damals-wars').ok);
+  // geo-daneben (1 von 2 geo) ok; zweite Rank-Kachel? 'koenig' + 'damals' = 2 rank -> keine weitere rank-Kachel
+  const view = eng.buildView(room, { role: 'tv' }, 0);
+  assert.equal(view.wall, null); // Board nach 3 Kacheln
 });

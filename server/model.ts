@@ -36,6 +36,8 @@ export interface RoundState {
 
 export interface Room {
   code: string;
+  /** Paketversion (Inhaltsstand) dieses Raums, z. B. "standard-1@1" */
+  bookId?: string;
   createdAt: number;
   hostKeyHash: string;
   hostPin: string;

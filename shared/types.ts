@@ -53,8 +53,6 @@ export interface EstimateTask {
   points: number;
   /** Mögliche Einsätze. */
   bets: number[];
-  /** Jeder darf mindestens so viel setzen (Verlust ist durch vorhandene Punkte gedeckelt, Stand nie < 0). */
-  minStake?: number;
   explain: string;
 }
 export interface GlitchZone { x: number; y: number; r: number }
@@ -97,6 +95,17 @@ export interface UniqueTask {
 }
 export type TaskDef = GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask;
 
+/** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
+export interface PackRules { startCredit?: number; maxFootball?: number; maxPerMode?: number }
+/** Fester Inhaltsstand, mit dem ein Raum läuft (unveränderlich nach Veröffentlichung). */
+export interface Book {
+  tiles: TileDef[];
+  scenes?: Record<string, import('./scenes').Scene>;
+  rules?: PackRules;
+  /** Paket-ID@Version, nur Information */
+  ref?: string;
+}
+
 export interface TileDef {
   id: string;
   title: string;
@@ -133,6 +142,8 @@ export interface TileView {
   icon: string;
   color: string;
   status: 'open' | 'selected' | 'played';
+  /** Wegen Verteilungsregeln (Fußball-/Modus-Limit) aktuell nicht wählbar */
+  blocked?: boolean;
   kind: 'tile' | 'surprise' | 'final';
   mode?: Mode; // erst nach dem Öffnen sichtbar
 }

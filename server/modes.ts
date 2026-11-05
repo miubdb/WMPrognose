@@ -4,7 +4,7 @@ import type { PlayerRec, Room, RoundState } from './model';
 import {
   scoreGeo, scoreRank, scoreEstimate, scoreGlitch, scoreCode, codeMatches, groupUnique, scoreUnique, rankPairs,
 } from '../shared/scoring';
-import { SCENES, diffZones } from '../shared/scenes';
+import { SCENES, diffZones, variantItems, type Scene } from '../shared/scenes';
 import { parseNumber } from '../shared/util';
 
 export interface Ctx {
@@ -13,6 +13,7 @@ export interface Ctx {
   task: TaskDef;
   now: number;
   players: PlayerRec[]; // aktive Spieler
+  scenes: Record<string, Scene>;
   setStage(stage: Stage, seconds: number | null): void;
 }
 export type Audience = { role: 'tv' | 'host' | 'player'; pid?: string };
@@ -192,7 +193,7 @@ const estimate: ModeImpl = {
       const target = String(payload?.target ?? '');
       if (!t.bets.includes(amount)) return err('invalid_bet');
       if (amount > 0) {
-        if (amount > Math.max(balanceOf(c, pid), t.minStake ?? 0)) return err('not_enough_points');
+        if (amount > balanceOf(c, pid)) return err('not_enough_points');
         if (c.round.pm[target]?.guess === undefined) return err('invalid_target');
       }
       const val = { amount, target: amount > 0 ? target : null };
@@ -250,7 +251,7 @@ const estimate: ModeImpl = {
     if (a.role === 'player' && a.pid) {
       base.mine = c.round.pm[a.pid] ?? {};
       base.balance = balanceOf(c, a.pid);
-      base.allowance = Math.max(base.balance, t.minStake ?? 0);
+      base.allowance = base.balance;
     }
     if (a.role === 'host') base.solution = `${t.answer} ${t.unit}`;
     return base;
@@ -260,9 +261,9 @@ const estimate: ModeImpl = {
 // =====================================================================
 // GLITCH
 // =====================================================================
-export function glitchZones(t: GlitchTask): GlitchZone[] {
+export function glitchZones(t: GlitchTask, scenes: Record<string, Scene> = SCENES): GlitchZone[] {
   if (t.zones) return t.zones;
-  const s = SCENES[t.scene];
+  const s = scenes[t.scene];
   return s ? diffZones(s) : [];
 }
 const glitch: ModeImpl = {
@@ -286,7 +287,7 @@ const glitch: ModeImpl = {
   complete(c) { return c.round.stage === 'open' && c.players.length > 0 && c.players.every(p => !!c.round.pm[p.id]); },
   score(c) {
     const t = c.task as GlitchTask;
-    const zones = glitchZones(t);
+    const zones = glitchZones(t, c.scenes);
     const rows = c.players.map(p => ({ pid: p.id, tap: c.round.pm[p.id] ?? null, ...scoreGlitch(c.round.pm[p.id], zones, t.points) }));
     return {
       entries: rows.filter(r => r.tap).map(r => ({ pid: r.pid, delta: r.points, label: r.hit ? 'Treffer' : r.points > 0 ? 'Knapp daneben' : 'Daneben' })),
@@ -296,16 +297,20 @@ const glitch: ModeImpl = {
   view(c, a) {
     const t = c.task as GlitchTask;
     const st = c.round.stage;
-    const base: any = { scene: t.scene, prompt: st === 'view' ? t.viewPrompt : t.prompt, variant: st === 'view' ? 'a' : 'b', hasDiff: !t.zones };
+    const sc = c.scenes[t.scene];
+    const variant = st === 'view' ? 'a' : 'b';
+    // Es werden nur die sichtbaren Elemente der aktuellen Variante ausgeliefert – nie die Liste der Änderungen.
+    const sceneData = sc ? { id: sc.id, title: sc.title, bg: sc.bg, items: variantItems(sc, variant) } : null;
+    const base: any = { scene: t.scene, sceneData, prompt: st === 'view' ? t.viewPrompt : t.prompt, variant };
     if (a.role === 'player') {
       // Während der Betrachtungsphase sehen Handys das Bild nicht (nur der TV).
-      if (st === 'view') base.scene = null;
+      if (st === 'view') { base.scene = null; base.sceneData = null; }
       if (a.pid) base.mine = c.round.pm[a.pid] ?? null;
     }
     if (st === 'locked' || st === 'review' || st === 'reveal') {
       base.taps = c.players.filter(p => c.round.pm[p.id]).map(p => ({ pid: p.id, ...c.round.pm[p.id] }));
     }
-    if (a.role === 'host') base.zones = glitchZones(t);
+    if (a.role === 'host') base.zones = glitchZones(t, c.scenes);
     return base;
   },
 };
