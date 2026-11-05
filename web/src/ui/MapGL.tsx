@@ -4,10 +4,13 @@ import { createPortal } from 'react-dom';
 import * as maplibregl from 'maplibre-gl';
 import type { LngLatBoundsLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { layers, LIGHT } from '@protomaps/basemaps';
 import type { MapKind } from '../../../shared/types';
 import { Avatar } from './Avatar';
 import type { LL, MapPin } from './MapView';
+
+(maplibregl as any).setWorkerUrl?.(workerUrl);
 
 interface Props {
   kind: MapKind; mode: 'pick' | 'show'; pin?: LL | null; onPin?: (ll: LL) => void; pins?: MapPin[]; answer?: LL & { label?: string };
@@ -20,7 +23,7 @@ const MAXB: Partial<Record<MapKind, LngLatBoundsLike>> = { germany: [[2.5, 44.5]
 const FLAVOR = { ...LIGHT, background: '#f2efe9', earth: '#f2efe9', water: '#aad3df', water_outline: '#aad3df', park_a: '#c8facc', park_b: '#c8facc', wood_a: '#add19e', wood_b: '#add19e', scrub_a: '#c8d7ab', scrub_b: '#c8d7ab', glacier: '#ffffff', residential: '#e0dfdf', industrial: '#ebdbe8', cemetery: '#aacbaf', boundaries: '#8f7aa8', city_label: '#1d1d24', subplace_label: '#4a4a55', state_label: '#7a6f6a', country_label: '#6a6575' } as typeof LIGHT;
 
 function pinSvg() {
-  return '<svg width="34" height="46" viewBox="-17 -40 34 46"><path d="M0 0 C-10 -14 -15 -22 -15 -30 A15 15 0 1 1 15 -30 C15 -22 10 -14 0 0Z" fill="#14d9c0" stroke="#fff" stroke-width="2.5"/><circle cy="-30" r="5.5" fill="#0a0820"/></svg>';
+  return '<svg width="34" height="53" viewBox="-17 -47 34 53"><path d="M0 0 C-10 -14 -15 -22 -15 -30 A15 15 0 1 1 15 -30 C15 -22 10 -14 0 0Z" fill="#14d9c0" stroke="#fff" stroke-width="2.5"/><circle cy="-30" r="5.5" fill="#0a0820"/></svg>';
 }
 
 export default function MapGL({ kind, mode, pin, onPin, pins = [], answer, fit, disabled, className, uiScale = 1, maxzoom, aspect, onFail }: Props) {
@@ -44,13 +47,20 @@ export default function MapGL({ kind, mode, pin, onPin, pins = [], answer, fit, 
           layers: layers('protomaps', FLAVOR, { lang: 'de' }) as any,
         },
         bounds: BOUNDS[kind], fitBoundsOptions: { padding: 6 }, maxBounds: MAXB[kind], maxZoom: 17.5,
-        attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, renderWorldCopies: false, fadeDuration: 150, cooperativeGestures: false,
+        attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, renderWorldCopies: false, fadeDuration: 150, cooperativeGestures: false, canvasContextAttributes: { preserveDrawingBuffer: true },
       });
     } catch { onFail(); return; }
-    mapRef.current = map;
+    mapRef.current = map; (box.current as any).__map = map;
     map.touchZoomRotate.disableRotation(); map.keyboard.disableRotation?.();
     let failures = 0;
     map.on('error', e => { if (!map.isStyleLoaded() && ++failures > 3) onFail(); void e; });
+    map.on('styleimagemissing', e => {      // Ortssymbole (Punkt / Hauptstadt-Ring) selbst zeichnen, kein Sprite nötig
+      if (map.hasImage(e.id)) return;
+      const n = 24, c = document.createElement('canvas'); c.width = c.height = n; const g = c.getContext('2d')!;
+      g.fillStyle = '#3a3a46'; g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.beginPath(); g.arc(n / 2, n / 2, e.id === 'capital' ? 6 : 4.5, 0, Math.PI * 2); g.stroke(); g.fill();
+      if (e.id === 'capital') { g.fillStyle = '#fff'; g.beginPath(); g.arc(n / 2, n / 2, 2, 0, Math.PI * 2); g.fill(); }
+      map.addImage(e.id, g.getImageData(0, 0, n, n), { pixelRatio: 2 });
+    });
     map.on('load', () => {
       map.setMinZoom(Math.max(0, map.getZoom() - 0.4));
       map.addSource('links', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });

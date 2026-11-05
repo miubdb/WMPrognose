@@ -30,9 +30,14 @@ for (const [label, opts] of [['phone', devices['Pixel 7']], ['desktop', { viewpo
   await p.locator('.modalbox .seg button').first().click(); await sleep(700);
   const box = await p.locator('.adminmap canvas').boundingBox();
   await p.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.6); await sleep(300);
-  const lat1 = await p.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); await p.getByLabel('Breite (lat)').inputValue(); const lon1 = await p.getByLabel('Länge (lon)').inputValue();
+  await p.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); const lat1 = await p.getByLabel('Breite (lat)').inputValue(); const lon1 = await p.getByLabel('Länge (lon)').inputValue();
   check(lat1 && lon1 && +lat1 > 47 && +lat1 < 55.5 && +lon1 > 5 && +lon1 < 16, `${label}: Pin setzt Koordinaten (${lat1}, ${lon1})`);
   await p.locator('.adminmap').screenshot({ path: `${SHOTS}/${label}-pin.png` });
+  // Pin per Ziehen verschieben (am Pinkopf greifen)
+  const hb = await p.locator('.glpin').boundingBox();
+  await p.mouse.move(hb.x + hb.width / 2, hb.y + 12); await p.mouse.down(); await p.mouse.move(hb.x + hb.width / 2 + 60, hb.y + 12 + 40, { steps: 8 }); await p.mouse.up(); await sleep(400);
+  const lat2 = await p.getByLabel('Breite (lat)').inputValue(), lon2 = await p.getByLabel('Länge (lon)').inputValue();
+  check(Math.abs(+lat2 - +lat1) > 0.05 && Math.abs(+lon2 - +lon1) > 0.05, `${label}: Pin lässt sich verschieben (${lat2}, ${lon2})`);
   await ctx.close();
 }
 await browser.close(); srv.kill(); console.log(failures ? `\n${failures} PROBLEME` : '\nKarten-Screenshots OK'); process.exit(failures ? 1 : 0);

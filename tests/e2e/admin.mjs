@@ -9,7 +9,7 @@ const SHOTS = process.env.SHOTS ?? '/tmp/claude-0/shots/admin'; mkdirSync(SHOTS,
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failures = 0; const check = (c, m) => { if (c) console.log('• ✓', m); else { failures++; console.log('✗ FEHLER:', m); } };
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 950 } });
 const page = await ctx.newPage(); page.on('pageerror', e => { failures++; console.log('pageerror', e.message); });
 page.on('dialog', d => d.accept('Notiz E2E'));
@@ -40,7 +40,7 @@ const save = async () => { await page.locator('.modalbox').last().getByRole('but
 await newQ('WO ZUR HÖLLE?');
 await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Wo liegt der Kölner Dom?'); await fill('Ortsname', 'Köln');
 await page.locator('.modalbox .seg button', { hasText: 'Deutschland' }).click(); await sleep(600);
-const box = await page.locator('.adminmap .mapsvg').boundingBox(); await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.5);
+const box = await page.locator('.adminmap .mapsvg, .adminmap canvas.maplibregl-canvas').first().boundingBox(); await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.5);
 await fill('Lösungserklärung', 'Der Dom steht direkt am Hauptbahnhof.');
 await page.screenshot({ path: `${SHOTS}/3-geo-editor.png` });
 await page.locator('.modalbox button', { hasText: '👀 Vorschau' }).last().click(); await page.waitForSelector('.frametabs'); await sleep(1500);

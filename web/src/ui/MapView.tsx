@@ -276,5 +276,5 @@ export function MapView(props: Props) {
   const holder = (txt: string) => <div className={`mapwrap gl ${props.className ?? ''}`} style={{ aspectRatio: ASPECT[props.kind] }}><div className="maploading">{txt}</div></div>;
   if (st === undefined) return holder('Karte lädt …');
   if (!st || failed) return <MapViewSvg {...props} />;
-  return <Suspense fallback={holder('Karte lädt …')}><MapGL {...props} maxzoom={st.maxzoom} aspect={ASPECT[props.kind]} onFail={() => setFailed(true)} /></Suspense>;
+  return <Suspense fallback={holder('Karte lädt …')}><MapGL {...props} maxzoom={st.source === 'local' && props.kind !== 'germany' ? Math.min(st.maxzoom, 7) : st.maxzoom} aspect={ASPECT[props.kind]} onFail={() => setFailed(true)} /></Suspense>;
 }

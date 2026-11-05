@@ -14,7 +14,7 @@ const log = (...a) => console.log('•', ...a);
 let failures = 0;
 const check = (cond, msg) => { if (cond) log('✓', msg); else { failures++; console.log('✗ FEHLER:', msg); } };
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.NOGL ? {} : { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const hostCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const tvCtx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
 const host = await hostCtx.newPage();
@@ -83,12 +83,12 @@ await phones[0].p.screenshot({ path: `${SHOTS}/phone-intro.png` });
 await host.getByText('Aufgabe 1 starten').click();
 
 // 6. Karte: jeder setzt einen Pin
-for (const ph of phones) await ph.p.waitForSelector('.mapsvg');
+for (const ph of phones) await ph.p.waitForSelector('.mapsvg, canvas.maplibregl-canvas');
 await sleep(1500);
 await tv.screenshot({ path: `${SHOTS}/tv-geo-open.png` });
 let i = 0;
 for (const ph of phones) {
-  const box = await ph.p.locator('.mapsvg').boundingBox();
+  const box = await ph.p.locator('.mapsvg, canvas.maplibregl-canvas').first().boundingBox();
   await ph.p.mouse.click(box.x + box.width * (0.45 + 0.06 * i), box.y + box.height * (0.35 + 0.04 * i));
   i++;
   await ph.p.getByRole('button', { name: 'Tipp abgeben' }).click();
@@ -107,7 +107,7 @@ check(true, 'Reload: Spieler 2 ist wieder drin, Antwort bleibt gespeichert');
 await host.getByText('Sofort auflösen').click();
 await tv.waitForSelector('.pointslist .prow');
 await sleep(4500);
-await tv.screenshot({ path: `${SHOTS}/tv-geo-reveal.png` });
+await sleep(3500); await tv.screenshot({ path: `${SHOTS}/tv-geo-reveal.png` });
 await phones[0].p.waitForSelector('.reveal .pts');
 await phones[0].p.screenshot({ path: `${SHOTS}/phone-reveal.png` });
 await host.screenshot({ path: `${SHOTS}/host-reveal.png` });

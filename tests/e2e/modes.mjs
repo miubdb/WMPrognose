@@ -27,7 +27,7 @@ await new Promise(res => { hws.on('open', () => hws.send(JSON.stringify({ t: 'he
 const H = async a => { const id = 'e' + ++n; hws.send(JSON.stringify({ t: 'act', reqId: id, a })); while (!acks.has(id)) await sleep(30); const r = acks.get(id); if (!r.ok) console.log('  host act failed', a.k, r.err); await sleep(60); return r; };
 const waitHost = async (pred, ms = 8000) => { const t0 = Date.now(); while (!pred(hostView)) { if (Date.now() - t0 > ms) throw new Error('timeout host wait ' + hostView.room.phase + ' ' + hostView.round?.stage); await sleep(50); } };
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.NOGL ? {} : { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const tv = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage();
 tv.on('pageerror', e => console.log('TV pageerror', e.message));
 await tv.goto(`${BASE}/tv/${code}`); await tv.getByText('Bildschirm starten').click();
