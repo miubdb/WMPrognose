@@ -1,6 +1,7 @@
 // Online-Admin auf Vercel (Serverless). Es läuft derselbe Admin-Code wie lokal; die SQLite-Inhaltsdatenbank
 // wird dauerhaft in einem PRIVATEN Vercel-Blob-Speicher abgelegt (optimistische Sperre per ETag/ifMatch).
 // Die Gameshow selbst (WebSockets) läuft online NICHT – sie wird lokal auf dem Laptop gespielt.
+import { RemoteTiles, handleMapTiles } from './maptiles';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs';
@@ -192,9 +193,13 @@ async function readBodyOf(req: any, limit: number): Promise<any> {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return {}; }
 }
 
+let _rt: RemoteTiles | null = null;
+const remoteTiles = () => (_rt ??= new RemoteTiles(process.env.MAP_PMTILES_URL ?? 'https://build.protomaps.com/20261104.pmtiles'));
+
 export async function handleVercel(req: IncomingMessage, res: ServerResponse, online: OnlineAdmin = getOnline()) {
   res.setHeader('x-content-type-options', 'nosniff');
   const url = new URL(req.url ?? '/', 'http://x');
+  if (url.pathname.startsWith('/api/maptiles/')) { await handleMapTiles(remoteTiles(), req, res, url.pathname); return; }
   const parts = url.pathname.split('/').filter(Boolean); // api, ...
   const st = online.status();
   if (url.pathname === '/api/health') return sendJson(res, 200, { ok: true, mode: 'online', gameshow: false, storage: { configured: st.storage, kind: 'vercel-blob' }, admin: { passwordConfigured: st.password } });

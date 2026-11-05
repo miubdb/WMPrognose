@@ -1,7 +1,7 @@
 // HTTP-API + WebSocket-Hub. Autoritativer Zustand liegt hier und in SQLite.
 import { createServer as createHttp, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { extname, join, normalize, resolve } from 'node:path';
+import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Action, ClientMsg, ServerMsg } from '../shared/types';
 import { Engine, type Actor, type Book } from './engine';
@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
 import { SCENES } from '../shared/scenes';
 import { netInfo } from './net';
+import { LocalTiles, handleMapTiles } from './maptiles';
 
 interface Conn {
   ws: WebSocket;
@@ -41,12 +42,14 @@ export interface AppOptions {
   /** Verzeichnis für automatische Sicherungen (leer = aus) */
   backupDir?: string;
   backupEveryMin?: number;
+  /** MBTiles-Datei der Offline-Karte (Standard: <Datenordner>/maps/outplay-karte.mbtiles) */
+  mapFile?: string;
 }
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
-  '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
+  '.woff2': 'font/woff2', '.pbf': 'application/x-protobuf', '.txt': 'text/plain; charset=utf-8',
 };
 
 export class App {
@@ -54,6 +57,7 @@ export class App {
   store: Store;
   content: ContentService;
   auth: AdminAuth;
+  tiles: LocalTiles;
   rooms = new Map<string, Room>();
   conns = new Set<Conn>();
   http: Server;
@@ -79,6 +83,7 @@ export class App {
   }
 
   constructor(public opts: AppOptions) {
+    this.tiles = new LocalTiles(opts.mapFile ?? join(dirname(opts.dbFile), 'maps', 'outplay-karte.mbtiles'));
     this.clock = opts.clock ?? Date.now;
     this.store = new Store(opts.dbFile);
     this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES }, this.clock);
@@ -239,6 +244,7 @@ export class App {
   private async handleApi(req: IncomingMessage, res: ServerResponse, path: string, _url: URL) {
     const now = this.clock();
     const parts = path.split('/').filter(Boolean); // api, rooms, CODE, action
+    if (path.startsWith('/api/maptiles/')) { await handleMapTiles(this.tiles, req, res, path); return; }
     if (path === '/api/health') return this.json(res, 200, { ok: true, mode: 'local', rooms: this.rooms.size, now, backup: this.lastBackup ? { at: this.lastBackup.at } : null });
     if (parts[1] === 'admin') return handleAdmin(this.adminCtx, req, res, parts, _url, limit => this.body(req, limit));
     if (path === '/api/netinfo') return this.json(res, 200, netInfo((this.http.address() as any)?.port ?? 8080, this.opts.publicHost));

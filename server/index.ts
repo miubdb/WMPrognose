@@ -12,6 +12,7 @@ const app = new App({
   publicHost: process.env.OUTPLAY_HOST || process.env.PUBLIC_URL || undefined,
   hostPassword: process.env.HOST_PASSWORD || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || undefined,
+  mapFile: process.env.MAP_FILE || undefined,
 });
 if (app.auth.initialPassword) {
   const f = `${dataDir}/admin-passwort.txt`;

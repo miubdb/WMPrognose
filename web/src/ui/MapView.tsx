@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MapKind, Avatar as AvatarT } from '../../../shared/types';
 import { Avatar } from './Avatar';
 import { HEIGHTS, MAX_ZOOM, W, layoutLabels, prepareMap, type Prepared, type LabelItem } from './mapGeo';
@@ -28,7 +28,7 @@ const C = {
 
 const clampN = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-export function MapView({ kind, mode, pin, onPin, pins = [], answer, fit, disabled, className, uiScale = 1 }: Props) {
+export function MapViewSvg({ kind, mode, pin, onPin, pins = [], answer, fit, disabled, className, uiScale = 1 }: Props) {
   const [geo, setGeo] = useState<Prepared | null>(null);
   const H = HEIGHTS[kind], maxK = MAX_ZOOM[kind];
   const svgRef = useRef<SVGSVGElement>(null);
@@ -254,3 +254,27 @@ const Labels = memo(function Labels({ placed, k, S }: { placed: { it: LabelItem;
     }
   })}</g>;
 });
+
+// ---------------------------------------------------------------- Auswahl: Vektorkarte (MapLibre) oder SVG-Notkarte
+export interface TileStatus { available: boolean; minzoom: number; maxzoom: number; source: string }
+let statusP: Promise<TileStatus | null> | null = null;
+function webglOk() { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } }
+export function useTileStatus() {
+  const [st, setSt] = useState<TileStatus | null | undefined>(undefined);
+  useEffect(() => {
+    statusP ??= fetch('/api/maptiles/status').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    statusP.then(s => setSt(s && s.available && webglOk() ? s : null));
+  }, []);
+  return st;
+}
+const MapGL = lazy(() => import('./MapGL'));
+const ASPECT: Record<MapKind, string> = { germany: '4 / 4.3', europe: '10 / 9', world: '2 / 1.1' };
+
+export function MapView(props: Props) {
+  const st = useTileStatus();
+  const [failed, setFailed] = useState(false);
+  const holder = (txt: string) => <div className={`mapwrap gl ${props.className ?? ''}`} style={{ aspectRatio: ASPECT[props.kind] }}><div className="maploading">{txt}</div></div>;
+  if (st === undefined) return holder('Karte lädt …');
+  if (!st || failed) return <MapViewSvg {...props} />;
+  return <Suspense fallback={holder('Karte lädt …')}><MapGL {...props} maxzoom={st.maxzoom} aspect={ASPECT[props.kind]} onFail={() => setFailed(true)} /></Suspense>;
+}
