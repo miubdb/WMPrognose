@@ -39,7 +39,7 @@ test('Online: ohne Blob-Speicher oder ohne ADMIN_PASSWORD wird NICHT still "flü
 });
 
 test('Online: Login, Secure-Cookie, Erstinitialisierung (34 Fragen), Schreiben, Persistenz über "Kaltstart" (neue Instanz)', async () => {
-  const blob = newBlob(); const opts = { adminPassword: PW, checkEveryMs: 0 };
+  const blob = newBlob(); const opts = { adminPassword: PW };
   const a = await boot(new OnlineAdmin(blob, opts));
   assert.equal((await a.call('POST', '/api/admin/login', { password: 'falsch' })).status, 401);
   const l = await a.call('POST', '/api/admin/login', { password: PW }); assert.equal(l.status, 200);
@@ -58,31 +58,61 @@ test('Online: Login, Secure-Cookie, Erstinitialisierung (34 Fragen), Schreiben, 
 });
 
 test('Online: Passwort-Falschversuche werden persistent gesperrt (über Instanzen hinweg)', async () => {
-  const blob = newBlob(); const opts = { adminPassword: PW, checkEveryMs: 0 };
+  const blob = newBlob(); const opts = { adminPassword: PW };
   const a = await boot(new OnlineAdmin(blob, opts));
   let last = 0; for (let i = 0; i < 9; i++) last = (await a.call('POST', '/api/admin/login', { password: 'nein' + i })).status;
   assert.equal(last, 429);
   const b = await boot(new OnlineAdmin(blob, opts)); assert.equal((await b.call('POST', '/api/admin/login', { password: PW })).status, 429);
 });
 
-test('Online: Schreibkonflikt (veralteter Stand) wird erkannt und überschreibt nichts', async () => {
+test('Online: Schreiben nach Schreiben einer anderen Instanz führt NICHT zum 409 – beide Änderungen bleiben erhalten', async () => {
   const blob = newBlob();
-  const a = await boot(new OnlineAdmin(blob, { adminPassword: PW, checkEveryMs: 0 }));
+  const a = await boot(new OnlineAdmin(blob, { adminPassword: PW }));
   await a.call('POST', '/api/admin/login', { password: PW });
-  const stale = await boot(new OnlineAdmin(blob, { adminPassword: PW, checkEveryMs: 3600_000 })); stale.setCookie(a.getCookie());
-  assert.equal((await stale.call('GET', '/api/admin/overview')).status, 200);        // lädt den Stand, merkt sich ETag
-  await a.call('POST', '/api/admin/questions', q);                                    // anderswo wird geschrieben
-  const r = await stale.call('POST', '/api/admin/questions', { ...q, topic: 'Verloren?' });
-  assert.equal(r.status, 409); assert.equal(r.data.conflict, true);
-  const fresh = await boot(new OnlineAdmin(blob, { adminPassword: PW, checkEveryMs: 0 })); fresh.setCookie(a.getCookie());
-  assert.equal((await fresh.call('GET', '/api/admin/questions?q=Online-Testhausen')).data.length, 1, 'der erste Schreibvorgang blieb erhalten');
-  assert.equal((await fresh.call('GET', '/api/admin/questions?topic=Verloren%3F')).data.length, 0, 'der veraltete Schreibvorgang wurde nicht angewendet');
+  const b = await boot(new OnlineAdmin(blob, { adminPassword: PW })); b.setCookie(a.getCookie());
+  assert.equal((await b.call('GET', '/api/admin/overview')).status, 200);               // Instanz B kennt den alten Stand
+  await a.call('POST', '/api/admin/questions', q);                                      // A schreibt
+  const r = await b.call('POST', '/api/admin/questions', { ...q, task: { ...q.task, prompt: 'Zweite Frage' } });  // B schreibt direkt danach
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const fresh = await boot(new OnlineAdmin(blob, { adminPassword: PW })); fresh.setCookie(a.getCookie());
+  assert.equal((await fresh.call('GET', '/api/admin/questions?topic=Online')).data.length, 2, 'beide Schreibvorgänge sind gespeichert');
+});
+
+test('Online: viele gleichzeitige Schreibvorgänge über mehrere Instanzen – keiner geht verloren', async () => {
+  const blob = newBlob();
+  const insts = await Promise.all([0, 1, 2].map(async () => boot(new OnlineAdmin(blob, { adminPassword: PW }))));
+  await insts[0].call('POST', '/api/admin/login', { password: PW }); insts.forEach(i => i.setCookie(insts[0].getCookie()));
+  const rs = await Promise.all(Array.from({ length: 12 }, (_, i) => insts[i % 3].call('POST', '/api/admin/questions', { ...q, task: { ...q.task, prompt: 'Parallel ' + i } })));
+  assert.ok(rs.every(r => r.status === 201), JSON.stringify(rs.map(r => r.status)));
+  const fresh = await boot(new OnlineAdmin(blob, { adminPassword: PW })); fresh.setCookie(insts[0].getCookie());
+  assert.equal((await fresh.call('GET', '/api/admin/questions?q=Parallel')).data.length, 12);
+});
+
+test('Online: normale Einzelbenutzer-Abfolge (Frage erstellen, Kategorie speichern ohne Änderung, mehrfach speichern, neu laden) ohne 409', async () => {
+  const blob = newBlob(); const a = await boot(new OnlineAdmin(blob, { adminPassword: PW }));
+  await a.call('POST', '/api/admin/login', { password: PW });
+  const c = await a.call('POST', '/api/admin/questions', q); assert.equal(c.status, 201);
+  const cat = (await a.call('GET', '/api/admin/categories/geo-daneben')).data;
+  for (let i = 0; i < 4; i++) { const r = await a.call('PUT', '/api/admin/categories/geo-daneben', { ...cat, ifUpdated: (await a.call('GET', '/api/admin/categories/geo-daneben')).data.updated }); assert.equal(r.status, 200, JSON.stringify(r.data)); }
+  let last = c.data; for (let i = 0; i < 5; i++) { const r = await a.call('PUT', '/api/admin/questions/' + c.data.id, { task: { ...q.task, prompt: 'V' + i }, topic: 'Online', ifUpdated: last.updated }); assert.equal(r.status, 200, JSON.stringify(r.data)); last = r.data; }
+  const b = await boot(new OnlineAdmin(blob, { adminPassword: PW })); b.setCookie(a.getCookie());
+  assert.equal((await b.call('GET', '/api/admin/questions/' + c.data.id)).data.task.prompt, 'V4');
+});
+
+test('Online: Änderung am selben Eintrag von zwei Seiten: der zweite wird als echter Konflikt gemeldet und überschreibt nichts', async () => {
+  const blob = newBlob(); const a = await boot(new OnlineAdmin(blob, { adminPassword: PW })); await a.call('POST', '/api/admin/login', { password: PW });
+  const b = await boot(new OnlineAdmin(blob, { adminPassword: PW })); b.setCookie(a.getCookie());
+  const c = (await a.call('POST', '/api/admin/questions', q)).data;
+  const r1 = await a.call('PUT', '/api/admin/questions/' + c.id, { task: { ...q.task, prompt: 'von A' }, topic: 'Online', ifUpdated: c.updated }); assert.equal(r1.status, 200);
+  const r2 = await b.call('PUT', '/api/admin/questions/' + c.id, { task: { ...q.task, prompt: 'von B' }, topic: 'Online', ifUpdated: c.updated });
+  assert.equal(r2.status, 409); assert.equal(r2.data.details.recordConflict, true);
+  assert.equal((await b.call('GET', '/api/admin/questions/' + c.id)).data.task.prompt, 'von A');
 });
 
 test('Online: schlägt das Speichern fehl, wird NICHT Erfolg gemeldet', async () => {
   const inner = newBlob(); let fail = false;
   const flaky: BlobBackend = { head: () => inner.head(), get: () => inner.get(), put: async (b, m) => { if (fail) throw new Error('Blob down'); return inner.put(b, m); } };
-  const a = await boot(new OnlineAdmin(flaky, { adminPassword: PW, checkEveryMs: 0 }));
+  const a = await boot(new OnlineAdmin(flaky, { adminPassword: PW }));
   await a.call('POST', '/api/admin/login', { password: PW });
   fail = true;
   const r = await a.call('POST', '/api/admin/questions', q); assert.equal(r.status, 503); assert.match(r.data.err, /NICHT gesichert/);
@@ -91,7 +121,7 @@ test('Online: schlägt das Speichern fehl, wird NICHT Erfolg gemeldet', async ()
 });
 
 test('Online: Sicherheit – nicht angemeldet = 401, CSRF-Header Pflicht, Gameshow-API klar abgelehnt, Backup nur mit Anmeldung', async () => {
-  const blob = newBlob(); const a = await boot(new OnlineAdmin(blob, { adminPassword: PW, checkEveryMs: 0 }));
+  const blob = newBlob(); const a = await boot(new OnlineAdmin(blob, { adminPassword: PW }));
   for (const [m, p] of [['GET', '/api/admin/questions'], ['POST', '/api/admin/questions'], ['GET', '/api/admin/export'], ['GET', '/api/admin/backup'], ['POST', '/api/admin/import'], ['GET', '/api/admin/packs']] as const)
     assert.equal((await a.call(m, p, m === 'GET' ? undefined : {})).status, 401, `${m} ${p}`);
   await a.call('POST', '/api/admin/login', { password: PW });
@@ -101,7 +131,7 @@ test('Online: Sicherheit – nicht angemeldet = 401, CSRF-Header Pflicht, Gamesh
 });
 
 test('Online: Voll-Backup (SQLite) ist eine gültige, vollständige Datenbank', async () => {
-  const blob = newBlob(); const a = await boot(new OnlineAdmin(blob, { adminPassword: PW, checkEveryMs: 0 }));
+  const blob = newBlob(); const a = await boot(new OnlineAdmin(blob, { adminPassword: PW }));
   await a.call('POST', '/api/admin/login', { password: PW }); await a.call('POST', '/api/admin/questions', q);
   const srvBase = (servers[servers.length - 1].address() as any).port;
   const r = await fetch(`http://127.0.0.1:${srvBase}/api/admin/backup`, { headers: { cookie: a.getCookie() } });

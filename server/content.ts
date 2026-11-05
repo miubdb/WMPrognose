@@ -135,8 +135,13 @@ export class ContentService {
     this.db.prepare('INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)').run(qid, task.mode, String(raw.topic ?? '').trim().slice(0, 60), JSON.stringify(task), t, t);
     return this.getQuestion(qid);
   }
-  updateQuestion(id: string, raw: { task?: any; topic?: string; archived?: boolean }) {
+  /** Optional: ifUpdated = Zeitstempel, den der Client geladen hat. Weicht er ab, wurde der Eintrag zwischenzeitlich geändert -> echter Konflikt. */
+  private checkStamp(kind: string, current: number, ifUpdated: unknown) {
+    if (ifUpdated !== undefined && ifUpdated !== null && Number(ifUpdated) !== current) throw new ApiError(409, `Dieser Eintrag (${kind}) wurde zwischenzeitlich woanders geändert. Bitte neu laden, damit nichts überschrieben wird.`, { recordConflict: true });
+  }
+  updateQuestion(id: string, raw: { task?: any; topic?: string; archived?: boolean; ifUpdated?: number }) {
     const cur = this.getQuestion(id);
+    this.checkStamp('Frage', cur.updated, raw.ifUpdated);
     const task = raw.task ? this.cleanTask(raw.task) : cur.task;
     if (task.mode !== cur.mode && cur.usedIn.length) throw new ApiError(409, 'Der Spielmodus einer Frage in einer Kategorie kann nicht geändert werden');
     this.db.prepare('UPDATE questions SET mode=?, topic=?, data=?, archived=?, updated=? WHERE id=?').run(task.mode, raw.topic !== undefined ? String(raw.topic).trim().slice(0, 60) : cur.topic, JSON.stringify(task), (raw.archived ?? cur.archived) ? 1 : 0, this.now(), id);
@@ -185,7 +190,7 @@ export class ContentService {
     for (const q of c.taskIds) if (!this.db.prepare('SELECT 1 FROM questions WHERE id=?').get(q)) throw new ApiError(422, `Frage ${q} existiert nicht`);
   }
   updateCategory(id: string, raw: any) {
-    this.getCategory(id);
+    this.checkStamp('Kategorie', this.getCategory(id).updated, raw?.ifUpdated);
     const c = normalizeCategory(raw); this.checkTaskIds(c);
     this.db.prepare('UPDATE categories SET data=?, updated=? WHERE id=?').run(JSON.stringify(c), this.now(), id);
     return this.getCategory(id);
@@ -215,7 +220,7 @@ export class ContentService {
     return this.getPack(pid);
   }
   updatePack(id: string, raw: any) {
-    this.getPack(id);
+    this.checkStamp('Paket', this.getPack(id).updated, raw?.ifUpdated);
     const d = normalizePack(raw);
     if (!d.name) throw new ApiError(422, 'Name fehlt');
     this.db.prepare('UPDATE packs SET data=?, updated=? WHERE id=?').run(JSON.stringify(d), this.now(), id);

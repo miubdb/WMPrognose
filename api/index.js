@@ -32999,8 +32999,13 @@ var ContentService = class {
     this.db.prepare("INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)").run(qid, task.mode, String(raw.topic ?? "").trim().slice(0, 60), JSON.stringify(task), t, t);
     return this.getQuestion(qid);
   }
+  /** Optional: ifUpdated = Zeitstempel, den der Client geladen hat. Weicht er ab, wurde der Eintrag zwischenzeitlich geändert -> echter Konflikt. */
+  checkStamp(kind, current, ifUpdated) {
+    if (ifUpdated !== void 0 && ifUpdated !== null && Number(ifUpdated) !== current) throw new ApiError(409, `Dieser Eintrag (${kind}) wurde zwischenzeitlich woanders ge\xE4ndert. Bitte neu laden, damit nichts \xFCberschrieben wird.`, { recordConflict: true });
+  }
   updateQuestion(id, raw) {
     const cur = this.getQuestion(id);
+    this.checkStamp("Frage", cur.updated, raw.ifUpdated);
     const task = raw.task ? this.cleanTask(raw.task) : cur.task;
     if (task.mode !== cur.mode && cur.usedIn.length) throw new ApiError(409, "Der Spielmodus einer Frage in einer Kategorie kann nicht ge\xE4ndert werden");
     this.db.prepare("UPDATE questions SET mode=?, topic=?, data=?, archived=?, updated=? WHERE id=?").run(task.mode, raw.topic !== void 0 ? String(raw.topic).trim().slice(0, 60) : cur.topic, JSON.stringify(task), raw.archived ?? cur.archived ? 1 : 0, this.now(), id);
@@ -33053,7 +33058,7 @@ var ContentService = class {
     for (const q of c.taskIds) if (!this.db.prepare("SELECT 1 FROM questions WHERE id=?").get(q)) throw new ApiError(422, `Frage ${q} existiert nicht`);
   }
   updateCategory(id, raw) {
-    this.getCategory(id);
+    this.checkStamp("Kategorie", this.getCategory(id).updated, raw?.ifUpdated);
     const c = normalizeCategory(raw);
     this.checkTaskIds(c);
     this.db.prepare("UPDATE categories SET data=?, updated=? WHERE id=?").run(JSON.stringify(c), this.now(), id);
@@ -33096,7 +33101,7 @@ var ContentService = class {
     return this.getPack(pid);
   }
   updatePack(id, raw) {
-    this.getPack(id);
+    this.checkStamp("Paket", this.getPack(id).updated, raw?.ifUpdated);
     const d = normalizePack(raw);
     if (!d.name) throw new ApiError(422, "Name fehlt");
     this.db.prepare("UPDATE packs SET data=?, updated=? WHERE id=?").run(JSON.stringify(d), this.now(), id);
@@ -36158,12 +36163,19 @@ var SdkBlobBackend = class {
   async put(bytes2, ifMatch) {
     const b = await this.sdk();
     try {
-      const r = await b.put(this.pathname, bytes2, { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream", cacheControlMaxAge: 60, ...ifMatch ? { ifMatch } : {} });
-      const h = await b.head(r.pathname);
-      return h.etag;
+      const opts = { access: "private", addRandomSuffix: false, contentType: "application/octet-stream", cacheControlMaxAge: 60, allowOverwrite: !!ifMatch, ...ifMatch ? { ifMatch } : {} };
+      const r = await b.put(this.pathname, bytes2, opts);
+      return r.etag ?? (await b.head(this.pathname)).etag;
     } catch (e) {
-      if (e instanceof b.BlobPreconditionFailedError) throw new ConflictError("etag");
+      if (e instanceof b.BlobPreconditionFailedError || /already exists/i.test(String(e?.message))) throw new ConflictError("etag");
       throw e;
+    }
+  }
+  async destroy() {
+    const b = await this.sdk();
+    try {
+      await b.del(this.pathname);
+    } catch {
     }
   }
 };
@@ -36192,7 +36204,6 @@ var OnlineAdmin = class {
   async ensure() {
     const b = this.backend;
     const l = this.live;
-    if (l && this.now() - l.checkedAt < (this.opts.checkEveryMs ?? 2500)) return l;
     const head2 = await b.head();
     if (l && head2 && head2.etag === l.etag) {
       l.checkedAt = this.now();
@@ -36212,10 +36223,20 @@ var OnlineAdmin = class {
     const content = new ContentService(store, { tiles: TILES, scenes: SCENES }, this.now);
     const auth = new AdminAuth(store, this.opts.adminPassword, this.now, { passwordRequiredFromEnv: true });
     this.live = { store, content, auth, etag, checkedAt: this.now(), file };
-    if (content.wasSeeded) await this.persist(true);
+    if (content.wasSeeded) {
+      try {
+        await this.persist();
+      } catch (e) {
+        if (e instanceof ConflictError) {
+          this.close();
+          return this.ensure();
+        }
+        throw e;
+      }
+    }
     return this.live;
   }
-  async persist(force = false) {
+  async persist() {
     const l = this.live;
     const snap = join(this.dir, "snap.db");
     if (existsSync2(snap)) rmSync2(snap);
@@ -36229,7 +36250,6 @@ var OnlineAdmin = class {
       this.close();
       throw e;
     }
-    void force;
   }
   /** Eine Admin-Anfrage ausführen. Schreibende Anfragen werden VOR der Antwort dauerhaft gespeichert. */
   handle(req, res, parts, url, readBody) {
@@ -36238,35 +36258,47 @@ var OnlineAdmin = class {
       if (!st.storage || !st.password) {
         return sendJson(res, 503, { err: !st.storage ? "Speicher nicht eingerichtet (Vercel Blob fehlt)" : "ADMIN_PASSWORD ist nicht gesetzt", setup: !st.storage ? "blob" : "password", status: st });
       }
-      let live;
-      try {
-        live = await this.ensure();
-      } catch (e) {
-        return sendJson(res, 503, { err: "Speicher nicht erreichbar: " + String(e?.message ?? e).slice(0, 200), setup: "blob-error" });
-      }
-      const before = live.store.db.prepare("PRAGMA data_version").get();
-      void before;
-      const buffered = new Buffered();
       const method = req.method ?? "GET";
-      const ctx = { auth: live.auth, content: live.content, roomCount: () => 0, mode: "online", backup: () => {
-        const f = join(this.dir, "bk.db");
-        if (existsSync2(f)) rmSync2(f);
-        live.store.backupTo(f);
-        const bt = readFileSync(f);
-        rmSync2(f, { force: true });
-        return bt;
-      } };
       const wrote = method !== "GET" || parts[2] === "login";
-      await handleAdmin(ctx, req, buffered, parts, url, readBody);
-      if (wrote && buffered.status < 500 && !(buffered.status >= 400 && parts[2] !== "login")) {
+      const body = method === "GET" ? {} : await readBody(8 * 1024 * 1024);
+      let lastConflict = false;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        let live;
+        try {
+          live = await this.ensure();
+        } catch (e) {
+          return sendJson(res, 503, { err: "Speicher nicht erreichbar: " + String(e?.message ?? e).slice(0, 200), setup: "blob-error" });
+        }
+        const buffered = new Buffered();
+        const ctx = { auth: live.auth, content: live.content, roomCount: () => 0, mode: "online", backup: () => {
+          const f = join(this.dir, "bk.db");
+          if (existsSync2(f)) rmSync2(f);
+          live.store.backupTo(f);
+          const bt = readFileSync(f);
+          rmSync2(f, { force: true });
+          return bt;
+        } };
+        await handleAdmin(ctx, req, buffered, parts, url, async () => body);
+        const failed = buffered.status >= 400 && parts[2] !== "login";
+        if (!wrote || buffered.status >= 500 || failed) {
+          buffered.flushTo(res);
+          return;
+        }
         try {
           await this.persist();
+          buffered.flushTo(res);
+          return;
         } catch (e) {
-          if (e instanceof ConflictError) return sendJson(res, 409, { err: "Konflikt: Die Daten wurden zwischenzeitlich anderswo ge\xE4ndert. Bitte Seite neu laden und die \xC4nderung wiederholen.", conflict: true });
+          if (e instanceof ConflictError) {
+            lastConflict = true;
+            this.close();
+            continue;
+          }
           return sendJson(res, 503, { err: "Speichern fehlgeschlagen \u2013 \xC4nderung NICHT gesichert: " + String(e?.message ?? e).slice(0, 160) });
         }
       }
-      buffered.flushTo(res);
+      void lastConflict;
+      return sendJson(res, 409, { err: "Der Speicher wird gerade von mehreren Seiten gleichzeitig ver\xE4ndert. Bitte in ein paar Sekunden erneut speichern \u2013 es ging nichts verloren.", conflict: true });
     };
     const p = this.chain.then(run, run);
     this.chain = p.catch(() => {
@@ -36345,56 +36377,89 @@ async function readBodyOf(req, limit) {
     return {};
   }
 }
-async function blobDiagnostics() {
-  const b = await Promise.resolve().then(() => (init_dist(), dist_exports));
-  const path = `outplay/selftest/diag-${Date.now()}.bin`;
-  const out = { path, steps: [] };
-  const step = async (name, fn) => {
+async function blobFlowTest() {
+  const { Readable: Readable2 } = await import("node:stream");
+  const path = `outplay/selftest/flow-${Date.now()}.db`;
+  const backend = new SdkBlobBackend(path);
+  const PW = "selftest-password-1";
+  const mkInst = () => new OnlineAdmin(backend, { adminPassword: PW });
+  const report = [];
+  const check = (name, ok, detail) => report.push({ name, ok, ...detail !== void 0 ? { detail } : {} });
+  const call = async (inst, method, p, body, cookie2 = "") => {
+    const u = new URL("http://x" + p);
+    const parts = u.pathname.split("/").filter(Boolean);
+    const req = Object.assign(Readable2.from([]), { headers: { "x-outplay-admin": "1", "x-forwarded-proto": "https", host: "x", ...cookie2 ? { cookie: cookie2 } : {} }, method, url: p, socket: { remoteAddress: "1.2.3.4" } });
+    const out = { status: 0, headers: {}, chunks: [], writeHead(st, h = {}) {
+      this.status = st;
+      Object.assign(this.headers, Object.fromEntries(Object.entries(h).map(([k, v]) => [k.toLowerCase(), v])));
+      return this;
+    }, setHeader() {
+    }, end(c) {
+      if (c !== void 0) this.chunks.push(Buffer.from(c));
+    } };
+    await inst.handle(req, out, parts, u, async () => body ?? {});
+    const text = Buffer.concat(out.chunks).toString("utf8");
+    let data = text;
     try {
-      out.steps.push({ name, ok: true, ...await fn() });
-    } catch (e) {
-      out.steps.push({ name, ok: false, err: `${e?.constructor?.name}: ${String(e?.message ?? e).slice(0, 200)}` });
+      data = JSON.parse(text);
+    } catch {
     }
+    return { status: out.status, data, cookie: String(out.headers["set-cookie"] ?? "").split(";")[0] };
   };
-  let r1, h1, g1, h2;
-  await step("put#1", async () => {
-    r1 = await b.put(path, Buffer.from("A"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream" });
-    return { keys: Object.keys(r1), putEtag: r1.etag ?? null };
-  });
-  await step("head#1", async () => {
-    h1 = await b.head(path);
-    return { etag: h1.etag, size: h1.size };
-  });
-  await step("get#1(useCache:false)", async () => {
-    g1 = await b.get(path, { access: "private", useCache: false });
-    return { statusCode: g1?.statusCode, blobEtag: g1?.blob?.etag, headerEtag: g1?.headers?.get("etag"), size: g1?.blob?.size };
-  });
-  await step("put#2 ifMatch=head.etag", async () => {
-    const r = await b.put(path, Buffer.from("B"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream", ifMatch: h1.etag });
-    return { putEtag: r.etag ?? null };
-  });
-  await step("head#2", async () => {
-    h2 = await b.head(path);
-    return { etag: h2.etag, changed: h2.etag !== h1.etag };
-  });
-  await step("put#3 ifMatch=get.blob.etag(alt,stale)", async () => {
-    const r = await b.put(path, Buffer.from("C"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream", ifMatch: g1?.blob?.etag });
-    return { note: "sollte Konflikt sein (veralteter ETag)", putEtag: r.etag ?? null };
-  });
-  await step("head#3", async () => {
-    const h = await b.head(path);
-    return { etag: h.etag };
-  });
-  await step("get#2 + put ifMatch=get.blob.etag", async () => {
-    const g = await b.get(path, { access: "private", useCache: false });
-    const r = await b.put(path, Buffer.from("D"), { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/octet-stream", ifMatch: g.blob.etag });
-    return { blobEtag: g.blob.etag, putEtag: r.etag ?? null };
-  });
-  await step("del", async () => {
-    await b.del(path);
-    return {};
-  });
-  return out;
+  const geo2 = (prompt) => ({ task: { mode: "geo", prompt, map: "germany", answer: { lat: 51, lon: 10, label: "Mitte" }, seconds: 30, points: 250, explain: "Test." }, topic: "Selbsttest" });
+  try {
+    const A = mkInst();
+    const login = await call(A, "POST", "/api/admin/login", { password: PW });
+    check("Login", login.status === 200, login.status);
+    const ck = login.cookie;
+    const list2 = await call(A, "GET", "/api/admin/questions", void 0, ck);
+    check("Erstinitialisierung: 34 Vorlagenfragen", list2.status === 200 && list2.data.length === 34, list2.data?.length ?? list2.data);
+    const q1 = await call(A, "POST", "/api/admin/questions", geo2("Kartenfrage 1"), ck);
+    check("Frage erstellen", q1.status === 201, q1.data?.err ?? q1.status);
+    const cat = (await call(A, "GET", "/api/admin/categories/geo-daneben", void 0, ck)).data;
+    const c1 = await call(A, "PUT", "/api/admin/categories/geo-daneben", { ...cat, ifUpdated: cat.updated }, ck);
+    check("Kategorie ohne \xC4nderung speichern", c1.status === 200, c1.data?.err ?? c1.status);
+    const c2 = await call(A, "PUT", "/api/admin/categories/geo-daneben", { ...c1.data, title: "Geografisch daneben (Test)", ifUpdated: c1.data.updated }, ck);
+    check("Kategorie \xE4ndern", c2.status === 200, c2.data?.err ?? c2.status);
+    let ok = true, last = q1.data;
+    for (let i = 0; i < 6; i++) {
+      const r = await call(A, "PUT", "/api/admin/questions/" + q1.data.id, { task: { ...last.task, prompt: `Kartenfrage 1 \u2013 Version ${i + 2}` }, topic: "Selbsttest", ifUpdated: last.updated }, ck);
+      if (r.status !== 200) {
+        ok = false;
+        check("mehrere Speicherungen nacheinander", false, r.data?.err);
+        break;
+      }
+      last = r.data;
+    }
+    if (ok) check("6 aufeinanderfolgende Speicherungen", true);
+    const B = mkInst();
+    const fresh = await call(B, "GET", "/api/admin/questions?q=Kartenfrage", void 0, ck);
+    check("Nach Neuladen (andere Instanz) vorhanden", fresh.status === 200 && fresh.data.length === 1 && fresh.data[0].task.prompt.endsWith("Version 7"), fresh.data?.[0]?.task?.prompt ?? fresh.data);
+    const titles = (await call(B, "GET", "/api/admin/categories/geo-daneben", void 0, ck)).data.title;
+    check("Kategorie-\xC4nderung dauerhaft", titles === "Geografisch daneben (Test)", titles);
+    const C = mkInst(), D = mkInst();
+    await call(C, "GET", "/api/admin/overview", void 0, ck);
+    await call(D, "GET", "/api/admin/overview", void 0, ck);
+    const w1 = await call(C, "POST", "/api/admin/questions", geo2("Instanz C schreibt"), ck);
+    const w2 = await call(D, "POST", "/api/admin/questions", geo2("Instanz D schreibt sofort danach"), ck);
+    check("Zweite Instanz schreibt direkt danach (kein 409)", w1.status === 201 && w2.status === 201, [w1.status, w2.status, w2.data?.err]);
+    const insts = [mkInst(), mkInst(), mkInst()];
+    const results = await Promise.all(Array.from({ length: 9 }, (_, i) => call(insts[i % 3], "POST", "/api/admin/questions", geo2(`Parallel ${i}`), ck)));
+    const created = results.filter((r) => r.status === 201).length;
+    const E = mkInst();
+    const par = (await call(E, "GET", "/api/admin/questions?q=Parallel", void 0, ck)).data;
+    check("9 gleichzeitige Schreibvorg\xE4nge: alle gespeichert, keiner verloren", par.length === created && created === 9, { erfolgreich: created, gespeichert: par.length, status: results.map((r) => r.status) });
+    const base = (await call(E, "GET", "/api/admin/questions/" + q1.data.id, void 0, ck)).data;
+    const x1 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X1", ifUpdated: base.updated }, ck);
+    const x2 = await call(mkInst(), "PUT", "/api/admin/questions/" + q1.data.id, { task: base.task, topic: "X2", ifUpdated: base.updated }, ck);
+    check("Zwei \xC4nderungen am selben Eintrag: zweite wird als Konflikt gemeldet, nichts \xFCberschrieben", x1.status === 200 && x2.status === 409 && x2.data?.details?.recordConflict === true, [x1.status, x2.status]);
+    check("Standardinhalte unver\xE4ndert (34 Vorlagen vorhanden)", (await call(mkInst(), "GET", "/api/admin/questions?topic=Torj\xE4ger", void 0, ck)).status === 200);
+  } catch (e) {
+    check("Unerwarteter Fehler", false, String(e?.stack ?? e).slice(0, 400));
+  } finally {
+    await backend.destroy();
+  }
+  return { path, passed: report.filter((r) => r.ok).length, total: report.length, report };
 }
 async function handleVercel(req, res, online = getOnline()) {
   res.setHeader("x-content-type-options", "nosniff");
@@ -36402,9 +36467,9 @@ async function handleVercel(req, res, online = getOnline()) {
   const parts = url.pathname.split("/").filter(Boolean);
   const st = online.status();
   if (url.pathname === "/api/health") return sendJson(res, 200, { ok: true, mode: "online", gameshow: false, storage: { configured: st.storage, kind: "vercel-blob" }, admin: { passwordConfigured: st.password } });
-  if (url.pathname === "/api/selftest-diag") {
+  if (url.pathname === "/api/selftest-flow") {
     try {
-      return sendJson(res, 200, await blobDiagnostics());
+      return sendJson(res, 200, await blobFlowTest());
     } catch (e) {
       return sendJson(res, 500, { err: String(e?.message ?? e) });
     }
