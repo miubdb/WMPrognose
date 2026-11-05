@@ -11,14 +11,39 @@ type Tab = 'packs' | 'categories' | 'questions' | 'scenes' | 'io';
 const TABS: { id: Tab; label: string }[] = [{ id: 'packs', label: '📦 Spielepakete' }, { id: 'categories', label: '🧱 Kategorien' }, { id: 'questions', label: '❓ Fragenbibliothek' }, { id: 'scenes', label: '🖼️ Szenen' }, { id: 'io', label: '⇅ Import/Export' }];
 
 export function Admin() {
-  const [state, setState] = useState<'loading' | 'in' | 'out'>('loading');
-  useEffect(() => { adm('GET', '/me').then(r => setState(r.ok ? 'in' : 'out')); const f = () => setState('out'); window.addEventListener('outplay-admin-401', f); return () => window.removeEventListener('outplay-admin-401', f); }, []);
+  const [state, setState] = useState<'loading' | 'in' | 'out' | 'setup'>('loading');
+  const [health, setHealth] = useState<any>(null);
+  useEffect(() => {
+    fetch('/api/health').then(r => r.json()).then(setHealth).catch(() => setHealth(null));
+    adm('GET', '/me').then(r => setState(r.status === 503 ? 'setup' : r.ok ? 'in' : 'out'));
+    const f = () => setState('out'); window.addEventListener('outplay-admin-401', f); return () => window.removeEventListener('outplay-admin-401', f);
+  }, []);
   if (state === 'loading') return <div className="adm"><p className="pulse">Lade …</p></div>;
-  if (state === 'out') return <Login onIn={() => setState('in')} />;
-  return <Shell onOut={() => setState('out')} />;
+  if (state === 'setup' || (health?.mode === 'online' && (!health.storage?.configured || !health.admin?.passwordConfigured))) return <Setup health={health} />;
+  if (state === 'out') return <Login onIn={() => setState('in')} online={health?.mode === 'online'} />;
+  return <Shell onOut={() => setState('out')} online={health?.mode === 'online'} />;
 }
 
-function Login({ onIn }: { onIn: () => void }) {
+function Setup({ health }: { health: any }) {
+  const st = !!health?.storage?.configured, pw = !!health?.admin?.passwordConfigured;
+  return (
+    <div className="hostlogin">
+      <div className="logo">OUT<span>PLAY</span></div>
+      <h2>Online-Admin: Einrichtung nötig</h2>
+      <div className="card">
+        <p>Der Online-Admin speichert deine Inhalte dauerhaft in einem <b>privaten Vercel-Blob-Speicher</b> (kostenloser Hobby-Tarif). Zwei Schritte im Vercel-Dashboard fehlen noch:</p>
+        <ol className="setuplist">
+          <li className={st ? 'done' : ''}><b>{st ? '✓' : '1.'} Speicher:</b> Projekt → <i>Storage</i> → <i>Create Database / Blob</i> → <b>Private</b> → mit diesem Projekt verbinden (alle Umgebungen).</li>
+          <li className={pw ? 'done' : ''}><b>{pw ? '✓' : '2.'} Passwort:</b> Projekt → <i>Settings → Environment Variables</i> → <code>ADMIN_PASSWORD</code> (mind. 12 Zeichen, als <i>Sensitive</i>) für Preview &amp; Production.</li>
+          <li><b>3.</b> Danach unter <i>Deployments</i> das neueste Deployment der Branch <code>claude/upbeat-galileo-4el50u</code> per „Redeploy“ neu starten und diese Seite neu laden.</li>
+        </ol>
+        <p className="muted small">Bis dahin werden bewusst keine Daten gespeichert – es gibt keinen flüchtigen Schein-Speicher.</p>
+      </div>
+    </div>
+  );
+}
+
+function Login({ onIn, online }: { onIn: () => void; online?: boolean }) {
   const [pw, setPw] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const go = async () => { setBusy(true); setErr(''); const r = await adm('POST', '/login', { password: pw }); setBusy(false); if (r.ok) onIn(); else setErr(errText(r)); };
   return (
@@ -27,7 +52,7 @@ function Login({ onIn }: { onIn: () => void }) {
       <h2>Admin-Bereich</h2>
       <div className="card">
         <label className="field"><span>Admin-Passwort</span><input type="password" autoFocus value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && pw && go()} /></label>
-        <p className="muted small">Beim ersten Serverstart wurde ein Passwort erzeugt: Konsole bzw. Datei <code>data/admin-passwort.txt</code>. Alternativ: Umgebungsvariable <code>ADMIN_PASSWORD</code>.</p>
+        <p className="muted small">{online ? <>Das Passwort ist die Umgebungsvariable <code>ADMIN_PASSWORD</code> deines Vercel-Projekts.</> : <>Beim ersten Serverstart wurde ein Passwort erzeugt: Konsole bzw. Datei <code>data/admin-passwort.txt</code>. Alternativ: Umgebungsvariable <code>ADMIN_PASSWORD</code>.</>}</p>
         {err && <div className="status bad">{err}</div>}
         <button className="btn primary wide" disabled={!pw || busy} onClick={go}>Anmelden</button>
       </div>
@@ -35,7 +60,7 @@ function Login({ onIn }: { onIn: () => void }) {
   );
 }
 
-function Shell({ onOut }: { onOut: () => void }) {
+function Shell({ onOut, online }: { onOut: () => void; online?: boolean }) {
   const [tab, setTab] = useState<Tab>((sessionStorage.getItem('admtab') as Tab) || 'packs');
   const [rev, setRev] = useState(0);            // erzwingt Neuladen der Listen
   const bump = () => setRev(x => x + 1);
@@ -45,14 +70,17 @@ function Shell({ onOut }: { onOut: () => void }) {
       <div className="admtop">
         <div className="logo tiny">OUT<span>PLAY</span> <small>Admin</small></div>
         <nav>{TABS.map(t => <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => go(t.id)}>{t.label}</button>)}</nav>
-        <div className="spacer" /><a className="btn small ghost" href="/host">🎤 Zur Show</a>
+        <div className="spacer" />{!online && <a className="btn small ghost" href="/host">🎤 Zur Show</a>}
         <button className="btn small ghost" onClick={async () => { await adm('POST', '/logout'); onOut(); }}>Abmelden</button>
       </div>
+      <div className={`modebanner ${online ? 'online' : 'local'}`}>{online
+        ? <>☁️ <b>Online-Admin</b> – Daten liegen dauerhaft serverseitig (privater Vercel-Blob). Die Gameshow selbst wird am Samstag <b>lokal auf dem Laptop</b> gespielt: Tab „Import/Export“ → <b>Spieleabend exportieren</b>.</>
+        : <>💻 <b>Lokale Version</b> – Daten liegen in <code>data/outplay.db</code> auf diesem Rechner (Backups in <code>data/backups</code>). Online vorbereitete Inhalte: Tab „Import/Export“ → <b>Spieleabend importieren</b>.</>}</div>
       {tab === 'packs' && <Packs rev={rev} bump={bump} />}
       {tab === 'categories' && <Categories rev={rev} bump={bump} />}
       {tab === 'questions' && <Library rev={rev} bump={bump} />}
       {tab === 'scenes' && <Scenes rev={rev} bump={bump} />}
-      {tab === 'io' && <IO bump={bump} />}
+      {tab === 'io' && <IO bump={bump} online={!!online} />}
     </div>
   );
 }
@@ -215,6 +243,7 @@ function Packs({ rev, bump }: { rev: number; bump: () => void }) {
           <div className="row wrap">
             <button className="btn small" onClick={() => setEdit(p)}>✏️ Öffnen</button>
             <button className="btn small ghost" onClick={() => act(() => adm('POST', `/packs/${p.id}/duplicate`), 'Dupliziert ✓')}>⧉ Duplizieren</button>
+            <button className="btn small gold" onClick={async () => { const r = await adm('GET', `/export?scope=pack:${p.id}`); if (r.ok) download(`OUTPLAY-Spieleabend-${p.id}.json`, r.data); else t.show(errText(r)); }}>📤 Spieleabend exportieren</button>
             {p.status === 'archived' ? <button className="btn small ghost" onClick={() => act(() => adm('POST', `/packs/${p.id}/status`, { status: 'published' }))}>↩ Wieder aktivieren</button>
               : p.versions > 0 && <button className="btn small ghost" onClick={() => act(() => adm('POST', `/packs/${p.id}/status`, { status: 'archived' }))}>🗄 Archivieren</button>}
             {p.versions === 0 && <button className="btn small warn" onClick={() => confirm('Entwurf löschen?') && act(() => adm('DELETE', '/packs/' + p.id))}>🗑</button>}
@@ -324,32 +353,73 @@ function Scenes({ rev, bump }: { rev: number; bump: () => void }) {
 }
 
 // ---------------------------------------------------------------- Import / Export
-function IO({ bump }: { bump: () => void }) {
+function Report({ r }: { r: any }) {
+  const row = (label: string, st: any) => <tr key={label}><td>{label}</td><td>{st.created}</td><td>{st.identical}</td><td>{st.renamed}</td><td>{st.overwritten}</td><td>{st.skipped}</td></tr>;
+  return (
+    <div className="card">
+      <h4>{r.dryRun ? '🔍 Prüfung (nichts wurde gespeichert)' : '✅ Import abgeschlossen'}</h4>
+      <div className="tablescroll"><table className="scoretab"><thead><tr><th></th><th>neu</th><th>identisch</th><th>als Kopie</th><th>überschrieben</th><th>übersprungen</th></tr></thead>
+        <tbody>{row('Szenen', r.scenes)}{row('Fragen', r.questions)}{row('Kategorien', r.categories)}{row('Pakete', r.packs)}</tbody></table></div>
+      {r.packResults.map((p: any) => (
+        <div key={p.id} className={`status ${p.errors.length ? 'bad' : 'ok'}`} style={{ textAlign: 'left' }}>
+          📦 <b>{p.name}</b>: {p.errors.length ? <>nicht veröffentlichbar – {p.errors.slice(0, 5).join(' · ')}</> : p.published ? <>veröffentlicht ({p.ref}){p.note ? ' – ' + p.note : ''}{p.match === true ? ' · ✓ Inhalt stimmt mit dem Export überein' : p.match === false ? ' · ⚠ Inhalt weicht vom Export ab' : ''}</> : 'geprüft – bereit zum Veröffentlichen'}
+          {p.warnings.length > 0 && <div className="small muted">Hinweise: {p.warnings.join(' · ')}</div>}
+        </div>))}
+      {r.warnings.length > 0 && <div className="warnbox card"><b>Hinweise:</b><ul>{r.warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}</ul></div>}
+      {r.errors.length > 0 && <div className="warnbox card"><b>Probleme:</b><ul>{r.errors.map((w: string, i: number) => <li key={i}>{w}</li>)}</ul></div>}
+    </div>
+  );
+}
+
+function IO({ bump, online }: { bump: () => void; online: boolean }) {
   const { data: packs } = useList<any>('/packs', 0);
-  const [mode, setMode] = useState('rename'); const [res, setRes] = useState<any>(null); const [err, setErr] = useState(''); const [text, setText] = useState('');
-  const exp = async (scope: string, name: string) => { const r = await adm('GET', '/export?scope=' + scope); if (r.ok) download(name, r.data); else setErr(errText(r)); };
-  const imp = async (raw: string) => {
-    setErr(''); setRes(null);
-    let data: any; try { data = JSON.parse(raw); } catch { setErr('Das ist kein gültiges JSON.'); return; }
-    const r = await adm('POST', '/import', { data, onConflict: mode });
-    if (r.ok) { setRes(r.data); bump(); } else setErr(errText(r));
+  const [mode, setMode] = useState('rename'); const [err, setErr] = useState(''); const [text, setText] = useState('');
+  const [pack, setPack] = useState(''); const [file, setFile] = useState<any>(null); const [fname, setFname] = useState(''); const [rep, setRep] = useState<any>(null); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (!pack && packs.length) setPack((packs.find((p: any) => p.status === 'published') ?? packs[0]).id); }, [packs, pack]);
+  const exp = async (scope: string, name: string) => { setErr(''); const r = await adm('GET', '/export?scope=' + scope); if (r.ok) download(name, r.data); else setErr(errText(r)); };
+  const parse = (raw: string, name = '') => { setErr(''); setRep(null); try { const d = JSON.parse(raw); setFile(d); setFname(name); return d; } catch { setErr('Das ist kein gültiges JSON.'); setFile(null); return null; } };
+  const check = async (d = file) => { if (!d) return; setBusy(true); const r = await adm('POST', '/import', { data: d, onConflict: mode, dryRun: true, publish: true }); setBusy(false); if (r.ok) setRep(r.data); else setErr(errText(r)); };
+  const doImport = async (publish: boolean) => { setBusy(true); const r = await adm('POST', '/import', { data: file, onConflict: mode, publish }); setBusy(false); if (r.ok) { setRep(r.data); bump(); } else setErr(errText(r)); };
+  const backup = async () => {
+    setErr(''); try {
+      const r = await fetch('/api/admin/backup', { credentials: 'same-origin' }); if (!r.ok) { setErr('Backup fehlgeschlagen (' + r.status + ')'); return; }
+      const cd = r.headers.get('content-disposition') ?? ''; const name = /filename="([^"]+)"/.exec(cd)?.[1] ?? 'OUTPLAY-VOLLBACKUP-VERTRAULICH.db';
+      const url = URL.createObjectURL(await r.blob()); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch { setErr('Backup fehlgeschlagen.'); }
   };
+  const pub = packs.filter((p: any) => p.versions > 0);
   return (
     <div>
       <h2>Import / Export &amp; Sicherung</h2>
-      <div className="card"><h3>⬇ Exportieren</h3>
-        <p className="muted small">JSON-Dateien enthalten Fragen, Kategorien, Szenen und Pakete. „Alles“ ist deine vollständige Sicherung (inkl. aller veröffentlichten Versionen). Zusätzlich liegt die gesamte Datenbank in <code>data/outplay.db</code> – diese Datei kopieren genügt als Komplett-Backup.</p>
-        <div className="row wrap"><button className="btn primary" onClick={() => exp('all', 'outplay-komplett.json')}>Alles (Backup)</button><button className="btn" onClick={() => exp('questions', 'outplay-fragen.json')}>Nur Fragen</button>
-          {packs.map((p: any) => <button key={p.id} className="btn ghost" onClick={() => exp('pack:' + p.id, `outplay-paket-${p.id}.json`)}>Paket: {p.name}</button>)}</div></div>
-      <div className="card"><h3>⬆ Importieren</h3>
-        <label className="field"><span>Wenn eine ID schon existiert …</span><select value={mode} onChange={e => setMode(e.target.value)}><option value="rename">als Kopie importieren (sicher, Standard)</option><option value="skip">vorhandene überspringen</option><option value="overwrite">vorhandene überschreiben</option></select></label>
-        <input type="file" accept="application/json,.json" onChange={async e => { const f = e.target.files?.[0]; if (f) imp(await f.text()); e.target.value = ''; }} />
-        <p className="muted small">… oder JSON einfügen:</p>
-        <textarea rows={5} className="mono" value={text} onChange={e => setText(e.target.value)} />
-        <button className="btn" disabled={!text.trim()} onClick={() => imp(text)}>Importieren</button>
+      <div className="card bigcard">
+        <h3>🎲 Spieleabend übertragen (Online → Laptop)</h3>
+        <p className="muted small">Der Export enthält das gesamte Paket: Fragen mit allen Antworten, Varianten und Synonymen, Kategorien in Reihenfolge, Überraschung, Finale, Zeitlimits, Punkte, Paketregeln, Startguthaben und selbst erstellte Glitch-Szenen.</p>
+        <div className="row wrap">
+          <label className="field inline"><span>Paket</span><select value={pack} onChange={e => setPack(e.target.value)}>{packs.map((p: any) => <option key={p.id} value={p.id}>{p.name}{p.versions ? ` (v${p.currentVersion})` : ' (Entwurf)'}</option>)}</select></label>
+          <button className="btn gold big" disabled={!pack} onClick={() => exp('pack:' + pack, `OUTPLAY-Spieleabend-${pack}.json`)}>📤 Spieleabend exportieren</button>
+        </div>
+        {pub.length === 0 && <p className="small muted">Tipp: Das Paket vorher unter „Spielepakete“ prüfen &amp; veröffentlichen.</p>}
+        <hr />
+        <h4>📥 Spieleabend importieren</h4>
+        <label className="field"><span>Wenn eine ID schon existiert, aber der Inhalt anders ist …</span><select value={mode} onChange={e => setMode(e.target.value)}><option value="rename">als Kopie importieren (sicher, Standard)</option><option value="skip">vorhandene behalten</option><option value="overwrite">vorhandene überschreiben</option></select></label>
+        <input type="file" accept="application/json,.json" onChange={async e => { const f = e.target.files?.[0]; if (f) { const d = parse(await f.text(), f.name); if (d) check(d); } e.target.value = ''; }} />
+        {fname && <p className="small">Datei: <b>{fname}</b>{file?.counts ? ` · ${file.counts.questions} Fragen, ${file.counts.categories} Kategorien, ${file.counts.scenes} Szenen, ${file.counts.packs} Paket(e)` : ''}</p>}
+        {busy && <p className="pulse">Prüfe …</p>}
+        {rep && <Report r={rep} />}
+        {file && rep?.dryRun && <div className="row wrap"><button className="btn primary big" disabled={busy} onClick={() => doImport(true)}>✅ Importieren &amp; veröffentlichen</button><button className="btn ghost" disabled={busy} onClick={() => doImport(false)}>Nur als Entwurf importieren</button></div>}
+        {rep && !rep.dryRun && rep.packResults.some((p: any) => p.published) && <p className="status ok">Fertig: Beim Erstellen des Spielraums (Showmaster-Seite) das Paket „{rep.packResults.find((p: any) => p.published)?.name}“ auswählen.</p>}
         {err && <div className="status bad">{err}</div>}
-        {res && <div className="status ok">Importiert: {res.questions} Fragen, {res.categories} Kategorien, {res.scenes} Szenen, {res.packs} Pakete{res.skipped ? `, ${res.skipped} übersprungen` : ''}{res.renamed ? `, ${res.renamed} als Kopie` : ''}.{res.errors.length > 0 && <ul>{res.errors.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul>}</div>}
-        <p className="muted small">Importierte Pakete erscheinen als Entwurf und müssen veröffentlicht werden.</p></div>
+        <details><summary className="small muted">JSON einfügen statt Datei wählen</summary>
+          <textarea rows={4} className="mono" value={text} onChange={e => setText(e.target.value)} /><button className="btn small" disabled={!text.trim()} onClick={() => { const d = parse(text, 'eingefügt'); if (d) check(d); }}>Prüfen</button></details>
+      </div>
+      <div className="card"><h3>A) Inhalts-Backup (für andere Installationen)</h3>
+        <p className="muted small">Fragen, Kategorien, Pakete (inkl. Versionen) und Szenen als JSON – zum Wiedereinspielen auf einem anderen Gerät. Enthält <b>keine</b> Räume, Spieler oder Zugangsdaten.</p>
+        <div className="row wrap"><button className="btn primary" onClick={() => exp('all', 'OUTPLAY-Inhalte-komplett.json')}>Alles (Inhalte)</button><button className="btn" onClick={() => exp('questions', 'OUTPLAY-Fragen.json')}>Nur Fragen</button>
+          {packs.map((p: any) => <button key={p.id} className="btn ghost" onClick={() => exp('pack:' + p.id, `OUTPLAY-Paket-${p.id}.json`)}>Paket: {p.name}</button>)}</div></div>
+      <div className="card warnbox"><h3>B) Vollständiges Server-Backup <span className="badge bad">vertraulich</span></h3>
+        <p className="small">Konsistente Kopie der gesamten SQLite-Datenbank ({online ? 'Inhalte, Pakete, Versionen und Admin-Sitzungen' : 'Inhalte, Pakete, Versionen, gespeicherte Räume, Spieler, Punkte, Spielstände'}). Sie enthält <b>sicherheitsrelevante Daten</b> (Passwort-Hashes, Sitzungen{online ? '' : ', Host-PINs, Spieler-Wiederherstellungscodes'}). Niemals teilen oder öffentlich ablegen.</p>
+        <button className="btn warn big" onClick={backup}>🔒 Voll-Backup herunterladen (.db)</button>
+        {!online && <p className="small muted">Zusätzlich sichert der Server alle 10 Minuten automatisch nach <code>data/backups</code> (letzte 30). Einspielen: Server beenden, Datei auf <code>OUTPLAY-WIEDERHERSTELLEN.bat</code> ziehen.</p>}</div>
     </div>
   );
 }

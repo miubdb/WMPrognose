@@ -1,5 +1,5 @@
 // Inhaltsverwaltung: Fragen-Bibliothek, Kategorien, Spielepakete (Entwurf -> Veröffentlichung -> unveränderliche Version), Szenen, Import/Export.
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { Book, PackRules, TaskDef, TileDef } from '../shared/types';
 import { BUDGET, MODES, normalizeCategory, normalizeTask, taskMax, validateCategory, validateTask, type CategoryData } from '../shared/validate';
 import { buildScene, validateTemplate, type SceneTemplate } from '../shared/sceneTemplates';
@@ -11,6 +11,18 @@ export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) { super(message); }
 }
 const nid = (p: string) => p + randomBytes(5).toString('hex');
+export function canonical(v: unknown): string {
+  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v as object).sort().filter(k => (v as any)[k] !== undefined).map(k => JSON.stringify(k) + ':' + canonical((v as any)[k])).join(',') + '}';
+  return JSON.stringify(v);
+}
+const sha = (s: string) => createHash('sha256').update(s).digest('hex');
+/** Inhalts-Fingerprint eines Paketstands – unabhängig von IDs (Kategorie-/Szenen-IDs werden durch Inhalt ersetzt). */
+export function bookHash(book: Book): string {
+  const sceneSig = (id: string) => { const sc = book.scenes?.[id]; return sc ? sha(canonical({ bg: sc.bg, items: sc.items, changes: sc.changes })) : 'missing'; };
+  const tiles = book.tiles.map(t => ({ ...t, id: undefined, tasks: t.tasks.map(k => (k.mode === 'glitch' ? { ...k, scene: sceneSig(k.scene) } : k)) }));
+  return sha(canonical({ tiles, rules: book.rules ?? {} }));
+}
 const J = <T>(s: string) => JSON.parse(s) as T;
 
 export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules> }
@@ -30,7 +42,7 @@ export function normalizePack(raw: any): PackData {
 export class ContentService {
   private cache = new Map<string, Book>();
   constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene> }, private now: () => number = Date.now) {
-    if (!this.setting('seeded')) { this.importBuiltins(); this.setSetting('seeded', '1'); }
+    if (!this.setting('seeded')) { this.importBuiltins(); this.setSetting('seeded', '1'); this.wasSeeded = true; }
   }
   private get db() { return this.store.db; }
   private setting(k: string): string | null { return (this.db.prepare('SELECT value FROM settings WHERE key=?').get(k) as any)?.value ?? null; }
@@ -307,72 +319,151 @@ export class ContentService {
   }
   versionBook(ref: string) { return this.resolveBook(ref); }
 
-  // ------------------------------------------------------------- Import / Export
+  // ------------------------------------------------------------- Import / Export (Format v2)
+  /** wasSeeded: true, wenn beim Start die initialen Vorlagen importiert wurden (Online-Adapter muss dann speichern). */
+  wasSeeded = false;
+
   export(scope: 'all' | 'questions' | { pack: string }) {
-    const out: any = { format: 'outplay-content', version: 1, exportedAt: new Date(this.now()).toISOString() };
+    const out: any = { format: 'outplay-content', version: 2, app: 'OUTPLAY', exportedAt: new Date(this.now()).toISOString() };
+    const wantScenes = (qs: { task: TaskDef }[]) => {
+      const ids = new Set(qs.filter(q => q.task.mode === 'glitch').map(q => (q.task as any).scene));
+      return this.listScenes().filter(s => ids.has(s.id) || (!s.builtin && scope !== 'all' && scope === 'questions')).map(s => ({ id: s.id, title: s.title, builtin: !!s.builtin, template: s.template ?? null, data: { id: s.id, title: s.title, bg: s.bg, items: s.items, changes: s.changes } }));
+    };
     if (scope === 'questions') {
-      out.questions = this.listQuestions().map(q => ({ id: q.id, topic: q.topic, task: q.task }));
-      out.scenes = this.listScenes().filter(s => !s.builtin);
-      return out;
+      const qs = this.listQuestions();
+      out.questions = qs.map(q => ({ id: q.id, topic: q.topic, archived: q.archived, task: q.task }));
+      out.scenes = this.listScenes().map(s => ({ id: s.id, title: s.title, builtin: !!s.builtin, template: s.template ?? null, data: { id: s.id, title: s.title, bg: s.bg, items: s.items, changes: s.changes } })).filter(s => !s.builtin || qs.some(q => (q.task as any).scene === s.id));
+    } else {
+      let catIds: Set<string> | null = null;
+      const packRow = (p: any, withVersions: boolean) => ({ id: p.id, name: p.name, description: p.description, categoryIds: p.categoryIds, surprise: p.surprise, final: p.final, rules: p.rules, status: p.status, currentVersion: p.currentVersion,
+        ...(p.currentVersion ? (() => { const b = this.resolveBook(`${p.id}@${p.currentVersion}`); return { book: b, bookHash: bookHash(b) }; })() : {}),
+        ...(withVersions ? { versions: this.versions(p.id).map(v => ({ ...v, book: this.resolveBook(v.ref), bookHash: bookHash(this.resolveBook(v.ref)) })) } : {}) });
+      if (typeof scope === 'object') { const p = this.getPack(scope.pack); catIds = new Set([...p.categoryIds, p.surprise, p.final]); out.packs = [packRow(p, false)]; }
+      else out.packs = this.listPacksView().map(p => packRow(p, true));
+      const cats = this.listCategories().filter(c => !catIds || catIds.has(c.id));
+      out.categories = cats.map(c => ({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, kind: c.kind, football: c.football, blurb: c.blurb, taskIds: c.taskIds, disabled: !!c.disabled }));
+      const qids = new Set(cats.flatMap(c => c.taskIds));
+      const qs = this.listQuestions().filter(q => qids.has(q.id));
+      out.questions = qs.map(q => ({ id: q.id, topic: q.topic, archived: q.archived, task: q.task }));
+      out.scenes = wantScenes(qs);
     }
-    let catIds: Set<string> | null = null;
-    if (typeof scope === 'object') { const p = this.getPack(scope.pack); catIds = new Set([...p.categoryIds, p.surprise, p.final]); out.packs = [{ id: p.id, name: p.name, description: p.description, categoryIds: p.categoryIds, surprise: p.surprise, final: p.final, rules: p.rules }]; }
-    else out.packs = this.listPacksView().map(p => ({ id: p.id, name: p.name, description: p.description, categoryIds: p.categoryIds, surprise: p.surprise, final: p.final, rules: p.rules, status: p.status, versions: this.versions(p.id).map(v => ({ ...v, book: this.resolveBook(v.ref) })) }));
-    const cats = this.listCategories().filter(c => !catIds || catIds.has(c.id));
-    out.categories = cats.map(c => ({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, kind: c.kind, football: c.football, blurb: c.blurb, taskIds: c.taskIds, disabled: !!c.disabled }));
-    const qids = new Set(cats.flatMap(c => c.taskIds));
-    const qs = this.listQuestions().filter(q => qids.has(q.id));
-    out.questions = qs.map(q => ({ id: q.id, topic: q.topic, task: q.task }));
-    const sceneIds = new Set(qs.filter(q => q.task.mode === 'glitch').map(q => (q.task as any).scene));
-    out.scenes = this.listScenes().filter(s => !s.builtin && sceneIds.has(s.id));
+    out.counts = { questions: out.questions.length, categories: out.categories?.length ?? 0, scenes: out.scenes.length, packs: out.packs?.length ?? 0 };
+    out.checksum = sha(canonical({ q: out.questions, c: out.categories ?? [], s: out.scenes, p: (out.packs ?? []).map((p: any) => ({ ...p, versions: undefined })) }));
     return out;
   }
-  import(data: any, onConflict: 'rename' | 'skip' | 'overwrite' = 'rename') {
-    if (!data || data.format !== 'outplay-content' || data.version !== 1) throw new ApiError(422, 'Keine gültige OUTPLAY-Exportdatei (format/version)');
-    const res = { scenes: 0, questions: 0, categories: 0, packs: 0, skipped: 0, renamed: 0, errors: [] as string[] };
-    const exists = (tbl: string, id: string) => !!this.db.prepare(`SELECT 1 FROM ${tbl} WHERE id=?`).get(id);
-    const maps = { s: new Map<string, string>(), q: new Map<string, string>(), c: new Map<string, string>() };
-    const resolve = (tbl: string, id: string, prefix: string, map: Map<string, string>): string | null => {
-      if (!exists(tbl, id)) { map.set(id, id); return id; }
-      if (onConflict === 'skip') { map.set(id, id); res.skipped++; return null; }
-      if (onConflict === 'overwrite') { map.set(id, id); return id; }
-      const n = nid(prefix); map.set(id, n); res.renamed++; return n;
+
+  /**
+   * Import mit Konfliktbehandlung. Identische Inhalte (gleiche ID + gleicher Inhalt) werden wiederverwendet – nie doppelt angelegt.
+   * onConflict bei gleicher ID mit ANDEREM Inhalt: rename (Kopie mit neuer ID, Standard), skip, overwrite.
+   * dryRun: nichts wird gespeichert (Trockenlauf); publish: Pakete prüfen und lokal veröffentlichen (mit Inhaltsvergleich).
+   */
+  import(data: any, onConflict: 'rename' | 'skip' | 'overwrite' = 'rename', opts: { dryRun?: boolean; publish?: boolean } = {}) {
+    if (!data || data.format !== 'outplay-content' || ![1, 2].includes(data.version)) throw new ApiError(422, 'Keine gültige OUTPLAY-Exportdatei (format/version)');
+    type St = { created: number; identical: number; renamed: number; overwritten: number; skipped: number };
+    const mk = (): St => ({ created: 0, identical: 0, renamed: 0, overwritten: 0, skipped: 0 });
+    const res: any = { dryRun: !!opts.dryRun, onConflict, scenes: mk(), questions: mk(), categories: mk(), packs: mk(), errors: [] as string[], warnings: [] as string[], packResults: [] as any[], idMap: {} as Record<string, Record<string, string>> };
+    // Rückwärtskompatible Kurzfelder
+    const finish = () => { res.questionsCount = res.questions.created + res.questions.renamed + res.questions.overwritten; };
+    const get = (tbl: string, id: string): any => this.db.prepare(`SELECT * FROM ${tbl} WHERE id=?`).get(id);
+    const maps = { s: new Map<string, string>(), q: new Map<string, string>(), c: new Map<string, string>(), p: new Map<string, string>() };
+    const sigOf = (kind: 's' | 'q' | 'c' | 'p', row: any): string => {
+      if (!row) return '';
+      if (kind === 's') { const sc = J<Scene>(row.data); return canonical({ bg: sc.bg, items: sc.items, changes: sc.changes }); }
+      if (kind === 'q') return canonical({ task: J(row.data), topic: row.topic });
+      if (kind === 'c') return canonical({ ...J<any>(row.data) });
+      return canonical(J<any>(row.data));
     };
-    this.tx(() => {
+    const place = (kind: 's' | 'q' | 'c' | 'p', tbl: string, prefix: string, id: string, sig: string, st: St): string | null => {
+      const ex = get(tbl, id);
+      const map = maps[kind];
+      if (!ex) { map.set(id, id); st.created++; return id; }
+      if (sigOf(kind, ex) === sig || (kind === 's' && J<Scene>(ex.data).builtin)) { map.set(id, id); st.identical++; return null; }
+      if (onConflict === 'skip') { map.set(id, id); st.skipped++; return null; }
+      if (onConflict === 'overwrite') { map.set(id, id); st.overwritten++; return id; }
+      const n = nid(prefix); map.set(id, n); st.renamed++; return n;
+    };
+    const t0 = this.now();
+    const run = () => {
+      // ---- Szenen: bevorzugt aus Vorlage, sonst aus gespeicherten Szenendaten
       for (const sc of Array.isArray(data.scenes) ? data.scenes : []) {
-        if (!sc?.id || !sc.template) { res.errors.push('Szene ohne Vorlage übersprungen'); continue; }
-        const errs = validateTemplate(sc.template); if (errs.length) { res.errors.push(`Szene ${sc.id}: ${errs.join('; ')}`); continue; }
-        const nidv = resolve('scenes', sc.id, 's_', maps.s); if (!nidv) continue;
-        const built = buildScene(nidv, sc.template);
-        this.db.prepare('INSERT INTO scenes(id,data,builtin,updated) VALUES(?,?,0,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated=excluded.updated').run(nidv, JSON.stringify(built), this.now()); res.scenes++;
+        if (!sc?.id) { res.errors.push('Szene ohne ID übersprungen'); continue; }
+        let built: Scene | null = null;
+        const tpl = sc.template ?? sc.data?.template;
+        if (tpl) { const errs = validateTemplate(tpl); if (errs.length) { res.errors.push(`Szene ${sc.id}: ${errs.join('; ')}`); continue; } built = buildScene(sc.id, tpl); }
+        else if (sc.data && Array.isArray(sc.data.items) && typeof sc.data.bg === 'string' && sc.data.changes && typeof sc.data.changes === 'object') built = { id: sc.id, title: String(sc.data.title ?? sc.title ?? sc.id).slice(0, 40), bg: sc.data.bg, items: sc.data.items, changes: sc.data.changes };
+        else if (sc.items && sc.bg) built = { id: sc.id, title: String(sc.title ?? sc.id).slice(0, 40), bg: sc.bg, items: sc.items, changes: sc.changes ?? {} };
+        if (!built) { res.errors.push(`Szene ${sc.id}: weder Vorlage noch Szenendaten vorhanden`); continue; }
+        const id = place('s', 'scenes', 's_', sc.id, canonical({ bg: built.bg, items: built.items, changes: built.changes }), res.scenes);
+        if (!id) continue;
+        const fin = { ...built, id, ...(tpl ? { template: tpl } : {}) } as Scene;
+        if (tpl) Object.assign(fin, buildScene(id, tpl));
+        this.db.prepare('INSERT INTO scenes(id,data,builtin,updated) VALUES(?,?,0,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated=excluded.updated').run(id, JSON.stringify(fin), this.now());
       }
+      // ---- Fragen
       for (const q of Array.isArray(data.questions) ? data.questions : []) {
-        if (!q?.id || !q.task || !MODES.includes(q.task.mode)) { res.errors.push('Frage ohne gültigen Modus übersprungen'); continue; }
-        const qid = resolve('questions', q.id, 'q_', maps.q); if (!qid) continue;
+        if (!q?.id || !q.task || !MODES.includes(q.task.mode)) { res.errors.push(`Frage ${q?.id ?? '?'}: ungültiger Spielmodus`); continue; }
         const task: any = normalizeTask(q.task);
         if (task.mode === 'glitch') task.scene = maps.s.get(task.scene) ?? task.scene;
+        const topic = String(q.topic ?? '').slice(0, 60);
+        const id = place('q', 'questions', 'q_', q.id, canonical({ task, topic }), res.questions);
+        if (!id) continue;
         const t = this.now();
-        this.db.prepare('INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?) ON CONFLICT(id) DO UPDATE SET mode=excluded.mode, topic=excluded.topic, data=excluded.data, updated=excluded.updated')
-          .run(qid, task.mode, String(q.topic ?? '').slice(0, 60), JSON.stringify(task), t, t); res.questions++;
+        this.db.prepare('INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET mode=excluded.mode, topic=excluded.topic, data=excluded.data, updated=excluded.updated')
+          .run(id, task.mode, topic, JSON.stringify(task), q.archived ? 1 : 0, t, t);
       }
+      // ---- Kategorien (Verknüpfungen auf Fragen werden umgeschrieben)
       for (const c of Array.isArray(data.categories) ? data.categories : []) {
         if (!c?.id) continue;
-        const cid = resolve('categories', c.id, 'c_', maps.c); if (!cid) continue;
-        const cat = normalizeCategory({ ...c, taskIds: (c.taskIds ?? []).map((x: string) => maps.q.get(x) ?? x).filter((x: string) => exists('questions', x)) });
+        const taskIds = (c.taskIds ?? []).map((x: string) => maps.q.get(x) ?? x);
+        const missing = taskIds.filter((x: string) => !get('questions', x));
+        if (missing.length) res.warnings.push(`Kategorie „${c.title}“: ${missing.length} Frage(n) fehlen und wurden nicht verknüpft`);
+        const cat = normalizeCategory({ ...c, taskIds: taskIds.filter((x: string) => !missing.includes(x)) });
+        const id = place('c', 'categories', 'c_', c.id, canonical(cat), res.categories);
+        if (!id) continue;
         const t = this.now();
-        this.db.prepare('INSERT INTO categories(id,data,created,updated) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated=excluded.updated').run(cid, JSON.stringify(cat), t, t); res.categories++;
+        this.db.prepare('INSERT INTO categories(id,data,created,updated) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated=excluded.updated').run(id, JSON.stringify(cat), t, t);
       }
+      // ---- Pakete
       for (const p of Array.isArray(data.packs) ? data.packs : []) {
         if (!p?.id) continue;
-        const pid = resolve('packs', p.id, 'p_', new Map());
-        if (!pid) continue;
         const d = normalizePack({ ...p, categoryIds: (p.categoryIds ?? []).map((x: string) => maps.c.get(x) ?? x), surprise: maps.c.get(p.surprise) ?? p.surprise, final: maps.c.get(p.final) ?? p.final });
-        if (!d.name) { res.errors.push('Paket ohne Namen übersprungen'); continue; }
-        if (exists('packs', pid)) { this.db.prepare('UPDATE packs SET data=?, updated=? WHERE id=?').run(JSON.stringify(d), this.now(), pid); }
-        else { const t = this.now(); this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pid, JSON.stringify(d), t, t); }
-        res.packs++;
+        if (!d.name) { res.errors.push(`Paket ${p.id}: Name fehlt`); continue; }
+        const placed = place('p', 'packs', 'p_', p.id, canonical(d), res.packs);
+        const pid: string = placed ?? maps.p.get(p.id) ?? p.id;           // identisch/übersprungen: vorhandenes Paket weiterverwenden
+        if (placed && placed !== p.id) d.name = (d.name + ' (Import)').slice(0, 60);
+        if (placed) {
+          if (!get('packs', pid)) { const t = this.now(); this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pid, JSON.stringify(d), t, t); }
+          else this.db.prepare('UPDATE packs SET data=?, updated=? WHERE id=?').run(JSON.stringify(d), this.now(), pid);
+        }
+        const result: any = { sourceId: p.id, id: pid, name: d.name, published: false, errors: [] as string[], warnings: [] as string[], expectedHash: p.bookHash ?? null };
+        if (opts.publish) {
+          const b = this.buildBook(pid);
+          result.errors = b.errors; result.warnings = b.warnings;
+          if (b.book) {
+            const h = bookHash(b.book);
+            const cur = this.getPack(pid);
+            const curHash = cur.currentVersion ? bookHash(this.resolveBook(`${pid}@${cur.currentVersion}`)) : null;
+            if (curHash === h) { result.published = true; result.ref = `${pid}@${cur.currentVersion}`; result.note = 'unverändert (bereits veröffentlicht)'; }
+            else { const pub = this.publish(pid, `Import ${new Date(t0).toISOString().slice(0, 16)}`); result.published = true; result.ref = pub.ref; }
+            result.actualHash = h; result.match = p.bookHash ? p.bookHash === h : null;
+          }
+        } else {
+          const an = this.buildBook(pid); result.errors = an.errors; result.warnings = an.warnings;
+        }
+        res.packResults.push(result);
       }
-    });
+      res.idMap = { scenes: Object.fromEntries(maps.s), questions: Object.fromEntries(maps.q), categories: Object.fromEntries(maps.c), packs: Object.fromEntries(maps.p) };
+    };
+    if (data.checksum) {
+      const sum = sha(canonical({ q: data.questions ?? [], c: data.categories ?? [], s: data.scenes ?? [], p: (data.packs ?? []).map((p: any) => ({ ...p, versions: undefined })) }));
+      if (data.version === 2 && sum !== data.checksum) res.warnings.push('Die Prüfsumme der Datei stimmt nicht – die Datei wurde nach dem Export verändert oder ist beschädigt.');
+    }
+    const ROLLBACK = Symbol('rollback');
+    try {
+      this.tx(() => { run(); if (opts.dryRun) throw ROLLBACK; });
+    } catch (e) { if (e !== ROLLBACK) throw e; }
+    this.cache.clear();
+    finish();
     return res;
   }
 }

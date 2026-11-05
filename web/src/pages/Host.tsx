@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, store, useGame } from '../net';
 import { Avatar } from '../ui/Avatar';
-import { ConnBadge, Countdown, QR } from '../ui/widgets';
+import { ConnBadge, Countdown, QR, useBaseUrl } from '../ui/widgets';
 import { MODE_NAME } from './Tv';
 import type { Action, PlayerPublic, RoundView, View } from '../../../shared/types';
 
@@ -24,7 +24,7 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
     setBusy(true); setErr('');
     const r = await api('/api/rooms', { password: pw, pack });
     setBusy(false);
-    if (!r.ok) { setErr(r.status === 403 ? 'Falsches Passwort.' : 'Server nicht erreichbar.'); return; }
+    if (!r.ok) { setErr(r.status === 403 ? 'Falsches Passwort.' : r.status === 501 ? ((r.data as any).message ?? 'Die Gameshow läuft nur lokal auf dem Laptop.') : 'Server nicht erreichbar.'); return; }
     onSession({ code: (r.data as any).code, key: (r.data as any).hostKey, pin: (r.data as any).hostPin });
   };
   const login = async () => {
@@ -61,6 +61,7 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
 function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
   const { view, conn, reason, act, serverNow, pendingCount } = useGame('host', sess.code, sess.key);
   const [busy, setBusy] = useState(false);
+  const nb = useBaseUrl();
   const [toast, setToast] = useState('');
   const run = async (a: Action) => {
     if (busy) return; setBusy(true);
@@ -72,8 +73,8 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
       <button className="btn primary" onClick={onLeave}>Neu anmelden</button></div></div>
   );
   if (!view) return <div className="hostlogin"><div className="card center"><div className="spinner" /><p>Verbinde mit Raum {sess.code} …</p></div></div>;
-  const tvUrl = `${location.origin}/tv/${sess.code}`;
-  const joinUrl = `${location.origin}/play/${sess.code}`;
+  const tvUrl = `${nb.base || location.origin}/tv/${sess.code}`;
+  const joinUrl = `${nb.base || location.origin}/play/${sess.code}`;
   return (
     <div className="host">
       <div className="hosttop">
@@ -86,6 +87,7 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
         <button className={`btn small ${view.room.reduced ? '' : 'ghost'}`} onClick={() => run({ k: 'h.reduced', on: !view.room.reduced })}>{view.room.reduced ? '✨ Animationen reduziert' : '✨ Animationen voll'}</button>
         <button className={`btn small ${view.room.showPaused ? 'warn' : 'ghost'}`} onClick={() => run({ k: 'h.showPause', paused: !view.room.showPaused })}>{view.room.showPaused ? '▶ Show fortsetzen' : '⏸ Show pausieren'}</button>
       </div>
+      {nb.loopback && (!nb.base || nb.ambiguous) && <div className="card warnbox small">{!nb.base ? '⚠ Es wurde keine Netzwerkadresse gefunden – ohne WLAN/LAN können Handys nicht beitreten.' : <>⚠ Mehrere Netzwerkadapter gefunden. Verwendet wird <b>{nb.base}</b>. Verbinden sich die Handys nicht, <code>OUTPLAY-STARTEN.bat</code> neu starten und den richtigen Adapter wählen. Alle: {nb.candidates.map(c => `${c.name} ${c.url}${c.virtual ? ' (virtuell)' : ''}`).join(' · ')}</>}</div>}
       {toast && <div className="toast">{toast}</div>}
       <div className="hostgrid">
         <div className="hostmain">
@@ -117,7 +119,7 @@ function Main({ view, run, busy, serverNow, tvUrl, joinUrl, code }: { view: View
       <div className="lobbyhost">
         <QR text={joinUrl} size={150} />
         <div>
-          <p>Spieler scannen den QR-Code oder öffnen <b>{location.host}/play/{code}</b>.</p>
+          <p>Spieler scannen den QR-Code oder öffnen <b>{joinUrl.replace(/^https?:\/\//, '')}</b>.</p>
           <p className="muted">{view.players.length} Kandidat(en) · {view.players.filter(p => p.connected).length} verbunden</p>
           <label className="check"><input type="checkbox" checked={view.room.joinOpen} onChange={e => run({ k: 'h.joinOpen', open: e.target.checked })} /> Lobby geöffnet (neue Spieler dürfen beitreten)</label>
           <p className="small muted">TV: <a href={tvUrl} target="_blank" rel="noreferrer">TV-Ansicht öffnen</a> – auf dem Fernseher einmal klicken, damit Ton &amp; Vollbild starten.</p>

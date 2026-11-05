@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGame } from '../net';
 import { Avatar } from '../ui/Avatar';
-import { AnswerRow, Countdown, Leaderboard, QR } from '../ui/widgets';
+import { AnswerRow, Countdown, Leaderboard, QR, useBaseUrl } from '../ui/widgets';
 import { MapView } from '../ui/MapView';
 import { SceneView } from '../ui/SceneView';
 import { initAudio, play, setSoundEnabled } from '../ui/audio';
@@ -76,7 +76,9 @@ export function Header({ view, right }: { view: View; right?: React.ReactNode })
 
 // ---------------------------------------------------------------- Lobby
 function LobbyTv({ view, code }: { view: View; code: string }) {
-  const url = `${location.origin}/play/${code}`;
+  const { base, ready, loopback } = useBaseUrl();
+  const url = `${base}/play/${code}`;
+  const shown = base.replace(/^https?:\/\//, '');
   return (
     <div className="lobbytv">
       <div className="left">
@@ -93,10 +95,11 @@ function LobbyTv({ view, code }: { view: View; code: string }) {
       </div>
       <div className="right joinbox">
         <h2>Mitspielen</h2>
-        <QR text={url} size={Math.round(Math.min(window.innerWidth * 0.2, 380))} />
+        {ready && base ? <QR text={url} size={Math.round(Math.min(window.innerWidth * 0.2, 380))} /> : <div className="qr noqr">{ready ? 'Keine Netzwerkadresse gefunden' : '…'}</div>}
         <div className="codelabel">Raumcode</div>
         <div className="roomcode">{code}</div>
-        <div className="joinurl">{location.host}/play/{code}</div>
+        <div className="joinurl">{ready && base ? `${shown}/play/${code}` : ''}</div>
+        {loopback && ready && !base && <div className="joinwarn">⚠ Kein WLAN/LAN gefunden – Laptop mit dem Netzwerk verbinden und Seite neu laden</div>}
         <div className="count">{view.players.length} / 8 Kandidaten</div>
       </div>
     </div>

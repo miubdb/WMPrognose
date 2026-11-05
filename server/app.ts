@@ -9,8 +9,12 @@ import type { Room } from './model';
 import { Store } from './store';
 import { ContentService, ApiError } from './content';
 import { AdminAuth } from './auth';
-import { handleAdmin } from './admin';
+import { handleAdmin, type AdminCtx } from './admin';
+import { mkdtempSync, readFileSync as rf, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as pjoin } from 'node:path';
 import { SCENES } from '../shared/scenes';
+import { netInfo } from './net';
 
 interface Conn {
   ws: WebSocket;
@@ -27,11 +31,16 @@ export interface AppOptions {
   dbFile: string;
   staticDir?: string;
   /** optional: Passwort zum Erstellen von Räumen (Host-Zugang) */
+  /** feste Adresse für QR-Codes (z. B. http://192.168.0.23:8080) */
+  publicHost?: string;
   hostPassword?: string;
   /** optional: Admin-Passwort (sonst wird beim ersten Start eines erzeugt) */
   adminPassword?: string;
   clock?: () => number;
   tickMs?: number;
+  /** Verzeichnis für automatische Sicherungen (leer = aus) */
+  backupDir?: string;
+  backupEveryMin?: number;
 }
 
 const MIME: Record<string, string> = {
@@ -52,12 +61,29 @@ export class App {
   clock: () => number;
   private timers: NodeJS.Timeout[] = [];
   private closing = false;
+  lastBackup: { at: number; file: string } | null = null;
+  adminCtx!: AdminCtx;
+  private backupBuffer(): Buffer {
+    const dir = mkdtempSync(pjoin(tmpdir(), 'outplay-bk-'));
+    try { const f = pjoin(dir, 'backup.db'); this.store.backupTo(f); return rf(f); } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+  /** Automatische Sicherung nach <backupDir> (konsistent per VACUUM INTO), die letzten 30 bleiben erhalten. */
+  autoBackup(dir: string, keep = 30): string {
+    const stamp = new Date(this.clock()).toISOString().replace(/[:T]/g, '-').slice(0, 19);
+    const f = pjoin(dir, `outplay-${stamp}.db`);
+    this.store.backupTo(f);
+    const files = readdirSync(dir).filter(x => /^outplay-.*\.db$/.test(x)).sort();
+    for (const old of files.slice(0, Math.max(0, files.length - keep))) rmSync(pjoin(dir, old), { force: true });
+    this.lastBackup = { at: this.clock(), file: f };
+    return f;
+  }
 
   constructor(public opts: AppOptions) {
     this.clock = opts.clock ?? Date.now;
     this.store = new Store(opts.dbFile);
     this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES }, this.clock);
     this.auth = new AdminAuth(this.store, opts.adminPassword, this.clock);
+    this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer() };
     this.engine = new Engine((id: string) => this.content.resolveBook(id));
     for (const r of this.store.loadAll()) this.rooms.set(r.code, r);
     this.store.deleteOlderThan(this.clock() - 14 * 24 * 3600 * 1000);
@@ -70,6 +96,12 @@ export class App {
     // Fristen-Ticker + Heartbeat
     this.timers.push(setInterval(() => this.tick(), opts.tickMs ?? 250));
     this.timers.push(setInterval(() => this.heartbeat(), 5000));
+    if (opts.backupDir) {
+      const dir = opts.backupDir;
+      const tryBackup = () => { try { this.autoBackup(dir); } catch (e) { console.error('Auto-Backup fehlgeschlagen:', e); } };
+      tryBackup();
+      const t = setInterval(tryBackup, (opts.backupEveryMin ?? 10) * 60000); t.unref?.(); this.timers.push(t);
+    }
   }
 
   listen(port: number, host = '0.0.0.0'): Promise<number> {
@@ -207,8 +239,9 @@ export class App {
   private async handleApi(req: IncomingMessage, res: ServerResponse, path: string, _url: URL) {
     const now = this.clock();
     const parts = path.split('/').filter(Boolean); // api, rooms, CODE, action
-    if (path === '/api/health') return this.json(res, 200, { ok: true, rooms: this.rooms.size, now });
-    if (parts[1] === 'admin') return handleAdmin(this, req, res, parts, _url, limit => this.body(req, limit));
+    if (path === '/api/health') return this.json(res, 200, { ok: true, mode: 'local', rooms: this.rooms.size, now, backup: this.lastBackup ? { at: this.lastBackup.at } : null });
+    if (parts[1] === 'admin') return handleAdmin(this.adminCtx, req, res, parts, _url, limit => this.body(req, limit));
+    if (path === '/api/netinfo') return this.json(res, 200, netInfo((this.http.address() as any)?.port ?? 8080, this.opts.publicHost));
     if (path === '/api/packs' && req.method === 'GET') return this.json(res, 200, this.content.listPublished());
     if (parts[1] !== 'rooms') return this.json(res, 404, { err: 'not_found' });
     if (req.method === 'POST' && parts.length === 2) {

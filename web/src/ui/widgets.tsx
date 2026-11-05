@@ -40,10 +40,20 @@ export function Countdown({ round, serverNow, size = 120, onTick }: {
   );
 }
 
+const isLoopback = (h: string) => /^(localhost|127\.|\[?::1\]?$|0\.0\.0\.0)/i.test(h);
+/** Basisadresse, die Smartphones erreichen können. Bei localhost/127.0.0.1 wird die LAN-Adresse vom Server geholt – nie localhost im QR-Code. */
+export function useBaseUrl(): { base: string; loopback: boolean; ready: boolean; ambiguous: boolean; candidates: { name: string; url: string; virtual: boolean; preferred: boolean }[] } {
+  const loop = isLoopback(location.hostname);
+  const [info, setInfo] = useState<any>(null);
+  useEffect(() => { if (loop) fetch('/api/netinfo').then(r => r.json()).then(setInfo).catch(() => setInfo({ preferred: null, candidates: [] })); }, [loop]);
+  if (!loop) return { base: location.origin, loopback: false, ready: true, ambiguous: false, candidates: [] };
+  return { base: info?.preferred ?? '', loopback: true, ready: !!info, ambiguous: !!info?.ambiguous, candidates: info?.candidates ?? [] };
+}
+
 export function QR({ text, size = 280 }: { text: string; size?: number }) {
   const [svg, setSvg] = useState('');
   useEffect(() => { QRCode.toString(text, { type: 'svg', margin: 1, color: { dark: '#0a0820', light: '#ffffff' } }).then(setSvg).catch(() => setSvg('')); }, [text]);
-  return <div className="qr" style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div className="qr" data-url={text} style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
 export function PlayerChip({ p, size = 44, ring }: { p: PlayerPublic; size?: number; ring?: boolean }) {

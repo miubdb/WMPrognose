@@ -7,7 +7,9 @@ const dataDir = process.env.DATA_DIR ?? './data';
 const app = new App({
   book: BOOK,
   dbFile: `${dataDir}/outplay.db`,
+  backupDir: `${dataDir}/backups`,
   staticDir: process.env.STATIC_DIR ?? 'dist',
+  publicHost: process.env.OUTPLAY_HOST || process.env.PUBLIC_URL || undefined,
   hostPassword: process.env.HOST_PASSWORD || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || undefined,
 });

@@ -225,25 +225,33 @@ test('Import/Export: Roundtrip, Konfliktmodi, ungültige Dateien', async () => {
   const sc = (await a.post('/scenes', { template: { kind: 'list', title: 'Karte', rows: [{ label: 'A', value: '1' }, { label: 'B', value: '2' }], changeRow: 1, newValue: '9', style: 'menu' } })).data;
   await a.post('/questions', { task: { mode: 'glitch', prompt: 'Was änderte sich?', viewPrompt: 'Merken!', scene: sc.id, viewSeconds: 8, seconds: 20, points: 100, explain: 'B' }, topic: 'Szene' });
   const ex = (await a.req('GET', `/export?scope=pack:${pack.id}`)).data;
-  assert.equal(ex.format, 'outplay-content'); assert.equal(ex.packs.length, 1); assert.equal(ex.categories.length, 8); assert.equal(ex.questions.length, 16);
+  assert.equal(ex.format, 'outplay-content'); assert.equal(ex.version, 2); assert.equal(ex.packs.length, 1); assert.equal(ex.categories.length, 8); assert.equal(ex.questions.length, 16); assert.ok(ex.checksum);
   const all = (await a.get('/export?scope=all')).data; assert.ok(all.questions.length > 40 && all.packs.some((p: any) => p.versions));
   const qOnly = (await a.get('/export?scope=questions')).data; assert.ok(!qOnly.packs && qOnly.scenes.some((s: any) => s.id === sc.id));
   const before = (await a.get('/questions')).data.length;
-  const skip = (await a.post('/import', { data: ex, onConflict: 'skip' })).data; assert.equal(skip.questions, 0); assert.ok(skip.skipped > 0);
-  const ren = (await a.post('/import', { data: ex, onConflict: 'rename' })).data; assert.equal(ren.questions, 16); assert.equal(ren.categories, 8); assert.equal(ren.packs, 1);
-  assert.equal((await a.get('/questions')).data.length, before + 16);
-  const packs = (await a.get('/packs')).data; const copy = packs.find((p: any) => p.id !== pack.id && p.name === 'Eigener Abend'); assert.ok(copy);
-  assert.equal((await a.get(`/packs/${copy.id}/analysis`)).data.ok, true, 'importiertes Paket ist vollständig und prüfbar');
-  // Szenen-Referenzen werden beim Umbenennen mitgezogen
+  // Gleicher Inhalt, gleiche IDs -> alles "identisch", nichts wird doppelt angelegt
+  const same = (await a.post('/import', { data: ex })).data;
+  assert.equal(same.questions.identical, 16); assert.equal(same.questions.created + same.questions.renamed, 0); assert.equal(same.categories.identical, 8);
+  assert.equal((await a.get('/questions')).data.length, before);
+  // Lokale Änderung -> Konflikt: skip lässt lokal, rename legt Kopie an, overwrite überschreibt
+  const q0 = ex.questions[0];
+  await a.put('/questions/' + q0.id, { task: { ...q0.task, prompt: 'Lokal geändert' } });
+  assert.equal((await a.post('/import', { data: ex, onConflict: 'skip' })).data.questions.skipped, 1);
+  assert.equal((await a.get('/questions/' + q0.id)).data.task.prompt, 'Lokal geändert');
+  const ren = (await a.post('/import', { data: ex, onConflict: 'rename' })).data;
+  assert.equal(ren.questions.renamed, 1); assert.equal(ren.questions.identical, 15);
+  assert.equal((await a.get('/questions')).data.length, before + 1);
+  assert.ok(ren.idMap.questions[q0.id] !== q0.id);
+  // Szenen-Referenzen werden mitgezogen
   const glitch = (await a.get('/questions?mode=glitch&q=änderte')).data; assert.ok(glitch.every((q: any) => !q.problems.length), JSON.stringify(glitch.map((q: any) => q.problems)));
-  // Überschreiben
-  const q0 = ex.questions[0]; q0.task.prompt = 'Überschrieben!';
-  assert.equal((await a.post('/import', { data: ex, onConflict: 'overwrite' })).data.questions, 16);
+  q0.task.prompt = 'Überschrieben!';
+  const ow = (await a.post('/import', { data: { ...ex, checksum: undefined }, onConflict: 'overwrite' })).data;
+  assert.equal(ow.questions.overwritten, 1);
   assert.equal((await a.get('/questions/' + q0.id)).data.task.prompt, 'Überschrieben!');
   // Ungültig
   assert.equal((await a.post('/import', { data: { foo: 1 } })).status, 422);
   const junk = (await a.post('/import', { data: { format: 'outplay-content', version: 1, questions: [{ id: 'zz', task: { mode: 'nope' } }, { id: 'zz2', task: { mode: 'geo', prompt: '<script>alert(1)</script>', map: 'world', answer: { lat: 1, lon: 1, label: 'x' }, seconds: 20, points: 10, explain: 'x' } }] } })).data;
-  assert.equal(junk.questions, 1); assert.ok(junk.errors.length === 1);
+  assert.equal(junk.questions.created, 1); assert.ok(junk.errors.length === 1);
 });
 
 test('Vorschau: nutzt die echte Engine, liefert TV-/Handy-/Host-Sichten, Auflösung und Punkte – ohne echte Räume zu berühren', async () => {

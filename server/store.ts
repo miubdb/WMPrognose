@@ -1,6 +1,6 @@
 // Persistenz: SQLite (node:sqlite). Jede Zustandsänderung wird synchron gespeichert, bevor sie bestätigt wird.
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Room } from './model';
 
@@ -8,12 +8,12 @@ export class Store {
   db: DatabaseSync;
   private upsert: ReturnType<DatabaseSync['prepare']>;
   private ev: ReturnType<DatabaseSync['prepare']>;
-  constructor(file: string) {
+  constructor(public file: string, opts: { wal?: boolean } = {}) {
     if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA synchronous = NORMAL;
+      PRAGMA journal_mode = ${opts.wal === false ? 'DELETE' : 'WAL'};
+      PRAGMA synchronous = ${opts.wal === false ? 'FULL' : 'NORMAL'};
       CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, json TEXT NOT NULL, seq INTEGER NOT NULL, updated INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, at INTEGER NOT NULL, actor TEXT NOT NULL, req TEXT, action TEXT NOT NULL, result TEXT);
       CREATE INDEX IF NOT EXISTS idx_events_room ON events(room, id);
@@ -42,6 +42,12 @@ export class Store {
   }
   eventCount(room: string): number {
     return (this.db.prepare('SELECT COUNT(*) AS n FROM events WHERE room = ?').get(room) as { n: number }).n;
+  }
+  /** Konsistenter Snapshot (auch im WAL-Betrieb): VACUUM INTO schreibt eine vollständige, eigenständige SQLite-Datei. */
+  backupTo(target: string) {
+    mkdirSync(dirname(target), { recursive: true });
+    if (existsSync(target)) rmSync(target);
+    this.db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
   }
   close() { this.db.close(); }
 }

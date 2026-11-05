@@ -232,3 +232,7 @@ details summary { cursor: pointer; font-weight: 700; }
 .phoneframe { width: 100%; max-width: 390px; min-height: 560px; height: auto; margin: 0 auto; border: 3px solid #2d2766; border-radius: 28px; padding: 14px; background: radial-gradient(circle at 80% -10%, #3b2a9a55, transparent 55%), var(--bg); overflow: hidden; }
 .hostdata { white-space: pre-wrap; word-break: break-word; font-size: .85rem; max-height: 200px; overflow: auto; }
 .chips .sw { width: 34px; height: 34px; }
+.qr.noqr { display: flex; align-items: center; justify-content: center; color: #20140a; font-weight: 700; text-align: center; padding: 1em; }
+.joinwarn { margin-top: .8em; color: #ffb4b4; font-size: 1.2em; text-align: center; }
+.modebanner { padding: 10px 14px; border-radius: 12px; margin: 4px 0 12px; font-size: .9rem; } .modebanner.online { background: rgba(56,189,248,.15); border: 1px solid rgba(56,189,248,.4); } .modebanner.local { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.35); }
+.setuplist li { margin: 10px 0; } .setuplist li.done { opacity: .6; } .bigcard { border-color: var(--gold); } .adm hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; } .field.inline { margin: 0; min-width: 240px; } .adm th { text-align: left; color: var(--muted); font-size: .8rem; padding: 4px 8px; }

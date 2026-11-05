@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: outplay
-    runtime: docker
-    plan: starter        # Free-Tarif schläft nach 15 min und hat KEIN dauerhaftes Dateisystem
-    disk: { name: outplay-data, mountPath: /data, sizeGB: 1 }
-    envVars:
-      - { key: ADMIN_PASSWORD, sync: false }

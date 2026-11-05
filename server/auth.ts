@@ -8,10 +8,9 @@ const SESSION_MS = 12 * 3600 * 1000;
 export class AdminAuth {
   /** Nur gesetzt, wenn beim ersten Start ein Passwort erzeugt wurde (wird einmal ausgegeben). */
   initialPassword: string | null = null;
-  private fails = new Map<string, { n: number; reset: number }>();
-
-  constructor(private store: Store, private envPassword: string | undefined, private now: () => number) {
-    if (!envPassword && !this.get('admin_hash')) {
+  /** passwordRequiredFromEnv: Online-Betrieb – kein automatisch erzeugtes Passwort, Anmeldung nur mit ADMIN_PASSWORD. */
+  constructor(private store: Store, private envPassword: string | undefined, private now: () => number, private opts: { passwordRequiredFromEnv?: boolean } = {}) {
+    if (!envPassword && !opts.passwordRequiredFromEnv && !this.get('admin_hash')) {
       this.initialPassword = randomBytes(9).toString('base64url');
       this.set('admin_hash', this.hash(this.initialPassword));
     }
@@ -32,16 +31,20 @@ export class AdminAuth {
     return timingSafeEqual(test, Buffer.from(hex, 'hex'));
   }
   setPassword(pw: string) { if (pw.length < 8) throw new Error('mindestens 8 Zeichen'); this.set('admin_hash', this.hash(pw)); this.store.db.exec('DELETE FROM admin_sessions'); }
-  /** Gibt ein Sitzungs-Token zurück oder null / 'limited'. */
+  get configured(): boolean { return !!this.envPassword || !!this.get('admin_hash'); }
+  private failKey(ip: string) { return 'fails:' + sha(ip).slice(0, 16); }
+  /** Gibt ein Sitzungs-Token zurück oder null / 'limited'. Fehlversuche werden in der Datenbank gezählt (überleben Neustarts und gelten für alle Instanzen). */
   login(pw: string, ip: string): string | null | 'limited' {
-    const f = this.fails.get(ip);
+    const key = this.failKey(ip);
+    let f: { n: number; reset: number } | null = null;
+    try { f = JSON.parse(this.get(key) ?? 'null'); } catch { f = null; }
     if (f && f.reset > this.now() && f.n >= 8) return 'limited';
     if (!this.verify(pw)) {
       const cur = f && f.reset > this.now() ? f : { n: 0, reset: this.now() + 10 * 60000 };
-      cur.n++; this.fails.set(ip, cur);
+      cur.n++; this.set(key, JSON.stringify(cur));
       return null;
     }
-    this.fails.delete(ip);
+    this.store.db.prepare('DELETE FROM settings WHERE key=?').run(key);
     const token = randomBytes(32).toString('base64url');
     this.store.db.prepare('INSERT INTO admin_sessions(hash,expires) VALUES(?,?)').run(sha(token), this.now() + SESSION_MS);
     return token;

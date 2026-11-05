@@ -1,17 +1,28 @@
 // Admin-API (/api/admin/*). Jede Route außer login/me/logout verlangt eine gültige Sitzung UND (bei Schreibzugriffen) den CSRF-Header.
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { App } from './app';
-import { ApiError } from './content';
+import type { AdminAuth } from './auth';
+import { ApiError, type ContentService } from './content';
 import { buildPreview } from './preview';
 
 export const COOKIE = 'outplay_admin';
+/** Was die Admin-Routen brauchen – lokal (Node-Server) und online (Vercel) liefern jeweils eine eigene Implementierung. */
+export interface AdminCtx {
+  auth: AdminAuth;
+  content: ContentService;
+  roomCount(): number;
+  mode: 'local' | 'online';
+  /** konsistenter Voll-Snapshot der SQLite-Datenbank (VACUUM INTO) */
+  backup(): Buffer;
+  /** Meldet nach einer Admin-Anfrage, ob geschrieben wurde (Online: dann wird nach Blob gespeichert) */
+  setupProblem?(): { err: string; setup: string } | null;
+}
 function cookie(req: IncomingMessage, name: string): string | undefined {
   const raw = req.headers.cookie ?? '';
   for (const part of raw.split(';')) { const [k, ...v] = part.trim().split('='); if (k === name) return decodeURIComponent(v.join('=')); }
   return undefined;
 }
 
-export async function handleAdmin(app: App, req: IncomingMessage, res: ServerResponse, parts: string[], url: URL, readBody: (limit: number) => Promise<any>) {
+export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: ServerResponse, parts: string[], url: URL, readBody: (limit: number) => Promise<any>) {
   const json = (status: number, body: unknown, headers: Record<string, string> = {}) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers });
     res.end(JSON.stringify(body));
@@ -22,6 +33,8 @@ export async function handleAdmin(app: App, req: IncomingMessage, res: ServerRes
   const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
 
   try {
+    const prob = app.setupProblem?.();
+    if (prob && a !== 'me') return json(503, prob);
     // ---- Anmeldung
     if (a === 'login' && method === 'POST') {
       const body = await readBody(4096);
@@ -45,7 +58,7 @@ export async function handleAdmin(app: App, req: IncomingMessage, res: ServerRes
     const q = url.searchParams;
 
     switch (a) {
-      case 'overview': return json(200, { questions: C.listQuestions().length, categories: C.listCategories().length, packs: C.listPacksView().length, rooms: app.rooms.size, defaultRef: C.defaultRef() });
+      case 'overview': return json(200, { questions: C.listQuestions().length, categories: C.listCategories().length, packs: C.listPacksView().length, rooms: app.roomCount(), mode: app.mode, defaultRef: C.defaultRef() });
       case 'scenes': {
         if (method === 'GET') return json(200, C.listScenes());
         const body = await readBody(256 * 1024);
@@ -97,6 +110,13 @@ export async function handleAdmin(app: App, req: IncomingMessage, res: ServerRes
         const body = await readBody(256 * 1024);
         return json(200, buildPreview(body.task, C.sceneMap(), body.meta ?? {}));
       }
+      case 'backup': {
+        if (method !== 'GET') break;
+        const buf = app.backup();
+        const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16);
+        res.writeHead(200, { 'content-type': 'application/octet-stream', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="OUTPLAY-VOLLBACKUP-VERTRAULICH-${stamp}.db"` });
+        return void res.end(buf);
+      }
       case 'export': {
         if (method !== 'GET') break;
         const scope = q.get('scope') ?? 'all';
@@ -107,7 +127,7 @@ export async function handleAdmin(app: App, req: IncomingMessage, res: ServerRes
         if (method !== 'POST') break;
         const body = await readBody(8 * 1024 * 1024);
         const mode = body.onConflict === 'skip' || body.onConflict === 'overwrite' ? body.onConflict : 'rename';
-        return json(200, C.import(body.data, mode));
+        return json(200, C.import(body.data, mode, { dryRun: !!body.dryRun, publish: !!body.publish }));
       }
     }
     void d;
