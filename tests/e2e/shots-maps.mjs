@@ -16,10 +16,10 @@ const browser = await chromium.launch();
 for (const [label, opts] of [['phone', devices['Pixel 7']], ['desktop', { viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 }]]) {
   const ctx = await browser.newContext(opts); const p = await ctx.newPage(); p.on('pageerror', e => { failures++; console.log('pageerror', e.message); });
   await p.goto(BASE + '/admin'); await p.getByLabel('Admin-Passwort').fill(PW); await p.getByRole('button', { name: 'Anmelden' }).click(); await p.waitForSelector('.admtop');
-  await p.getByRole('button', { name: /Fragenbibliothek/ }).click(); await p.waitForSelector('.qcard');
+  await p.getByRole('button', { name: /Fragen/ }).click(); await p.waitForSelector('.qcard');
   await p.locator('.newmenu summary').click(); await p.locator('.newmenu button').filter({ hasText: 'WO ZUR' }).click(); await p.waitForSelector('.adminmap svg');
   for (const kind of ['germany', 'europe', 'world']) {
-    await p.locator('.modalbox select').first().selectOption(kind); await sleep(900);
+    await p.locator('.modalbox .seg button').nth(['germany', 'europe', 'world'].indexOf(kind)).click(); await sleep(900);
     const map = p.locator('.adminmap');
     await map.scrollIntoViewIfNeeded(); await map.screenshot({ path: `${SHOTS}/${label}-${kind}-1.png` });
     const plus = p.getByLabel('Vergrößern');
@@ -27,10 +27,10 @@ for (const [label, opts] of [['phone', devices['Pixel 7']], ['desktop', { viewpo
     await p.getByLabel('Ganze Karte').click(); await sleep(200);
   }
   // Pin setzen (Deutschland) und verschieben
-  await p.locator('.modalbox select').first().selectOption('germany'); await sleep(700);
+  await p.locator('.modalbox .seg button').first().click(); await sleep(700);
   const box = await p.locator('.adminmap svg').boundingBox();
   await p.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.6); await sleep(300);
-  const lat1 = await p.getByLabel('Breite (lat)').inputValue(); const lon1 = await p.getByLabel('Länge (lon)').inputValue();
+  const lat1 = await p.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); await p.getByLabel('Breite (lat)').inputValue(); const lon1 = await p.getByLabel('Länge (lon)').inputValue();
   check(lat1 && lon1 && +lat1 > 47 && +lat1 < 55.5 && +lon1 > 5 && +lon1 < 16, `${label}: Pin setzt Koordinaten (${lat1}, ${lon1})`);
   await p.locator('.adminmap').screenshot({ path: `${SHOTS}/${label}-pin.png` });
   await ctx.close();

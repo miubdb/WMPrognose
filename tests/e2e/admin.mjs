@@ -22,23 +22,24 @@ await page.getByLabel('Admin-Passwort').fill('falsch'); await page.getByRole('bu
 await page.waitForSelector('.status.bad'); check(true, 'falsches Passwort wird abgewiesen');
 await page.getByLabel('Admin-Passwort').fill(PW); await page.getByRole('button', { name: 'Anmelden' }).click();
 await page.waitForSelector('.admtop'); await page.screenshot({ path: `${SHOTS}/1-packs.png` }); check(true, 'Admin-Login erfolgreich');
-check((await page.locator('.catcard').count()) >= 1, 'Standardpaket ist sichtbar');
+await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.catcard'); check((await page.locator('.catcard').count()) >= 1, 'Standardpaket ist sichtbar');
 
 // ---- Fragenbibliothek
-await page.getByRole('button', { name: '❓ Fragenbibliothek' }).click(); await page.waitForSelector('.qcard');
+await page.getByRole('button', { name: '❓ Fragen' }).click(); await page.waitForSelector('.qcard');
 const total = await page.locator('.qcard').count(); check(total >= 34, `Bibliothek zeigt alle bisherigen Fragen (${total})`);
 await page.screenshot({ path: `${SHOTS}/2-library.png` });
-await page.getByPlaceholder('🔍 Suchen (Fragetext, Thema, ID)').fill('Timbuktu'); await sleep(500);
+await page.getByPlaceholder('🔍 Suchen …').fill('Timbuktu'); await sleep(500);
 check(await page.locator('.qcard').count() === 1, 'Suche findet die Timbuktu-Frage');
-await page.getByPlaceholder('🔍 Suchen (Fragetext, Thema, ID)').fill('');
+await page.getByPlaceholder('🔍 Suchen …').fill('');
 
-const newQ = async (name) => { await page.locator('.newmenu summary').click(); await page.locator('.newmenu button', { hasText: name }).click(); await page.waitForSelector('.modalbox'); };
+const openMore = async () => { await page.locator('.modalbox').last().locator('details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); };
+const newQ = async (name) => { await page.locator('.newmenu summary').click(); await page.locator('.newmenu button', { hasText: name }).click(); await page.waitForSelector('.modalbox'); await openMore(); };
 const save = async () => { await page.locator('.modalbox').last().getByRole('button', { name: '💾 Speichern' }).click(); await page.waitForSelector('.toast'); await sleep(300); };
 
 // GEO
 await newQ('WO ZUR HÖLLE?');
-await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Wo liegt der Kölner Dom?'); await fill('Ortsbezeichnung', 'Köln');
-await fill('Karte', 'germany');
+await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Wo liegt der Kölner Dom?'); await fill('Ortsname', 'Köln');
+await page.locator('.modalbox .seg button', { hasText: 'Deutschland' }).click(); await sleep(600);
 const box = await page.locator('.adminmap .mapsvg').boundingBox(); await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.5);
 await fill('Lösungserklärung', 'Der Dom steht direkt am Hauptbahnhof.');
 await page.screenshot({ path: `${SHOTS}/3-geo-editor.png` });
@@ -51,7 +52,7 @@ await page.locator('.modal').last().getByRole('button', { name: 'Schließen ✕'
 
 // RANK
 await newQ('BLIND RANK');
-await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Höhe der Gebäude – höchstes zuerst'); await fill('Beschriftung oben', 'am höchsten'); await fill('Beschriftung unten', 'am niedrigsten');
+await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Höhe der Gebäude – höchstes zuerst'); await fill('Platz 1 bedeutet', 'am höchsten'); await fill('Platz 5 bedeutet', 'am niedrigsten');
 const items = [['Burj Khalifa', '828 m'], ['Empire State Building', '443 m'], ['Eiffelturm', '330 m'], ['Kölner Dom', '157 m'], ['Freiheitsstatue', '93 m']];
 for (let i = 0; i < 5; i++) { await page.locator('.modalbox input[placeholder="Begriff ' + (i + 1) + '"]').fill(items[i][0]); await page.locator('.modalbox input[placeholder="Wert (Auflösung)"]').nth(i).fill(items[i][1]); }
 await fill('Lösungserklärung', 'Vom Burj Khalifa bis zur Freiheitsstatue.');
@@ -59,7 +60,7 @@ await page.screenshot({ path: `${SHOTS}/6-rank-editor.png` }); await save();
 
 // ESTIMATE
 await newQ('SETZ AUF MICH');
-await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Wie viele Stufen hat der Kölner Dom Südturm?'); await fill('Richtiger Zahlenwert', '533'); await fill('Einheit', 'Stufen'); await fill('Lösungserklärung', 'Es sind 533 Stufen.');
+await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Wie viele Stufen hat der Kölner Dom Südturm?'); await fill('Richtiger Wert', '533'); await fill('Einheit', 'Stufen'); await fill('Lösungserklärung', 'Es sind 533 Stufen.');
 await save();
 
 // CODEBREAK
@@ -77,8 +78,8 @@ await fill('Lösungserklärung', 'Deutschland hat neun Nachbarn.'); await save()
 
 // GLITCH mit neuer Szene aus Vorlage
 await newQ('GLITCH');
-await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'x', 'input').catch(() => {});
-await page.getByRole('button', { name: '＋ Neue Szene aus Vorlage' }).click(); await page.waitForSelector('.scenepair');
+await fill('Thema', 'Test-E2E');
+await page.getByRole('button', { name: '＋ Neue Szene' }).click(); await page.waitForSelector('.scenepair');
 await page.locator('.chipbtn', { hasText: 'Tabelle' }).click(); await sleep(300);
 await page.screenshot({ path: `${SHOTS}/7-scene-builder.png` });
 await page.getByRole('button', { name: '💾 Szene speichern' }).click(); await sleep(600);
@@ -93,11 +94,11 @@ await page.screenshot({ path: `${SHOTS}/9-library-after.png` });
 // ---- Kategorie
 await page.getByRole('button', { name: '🧱 Kategorien' }).click(); await page.waitForSelector('.catcard');
 await page.getByRole('button', { name: '＋ Neue Kategorie' }).click();
-await page.locator('.modalbox label.field', { hasText: 'Titel' }).first().locator('input').fill('Stadt & Land');
-await page.locator('.modalbox label.field', { hasText: 'Beschreibung' }).first().locator('input').fill('Eigene Testfragen');
+await page.locator('.modalbox label.field', { hasText: 'Titel' }).first().locator('input').fill('Stadt & Land'); await openMore();
+await page.locator('.modalbox label.field', { hasText: 'Untertitel' }).first().locator('input').fill('Eigene Testfragen');
 await page.locator('.modalbox label.field', { hasText: 'Regeltext' }).locator('textarea').fill('Setze deinen Pin auf der Karte.');
 await page.locator('.modalbox .chipbtn', { hasText: '🏆' }).click();
-await page.getByRole('button', { name: '＋ Aus Bibliothek hinzufügen' }).click(); await sleep(400);
+await page.getByRole('button', { name: '＋ Aus Fragen wählen' }).click(); await sleep(400);
 await page.locator('.pickrow', { hasText: 'Kölner Dom?' }).click();
 await page.screenshot({ path: `${SHOTS}/10-category-editor.png` });
 await page.getByRole('button', { name: '💾 Kategorie speichern' }).click(); await page.waitForSelector('.toast'); await sleep(500);
@@ -105,19 +106,20 @@ check(await page.locator('.catcard', { hasText: 'Stadt & Land' }).count() === 1,
 await page.screenshot({ path: `${SHOTS}/11-categories.png` });
 
 // ---- Paket: Analyse + Veröffentlichung (Standardpaket duplizieren)
-await page.getByRole('button', { name: '📦 Spielepakete' }).click(); await page.waitForSelector('.catcard');
-await page.getByRole('button', { name: '⧉ Duplizieren' }).first().click(); await sleep(700);
-await page.locator('.catcard', { hasText: '(Kopie)' }).getByRole('button', { name: '✏️ Öffnen' }).click(); await page.waitForSelector('.stats'); await sleep(500);
+await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.catcard');
+await page.locator('.catcard .rowmenu summary').first().click(); await page.getByRole('button', { name: '⧉ Duplizieren' }).first().click(); await sleep(700);
+await page.locator('.catcard', { hasText: '(Kopie)' }).getByRole('button', { name: 'Öffnen' }).click(); await page.waitForSelector('.modalbox details.more .stats', { state: 'attached' }); await page.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); await page.waitForSelector('.stats'); await sleep(500);
 await page.screenshot({ path: `${SHOTS}/12-pack-editor.png`, fullPage: false });
 check(await page.locator('.stats > div').count() === 4, 'Paket-Analyse zeigt Spielzeit, Maximalzeit, Fußballanteil, Modusverteilung');
-await page.getByRole('button', { name: '🚀 Prüfen & veröffentlichen' }).click(); await page.waitForSelector('.status.ok'); await sleep(500);
+await page.getByRole('button', { name: '🚀 Veröffentlichen' }).click(); await page.waitForSelector('.status.ok'); await sleep(500);
 check((await page.locator('.status.ok').innerText()).includes('Veröffentlicht'), 'Paketkopie veröffentlicht (Version 1)');
 await page.screenshot({ path: `${SHOTS}/13-pack-published.png` });
 await page.getByRole('button', { name: 'Schließen ✕' }).first().click();
 
 // ---- Import/Export
-await page.getByRole('button', { name: '⇅ Import/Export' }).click(); await sleep(600);
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Alles (Inhalte)' }).click()]);
+await page.getByRole('button', { name: '⇅ Daten' }).click(); await sleep(600);
+await page.locator('details.backups > summary').click();
+const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Alles', exact: true }).click()]);
 check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Datei'); await page.screenshot({ path: `${SHOTS}/14-io.png` });
 
 // ---- Show mit dem Paket starten (Host-Seite zeigt Paketauswahl)
@@ -129,8 +131,8 @@ await host.locator('select').selectOption({ index: 1 }); await host.getByText('S
 // ---- Mobile Ansicht
 const m = await (await browser.newContext({ ...devices['Pixel 7'] })).newPage(); await m.goto(BASE + '/admin');
 await m.getByLabel('Admin-Passwort').fill(PW); await m.getByRole('button', { name: 'Anmelden' }).click(); await m.waitForSelector('.admtop');
-await m.getByRole('button', { name: '❓ Fragenbibliothek' }).click(); await m.waitForSelector('.qcard'); await m.screenshot({ path: `${SHOTS}/15-mobile-library.png` });
-await m.locator('.qcard').first().getByRole('button', { name: '✏️ Bearbeiten' }).click(); await sleep(700); await m.screenshot({ path: `${SHOTS}/16-mobile-editor.png` });
+await m.getByRole('button', { name: '❓ Fragen' }).click(); await m.waitForSelector('.qcard'); await m.screenshot({ path: `${SHOTS}/15-mobile-library.png` });
+await m.locator('.qcard').first().getByRole('button', { name: 'Bearbeiten' }).click(); await sleep(700); await m.screenshot({ path: `${SHOTS}/16-mobile-editor.png` });
 const overflow = await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2); check(!overflow, 'Mobil: kein horizontales Scrollen');
 
 await browser.close(); console.log(failures ? `\n${failures} FEHLER` : '\nE2E-Admin OK'); process.exit(failures ? 1 : 0);

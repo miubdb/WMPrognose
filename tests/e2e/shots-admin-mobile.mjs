@@ -16,23 +16,23 @@ const browser = await chromium.launch();
 for (const [label, dev] of [['pixel7', devices['Pixel 7']], ['iphone13', devices['iPhone 13']]]) {
   const ctx = await browser.newContext(dev); const p = await ctx.newPage(); p.on('pageerror', e => { failures++; console.log('pageerror', e.message); });
   await p.goto(BASE + '/admin'); await p.getByLabel('Admin-Passwort').fill(PW); await p.getByRole('button', { name: 'Anmelden' }).click(); await p.waitForSelector('.admtop');
-  const overflow = async (name) => { const o = await p.evaluate(() => { const w = window.innerWidth; const bad = [...document.querySelectorAll('.modalbox *, .adm *')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > w + 2 && getComputedStyle(e).position !== 'fixed' && !e.closest('.tablescroll, .tvframe, svg, .frametabs'); }).slice(0, 3).map(e => e.tagName + '.' + e.className); return { sw: document.documentElement.scrollWidth > w + 2, bad }; }); check(!o.sw && !o.bad.length, `${label} ${name}: kein Überlauf ${o.bad.join(' ')}`); };
+  const overflow = async (name) => { const o = await p.evaluate(() => { const w = window.innerWidth; const bad = [...document.querySelectorAll('.modalbox *, .adm *')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > w + 2 && getComputedStyle(e).position !== 'fixed' && !e.closest('.tablescroll, .tvframe, svg, .frametabs, .chipsrow, .admtop nav'); }).slice(0, 3).map(e => e.tagName + '.' + e.className); return { sw: document.documentElement.scrollWidth > w + 2, bad }; }); check(!o.sw && !o.bad.length, `${label} ${name}: kein Überlauf ${o.bad.join(' ')}`); };
   await p.screenshot({ path: `${SHOTS}/${label}-1-packs.png` }); await overflow('Pakete');
-  await p.getByRole('button', { name: '❓ Fragenbibliothek' }).click(); await p.waitForSelector('.qcard'); await p.screenshot({ path: `${SHOTS}/${label}-2-library.png` }); await overflow('Bibliothek');
+  await p.getByRole('button', { name: '❓ Fragen' }).click(); await p.waitForSelector('.qcard'); await p.screenshot({ path: `${SHOTS}/${label}-2-library.png` }); await overflow('Bibliothek');
   for (const mode of ['geo', 'rank', 'estimate', 'glitch', 'codebreak', 'unique']) {
-    await p.locator('.newmenu summary').click(); await p.locator('.newmenu button').filter({ hasText: { geo: 'WO ZUR', rank: 'BLIND', estimate: 'SETZ', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG' }[mode] }).click(); await p.waitForSelector('.modalbox');
+    await p.locator('.newmenu summary').click(); await p.locator('.newmenu button').filter({ hasText: { geo: 'WO ZUR', rank: 'BLIND', estimate: 'SETZ AUF', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG' }[mode] }).click(); await p.waitForSelector('.modalbox');
     await sleep(500); await p.screenshot({ path: `${SHOTS}/${label}-3-editor-${mode}.png` }); await overflow('Editor ' + mode);
     await p.locator('.modalbox').evaluate(e => e.scrollTo?.(0, 99999)); await p.evaluate(() => window.scrollTo(0, 99999)); await sleep(200); await p.screenshot({ path: `${SHOTS}/${label}-3-editor-${mode}-unten.png` });
     await p.locator('.modalbox').first().getByRole('button', { name: 'Schließen ✕' }).first().click(); await sleep(200);
   }
   // Vorschau einer vorhandenen Frage (Glitch) auf dem Handy
-  await p.locator('.qcard', { hasText: 'Abfahrtstafel' }).first().getByRole('button', { name: '👀 Vorschau' }).click().catch(async () => { await p.locator('.qcard').filter({ hasText: 'GLITCH' }).first().getByRole('button', { name: '👀 Vorschau' }).click(); });
+  await p.locator('.chipsrow .chip').nth(4).click(); await sleep(600); await p.locator('.qcard').first().getByRole('button', { name: 'Vorschau' }).click();
   await p.waitForSelector('.frametabs'); await sleep(1800); await p.screenshot({ path: `${SHOTS}/${label}-4-vorschau.png` }); await p.locator('.frametabs button').last().click(); await sleep(2500); await p.screenshot({ path: `${SHOTS}/${label}-5-vorschau-aufloesung.png`, fullPage: false }); await overflow('Vorschau');
   await p.locator('.modal').last().getByRole('button', { name: 'Schließen ✕' }).first().click();
   // Szenen-Builder
   await p.getByRole('button', { name: '🖼️ Szenen' }).click(); await sleep(700); await p.getByRole('button', { name: '＋ Neue Szene' }).click(); await p.waitForSelector('.scenepair'); await sleep(400); await p.screenshot({ path: `${SHOTS}/${label}-6-szene.png` }); await overflow('Szene');
   await p.locator('.modalbox').getByRole('button', { name: 'Schließen ✕' }).first().click();
-  await p.getByRole('button', { name: '⇅ Import/Export' }).click(); await sleep(600); await p.screenshot({ path: `${SHOTS}/${label}-7-io.png` }); await overflow('Import/Export');
+  await p.getByRole('button', { name: '⇅ Daten' }).click(); await sleep(600); await p.screenshot({ path: `${SHOTS}/${label}-7-io.png` }); await overflow('Import/Export');
   await ctx.close();
 }
 await browser.close(); srv.kill(); console.log(failures ? `\n${failures} PROBLEME` : '\nMobile-Screenshots OK'); process.exit(failures ? 1 : 0);

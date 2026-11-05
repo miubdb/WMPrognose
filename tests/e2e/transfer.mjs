@@ -44,7 +44,7 @@ const browser = await chromium.launch();
 // ---- UI-Export auf A
 const ctxA = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true }); const pa = await ctxA.newPage(); pa.on('pageerror', e => { failures++; console.log('pageerror A', e.message); });
 await pa.goto(A + '/admin'); await pa.getByLabel('Admin-Passwort').fill(PW); await pa.getByRole('button', { name: 'Anmelden' }).click(); await pa.waitForSelector('.admtop');
-await pa.getByRole('button', { name: '⇅ Import/Export' }).click(); await pa.waitForSelector('.bigcard');
+await pa.getByRole('button', { name: '⇅ Daten' }).click(); await pa.waitForSelector('.bigcard');
 await pa.locator('.bigcard select').first().selectOption({ label: 'Samstag-Abend (v1)' });
 await pa.screenshot({ path: `${SHOTS}/1-export.png` });
 const [dl] = await Promise.all([pa.waitForEvent('download'), pa.getByRole('button', { name: '📤 Spieleabend exportieren' }).click()]);
@@ -54,7 +54,7 @@ const exported = JSON.parse(readFileSync(file, 'utf8')); check(exported.counts.q
 // ---- UI-Import auf B
 const ctxB = await browser.newContext({ viewport: { width: 1280, height: 1000 } }); const pb = await ctxB.newPage(); pb.on('pageerror', e => { failures++; console.log('pageerror B', e.message); });
 await pb.goto(B + '/admin'); await pb.getByLabel('Admin-Passwort').fill(PW); await pb.getByRole('button', { name: 'Anmelden' }).click(); await pb.waitForSelector('.admtop');
-await pb.getByRole('button', { name: '⇅ Import/Export' }).click(); await pb.waitForSelector('.bigcard');
+await pb.getByRole('button', { name: '⇅ Daten' }).click(); await pb.waitForSelector('.bigcard');
 await pb.locator('input[type=file]').setInputFiles(file); await pb.waitForSelector('.card h4:has-text("Prüfung")'); await sleep(400);
 await pb.screenshot({ path: `${SHOTS}/2-import-pruefung.png`, fullPage: true });
 check(await pb.getByText('nichts wurde gespeichert').count() > 0, 'Trockenlauf zeigt den Bericht, ohne zu speichern');

@@ -57,3 +57,6 @@ Lokal: keine. Online-Admin: Vercel Hobby (kostenlos) + Vercel Blob (im Hobby-Tar
 
 ## Tests
 `npm test` (Wertungen, Multiplayer über echte WebSockets, komplette Show mit Bots, Admin-API, Online-Adapter, Transfer, Backup, Netzwerk). Browser-E2E (Playwright; Server vorher starten bzw. Skript startet selbst): `tests/e2e/play.mjs`, `modes.mjs`, `admin.mjs`, `transfer.mjs`. Ehrlicher Stand: siehe `docs/TESTBERICHT.md`.
+
+## Kartendaten & Lizenzen
+Die Karten (WO ZUR HÖLLE?) laufen vollständig lokal ohne externe Kartenserver. Daten: [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei: Länder, Bundesländer, Flüsse, Seen, Orte) und [GeoNames](https://www.geonames.org/) (CC BY 4.0: Orte ≥ 8.000 Einwohner in Deutschland). Neu erzeugen: `node scripts/build-mapdata.mjs` (siehe Kopfkommentar). Auf der Karte steht die Quellenangabe.
