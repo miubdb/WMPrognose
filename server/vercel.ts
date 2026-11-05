@@ -43,12 +43,22 @@ export class SdkBlobBackend implements BlobBackend {
     const b = await this.sdk();
     try { const h = await b.head(this.pathname); return { etag: h.etag }; } catch (e) { if (e instanceof b.BlobNotFoundError) return null; throw e; }
   }
+  /**
+   * WICHTIG (Ursache des früheren Dauer-409): get() liefert über das CDN bei größeren Dateien einen SCHWACHEN ETag (W/"…"),
+   * den ifMatch niemals akzeptiert. Der ETag kommt deshalb ausschließlich aus head() (stark) – gemessen vor UND nach dem Download,
+   * damit Inhalt und ETag zusammengehören.
+   */
   async get() {
     const b = await this.sdk();
-    const r = await b.get(this.pathname, { access: 'private', useCache: false });
-    if (!r || r.statusCode !== 200) return null;
-    const bytes = Buffer.from(await new Response(r.stream as any).arrayBuffer());
-    return { bytes, etag: (r.blob as any).etag as string };
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const before = await this.head(); if (!before) return null;
+      const r = await b.get(this.pathname, { access: 'private', useCache: false });
+      if (!r || r.statusCode !== 200) return null;
+      const bytes = Buffer.from(await new Response(r.stream as any).arrayBuffer());
+      const after = await this.head();
+      if (after && after.etag === before.etag) return { bytes, etag: after.etag };
+    }
+    throw new Error('Blob ändert sich während des Ladens – bitte erneut versuchen');
   }
   async put(bytes: Buffer, ifMatch: string | null) {
     const b = await this.sdk();

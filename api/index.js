@@ -36153,12 +36153,23 @@ var SdkBlobBackend = class {
       throw e;
     }
   }
+  /**
+   * WICHTIG (Ursache des früheren Dauer-409): get() liefert über das CDN bei größeren Dateien einen SCHWACHEN ETag (W/"…"),
+   * den ifMatch niemals akzeptiert. Der ETag kommt deshalb ausschließlich aus head() (stark) – gemessen vor UND nach dem Download,
+   * damit Inhalt und ETag zusammengehören.
+   */
   async get() {
     const b = await this.sdk();
-    const r = await b.get(this.pathname, { access: "private", useCache: false });
-    if (!r || r.statusCode !== 200) return null;
-    const bytes2 = Buffer.from(await new Response(r.stream).arrayBuffer());
-    return { bytes: bytes2, etag: r.blob.etag };
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const before = await this.head();
+      if (!before) return null;
+      const r = await b.get(this.pathname, { access: "private", useCache: false });
+      if (!r || r.statusCode !== 200) return null;
+      const bytes2 = Buffer.from(await new Response(r.stream).arrayBuffer());
+      const after = await this.head();
+      if (after && after.etag === before.etag) return { bytes: bytes2, etag: after.etag };
+    }
+    throw new Error("Blob \xE4ndert sich w\xE4hrend des Ladens \u2013 bitte erneut versuchen");
   }
   async put(bytes2, ifMatch) {
     const b = await this.sdk();
