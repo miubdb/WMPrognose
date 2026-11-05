@@ -230,7 +230,7 @@ function GlitchPhone({ round, act, room, d }: Props & { d: any }) {
   return (
     <div className="glitch">
       <div className="question small">{d.prompt}</div>
-      <SceneView scene={d.scene} variant="b" marker={marker} onTap={(x, y) => !mine && setDraft({ x, y })} disabled={!!mine} className="phonescene" />
+      <SceneView scene={d.sceneData} marker={marker} onTap={(x, y) => !mine && setDraft({ x, y })} disabled={!!mine} className="phonescene" />
       <Status sent={!!mine} draft={!!draft && !mine} sending={snd.state === 'sending'} msg={snd.msg} />
       {!mine && <button className="btn primary wide" disabled={!draft || snd.state === 'sending'} onClick={() => draft && snd.send({ k: 'submit', payload: draft })}>{draft ? 'Markierung abgeben' : 'Tippe auf die gesuchte Stelle'}</button>}
     </div>

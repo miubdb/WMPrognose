@@ -70,7 +70,7 @@ function Screen({ view, serverNow, code }: { view: View; serverNow: () => number
   }
 }
 
-function Header({ view, right }: { view: View; right?: React.ReactNode }) {
+export function Header({ view, right }: { view: View; right?: React.ReactNode }) {
   return <div className="tvhead"><div className="logo tiny">OUT<span>PLAY</span></div><div className="act">{view.room.act}</div><div className="right">{right}</div></div>;
 }
 
@@ -130,11 +130,12 @@ function WallTv({ view }: { view: View }) {
       {picker && <div className="pickerbanner" key={picker.id}><Avatar a={picker.avatar} size={90} /><div><small>Am Zug</small><b>{picker.name}</b><span>wählt eine Kategorie</span></div></div>}
       <div className="wall">
         {w.tiles.map((t, i) => (
-          <div key={t.id} className={`wtile ${t.status}`} style={{ ['--c' as any]: t.color, animationDelay: `${i * 0.06}s` }}>
+          <div key={t.id} className={`wtile ${t.status} ${t.blocked ? 'blocked' : ''}`} style={{ ['--c' as any]: t.color, animationDelay: `${i * 0.06}s` }}>
             <div className="ic">{t.icon}</div>
             <b>{t.title}</b>
             <small>{t.status === 'played' ? 'Gespielt' : t.topic}</small>
             {t.status === 'selected' && <i className="sel">Gewählt</i>}
+            {t.blocked && <i className="sel lock">🔒 Limit erreicht</i>}
           </div>
         ))}
       </div>
@@ -143,7 +144,7 @@ function WallTv({ view }: { view: View }) {
 }
 
 // ---------------------------------------------------------------- Runde
-function RoundTv({ view, round, serverNow }: { view: View; round: RoundView; serverNow: () => number }) {
+export function RoundTv({ view, round, serverNow }: { view: View; round: RoundView; serverNow: () => number }) {
   const timer = round.stage !== 'intro' && round.stage !== 'reveal' && round.deadline !== null || round.pausedLeft !== null;
   return (
     <div className={`roundtv k-${round.kind}`} style={{ ['--accent' as any]: round.color }}>
@@ -305,7 +306,7 @@ function GlitchTv({ view, round }: { view: View; round: RoundView }) {
         {rev ? <><PointsList view={view} rows={rev.rows.map((r: any) => ({ pid: r.pid, points: r.points, note: r.tap ? (r.hit ? 'Treffer!' : r.points ? 'knapp daneben' : 'daneben') : 'keine Abgabe' })).sort((a: any, b: any) => b.points - a.points)} /><Explain text={rev.explain} /></> :
           round.stage === 'view' ? <p className="hint big">Merken, merken, merken …</p> : <AnswerRow players={view.players} />}
       </div>
-      <div className="scenecol"><SceneView scene={d.scene} variant={d.variant} zones={rev?.zones} taps={taps} className="tvscene" /></div>
+      <div className="scenecol"><SceneView scene={d.sceneData} zones={rev?.zones} taps={taps} className="tvscene" /></div>
     </div>
   );
 }

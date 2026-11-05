@@ -191,9 +191,9 @@ function WallCtl({ view, act }: { view: View; act: any }) {
       <h2>Du bist dran! 🎉</h2><p className="muted center">Wähle eine Kategorie. Was dahinter steckt, bleibt geheim.</p>
       <div className="tilegrid">
         {w.tiles.map(t => (
-          <button key={t.id} disabled={t.status !== 'open' || !!busy} className={`tile ${t.status}`} style={{ ['--c' as any]: t.color }}
+          <button key={t.id} disabled={t.status !== 'open' || !!busy || !!t.blocked} className={`tile ${t.status}`} style={{ ['--c' as any]: t.color }}
             onClick={async () => { setBusy(t.id); await act({ k: 'pick', tileId: t.id }); setBusy(''); }}>
-            <span className="ic">{t.icon}</span><b>{t.title}</b><small>{t.topic}</small>
+            <span className="ic">{t.icon}</span><b>{t.title}</b><small>{t.blocked ? '🔒 Limit erreicht' : t.topic}</small>
           </button>
         ))}
       </div>

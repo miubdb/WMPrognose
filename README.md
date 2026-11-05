@@ -12,7 +12,7 @@ Entwicklung: `npm run dev` (Vite :5173 + Server :8080). Tests: `npm test` (Wertu
 Browser-E2E (Playwright, Server auf :8091 starten): `node tests/e2e/play.mjs`, `node tests/e2e/modes.mjs`.
 
 ## Umgebungsvariablen
-`PORT` (8080) · `DATA_DIR` (./data, SQLite-Datei `outplay.db`) · `ADMIN_PASSWORD` (optional; schützt das Erstellen von Räumen).
+`PORT` (8080) · `DATA_DIR` (./data, SQLite-Datei `outplay.db`) · `ADMIN_PASSWORD` (Admin-Bereich; ohne Angabe wird beim ersten Start ein zufälliges Passwort erzeugt, in der Konsole angezeigt und in `data/admin-passwort.txt` abgelegt) · `HOST_PASSWORD` (optional; schützt das Erstellen von Räumen).
 
 ## Show-Ablauf
 1. `/host` → „Spielraum erstellen“. Host-Schlüssel liegt im Browser, zusätzlich gibt es eine 6-stellige Host-PIN (Gerätewechsel).
@@ -47,3 +47,35 @@ Nur 6 Spielmodi; HOCHSTAPLER u. a. nicht umgesetzt. Neue Modi: Eintrag in `serve
 
 ## Spielzeit (aus den hinterlegten Timern berechnet, `shared/timing.ts`)
 Kacheln 5–7,5 min, Überraschung ca. 6,5 min, Finale ca. 10 min, plus Lobby 8 min, Eröffnung, 3 Zwischenstände, Siegerehrung. Jede der 84 möglichen Auswahlen von 6 Kacheln ergibt 60–75 min (Test `tests/timing.test.ts`).
+
+## Admin-Bereich (`/admin`)
+Verwaltet alle Inhalte im Browser; gespeichert wird in SQLite (`data/outplay.db`, Tabellen `questions`, `categories`, `packs`, `pack_versions`, `scenes`).
+- **Fragenbibliothek**: suchen, nach Modus/Thema filtern, anlegen (alle 6 Modi mit eigener Eingabemaske), bearbeiten, duplizieren, archivieren, löschen (nur wenn in keiner Kategorie verwendet), 👀 Vorschau.
+- **Kategorien**: Titel, Beschreibung, Icon, Farbe, Regeltext, Typ (Kachel / Überraschung / Finale), Fußball-Kennzeichen, Aufgabenliste (Reihenfolge, Budgetanzeige 1.000/2.000), duplizieren, deaktivieren, löschen.
+- **Spielepakete**: Kategorien + Überraschung + Finale + Regeln (Startguthaben, Fußball-/Modus-Limit). Prüfung/Analyse (Spielzeit erwartet & maximal, Fußballanteil, Modusverteilung über alle möglichen Kategorien-Auswahlen), **Veröffentlichen** erzeugt eine unveränderliche Version; **Archivieren**; **Wiederherstellen** früherer Versionen.
+- **Szenen** (GLITCH): Vorlagen Raster, Liste/Speisekarte/Kassenzettel, Tabelle, Spielfeld – Unterschied und Trefferzone werden automatisch erzeugt und grafisch gezeigt.
+- **Import/Export** (JSON): alles (Backup), nur Fragen, einzelne Pakete. Import als Kopie (Standard), überspringen oder überschreiben.
+- Die ursprünglichen Inhalte aus `content/tiles.ts` werden beim ersten Start als bearbeitbare Vorlagen importiert (Paket „Standardpaket – Abend 1“, Version 1).
+
+### Neue Kategorie und Frage anlegen
+1. `/admin` → Anmelden → **Kategorien** → „＋ Neue Kategorie“ (Titel, Beschreibung, Regeltext, Icon, Farbe).
+2. Im selben Dialog „＋ Neu: <Modus>“ wählen, Maske ausfüllen (Pflichtfelder werden unten als „Noch offen“ gemeldet), **Speichern** – die Frage landet in der Bibliothek und in der Kategorie. Mit **👀 Vorschau** TV, Handy, Auflösung und Punkte ansehen.
+3. Kategorie speichern (Budget 1.000 Punkte anpeilen). **Spielepakete** → Paket öffnen/duplizieren → Kategorie hinzufügen → **Prüfen & veröffentlichen**.
+4. Auf der Host-Seite (`/host`) das Paket beim Erstellen des Raums auswählen.
+
+### Garantien
+- Ein Raum speichert die Paketversion (`bookId`, z. B. `standard-1@1`). Änderungen im Admin, neue Versionen oder Rollbacks verändern laufende Räume nie (Test vorhanden).
+- Alle Schreib-APIs verlangen eine serverseitig geprüfte Sitzung (HttpOnly-Cookie, SameSite=Strict), den Header `x-outplay-admin` (CSRF) und passende Herkunft; Login mit scrypt-Hash bzw. Konstantzeit-Vergleich, Rate-Limit (8 Fehlversuche / 10 min).
+- Backup: `data/outplay.db` kopieren oder im Admin „Alles (Backup)“ exportieren.
+
+## Einsätze und Startguthaben
+Alle Spieler starten mit dem Startguthaben des Pakets (Standard 200). Einsätze (SETZ AUF MICH) sind nur bis zum tatsächlichen Punktestand möglich; wer 0 Punkte hat, schätzt weiter mit, kann aber nichts setzen. Ein verlorener Einsatz kostet genau den Einsatz. Die Kachelmaxima (1.000 / 1.000 / 2.000) ändern sich nicht; theoretisches Gesamtmaximum = Startguthaben + 6 × 1.000 + 1.000 + 2.000. Im Finale gilt weiter: Einsatz ≤ vorhandene Punkte (500).
+
+## Verteilung bei freier Kategorienwahl
+Pro Paket einstellbar: max. Fußball-Kacheln (Standard 2) und max. Kacheln je Modus (Standard 2). Gesperrte Kacheln erscheinen mit 🔒; sind alle übrigen gesperrt, wird das Limit automatisch aufgehoben, damit nie jemand blockiert ist.
+
+## Spielzeit
+`shared/timing.ts`: *erwartet* (Runden enden im Schnitt bei 85 % des Limits) und *maximal* (alle Limits voll ausgeschöpft, Moderation 30 % langsamer). Das Maximum ist nur eine Planungsgröße – die Show bricht nie automatisch ab; der Host kann überspringen und pausieren.
+
+## Hosting später kostenlos online
+Siehe `docs/cloudflare.md` (Workers + Durable Objects + D1).

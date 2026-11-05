@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, store, useGame } from '../net';
 import { Avatar } from '../ui/Avatar';
 import { ConnBadge, Countdown, QR } from '../ui/widgets';
@@ -17,9 +17,12 @@ export function Host({ code }: { code?: string }) {
 function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSession) => void }) {
   const [pw, setPw] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [rc, setRc] = useState(code ?? ''); const [pin, setPin] = useState('');
+  const [packs, setPacks] = useState<{ id: string; name: string; version: number; description: string }[]>([]);
+  const [pack, setPack] = useState('');
+  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { setPacks(r.data as any); setPack((r.data as any)[0]?.id ?? ''); } }); }, []);
   const create = async () => {
     setBusy(true); setErr('');
-    const r = await api('/api/rooms', { password: pw });
+    const r = await api('/api/rooms', { password: pw, pack });
     setBusy(false);
     if (!r.ok) { setErr(r.status === 403 ? 'Falsches Passwort.' : 'Server nicht erreichbar.'); return; }
     onSession({ code: (r.data as any).code, key: (r.data as any).hostKey, pin: (r.data as any).hostPin });
@@ -37,6 +40,9 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
       <h2>Showmaster</h2>
       <div className="card">
         <h3>Neue Show erstellen</h3>
+        <label className="field"><span>Spielepaket</span>
+          <select value={pack} onChange={e => setPack(e.target.value)}>{packs.map(p => <option key={p.id} value={p.id}>{p.name} (v{p.version})</option>)}</select></label>
+        {packs.find(p => p.id === pack)?.description && <p className="muted small">{packs.find(p => p.id === pack)!.description}</p>}
         <label className="field"><span>Passwort (nur falls der Server eines verlangt)</span><input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="optional" /></label>
         <button className="btn primary wide" disabled={busy} onClick={create}>🎬 Spielraum erstellen</button>
       </div>
@@ -146,7 +152,7 @@ function WallHost({ view, run, busy }: { view: View; run: Run; busy: boolean }) 
         <button className="btn ghost" onClick={() => run({ k: 'h.scoreboard', show: true })}>📊 Zwischenstand zeigen</button>
       </div>
       <div className="hosttiles">
-        {w.tiles.map(t => <button key={t.id} disabled={busy || t.status !== 'open'} className={`htile ${t.status}`} style={{ ['--c' as any]: t.color }} onClick={() => run({ k: 'h.pick', tileId: t.id })}><span>{t.icon}</span><b>{t.title}</b><small>{t.status === 'played' ? 'gespielt' : 'öffnen'}</small></button>)}
+        {w.tiles.map(t => <button key={t.id} disabled={busy || t.status !== 'open' || !!t.blocked} className={`htile ${t.status}`} style={{ ['--c' as any]: t.color }} onClick={() => run({ k: 'h.pick', tileId: t.id })}><span>{t.icon}</span><b>{t.title}</b><small>{t.status === 'played' ? 'gespielt' : t.blocked ? '🔒 Limit' : 'öffnen'}</small></button>)}
       </div>
     </div>
   );

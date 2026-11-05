@@ -1,17 +1,21 @@
 import type { GlitchZone } from '../../../shared/types';
-import { SCENES, variantItems, type Item } from '../../../shared/scenes';
+import { variantItems, type Item, type Scene } from '../../../shared/scenes';
 import { Avatar } from './Avatar';
 import type { Avatar as AvatarT } from '../../../shared/types';
 
 export interface Tap { x: number; y: number; avatar?: AvatarT; id?: string; hit?: boolean }
 
-export function SceneView({ scene, variant, onTap, marker, zones, taps, className, disabled }: {
-  scene: string; variant: 'a' | 'b'; onTap?: (x: number, y: number) => void; marker?: { x: number; y: number } | null;
+export interface SceneData { id: string; title: string; bg: string; items: Item[] }
+/** Szene für Vorschau/Admin: komplette Definition (mit Änderungen) -> Anzeige-Daten einer Variante. */
+export const sceneVariant = (s: Scene, v: 'a' | 'b'): SceneData => ({ id: s.id, title: s.title, bg: s.bg, items: variantItems(s, v) });
+
+export function SceneView({ scene, onTap, marker, zones, taps, className, disabled }: {
+  scene: SceneData | null; onTap?: (x: number, y: number) => void; marker?: { x: number; y: number } | null;
   zones?: GlitchZone[]; taps?: Tap[]; className?: string; disabled?: boolean;
 }) {
-  const s = SCENES[scene];
+  const s = scene;
   if (!s) return <div className="muted">Szene fehlt</div>;
-  const items = variantItems(s, variant);
+  const items = s.items;
   const handle = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!onTap || disabled) return;
     const svg = e.currentTarget;
