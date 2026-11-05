@@ -149,7 +149,7 @@ for (let t = 0; t < 4; t++) {
   await H({ k: 'h.reveal' }); await sleep(t === 2 ? 5000 : 2500); await tv.screenshot({ path: `${SHOTS}/tv-final-${t}-reveal.png` }); await H({ k: 'h.next' });
 }
 await waitHost(v => v.room.phase === 'ceremony');
-for (let st = 0; st < 8; st++) { await sleep(1700); if ([0, 4, 7].includes(st)) await tv.screenshot({ path: `${SHOTS}/tv-ceremony-${st}.png` }); if (st < 7) await H({ k: 'h.ceremonyNext' }); }
+for (let st = 0; st < 9; st++) { await sleep(1700); if ([0, 4, 8].includes(st)) await tv.screenshot({ path: `${SHOTS}/tv-ceremony-${st}.png` }); if (st < 8) await H({ k: 'h.ceremonyNext' }); }
 await phones[0].screenshot({ path: `${SHOTS}/phone-end.png` });
 check(hostView.room.phase === 'ceremony' && hostView.ceremony.step === 8, 'Siegerehrung bis zum Sieger durchgespielt');
 

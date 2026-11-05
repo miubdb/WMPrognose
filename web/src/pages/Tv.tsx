@@ -359,7 +359,7 @@ function UniqueTv({ view, round }: { view: View; round: RoundView }) {
 function MatchTv({ view, round }: { view: View; round: RoundView }) {
   const d = round.data; const rev = round.reveal;
   return (
-    <div className="matchtv">
+    <div className={`matchtv ${rev ? 'rev' : ''}`}>
       <div className="bigq">{d.prompt}</div>
       {!rev && (
         <>
@@ -384,7 +384,7 @@ function LinkTv({ view, round }: { view: View; round: RoundView }) {
   const clues: string[] = rev ? rev.clues : d.clues;
   const total = 4;
   return (
-    <div className="linktv">
+    <div className={`linktv ${rev ? 'rev' : ''}`}>
       <div className="bigq">{d.prompt}</div>
       <div className="lclues">
         {Array.from({ length: total }).map((_, i) => i < clues.length
