@@ -14,13 +14,13 @@ export const SHOW_PACK = {
 export interface PoolQuestion { id: string; topic: string; task: TaskDef }
 
 const geo = (id: string, topic: string, map: 'world' | 'europe' | 'germany', seconds: number, points: number, prompt: string, lat: number, lon: number, label: string, explain: string): PoolQuestion =>
-  ({ id, topic, task: { mode: 'geo', map, seconds, points, prompt, answer: { lat, lon, label }, explain } });
+  ({ id, topic, task: { mode: 'geo', map, seconds: 60, points, prompt, answer: { lat, lon, label }, explain } });
 const est = (id: string, topic: string, prompt: string, unit: string, answer: number, explain: string, bets = [0, 100, 200], points = 300): PoolQuestion =>
   ({ id, topic, task: { mode: 'estimate', seconds: 45, betSeconds: 35, points, bets, prompt, unit, answer, explain } });
 const glitch = (id: string, scene: string, viewPrompt: string, prompt: string, explain: string, viewSeconds = 12): PoolQuestion =>
   ({ id, topic: 'Beobachtung', task: { mode: 'glitch', scene, viewSeconds, seconds: 25, points: 250, viewPrompt, prompt, explain } });
 const link = (id: string, topic: string, prompt: string, clues: string[], answer: string, accept: string[], explain: string): PoolQuestion =>
-  ({ id, topic, task: { mode: 'link', prompt, clueSeconds: 12, points: 300, clues, answer, accept, explain } });
+  ({ id, topic, task: { mode: 'link', prompt, clueSeconds: 20, points: 300, clues, answer, accept, explain } });
 const match = (id: string, topic: string, prompt: string, pairs: [string, string][], order: number[], explain: string): PoolQuestion =>
   ({ id, topic, task: { mode: 'match', seconds: 60, points: 300, prompt, pairs: pairs.map(([left, right]) => ({ left, right })), order, explain } });
 const rank = (id: string, topic: string, prompt: string, topLabel: string, bottomLabel: string, items: [string, string][], order: number[], explain: string, points = 250, secondsPerItem = 12): PoolQuestion =>
@@ -148,7 +148,7 @@ export const SHOW_ROUNDS: ShowRound[] = [
     taskIds: ['v2-einzigartig-1', 'v2-einzigartig-2', 's3-unique-orchester'] },
   { id: 's3-r4', title: 'Alles im Blick', topic: 'Alltag & Beobachtung', icon: '👁️', color: CY, kind: 'tile', football: false, blurb: RB.glitch,
     taskIds: ['v2-alles-im-blick-1', 'v2-alles-im-blick-2', 'v2-alles-im-blick-3', 'v2-alles-im-blick-4'] },
-  { id: 's3-r5', title: 'Schätz mal!', topic: 'Zahlen, Tore & Töne', icon: '🎯', color: GO, kind: 'tile', football: false, blurb: RB.est,
+  { id: 's3-r5', title: 'SETZ AUF MICH', topic: 'Zahlen, Tore & Töne', icon: '🎯', color: GO, kind: 'tile', football: false, blurb: RB.est,
     taskIds: ['v2-wahnsinnszahlen-1', 'v2-sport-und-pop-2', 'v2-sport-und-pop-1', 'v2-wahnsinnszahlen-2'] },
   { id: 's3-r6', title: 'Wer oder was?', topic: 'Die gemeinsame Lösung', icon: '🔗', color: BL, kind: 'tile', football: false, blurb: RB.link,
     taskIds: ['v2-wer-oder-was-2', 'v2-wer-oder-was-1', 's3-link-pele', 'v2-wer-oder-was-3'] },

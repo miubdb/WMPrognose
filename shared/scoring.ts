@@ -30,23 +30,52 @@ export function rankAscending(items: { pid: string; value: number }[], eps = 0):
 }
 
 // ---------- WO ZUR HÖLLE ----------
+/**
+ * Entfernungswertung (Prinzip GeoGuessr): points = budget · exp(−(d − frei)/S).
+ * - d ≤ frei (Treffer-Toleranz): volle Punkte; danach stetig fallend, unabhängig von den Mitspielern.
+ * - Skala S je Karte (Entfernung, bei der noch ≈ 37 % übrig sind): Deutschland 200 km, Europa 700 km, Welt 2000 km.
+ */
+export const GEO_SCALE: Record<'germany' | 'europe' | 'world', { scaleKm: number; freeKm: number }> = {
+  germany: { scaleKm: 200, freeKm: 2 },
+  europe: { scaleKm: 700, freeKm: 5 },
+  world: { scaleKm: 2000, freeKm: 15 },
+};
+export function geoFraction(km: number, map: 'germany' | 'europe' | 'world' = 'germany'): number {
+  const { scaleKm, freeKm } = GEO_SCALE[map] ?? GEO_SCALE.germany;
+  return km <= freeKm ? 1 : Math.exp(-(km - freeKm) / scaleKm);
+}
+export function geoPoints(km: number, budget: number, map: 'germany' | 'europe' | 'world' = 'germany'): number {
+  return Math.round(budget * geoFraction(km, map));
+}
 export function scoreGeo(
   guesses: Record<string, { lat: number; lon: number }>,
   answer: { lat: number; lon: number },
   budget: number,
-  nPlayers: number,
+  _nPlayers = 0,
+  map: 'germany' | 'europe' | 'world' = 'germany',
 ) {
-  const dists = Object.entries(guesses).map(([pid, g]) => ({ pid, value: Math.round(haversineKm(g, answer)) }));
-  const ranked = rankAscending(dists, 0);
   const result: Record<string, { km: number; place: number; points: number }> = {};
-  for (const r of ranked) {
-    const pts = Math.round(budget * placeFactor(GEO_TABLE, r.place, Math.max(nPlayers, ranked.length)));
-    result[r.pid] = { km: r.value, place: r.place, points: pts };
-  }
+  const dists = Object.entries(guesses).map(([pid, g]) => ({ pid, km: Math.round(haversineKm(g, answer)) }));
+  const ranked = rankAscending(dists.map(d => ({ pid: d.pid, value: d.km })), 0);   // Platz nur zur Anzeige, nicht für die Punkte
+  for (const r of ranked) result[r.pid] = { km: r.value, place: r.place, points: geoPoints(r.value, budget, map) };
   return result;
 }
 
 // ---------- BLIND RANK ----------
+/** Wirksame Bedienvariante: Paketregel (falls nicht 'task') vor Frage-Einstellung, Standard = nacheinander. */
+export function rankVariantOf(t: { variant?: 'sequence' | 'sort' }, rules?: { rankVariant?: 'task' | 'sequence' | 'sort' }): 'sequence' | 'sort' {
+  return rules?.rankVariant === 'sequence' || rules?.rankVariant === 'sort' ? rules.rankVariant : t.variant ?? 'sequence';
+}
+/** Gesamtzeit der Sortier-Variante (alle fünf Begriffe auf einmal). */
+export const rankSortSeconds = (t: { items: unknown[]; secondsPerItem: number }) => Math.max(30, Math.round(t.items.length * t.secondsPerItem * 0.7));
+/** Alle Paarvergleiche mit Ergebnis (für die Auflösung): Begriff i steht richtig vor Begriff j (i<j in korrekter Reihenfolge). */
+export function rankPairDetail(slots: number[]): { a: number; b: number; ok: boolean; placed: boolean }[] {
+  const pos: number[] = new Array(slots.length).fill(-1);
+  slots.forEach((item, slot) => { if (item >= 0) pos[item] = slot; });
+  const out: { a: number; b: number; ok: boolean; placed: boolean }[] = [];
+  for (let i = 0; i < slots.length; i++) for (let j = i + 1; j < slots.length; j++) out.push({ a: i, b: j, placed: pos[i] >= 0 && pos[j] >= 0, ok: pos[i] >= 0 && pos[j] >= 0 && pos[i] < pos[j] });
+  return out;
+}
 /** slots[i] = Index des Begriffs auf Rangplatz i (oder -1). Korrekte Reihenfolge: Begriff k gehört auf Platz k. */
 export function rankPairs(slots: number[]): { correct: number; total: number } {
   const n = slots.length;
@@ -89,24 +118,24 @@ export function scoreEstimate(guesses: Record<string, number>, answer: number, b
 }
 
 // ---------- GLITCH ----------
+/** Fingertoleranz in Szenenkoordinaten (1000×600 ≙ Bildbreite): ca. 3,5 % der Bildbreite um die Objektbox. */
+export const GLITCH_TOLERANCE = 35;
+/** Abstand eines Tipps zur Zonenbox (0 = innerhalb der Box). Alte Zonen ohne Box: Kreis mit Radius r. */
+export function zoneEdgeDistance(tap: { x: number; y: number }, z: GlitchZone): number {
+  if (z.hw === undefined || z.hh === undefined) return Math.max(0, Math.hypot(tap.x - z.x, tap.y - z.y) - z.r);
+  const dx = Math.max(0, Math.abs(tap.x - z.x) - z.hw), dy = Math.max(0, Math.abs(tap.y - z.y) - z.hh);
+  return Math.hypot(dx, dy);
+}
 export function scoreGlitch(tap: { x: number; y: number } | undefined, zones: GlitchZone[], budget: number) {
   if (!tap) return { hit: false, points: 0, dist: null as number | null, accuracy: 0 };
-  let best: { d: number; r: number } | null = null;
-  for (const z of zones) {
-    const d = Math.hypot(tap.x - z.x, tap.y - z.y);
-    if (!best || d / z.r < best.d / best.r) best = { d, r: z.r };
-  }
-  if (!best) return { hit: false, points: 0, dist: null, accuracy: 0 };
-  const ratio = best.d / best.r;
-  if (ratio <= 1) {
-    const accuracy = 1 - ratio;
-    return { hit: true, points: Math.round(budget * (0.7 + 0.3 * accuracy)), dist: best.d, accuracy };
-  }
-  if (ratio <= 2) {
-    // knapp daneben: kleiner Trostpreis
-    return { hit: false, points: Math.round(budget * 0.15 * (2 - ratio)), dist: best.d, accuracy: 0 };
-  }
-  return { hit: false, points: 0, dist: best.d, accuracy: 0 };
+  let e: number | null = null;
+  for (const z of zones) { const d = zoneEdgeDistance(tap, z); if (e === null || d < e) e = d; }
+  if (e === null) return { hit: false, points: 0, dist: null, accuracy: 0 };
+  // Treffer: innerhalb der Objektbox + Fingertoleranz. Innen volle Punkte, im Toleranzrand 85–100 %.
+  if (e <= GLITCH_TOLERANCE) { const accuracy = 1 - e / GLITCH_TOLERANCE; return { hit: true, points: Math.round(budget * (0.85 + 0.15 * accuracy)), dist: e, accuracy }; }
+  // knapp daneben (bis 2× Toleranz): kleiner Trostpreis, nie ein „Treffer“
+  if (e <= 2 * GLITCH_TOLERANCE) return { hit: false, points: Math.round(budget * 0.1 * (2 - e / GLITCH_TOLERANCE)), dist: e, accuracy: 0 };
+  return { hit: false, points: 0, dist: e, accuracy: 0 };
 }
 
 // ---------- CODEBREAK ----------
@@ -169,27 +198,44 @@ export interface UniqueGroup {
   state: 'valid' | 'unknown' | 'invalid';
   members: string[];
   raw: Record<string, string>; // pid -> Originaleingabe
+  /** pids, deren Eingabe nur per Tippfehlererkennung zugeordnet wurde (Showmaster sieht sie und kann widersprechen) */
+  auto?: string[];
 }
-/** Ordnet Eingaben der Liste gültiger Antworten zu (Schreibweise, Tippfehler, Synonyme). */
-export function matchValid(input: string, valid: UniqueTask['valid']): string | null {
+/**
+ * Ordnet eine Eingabe der Liste gültiger Antworten zu.
+ * exact = gleiche Schreibweise nach Normalisierung (Groß-/Kleinschreibung, Akzente, Leerzeichen) oder hinterlegtes Synonym → automatisch sicher.
+ * typo  = vorsichtige Tippfehlererkennung: mind. 6 Zeichen, gleicher Anfangsbuchstabe, 1 Fehler (2 ab 11 Zeichen), eindeutig EIN Ziel,
+ *         und die gültigen Begriffe selbst dürfen sich nicht so ähnlich sein (sonst nie automatisch zusammenführen). Wird dem Showmaster angezeigt.
+ */
+/** Levenshtein mit Buchstabendreher (Spanein↔Spanien = 1 Fehler). */
+function typoDistance(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...new Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[a.length][b.length];
+}
+export function matchValidDetail(input: string, valid: UniqueTask['valid']): { name: string; kind: 'exact' | 'typo' } | null {
   const n = normText(input);
   if (!n) return null;
   for (const v of valid) {
-    for (const form of [v.name, ...v.variants]) if (normText(form) === n) return v.name;
+    for (const form of [v.name, ...v.variants]) if (normText(form) === n) return { name: v.name, kind: 'exact' };
   }
-  const lim = fuzzyLimit(n.length);
-  if (lim > 0) {
-    let best: { name: string; d: number } | null = null;
-    for (const v of valid) for (const form of [v.name, ...v.variants]) {
-      const f = normText(form);
-      if (f.length < 5) continue;
-      const d = levenshtein(n, f);
-      if (d <= lim && (!best || d < best.d)) best = { name: v.name, d };
-    }
-    if (best) return best.name;
-  }
-  return null;
+  if (n.length < 6) return null;
+  const lim = n.length >= 11 ? 2 : 1;
+  const forms = valid.flatMap(v => [v.name, ...v.variants].map(f => ({ name: v.name, f: normText(f) }))).filter(x => x.f.length >= 6 && x.f[0] === n[0]);
+  const near = forms.map(x => ({ ...x, d: typoDistance(n, x.f) })).filter(x => x.d <= lim);
+  const names = [...new Set(near.map(x => x.name))];
+  if (names.length !== 1) return null;                                        // kein oder mehrdeutiges Ziel → Showmaster entscheidet
+  const target = names[0];
+  const others = valid.filter(v => v.name !== target).flatMap(v => [v.name, ...v.variants].map(normText));
+  const mine = [valid.find(v => v.name === target)!.name, ...valid.find(v => v.name === target)!.variants].map(normText);
+  if (mine.some(m => others.some(o => typoDistance(m, o) <= lim + 2))) return null;   // ähnliche gültige Begriffe (z. B. Slowakei/Slowenien)
+  return { name: target, kind: 'typo' };
 }
+export function matchValid(input: string, valid: UniqueTask['valid']): string | null { return matchValidDetail(input, valid)?.name ?? null; }
 export function groupUnique(
   answers: Record<string, string>,
   valid: UniqueTask['valid'],
@@ -199,9 +245,10 @@ export function groupUnique(
   for (const [pid, raw] of Object.entries(answers)) {
     const n = normText(raw);
     if (!n) continue;
-    let key: string, label: string, state: UniqueGroup['state'];
-    const m = matchValid(raw, valid);
-    if (m) { key = 'v:' + normText(m); label = m; state = 'valid'; }
+    let key: string, label: string, state: UniqueGroup['state']; let autoTypo = false;
+    const md = matchValidDetail(raw, valid);
+    const mine = overrides['u:' + n];
+    if (md && !(md.kind === 'typo' && mine)) { key = 'v:' + normText(md.name); label = md.name; state = 'valid'; autoTypo = md.kind === 'typo'; }
     else {
       key = 'u:' + n; label = raw.trim(); state = 'unknown';
       const ov = overrides[key];
@@ -215,6 +262,7 @@ export function groupUnique(
     const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
     g.members.push(pid);
     g.raw[pid] = raw;
+    if (autoTypo) (g.auto ??= []).push(pid);
     groups.set(key, g);
   }
   return [...groups.values()];
@@ -235,3 +283,7 @@ export function applyClamped(balance: number, requested: number): number {
   if (requested >= 0) return requested;
   return -Math.min(balance, -requested);
 }
+
+/** Sekunden je Hinweis (DIE VERBINDUNG). Der frühere Standardwert 12 s wird – auch in bereits gespeicherten Fragen – als 20 s gespielt; jeder andere Wert gilt unverändert. */
+export const CLUE_SECONDS_DEFAULT = 20;
+export const clueSecs = (t: { clueSeconds: number }) => (t.clueSeconds === 12 ? CLUE_SECONDS_DEFAULT : t.clueSeconds);

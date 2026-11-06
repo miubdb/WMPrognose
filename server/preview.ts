@@ -1,5 +1,6 @@
 // Vorschau: spielt eine einzelne Aufgabe mit der ECHTEN Engine in einem flüchtigen Raum (nie gespeichert, nie mit echten Räumen verbunden).
 import type { Avatar, TaskDef, TileDef, View } from '../shared/types';
+import { clueSecs } from '../shared/scoring';
 import { normalizeTask, validateTask } from '../shared/validate';
 import type { Scene } from '../shared/scenes';
 import { Engine } from './engine';
@@ -101,17 +102,19 @@ export function buildPreview(rawTask: unknown, scenes: Record<string, Scene>, me
     case 'link': {
       snap('Hinweis 1');
       P(0, { k: 'submit', payload: { answer: t.answer } });
-      now += (t.clueSeconds + 1) * 1000; eng.tick(room, now); snap('Hinweis 2');
-      now += (t.clueSeconds + 1) * 1000; eng.tick(room, now); snap('Hinweis 3');
+      now += (clueSecs(t) + 1) * 1000; eng.tick(room, now); snap('Hinweis 2');
+      now += (clueSecs(t) + 1) * 1000; eng.tick(room, now); snap('Hinweis 3');
       P(1, { k: 'submit', payload: { answer: t.accept[0] ?? t.answer } }); P(2, { k: 'submit', payload: { answer: 'Phantasiewort' } });
-      now += (t.clueSeconds + 1) * 1000; eng.tick(room, now); snap('Hinweis 4');
+      now += (clueSecs(t) + 1) * 1000; eng.tick(room, now); snap('Hinweis 4');
       H({ k: 'h.lock' }); snap('Prüfung (Host)'); break;
     }
     case 'unique': {
       snap('Aufgabe läuft');
       const n = t.valid.map(v => v.name);
       P(0, { k: 'submit', payload: { answer: n[0] } }); P(1, { k: 'submit', payload: { answer: n[0] } }); P(2, { k: 'submit', payload: { answer: n[1] ?? n[0] } }); P(3, { k: 'submit', payload: { answer: 'Phantasiewort' } });
-      H({ k: 'h.lock' }); snap('Antworten prüfen (Host)'); break;
+      H({ k: 'h.lock' }); snap('Antworten prüfen (Host)');
+      for (const gr of (eng.buildView(room, { role: 'host' }, now).round?.data.groups ?? [])) if (gr.state === 'unknown') H({ k: 'h.review', groupKey: gr.key, decision: 'invalid' });   // Vorschau: Unbekanntes als ungültig werten
+      break;
     }
   }
   H({ k: 'h.reveal' });

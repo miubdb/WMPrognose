@@ -419,6 +419,14 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
             <label className="field"><span>Max. Fußball-Kacheln</span><input inputMode="numeric" value={p.rules.maxFootball} onChange={e => setRule('maxFootball', e.target.value)} /></label>
             <label className="field"><span>Max. Kacheln je Modus</span><input inputMode="numeric" value={p.rules.maxPerMode} onChange={e => setRule('maxPerMode', e.target.value)} /></label>
           </div>
+          <div className="form2">
+            <label className="field"><span>BLIND RANK – Bedienung</span><select value={p.rules.rankVariant ?? 'task'} onChange={e => set('rules', { ...p.rules, rankVariant: e.target.value })}><option value="task">je Frage festgelegt (Standard: nacheinander)</option><option value="sequence">immer nacheinander (klassisch)</option><option value="sort">immer: alle fünf sichtbar & sortieren</option></select></label>
+          </div>
+          <div className="form2">
+            <label className="field"><span>Showtitel (TV-Eröffnung)</span><input value={p.rules.showTitle ?? ''} maxLength={40} placeholder="OUTPLAY" onChange={e => set('rules', { ...p.rules, showTitle: e.target.value })} /></label>
+            <label className="field"><span>Gewinnerbezeichnung (Siegerehrung)</span><input value={p.rules.winnerTitle ?? ''} maxLength={40} placeholder="Champion" onChange={e => set('rules', { ...p.rules, winnerTitle: e.target.value })} /></label>
+          </div>
+          <p className="muted small">Paketname oben ändern. Änderungen gelten für neue Räume, sobald du das Paket neu veröffentlichst (neue Version); laufende Räume bleiben unverändert.</p>
         </details>
         {ana && <details className="more" open={ana.errors.length > 0}><summary>{ana.errors.length ? `⚠ ${ana.errors.length} Fehler` : '✓ Prüfung'}{a?.combos ? ` · ca. ${a.combos.minutesExpected.min}–${a.combos.minutesExpected.max} min` : ''}</summary>
           {ana.errors.length > 0 && <div className="warnbox card"><b>Verhindert die Veröffentlichung:</b><ul>{ana.errors.map((e: string, i: number) => <li key={i}>{e}</li>)}</ul></div>}

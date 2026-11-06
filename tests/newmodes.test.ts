@@ -119,20 +119,20 @@ function linkGame(n = 7) {
   g.start('v2-wer-oder-was'); g.host({ k: 'h.begin' });
   return { g, t };
 }
-test('DIE VERBINDUNG: Hinweise erscheinen alle 12 s, Server bestimmt die Stufe – Punkte 300/225/150/75', () => {
+test('DIE VERBINDUNG: Hinweise erscheinen alle 20 s, Server bestimmt die Stufe – Punkte 300/225/150/75', () => {
   const { g, t } = linkGame();
   const shown = () => (g.view(0).round!.data.clues as string[]).length;
   assert.equal(shown(), 1); assert.equal(g.view(0).round!.data.level, 0);
-  assert.equal(g.room.round!.stageSeconds, 12);
+  assert.equal(g.room.round!.stageSeconds, 20);
   // niemand sieht spätere Hinweise vorzeitig
   assert.ok(!JSON.stringify(g.view('tv').round!.data).includes(t.clues[1]));
   g.pl(0, { k: 'submit', payload: { answer: 'Venedig' } });                 // Stufe 1 → 300
-  g.advance(12_000 + 5); assert.equal(shown(), 2);
+  g.advance(20_000 + 5); assert.equal(shown(), 2);
   g.pl(1, { k: 'submit', payload: { answer: 'venice' } });                  // Stufe 2 → 225 (Variante)
-  g.advance(12_000); assert.equal(shown(), 3);
+  g.advance(20_000); assert.equal(shown(), 3);
   g.pl(2, { k: 'submit', payload: { answer: 'VENEZIA' } } as any);          // nicht hinterlegt → falsch/unklar
   g.pl(3, { k: 'submit', payload: { answer: 'Venedig' } });                 // Stufe 3 → 150
-  g.advance(12_000); assert.equal(shown(), 4);
+  g.advance(20_000); assert.equal(shown(), 4);
   g.pl(4, { k: 'submit', payload: { answer: 'Venedig' } });                 // Stufe 4 → 75
   assert.equal(g.pl(1, { k: 'submit', payload: { answer: 'Rom' } }).err, 'already_submitted', 'nur eine endgültige Antwort');
   assert.equal(g.pl(0, { k: 'submit', payload: { answer: 'Venedig' } }).dup, true, 'doppelte Abgabe harmlos');
@@ -140,7 +140,7 @@ test('DIE VERBINDUNG: Hinweise erscheinen alle 12 s, Server bestimmt die Stufe �
   // Antworten anderer bleiben verborgen (TV/Handys), auch nach Sperre
   assert.ok(!JSON.stringify(g.view('tv')).includes('"Rom"'));
   assert.equal(g.view(0).round!.data.mine.level, 0); assert.equal(g.view(1).round!.data.mine.level, 1);
-  g.advance(12_000 + 5);                                                    // Ende des vierten Fensters
+  g.advance(20_000 + 5);                                                    // Ende des vierten Fensters
   assert.equal(g.room.round!.stage, 'review', 'unklare/falsche Antworten brauchen die Host-Prüfung');
   assert.equal(g.pl(6, { k: 'submit', payload: { answer: 'Venedig' } }).err, 'closed');
   assert.ok(!('groups' in g.view('tv').round!.data) && !('groups' in g.view(0).round!.data), 'nur der Host sieht die Antworten');
@@ -157,12 +157,12 @@ test('DIE VERBINDUNG: Hinweise erscheinen alle 12 s, Server bestimmt die Stufe �
   assert.ok(g.room.players.every(p => p.score >= 200));
 });
 
-test('DIE VERBINDUNG: Abgabe unmittelbar nach Fristende (Tick hinkt hinterher) zählt für die NÄCHSTE Stufe; nach 48 s geschlossen', () => {
+test('DIE VERBINDUNG: Abgabe unmittelbar nach Fristende (Tick hinkt hinterher) zählt für die NÄCHSTE Stufe; nach 80 s geschlossen', () => {
   const { g } = linkGame();
-  g.now = g.now + 12_000 + 30;                                              // Frist überschritten, aber kein Tick
+  g.now = g.now + 20_000 + 30;                                              // Frist überschritten, aber kein Tick
   assert.ok(g.pl(0, { k: 'submit', payload: { answer: 'Venedig' } }).ok);
   g.eng.tick(g.room, g.now);
-  g.advance(12_000 * 3);                                                    // weit über das Ende
+  g.advance(20_000 * 3);                                                    // weit über das Ende
   assert.notEqual(g.room.round!.stage, 'open');
   g.host({ k: 'h.reveal' }) as any;
   const r0 = (g.room.round!.result!.reveal.rows as any[]).find(r => r.pid === g.ids[0]);
@@ -195,7 +195,7 @@ test('DIE VERBINDUNG: Pause friert die Hinweisfrist ein, Host-Sperre beendet sof
 });
 
 // ------------------------------------------------------------------ Struktur / Paket
-test('Neues Standardpaket: neun Kategorien, sieben Modi, 34 Aufgaben, Dauer 60–75 min, Fußballanteil 20–35 %, kein CODEBREAK', () => {
+test('Neues Standardpaket: neun Kategorien, sieben Modi, 34 Aufgaben, Dauer 60–80 min, Fußballanteil 20–35 %, kein CODEBREAK', () => {
   const regular = TILES.filter(t => t.kind === 'tile');
   assert.equal(regular.length, 9);
   const modes = regular.map(t => t.mode).sort();
@@ -209,7 +209,7 @@ test('Neues Standardpaket: neun Kategorien, sieben Modi, 34 Aufgaben, Dauer 60�
   assert.ok(new Set(fin.tasks.map(k => k.mode)).size >= 3, 'Finale: mehrere unterschiedliche Aufgaben');
   for (const k of all) { const e = validateTask(normalizeTask(k), id => !!SCENES[id]); assert.deepEqual(e, [], k.prompt); }
   const a = analyzeBook({ tiles: TILES, rules: { startCredit: 200, maxFootball: 2, maxPerMode: 2 } });
-  assert.ok(a.combos!.minutesExpected.min >= 60 && a.combos!.minutesExpected.max <= 75, JSON.stringify(a.combos!.minutesExpected));
+  assert.ok(a.combos!.minutesExpected.min >= 60 && a.combos!.minutesExpected.max <= 80, JSON.stringify(a.combos!.minutesExpected));
   assert.ok(a.combos!.footballShare.mean >= 0.2 && a.combos!.footballShare.mean <= 0.35, 'Fußball Ø ' + a.combos!.footballShare.mean);
   // keine Frage doppelt; Pointe „Allianz Arena“ nur einmal wiederholt
   const prompts = all.map(k => k.prompt); assert.equal(new Set(prompts).size, prompts.length);

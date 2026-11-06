@@ -33415,7 +33415,6 @@ function shuffled(arr, rand) {
 }
 
 // shared/scoring.ts
-var GEO_TABLE = [1, 0.8, 0.65, 0.5, 0.35, 0.2, 0.1];
 var EST_TABLE = [1, 0.75, 0.55, 0.4, 0.28, 0.18, 0.1];
 function placeFactor(table, place, n) {
   if (n <= 1) return table[0];
@@ -33435,15 +33434,37 @@ function rankAscending(items, eps = 0) {
   });
   return out;
 }
-function scoreGeo(guesses, answer, budget, nPlayers) {
-  const dists = Object.entries(guesses).map(([pid, g]) => ({ pid, value: Math.round(haversineKm(g, answer)) }));
-  const ranked = rankAscending(dists, 0);
+var GEO_SCALE = {
+  germany: { scaleKm: 200, freeKm: 2 },
+  europe: { scaleKm: 700, freeKm: 5 },
+  world: { scaleKm: 2e3, freeKm: 15 }
+};
+function geoFraction(km, map2 = "germany") {
+  const { scaleKm, freeKm } = GEO_SCALE[map2] ?? GEO_SCALE.germany;
+  return km <= freeKm ? 1 : Math.exp(-(km - freeKm) / scaleKm);
+}
+function geoPoints(km, budget, map2 = "germany") {
+  return Math.round(budget * geoFraction(km, map2));
+}
+function scoreGeo(guesses, answer, budget, _nPlayers = 0, map2 = "germany") {
   const result = {};
-  for (const r of ranked) {
-    const pts = Math.round(budget * placeFactor(GEO_TABLE, r.place, Math.max(nPlayers, ranked.length)));
-    result[r.pid] = { km: r.value, place: r.place, points: pts };
-  }
+  const dists = Object.entries(guesses).map(([pid, g]) => ({ pid, km: Math.round(haversineKm(g, answer)) }));
+  const ranked = rankAscending(dists.map((d2) => ({ pid: d2.pid, value: d2.km })), 0);
+  for (const r of ranked) result[r.pid] = { km: r.value, place: r.place, points: geoPoints(r.value, budget, map2) };
   return result;
+}
+function rankVariantOf(t, rules) {
+  return rules?.rankVariant === "sequence" || rules?.rankVariant === "sort" ? rules.rankVariant : t.variant ?? "sequence";
+}
+var rankSortSeconds = (t) => Math.max(30, Math.round(t.items.length * t.secondsPerItem * 0.7));
+function rankPairDetail(slots) {
+  const pos = new Array(slots.length).fill(-1);
+  slots.forEach((item, slot) => {
+    if (item >= 0) pos[item] = slot;
+  });
+  const out = [];
+  for (let i2 = 0; i2 < slots.length; i2++) for (let j2 = i2 + 1; j2 < slots.length; j2++) out.push({ a: i2, b: j2, placed: pos[i2] >= 0 && pos[j2] >= 0, ok: pos[i2] >= 0 && pos[j2] >= 0 && pos[i2] < pos[j2] });
+  return out;
 }
 function rankPairs(slots) {
   const n = slots.length;
@@ -33484,23 +33505,26 @@ function scoreEstimate(guesses, answer, budget, nPlayers) {
   }
   return out;
 }
+var GLITCH_TOLERANCE = 35;
+function zoneEdgeDistance(tap, z2) {
+  if (z2.hw === void 0 || z2.hh === void 0) return Math.max(0, Math.hypot(tap.x - z2.x, tap.y - z2.y) - z2.r);
+  const dx = Math.max(0, Math.abs(tap.x - z2.x) - z2.hw), dy = Math.max(0, Math.abs(tap.y - z2.y) - z2.hh);
+  return Math.hypot(dx, dy);
+}
 function scoreGlitch(tap, zones, budget) {
   if (!tap) return { hit: false, points: 0, dist: null, accuracy: 0 };
-  let best = null;
+  let e = null;
   for (const z2 of zones) {
-    const d2 = Math.hypot(tap.x - z2.x, tap.y - z2.y);
-    if (!best || d2 / z2.r < best.d / best.r) best = { d: d2, r: z2.r };
+    const d2 = zoneEdgeDistance(tap, z2);
+    if (e === null || d2 < e) e = d2;
   }
-  if (!best) return { hit: false, points: 0, dist: null, accuracy: 0 };
-  const ratio = best.d / best.r;
-  if (ratio <= 1) {
-    const accuracy = 1 - ratio;
-    return { hit: true, points: Math.round(budget * (0.7 + 0.3 * accuracy)), dist: best.d, accuracy };
+  if (e === null) return { hit: false, points: 0, dist: null, accuracy: 0 };
+  if (e <= GLITCH_TOLERANCE) {
+    const accuracy = 1 - e / GLITCH_TOLERANCE;
+    return { hit: true, points: Math.round(budget * (0.85 + 0.15 * accuracy)), dist: e, accuracy };
   }
-  if (ratio <= 2) {
-    return { hit: false, points: Math.round(budget * 0.15 * (2 - ratio)), dist: best.d, accuracy: 0 };
-  }
-  return { hit: false, points: 0, dist: best.d, accuracy: 0 };
+  if (e <= 2 * GLITCH_TOLERANCE) return { hit: false, points: Math.round(budget * 0.1 * (2 - e / GLITCH_TOLERANCE)), dist: e, accuracy: 0 };
+  return { hit: false, points: 0, dist: e, accuracy: 0 };
 }
 var HINT_FACTORS = [1, 0.75, 0.5, 0.25];
 function scoreCode(correct, hintsUsed, budget) {
@@ -33548,24 +33572,32 @@ function linkMatch(input, answer, accept = []) {
   if (lim > 0 && forms.some((f) => f.length >= 5 && levenshtein(n, f) <= lim)) return "close";
   return "none";
 }
-function matchValid(input, valid) {
+function typoDistance(a, b2) {
+  const d2 = Array.from({ length: a.length + 1 }, (_2, i2) => [i2, ...new Array(b2.length).fill(0)]);
+  for (let j2 = 0; j2 <= b2.length; j2++) d2[0][j2] = j2;
+  for (let i2 = 1; i2 <= a.length; i2++) for (let j2 = 1; j2 <= b2.length; j2++) {
+    d2[i2][j2] = Math.min(d2[i2 - 1][j2] + 1, d2[i2][j2 - 1] + 1, d2[i2 - 1][j2 - 1] + (a[i2 - 1] === b2[j2 - 1] ? 0 : 1));
+    if (i2 > 1 && j2 > 1 && a[i2 - 1] === b2[j2 - 2] && a[i2 - 2] === b2[j2 - 1]) d2[i2][j2] = Math.min(d2[i2][j2], d2[i2 - 2][j2 - 2] + 1);
+  }
+  return d2[a.length][b2.length];
+}
+function matchValidDetail(input, valid) {
   const n = normText(input);
   if (!n) return null;
   for (const v2 of valid) {
-    for (const form of [v2.name, ...v2.variants]) if (normText(form) === n) return v2.name;
+    for (const form of [v2.name, ...v2.variants]) if (normText(form) === n) return { name: v2.name, kind: "exact" };
   }
-  const lim = fuzzyLimit(n.length);
-  if (lim > 0) {
-    let best = null;
-    for (const v2 of valid) for (const form of [v2.name, ...v2.variants]) {
-      const f = normText(form);
-      if (f.length < 5) continue;
-      const d2 = levenshtein(n, f);
-      if (d2 <= lim && (!best || d2 < best.d)) best = { name: v2.name, d: d2 };
-    }
-    if (best) return best.name;
-  }
-  return null;
+  if (n.length < 6) return null;
+  const lim = n.length >= 11 ? 2 : 1;
+  const forms = valid.flatMap((v2) => [v2.name, ...v2.variants].map((f) => ({ name: v2.name, f: normText(f) }))).filter((x3) => x3.f.length >= 6 && x3.f[0] === n[0]);
+  const near = forms.map((x3) => ({ ...x3, d: typoDistance(n, x3.f) })).filter((x3) => x3.d <= lim);
+  const names = [...new Set(near.map((x3) => x3.name))];
+  if (names.length !== 1) return null;
+  const target = names[0];
+  const others = valid.filter((v2) => v2.name !== target).flatMap((v2) => [v2.name, ...v2.variants].map(normText));
+  const mine = [valid.find((v2) => v2.name === target).name, ...valid.find((v2) => v2.name === target).variants].map(normText);
+  if (mine.some((m) => others.some((o) => typoDistance(m, o) <= lim + 2))) return null;
+  return { name: target, kind: "typo" };
 }
 function groupUnique(answers, valid, overrides = {}) {
   const groups = /* @__PURE__ */ new Map();
@@ -33573,11 +33605,14 @@ function groupUnique(answers, valid, overrides = {}) {
     const n = normText(raw);
     if (!n) continue;
     let key, label, state;
-    const m = matchValid(raw, valid);
-    if (m) {
-      key = "v:" + normText(m);
-      label = m;
+    let autoTypo = false;
+    const md = matchValidDetail(raw, valid);
+    const mine = overrides["u:" + n];
+    if (md && !(md.kind === "typo" && mine)) {
+      key = "v:" + normText(md.name);
+      label = md.name;
       state = "valid";
+      autoTypo = md.kind === "typo";
     } else {
       key = "u:" + n;
       label = raw.trim();
@@ -33597,6 +33632,7 @@ function groupUnique(answers, valid, overrides = {}) {
     const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
     g.members.push(pid);
     g.raw[pid] = raw;
+    if (autoTypo) (g.auto ??= []).push(pid);
     groups.set(key, g);
   }
   return [...groups.values()];
@@ -33615,6 +33651,8 @@ function applyClamped(balance, requested) {
   if (requested >= 0) return requested;
   return -Math.min(balance, -requested);
 }
+var CLUE_SECONDS_DEFAULT = 20;
+var clueSecs = (t) => t.clueSeconds === 12 ? CLUE_SECONDS_DEFAULT : t.clueSeconds;
 
 // shared/validate.ts
 var MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "codebreak"];
@@ -33654,6 +33692,7 @@ function normalizeTask(raw) {
         order: Array.isArray(r.order) ? r.order.map((x3) => num(x3)) : [],
         secondsPerItem: num(r.secondsPerItem),
         points: num(r.points),
+        ...r.variant === "sort" ? { variant: "sort" } : {},
         explain: str(r.explain, 500)
       };
     case "estimate":
@@ -33714,7 +33753,7 @@ function normalizeTask(raw) {
         clues: (Array.isArray(r.clues) ? r.clues : []).slice(0, 4).map((c) => str(c, 220)),
         answer: str(r.answer, 80),
         accept: strList(r.accept, 12, 80),
-        clueSeconds: num(r.clueSeconds, 12),
+        clueSeconds: num(r.clueSeconds, 20),
         points: LINK_POINTS[0],
         explain: str(r.explain, 500)
       };
@@ -33775,7 +33814,7 @@ function validateTask(t, sceneExists = () => true) {
     case "link":
       if (t.clues.length !== 4 || t.clues.some((c) => !c)) e.push("Genau vier Hinweise eintragen");
       if (!t.answer) e.push("Hauptl\xF6sung fehlt");
-      if (!inRange(t.clueSeconds, 5, 30)) e.push("Zeit je Hinweis 5\u201330 Sekunden");
+      if (!inRange(t.clueSeconds, 5, 60)) e.push("Zeit je Hinweis 5\u201360 Sekunden");
       break;
     case "unique":
       if (t.valid.length < 3 || t.valid.some((v2) => !v2.name)) e.push("Mindestens drei g\xFCltige Antworten eintragen");
@@ -33944,7 +33983,7 @@ function taskSeconds(t, m = "expected") {
   const rv = (x3) => m === "max" ? x3 * SLOW : x3;
   switch (t.mode) {
     case "geo":
-      return { play: t.seconds * a, reveal: rv(38) };
+      return { play: Math.max(60, t.seconds) * a, reveal: rv(38) };
     case "rank":
       return { play: t.items.length * (t.secondsPerItem * (m === "max" ? 1 : 0.75) + 1.5), reveal: rv(55) };
     case "estimate":
@@ -33956,7 +33995,7 @@ function taskSeconds(t, m = "expected") {
     case "match":
       return { play: t.seconds * (m === "max" ? 1 : 0.9), reveal: rv(45) };
     case "link":
-      return { play: t.clues.length * t.clueSeconds * (m === "max" ? 1 : 0.8) + (m === "max" ? 40 : 15), reveal: rv(45) };
+      return { play: t.clues.length * clueSecs(t) * (m === "max" ? 1 : 0.8) + (m === "max" ? 40 : 15), reveal: rv(45) };
     case "unique":
       return { play: t.seconds * a + (m === "max" ? 60 : 30), reveal: rv(50) };
   }
@@ -34106,7 +34145,7 @@ function bookHash(book) {
   return sha(canonical({ tiles, rules: book.rules ?? {} }));
 }
 var J2 = (s) => JSON.parse(s);
-var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2 };
+var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "Champion" };
 function normalizePack(raw) {
   const r = raw ?? {};
   const s = (v2, m) => typeof v2 === "string" ? v2.trim().slice(0, m) : "";
@@ -34121,7 +34160,7 @@ function normalizePack(raw) {
     surprise: s(r.surprise, 80),
     final: s(r.final, 80),
     ...Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x3) => x3?.k === "board" ? { k: "board" } : (x3?.k === "round" || x3?.k === "surprise" || x3?.k === "final") && s(x3.cat, 80) ? { k: x3.k, cat: s(x3.cat, 80) } : null).filter((x3) => !!x3) } : {},
-    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10) }
+    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ["task", "sequence", "sort"].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle }
   };
 }
 var ContentService = class {
@@ -34859,6 +34898,7 @@ function variantItems(scene, variant) {
     return ch === null ? [] : [{ ...it, ...ch }];
   });
 }
+var MIN_HALF = 18;
 function diffZones(scene) {
   const a = variantItems(scene, "a");
   const b2 = variantItems(scene, "b");
@@ -34866,11 +34906,12 @@ function diffZones(scene) {
   for (const id of Object.keys(scene.changes)) {
     const ia = a.find((i2) => i2.id === id);
     const ib = b2.find((i2) => i2.id === id);
-    const boxes = [ia, ib].filter(Boolean).map((i2) => bbox(i2));
+    const boxes = [ib ?? ia].filter(Boolean).map((i2) => bbox(i2));
     if (!boxes.length) continue;
     const x0 = Math.min(...boxes.map((x3) => x3.x0)), y0 = Math.min(...boxes.map((x3) => x3.y0));
     const x1 = Math.max(...boxes.map((x3) => x3.x1)), y1 = Math.max(...boxes.map((x3) => x3.y1));
-    zones.push({ x: Math.round((x0 + x1) / 2), y: Math.round((y0 + y1) / 2), r: Math.max(40, Math.round(Math.hypot(x1 - x0, y1 - y0) / 2)) });
+    const hw = Math.max(MIN_HALF, Math.round((x1 - x0) / 2)), hh = Math.max(MIN_HALF, Math.round((y1 - y0) / 2));
+    zones.push({ x: Math.round((x0 + x1) / 2), y: Math.round((y0 + y1) / 2), r: Math.max(hw, hh), hw, hh });
   }
   return zones;
 }
@@ -35130,10 +35171,12 @@ var OK = { ok: true };
 var sameJson = (a, b2) => JSON.stringify(a) === JSON.stringify(b2);
 var nm = (c, pid) => c.players.find((p) => p.id === pid)?.name ?? "?";
 var balanceOf = (c, pid) => c.room.players.find((p) => p.id === pid)?.score ?? 0;
+var GEO_SECONDS = 60;
+var geoSeconds = (c) => Math.max(GEO_SECONDS, c.task.seconds);
 var geo = {
   maxPoints: (t) => t.points,
   begin(c) {
-    c.setStage("open", c.task.seconds);
+    c.setStage("open", geoSeconds(c));
   },
   advance(c) {
     c.setStage("locked", null);
@@ -35151,8 +35194,8 @@ var geo = {
   answered: (c, pid) => !!c.round.pm[pid],
   score(c) {
     const t = c.task;
-    const res = scoreGeo(c.round.pm, t.answer, t.points, c.players.length);
-    const entries = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points, label: `Platz ${r.place} \xB7 ${r.km.toLocaleString("de-DE")} km` }));
+    const res = scoreGeo(c.round.pm, t.answer, t.points, c.players.length, t.map);
+    const entries = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points, label: `${r.km.toLocaleString("de-DE")} km daneben` }));
     return {
       entries,
       reveal: {
@@ -35178,11 +35221,16 @@ var rank = {
   maxPoints: (t) => t.points,
   begin(c) {
     const t = c.task;
-    c.round.m = { step: 0 };
-    c.setStage("open", t.secondsPerItem);
+    const sort = rankVariantOf(t, c.rules) === "sort";
+    c.round.m = { step: 0, sort };
+    c.setStage("open", sort ? rankSortSeconds(t) : t.secondsPerItem);
   },
   advance(c) {
     const t = c.task;
+    if (c.round.m.sort) {
+      c.setStage("locked", null);
+      return;
+    }
     const step = c.round.m.step;
     if (step + 1 >= t.order.length) {
       c.setStage("locked", null);
@@ -35193,6 +35241,17 @@ var rank = {
   },
   submit(c, pid, payload) {
     const t = c.task;
+    if (c.round.m.sort) {
+      if (c.round.stage !== "open") return err2("closed");
+      const ord = payload?.order;
+      if (!Array.isArray(ord) || ord.length !== t.items.length) return err2("invalid");
+      const nums = ord.map(Number);
+      if (nums.some((x3) => !Number.isInteger(x3) || x3 < 0 || x3 >= t.items.length) || new Set(nums).size !== t.items.length) return err2("invalid");
+      const cur = c.round.pm[pid];
+      if (cur) return sameJson(cur.slots, nums) ? { ok: true, dup: true } : err2("already_submitted");
+      c.round.pm[pid] = { slots: nums };
+      return OK;
+    }
     const step = Number(payload?.step), slot = Number(payload?.slot);
     if (!Number.isInteger(step) || !Number.isInteger(slot) || slot < 0 || slot >= t.items.length) return err2("invalid");
     const pm = c.round.pm[pid] ??= { slots: new Array(t.items.length).fill(-1) };
@@ -35211,12 +35270,14 @@ var rank = {
     const t = c.task;
     const pm = c.round.pm[pid];
     if (!pm) return false;
+    if (c.round.m.sort) return true;
     if (c.round.stage === "open") return pm.slots.includes(t.order[c.round.m.step]);
     return pm.slots.some((s) => s >= 0);
   },
   complete(c) {
     const t = c.task;
     if (c.round.stage !== "open") return false;
+    if (c.round.m.sort) return c.players.length > 0 && c.players.every((p) => !!c.round.pm[p.id]);
     const item = t.order[c.round.m.step];
     return c.players.length > 0 && c.players.every((p) => c.round.pm[p.id]?.slots.includes(item));
   },
@@ -35225,11 +35286,11 @@ var rank = {
     const rows = c.players.map((p) => {
       const slots = c.round.pm[p.id]?.slots ?? new Array(t.items.length).fill(-1);
       const r = scoreRank(c.round.pm[p.id]?.slots, t.points);
-      return { pid: p.id, slots, correct: r.correct, total: r.total, points: r.points, placed: slots.filter((s) => s >= 0).length };
+      return { pid: p.id, slots, correct: r.correct, total: r.total, points: r.points, placed: slots.filter((s) => s >= 0).length, pairs: rankPairDetail(slots) };
     });
     return {
       entries: rows.filter((r) => r.placed > 0 || r.points > 0).map((r) => ({ pid: r.pid, delta: r.points, label: `${r.correct} von ${r.total} Paaren richtig` })),
-      reveal: { items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel }
+      reveal: { items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel, perPair: Math.round(t.points / 10 * 10) / 10, maxPoints: t.points }
     };
   },
   view(c, a) {
@@ -35241,10 +35302,14 @@ var rank = {
       topLabel: t.topLabel,
       bottomLabel: t.bottomLabel,
       slots: t.items.length,
+      variant: c.round.m?.sort ? "sort" : "sequence",
+      points: t.points,
       step,
       steps: t.order.length,
-      item: c.round.stage === "open" ? t.items[t.order[step]].text : null,
-      seen: showItem ? t.order.slice(0, c.round.stage === "open" ? step : t.order.length).map((i2) => t.items[i2].text) : []
+      // Sortier-Variante: alle Begriffe in gemischter (nicht der richtigen) Reihenfolge, gleich für alle
+      pool: c.round.m?.sort && (c.round.stage === "open" || c.round.stage === "locked") ? t.order.map((i2) => ({ idx: i2, text: t.items[i2].text })) : null,
+      item: c.round.stage === "open" && !c.round.m?.sort ? t.items[t.order[step]].text : null,
+      seen: showItem && !c.round.m?.sort ? t.order.slice(0, c.round.stage === "open" ? step : t.order.length).map((i2) => t.items[i2].text) : []
     };
     if (a.role === "player" && a.pid) {
       const pm = c.round.pm[a.pid];
@@ -35325,7 +35390,13 @@ var estimate = {
         explain: t.explain,
         winners,
         guesses: Object.entries(res).map(([pid, r]) => ({ pid, value: guesses[pid], place: r.place, points: r.points, best: r.best })).sort((a, b2) => a.place - b2.place),
-        bets
+        bets,
+        // Klartext-Erklärung für TV und Handys: wer lag am besten, welche Wetten gewonnen/verloren
+        summary: [
+          winners.length ? `Beste Sch\xE4tzung: ${winners.map((w2) => `${nm(c, w2)} (${guesses[w2].toLocaleString("de-DE")} ${t.unit})`).join(" und ")} \u2013 L\xF6sung: ${t.answer.toLocaleString("de-DE")} ${t.unit}.` : "Es gab keine g\xFCltige Sch\xE4tzung.",
+          ...bets.map((b2) => `${nm(c, b2.pid)} setzte ${b2.amount} auf ${nm(c, b2.target)} \u2192 ${b2.won ? `gewonnen (+${b2.delta})` : `verloren (${b2.delta})`}`),
+          ...bets.length ? [] : ["Niemand hat gewettet."]
+        ]
       }
     };
   },
@@ -35333,6 +35404,9 @@ var estimate = {
     const t = c.task;
     const st = c.round.stage;
     const base = { prompt: t.prompt, unit: t.unit, bets: t.bets };
+    base.guessedCount = c.players.filter((p) => c.round.pm[p.id]?.guess !== void 0).length;
+    base.betCount = c.players.filter((p) => !!c.round.pm[p.id]?.bet).length;
+    base.total = c.players.length;
     if (st === "bet" || st === "locked" || st === "review" || st === "reveal") {
       base.guesses = c.players.filter((p) => c.round.pm[p.id]?.guess !== void 0).map((p) => ({ pid: p.id, value: c.round.pm[p.id].guess }));
     }
@@ -35399,7 +35473,12 @@ var glitch = {
       }
       if (a.pid) base.mine = c.round.pm[a.pid] ?? null;
     }
-    if (st === "locked" || st === "review" || st === "reveal") {
+    if (a.role === "tv" && st !== "view" && st !== "reveal") {
+      base.scene = null;
+      base.sceneData = null;
+      base.searching = true;
+    }
+    if ((st === "locked" || st === "review" || st === "reveal") && !(a.role === "tv" && st !== "reveal")) {
       base.taps = c.players.filter((p) => c.round.pm[p.id]).map((p) => ({ pid: p.id, ...c.round.pm[p.id] }));
     }
     if (a.role === "host") base.zones = glitchZones(t, c.scenes);
@@ -35497,6 +35576,10 @@ var unique = {
   complete(c) {
     return c.round.stage === "open" && c.players.length > 0 && c.players.every((p) => !!c.round.pm[p.id]?.answer);
   },
+  // Keine endgültige Punktevergabe, solange unbekannte Antworten nicht vom Showmaster geprüft sind
+  blockReveal(c) {
+    return uniqueGroups(c).some((g) => g.state === "unknown");
+  },
   score(c) {
     const t = c.task;
     const groups = uniqueGroups(c);
@@ -35570,7 +35653,7 @@ function linkLevel(c) {
   const t = c.task;
   const r = c.round;
   let lvl = r.m?.level ?? 0;
-  if (r.deadline !== null && r.pausedLeft === null && c.now >= r.deadline) lvl += 1 + Math.floor((c.now - r.deadline) / (t.clueSeconds * 1e3));
+  if (r.deadline !== null && r.pausedLeft === null && c.now >= r.deadline) lvl += 1 + Math.floor((c.now - r.deadline) / (clueSecs(t) * 1e3));
   return lvl > 3 ? null : lvl;
 }
 function linkGroups(c) {
@@ -35607,14 +35690,14 @@ var link = {
   maxPoints: () => LINK_POINTS[0],
   begin(c) {
     c.round.m = { level: 0, overrides: {} };
-    c.setStage("open", c.task.clueSeconds);
+    c.setStage("open", clueSecs(c.task));
   },
   advance(c) {
     const t = c.task;
     const lvl = c.round.m.level ?? 0;
     if (c.round.stage === "open" && lvl < 3) {
       c.round.m.level = lvl + 1;
-      c.setStage("open", t.clueSeconds);
+      c.setStage("open", clueSecs(t));
       return;
     }
     const needs = linkGroups(c).some((g) => g.state === "unknown" || g.state === "invalid" && g.key.startsWith("u:"));
@@ -35656,7 +35739,7 @@ var link = {
     const t = c.task;
     const st = c.round.stage;
     const shown = st === "open" ? (c.round.m?.level ?? 0) + 1 : 4;
-    const base = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: t.clueSeconds };
+    const base = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: clueSecs(t) };
     if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid] ? { answer: c.round.pm[a.pid].answer, level: c.round.pm[a.pid].level } : null;
     if ((st === "review" || st === "locked") && a.role === "host") base.groups = linkGroups(c);
     if (a.role === "host") {
@@ -35854,6 +35937,7 @@ var Engine = class _Engine {
       now,
       players: this.active(room),
       scenes: this.bk(room).scenes ?? SCENES,
+      rules: this.bk(room).rules,
       setStage: (stage, seconds) => {
         round.stage = stage;
         round.stageStartedAt = now;
@@ -36694,15 +36778,15 @@ function buildPreview(rawTask, scenes, meta = {}) {
     case "link": {
       snap("Hinweis 1");
       P2(0, { k: "submit", payload: { answer: t.answer } });
-      now += (t.clueSeconds + 1) * 1e3;
+      now += (clueSecs(t) + 1) * 1e3;
       eng.tick(room, now);
       snap("Hinweis 2");
-      now += (t.clueSeconds + 1) * 1e3;
+      now += (clueSecs(t) + 1) * 1e3;
       eng.tick(room, now);
       snap("Hinweis 3");
       P2(1, { k: "submit", payload: { answer: t.accept[0] ?? t.answer } });
       P2(2, { k: "submit", payload: { answer: "Phantasiewort" } });
-      now += (t.clueSeconds + 1) * 1e3;
+      now += (clueSecs(t) + 1) * 1e3;
       eng.tick(room, now);
       snap("Hinweis 4");
       H3({ k: "h.lock" });
@@ -36718,6 +36802,7 @@ function buildPreview(rawTask, scenes, meta = {}) {
       P2(3, { k: "submit", payload: { answer: "Phantasiewort" } });
       H3({ k: "h.lock" });
       snap("Antworten pr\xFCfen (Host)");
+      for (const gr of eng.buildView(room, { role: "host" }, now).round?.data.groups ?? []) if (gr.state === "unknown") H3({ k: "h.review", groupKey: gr.key, decision: "invalid" });
       break;
     }
   }
@@ -37056,7 +37141,7 @@ var TILES = [
       {
         mode: "geo",
         map: "germany",
-        seconds: 30,
+        seconds: 60,
         points: 200,
         prompt: "Wo steht die Allianz Arena?",
         answer: { lat: 48.2188, lon: 11.6247, label: "Allianz Arena, M\xFCnchen" },
@@ -37065,7 +37150,7 @@ var TILES = [
       {
         mode: "geo",
         map: "europe",
-        seconds: 35,
+        seconds: 60,
         points: 250,
         prompt: "Wo fand das Champions-League-Finale 2025 zwischen Paris Saint-Germain und Inter Mailand statt?",
         answer: { lat: 48.2188, lon: 11.6247, label: "Allianz Arena, M\xFCnchen" },
@@ -37074,7 +37159,7 @@ var TILES = [
       {
         mode: "geo",
         map: "europe",
-        seconds: 35,
+        seconds: 60,
         points: 250,
         prompt: "Wo liegt Bod\xF8, die Heimat des norwegischen Klubs Bod\xF8/Glimt?",
         answer: { lat: 67.2804, lon: 14.4049, label: "Bod\xF8, Norwegen" },
@@ -37083,7 +37168,7 @@ var TILES = [
       {
         mode: "geo",
         map: "world",
-        seconds: 40,
+        seconds: 60,
         points: 300,
         prompt: "1930 fand die allererste Fu\xDFball-Weltmeisterschaft statt. Wo stand das Finalstadion, das Estadio Centenario?",
         answer: { lat: -34.8946, lon: -56.1527, label: "Montevideo, Uruguay" },
@@ -37323,7 +37408,7 @@ var TILES = [
       {
         mode: "geo",
         map: "germany",
-        seconds: 30,
+        seconds: 60,
         points: 200,
         prompt: "Wo steht Schloss Neuschwanstein, das Vorbild f\xFCr das M\xE4rchenschloss von Disney?",
         answer: { lat: 47.5576, lon: 10.7498, label: "Schloss Neuschwanstein, Allg\xE4u" },
@@ -37332,7 +37417,7 @@ var TILES = [
       {
         mode: "geo",
         map: "germany",
-        seconds: 35,
+        seconds: 60,
         points: 250,
         prompt: "Ein Dorf mit rund 2.000 Einwohnern, in dem einmal im Jahr bis zu 85.000 Metal-Fans feiern: Wo liegt Wacken?",
         answer: { lat: 54.02, lon: 9.3775, label: "Wacken, Schleswig-Holstein" },
@@ -37341,7 +37426,7 @@ var TILES = [
       {
         mode: "geo",
         map: "europe",
-        seconds: 35,
+        seconds: 60,
         points: 250,
         prompt: "Hier wohnt \u2013 offiziell \u2013 der Weihnachtsmann: Wo liegt das Santa-Claus-Dorf bei Rovaniemi?",
         answer: { lat: 66.5436, lon: 25.8473, label: "Rovaniemi, Finnland" },
@@ -37350,7 +37435,7 @@ var TILES = [
       {
         mode: "geo",
         map: "world",
-        seconds: 40,
+        seconds: 60,
         points: 300,
         prompt: "Timbuktu klingt wie ein Ort aus dem M\xE4rchen \u2013 aber es gibt ihn wirklich. Wo liegt die Stadt?",
         answer: { lat: 16.7735, lon: -3.0074, label: "Timbuktu, Mali" },
@@ -37438,7 +37523,7 @@ var TILES = [
       {
         mode: "link",
         prompt: "Welcher Ort wird gesucht?",
-        clueSeconds: 12,
+        clueSeconds: 20,
         points: 300,
         clues: [
           "Unsichtbar unter ihr steckt ein riesiger Wald aus Holzpf\xE4hlen im Schlamm \u2013 ohne ihn w\xFCrde sie versinken.",
@@ -37453,7 +37538,7 @@ var TILES = [
       {
         mode: "link",
         prompt: "Welcher Alltagsgegenstand wird gesucht?",
-        clueSeconds: 12,
+        clueSeconds: 20,
         points: 300,
         clues: [
           "Er entstand aus einem Fehlschlag: Ein Chemiker wollte 1968 einen besonders starken Kleber \u2013 und erfand das Gegenteil.",
@@ -37468,7 +37553,7 @@ var TILES = [
       {
         mode: "link",
         prompt: "Welche Person wird gesucht?",
-        clueSeconds: 12,
+        clueSeconds: 20,
         points: 300,
         clues: [
           "Ihre Notizb\xFCcher aus dem 19. Jahrhundert lagern bis heute in Bleikisten, weil sie noch immer strahlen.",
@@ -37598,7 +37683,7 @@ var TILES = [
       {
         mode: "geo",
         map: "world",
-        seconds: 45,
+        seconds: 60,
         points: 400,
         prompt: "Der abgelegenste dauerhaft bewohnte Ort der Welt: Wo liegt die Insel Tristan da Cunha?",
         answer: { lat: -37.1122, lon: -12.2822, label: "Tristan da Cunha, S\xFCdatlantik" },
@@ -37607,7 +37692,7 @@ var TILES = [
       {
         mode: "link",
         prompt: "Welches Spiel wird gesucht?",
-        clueSeconds: 12,
+        clueSeconds: 20,
         points: 300,
         clues: [
           "Erfunden wurde es 1984 in Moskau von einem Informatiker \u2013 urspr\xFCnglich, um einen neuen Computer zu testen.",
@@ -37664,10 +37749,10 @@ var SHOW_PACK = {
   name: "Showpaket \u2013 Spieleabend (fester Ablauf)",
   description: "31 Aufgaben in fester Reihenfolge: 6 Runden, \xDCberraschungsrunde EINZIGARTIG und Finale \u2013 alle sieben Spielmodi. Etwa 80 Minuten."
 };
-var geo2 = (id, topic, map2, seconds, points, prompt, lat, lon, label, explain) => ({ id, topic, task: { mode: "geo", map: map2, seconds, points, prompt, answer: { lat, lon, label }, explain } });
+var geo2 = (id, topic, map2, seconds, points, prompt, lat, lon, label, explain) => ({ id, topic, task: { mode: "geo", map: map2, seconds: 60, points, prompt, answer: { lat, lon, label }, explain } });
 var est = (id, topic, prompt, unit, answer, explain, bets = [0, 100, 200], points = 300) => ({ id, topic, task: { mode: "estimate", seconds: 45, betSeconds: 35, points, bets, prompt, unit, answer, explain } });
 var glitch2 = (id, scene, viewPrompt, prompt, explain, viewSeconds = 12) => ({ id, topic: "Beobachtung", task: { mode: "glitch", scene, viewSeconds, seconds: 25, points: 250, viewPrompt, prompt, explain } });
-var link2 = (id, topic, prompt, clues, answer, accept, explain) => ({ id, topic, task: { mode: "link", prompt, clueSeconds: 12, points: 300, clues, answer, accept, explain } });
+var link2 = (id, topic, prompt, clues, answer, accept, explain) => ({ id, topic, task: { mode: "link", prompt, clueSeconds: 20, points: 300, clues, answer, accept, explain } });
 var match2 = (id, topic, prompt, pairs, order, explain) => ({ id, topic, task: { mode: "match", seconds: 60, points: 300, prompt, pairs: pairs.map(([left, right]) => ({ left, right })), order, explain } });
 var rank2 = (id, topic, prompt, topLabel, bottomLabel, items, order, explain, points = 250, secondsPerItem = 12) => ({ id, topic, task: { mode: "rank", secondsPerItem, points, prompt, topLabel, bottomLabel, items: items.map(([text, value]) => ({ text, value })), order, explain } });
 var unique2 = (id, topic, placeholder, prompt, valid, explain) => ({ id, topic, task: { mode: "unique", seconds: 45, pointsUnique: 500, pointsShared: 150, placeholder, prompt, valid: valid.map(([name, variants]) => ({ name, variants })), explain } });
@@ -37972,7 +38057,7 @@ var SHOW_ROUNDS = [
   },
   {
     id: "s3-r5",
-    title: "Sch\xE4tz mal!",
+    title: "SETZ AUF MICH",
     topic: "Zahlen, Tore & T\xF6ne",
     icon: "\u{1F3AF}",
     color: GO2,

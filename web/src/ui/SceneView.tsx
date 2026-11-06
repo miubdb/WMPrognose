@@ -32,7 +32,7 @@ export function SceneView({ scene, onTap, marker, zones, taps, className, disabl
       <rect width="1000" height="600" fill={s.bg} />
       {items.map(it => <ItemEl key={it.id} it={it} />)}
       {zones?.map((z, i) => (
-        <g key={'z' + i} className="zone"><circle cx={z.x} cy={z.y} r={z.r} fill="rgba(20,217,192,0.18)" stroke="#14d9c0" strokeWidth={5} strokeDasharray="14 8" /></g>
+        <g key={'z' + i} className="zone">{z.hw !== undefined && z.hh !== undefined ? <rect x={z.x - z.hw - 6} y={z.y - z.hh - 6} width={2 * z.hw + 12} height={2 * z.hh + 12} rx={14} fill="rgba(20,217,192,0.14)" stroke="#14d9c0" strokeWidth={4} strokeDasharray="12 7" /> : <circle cx={z.x} cy={z.y} r={z.r} fill="rgba(20,217,192,0.18)" stroke="#14d9c0" strokeWidth={5} strokeDasharray="14 8" />}</g>
       ))}
       {taps?.map((t, i) => (
         <g key={'t' + i} transform={`translate(${t.x},${t.y})`} className="mappin" style={{ animationDelay: `${i * 0.18}s` }}>

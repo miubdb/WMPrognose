@@ -2,6 +2,7 @@
 // Annahmen (Moderator-Rhythmus): Antworten dauern im Schnitt ~85 % des Limits (die Runde endet früher, wenn alle abgegeben haben),
 // Regelkarte lesen, Auflösung ansehen und Host-Klicks sind pauschal berücksichtigt.
 import type { TaskDef, TileDef } from './types';
+import { clueSecs } from './scoring';
 
 export const OVERHEAD = {
   lobby: 8 * 60, intro: 90, scoreboard: 45, ceremony: 210,
@@ -16,13 +17,13 @@ export function taskSeconds(t: TaskDef, m: TimeMode = 'expected'): { play: numbe
   const a = m === 'max' ? 1 : AVG;
   const rv = (x: number) => (m === 'max' ? x * SLOW : x);
   switch (t.mode) {
-    case 'geo': return { play: t.seconds * a, reveal: rv(38) };
+    case 'geo': return { play: Math.max(60, t.seconds) * a, reveal: rv(38) };
     case 'rank': return { play: t.items.length * (t.secondsPerItem * (m === 'max' ? 1 : 0.75) + 1.5), reveal: rv(55) };
     case 'estimate': return { play: t.seconds * a + t.betSeconds * a, reveal: rv(55) };
     case 'glitch': return { play: t.viewSeconds + t.seconds * a, reveal: rv(32) };
     case 'codebreak': return { play: t.seconds * a, reveal: rv(38) };
     case 'match': return { play: t.seconds * (m === 'max' ? 1 : 0.9), reveal: rv(45) };
-    case 'link': return { play: t.clues.length * t.clueSeconds * (m === 'max' ? 1 : 0.8) + (m === 'max' ? 40 : 15) /* Host-Prüfung unklarer Antworten */, reveal: rv(45) };
+    case 'link': return { play: t.clues.length * clueSecs(t) * (m === 'max' ? 1 : 0.8) + (m === 'max' ? 40 : 15) /* Host-Prüfung unklarer Antworten */, reveal: rv(45) };
     case 'unique': return { play: t.seconds * a + (m === 'max' ? 60 : 30) /* Host-Prüfung */, reveal: rv(50) };
   }
 }

@@ -40,6 +40,8 @@ export interface RankTask {
   /** Reihenfolge, in der die Begriffe gezeigt werden (Indizes in items). */
   order: number[];
   secondsPerItem: number;
+  /** Bedienvariante: 'sequence' (Standard, nacheinander) oder 'sort' (alle fünf sichtbar, sortieren). Paketregel rankVariant kann überschreiben. */
+  variant?: 'sequence' | 'sort';
   points: number;
   explain: string;
 }
@@ -56,7 +58,8 @@ export interface EstimateTask {
   bets: number[];
   explain: string;
 }
-export interface GlitchZone { x: number; y: number; r: number }
+/** Trefferzone in Szenenkoordinaten (1000×600). hw/hh = halbe Breite/Höhe der engen Box um das veränderte Objekt; r nur noch für alte Zonen ohne Box. */
+export interface GlitchZone { x: number; y: number; r: number; hw?: number; hh?: number }
 export interface GlitchTask {
   mode: 'glitch';
   prompt: string; // Suchauftrag (nach der Betrachtungsphase)
@@ -120,7 +123,13 @@ export interface LinkTask {
 export type TaskDef = GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask;
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
-export interface PackRules { startCredit?: number; maxFootball?: number; maxPerMode?: number }
+export interface PackRules {
+  startCredit?: number; maxFootball?: number; maxPerMode?: number;
+  /** BLIND RANK: 'task' = je Frage festgelegt (Standard), 'sequence' = Begriffe nacheinander, 'sort' = alle fünf sichtbar und sortieren */
+  rankVariant?: 'task' | 'sequence' | 'sort';
+  /** Branding: Titel der Show (TV-Eröffnung) und Gewinnerbezeichnung der Siegerehrung */
+  showTitle?: string; winnerTitle?: string;
+}
 /** Ablaufmodell eines Raums: fester Showablauf (Standard) oder klassische Kategorienwand. */
 export type Flow = 'show' | 'classic';
 /** Schritt der festen Show: eine Runde (Kategorie/Kachel), die Überraschungsrunde, das Finale oder ein Zwischenstand. */

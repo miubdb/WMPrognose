@@ -2,8 +2,8 @@
 import type { Stage, TaskDef, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, GlitchZone } from '../shared/types';
 import type { PlayerRec, Room, RoundState } from './model';
 import {
-  scoreGeo, scoreRank, scoreEstimate, scoreGlitch, scoreCode, codeMatches, groupUnique, scoreUnique, rankPairs,
-  scoreMatch, validMatching, MATCH_PAIRS, MATCH_PAIR_POINTS, LINK_POINTS, linkMatch,
+  scoreGeo, scoreRank, rankVariantOf, rankSortSeconds, rankPairDetail, scoreEstimate, scoreGlitch, scoreCode, codeMatches, groupUnique, scoreUnique, rankPairs,
+  scoreMatch, clueSecs, validMatching, MATCH_PAIRS, MATCH_PAIR_POINTS, LINK_POINTS, linkMatch,
 } from '../shared/scoring';
 import { normText } from '../shared/util';
 import { SCENES, diffZones, variantItems, type Scene } from '../shared/scenes';
@@ -16,6 +16,7 @@ export interface Ctx {
   now: number;
   players: PlayerRec[]; // aktive Spieler
   scenes: Record<string, Scene>;
+  rules?: import('../shared/types').PackRules;
   setStage(stage: Stage, seconds: number | null): void;
 }
 export type Audience = { role: 'tv' | 'host' | 'player'; pid?: string };
@@ -48,9 +49,12 @@ const balanceOf = (c: Ctx, pid: string) => c.room.players.find(p => p.id === pid
 // =====================================================================
 // GEO
 // =====================================================================
+/** Alle regulären Geo-Fragen: 60 Sekunden (Finale behält die hinterlegte Zeit, mindestens 60). */
+export const GEO_SECONDS = 60;
+const geoSeconds = (c: Ctx) => Math.max(GEO_SECONDS, (c.task as GeoTask).seconds);
 const geo: ModeImpl = {
   maxPoints: t => (t as GeoTask).points,
-  begin(c) { c.setStage('open', (c.task as GeoTask).seconds); },
+  begin(c) { c.setStage('open', geoSeconds(c)); },
   advance(c) { c.setStage('locked', null); },
   submit(c, pid, payload) {
     if (c.round.stage !== 'open') return err('closed');
@@ -65,8 +69,8 @@ const geo: ModeImpl = {
   answered: (c, pid) => !!c.round.pm[pid],
   score(c) {
     const t = c.task as GeoTask;
-    const res = scoreGeo(c.round.pm, t.answer, t.points, c.players.length);
-    const entries: Draft[] = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points, label: `Platz ${r.place} · ${r.km.toLocaleString('de-DE')} km` }));
+    const res = scoreGeo(c.round.pm, t.answer, t.points, c.players.length, t.map);
+    const entries: Draft[] = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points, label: `${r.km.toLocaleString('de-DE')} km daneben` }));
     return {
       entries,
       reveal: {
@@ -95,11 +99,13 @@ const rank: ModeImpl = {
   maxPoints: t => (t as RankTask).points,
   begin(c) {
     const t = c.task as RankTask;
-    c.round.m = { step: 0 };
-    c.setStage('open', t.secondsPerItem);
+    const sort = rankVariantOf(t, c.rules) === 'sort';
+    c.round.m = { step: 0, sort };
+    c.setStage('open', sort ? rankSortSeconds(t) : t.secondsPerItem);
   },
   advance(c) {
     const t = c.task as RankTask;
+    if (c.round.m.sort) { c.setStage('locked', null); return; }
     const step = c.round.m.step as number;
     if (step + 1 >= t.order.length) { c.setStage('locked', null); return; }
     c.round.m.step = step + 1;
@@ -107,6 +113,17 @@ const rank: ModeImpl = {
   },
   submit(c, pid, payload) {
     const t = c.task as RankTask;
+    if (c.round.m.sort) {   // Sortier-Variante: eine vollständige Reihenfolge (order[slot] = Begriff), nur einmal abgebbar
+      if (c.round.stage !== 'open') return err('closed');
+      const ord = payload?.order;
+      if (!Array.isArray(ord) || ord.length !== t.items.length) return err('invalid');
+      const nums = ord.map(Number);
+      if (nums.some(x => !Number.isInteger(x) || x < 0 || x >= t.items.length) || new Set(nums).size !== t.items.length) return err('invalid');
+      const cur = c.round.pm[pid];
+      if (cur) return sameJson(cur.slots, nums) ? { ok: true, dup: true } : err('already_submitted');
+      c.round.pm[pid] = { slots: nums };
+      return OK;
+    }
     const step = Number(payload?.step), slot = Number(payload?.slot);
     if (!Number.isInteger(step) || !Number.isInteger(slot) || slot < 0 || slot >= t.items.length) return err('invalid');
     const pm = (c.round.pm[pid] ??= { slots: new Array(t.items.length).fill(-1) });
@@ -126,12 +143,14 @@ const rank: ModeImpl = {
     const t = c.task as RankTask;
     const pm = c.round.pm[pid];
     if (!pm) return false;
+    if (c.round.m.sort) return true;
     if (c.round.stage === 'open') return pm.slots.includes(t.order[c.round.m.step]);
     return pm.slots.some((s: number) => s >= 0);
   },
   complete(c) {
     const t = c.task as RankTask;
     if (c.round.stage !== 'open') return false;
+    if (c.round.m.sort) return c.players.length > 0 && c.players.every(p => !!c.round.pm[p.id]);
     const item = t.order[c.round.m.step];
     return c.players.length > 0 && c.players.every(p => c.round.pm[p.id]?.slots.includes(item));
   },
@@ -140,11 +159,11 @@ const rank: ModeImpl = {
     const rows = c.players.map(p => {
       const slots: number[] = c.round.pm[p.id]?.slots ?? new Array(t.items.length).fill(-1);
       const r = scoreRank(c.round.pm[p.id]?.slots, t.points);
-      return { pid: p.id, slots, correct: r.correct, total: r.total, points: r.points, placed: slots.filter(s => s >= 0).length };
+      return { pid: p.id, slots, correct: r.correct, total: r.total, points: r.points, placed: slots.filter(s => s >= 0).length, pairs: rankPairDetail(slots) };
     });
     return {
       entries: rows.filter(r => r.placed > 0 || r.points > 0).map(r => ({ pid: r.pid, delta: r.points, label: `${r.correct} von ${r.total} Paaren richtig` })),
-      reveal: { items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel },
+      reveal: { items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel, perPair: Math.round(t.points / 10 * 10) / 10, maxPoints: t.points },
     };
   },
   view(c, a) {
@@ -153,9 +172,12 @@ const rank: ModeImpl = {
     const showItem = c.round.stage === 'open' || c.round.stage === 'locked' || c.round.stage === 'review';
     const base: any = {
       prompt: t.prompt, topLabel: t.topLabel, bottomLabel: t.bottomLabel, slots: t.items.length,
+      variant: c.round.m?.sort ? 'sort' : 'sequence', points: t.points,
       step, steps: t.order.length,
-      item: c.round.stage === 'open' ? t.items[t.order[step]].text : null,
-      seen: showItem ? t.order.slice(0, c.round.stage === 'open' ? step : t.order.length).map(i => t.items[i].text) : [],
+      // Sortier-Variante: alle Begriffe in gemischter (nicht der richtigen) Reihenfolge, gleich für alle
+      pool: c.round.m?.sort && (c.round.stage === 'open' || c.round.stage === 'locked') ? t.order.map(i => ({ idx: i, text: t.items[i].text })) : null,
+      item: c.round.stage === 'open' && !c.round.m?.sort ? t.items[t.order[step]].text : null,
+      seen: showItem && !c.round.m?.sort ? t.order.slice(0, c.round.stage === 'open' ? step : t.order.length).map(i => t.items[i].text) : [],
     };
     if (a.role === 'player' && a.pid) {
       const pm = c.round.pm[a.pid];
@@ -238,6 +260,14 @@ const estimate: ModeImpl = {
         guesses: Object.entries(res).map(([pid, r]) => ({ pid, value: guesses[pid], place: r.place, points: r.points, best: r.best }))
           .sort((a, b) => a.place - b.place),
         bets,
+        // Klartext-Erklärung für TV und Handys: wer lag am besten, welche Wetten gewonnen/verloren
+        summary: [
+          winners.length
+            ? `Beste Schätzung: ${winners.map(w => `${nm(c, w)} (${guesses[w].toLocaleString('de-DE')} ${t.unit})`).join(' und ')} – Lösung: ${t.answer.toLocaleString('de-DE')} ${t.unit}.`
+            : 'Es gab keine gültige Schätzung.',
+          ...bets.map(b => `${nm(c, b.pid)} setzte ${b.amount} auf ${nm(c, b.target)} → ${b.won ? `gewonnen (+${b.delta})` : `verloren (${b.delta})`}`),
+          ...(bets.length ? [] : ['Niemand hat gewettet.']),
+        ],
       },
     };
   },
@@ -245,6 +275,10 @@ const estimate: ModeImpl = {
     const t = c.task as EstimateTask;
     const st = c.round.stage;
     const base: any = { prompt: t.prompt, unit: t.unit, bets: t.bets };
+    // Wie viele haben schon geschätzt / gewettet (ohne Inhalte)
+    base.guessedCount = c.players.filter(p => c.round.pm[p.id]?.guess !== undefined).length;
+    base.betCount = c.players.filter(p => !!c.round.pm[p.id]?.bet).length;
+    base.total = c.players.length;
     if (st === 'bet' || st === 'locked' || st === 'review' || st === 'reveal') {
       base.guesses = c.players.filter(p => c.round.pm[p.id]?.guess !== undefined).map(p => ({ pid: p.id, value: c.round.pm[p.id].guess }));
     }
@@ -311,7 +345,9 @@ const glitch: ModeImpl = {
       if (st === 'view') { base.scene = null; base.sceneData = null; }
       if (a.pid) base.mine = c.round.pm[a.pid] ?? null;
     }
-    if (st === 'locked' || st === 'review' || st === 'reveal') {
+    // TV: Die veränderte Szene erscheint erst zur Auflösung – während der Suche zeigt der TV nur Countdown und Abgabestatus.
+    if (a.role === 'tv' && st !== 'view' && st !== 'reveal') { base.scene = null; base.sceneData = null; base.searching = true; }
+    if ((st === 'locked' || st === 'review' || st === 'reveal') && !(a.role === 'tv' && st !== 'reveal')) {
       base.taps = c.players.filter(p => c.round.pm[p.id]).map(p => ({ pid: p.id, ...c.round.pm[p.id] }));
     }
     if (a.role === 'host') base.zones = glitchZones(t, c.scenes);
@@ -401,6 +437,8 @@ const unique: ModeImpl = {
   },
   answered: (c, pid) => !!c.round.pm[pid]?.answer,
   complete(c) { return c.round.stage === 'open' && c.players.length > 0 && c.players.every(p => !!c.round.pm[p.id]?.answer); },
+  // Keine endgültige Punktevergabe, solange unbekannte Antworten nicht vom Showmaster geprüft sind
+  blockReveal(c) { return uniqueGroups(c).some(g => g.state === 'unknown'); },
   score(c) {
     const t = c.task as UniqueTask;
     const groups = uniqueGroups(c);
@@ -473,7 +511,7 @@ const match: ModeImpl = {
 function linkLevel(c: Ctx): number | null {
   const t = c.task as LinkTask; const r = c.round;
   let lvl = (r.m?.level as number) ?? 0;
-  if (r.deadline !== null && r.pausedLeft === null && c.now >= r.deadline) lvl += 1 + Math.floor((c.now - r.deadline) / (t.clueSeconds * 1000));
+  if (r.deadline !== null && r.pausedLeft === null && c.now >= r.deadline) lvl += 1 + Math.floor((c.now - r.deadline) / (clueSecs(t) * 1000));
   return lvl > 3 ? null : lvl;
 }
 function linkGroups(c: Ctx) {
@@ -498,11 +536,11 @@ function linkGroups(c: Ctx) {
 }
 const link: ModeImpl = {
   maxPoints: () => LINK_POINTS[0],
-  begin(c) { c.round.m = { level: 0, overrides: {} }; c.setStage('open', (c.task as LinkTask).clueSeconds); },
+  begin(c) { c.round.m = { level: 0, overrides: {} }; c.setStage('open', clueSecs(c.task as LinkTask)); },
   advance(c) {
     const t = c.task as LinkTask;
     const lvl = (c.round.m.level as number) ?? 0;
-    if (c.round.stage === 'open' && lvl < 3) { c.round.m.level = lvl + 1; c.setStage('open', t.clueSeconds); return; }
+    if (c.round.stage === 'open' && lvl < 3) { c.round.m.level = lvl + 1; c.setStage('open', clueSecs(t)); return; }
     // letzter Hinweis abgelaufen: nur wenn Antworten nicht eindeutig sind, braucht der Host eine Prüfung
     const needs = linkGroups(c).some(g => g.state === 'unknown' || (g.state === 'invalid' && g.key.startsWith('u:')));
     c.setStage(needs ? 'review' : 'locked', null);
@@ -538,7 +576,7 @@ const link: ModeImpl = {
   view(c, a) {
     const t = c.task as LinkTask; const st = c.round.stage;
     const shown = st === 'open' ? (c.round.m?.level ?? 0) + 1 : 4;
-    const base: any = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: t.clueSeconds };
+    const base: any = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: clueSecs(t) };
     if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid] ? { answer: c.round.pm[a.pid].answer, level: c.round.pm[a.pid].level } : null;
     // Antworten bleiben bis zur Auflösung verborgen – nur der Showmaster sieht sie zur Prüfung
     if ((st === 'review' || st === 'locked') && a.role === 'host') base.groups = linkGroups(c);

@@ -26,7 +26,7 @@ export function bookHash(book: Book): string {
 const J = <T>(s: string) => JSON.parse(s) as T;
 
 export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules>; /** fester Showablauf (optional) */ show?: ShowStep[] }
-export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2 };
+export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'Champion' };
 
 export function normalizePack(raw: any): PackData {
   const r = raw ?? {};
@@ -36,7 +36,7 @@ export function normalizePack(raw: any): PackData {
     name: s(r.name, 60), description: s(r.description, 300), categoryIds: Array.isArray(r.categoryIds) ? [...new Set<string>(r.categoryIds.map((x: unknown) => s(x, 80)).filter(Boolean))].slice(0, 20) : [],
     surprise: s(r.surprise, 80), final: s(r.final, 80),
     ...(Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x: any): ShowStep | null => (x?.k === 'board' ? { k: 'board' } : (x?.k === 'round' || x?.k === 'surprise' || x?.k === 'final') && s(x.cat, 80) ? { k: x.k, cat: s(x.cat, 80) } : null)).filter((x: ShowStep | null): x is ShowStep => !!x) } : {}),
-    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10) },
+    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ['task', 'sequence', 'sort'].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle },
   };
 }
 

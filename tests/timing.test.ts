@@ -14,7 +14,7 @@ test('Spielzeit: jede Kachel dauert 5–8 Minuten, Überraschung ca. 6–8, Fina
   assert.ok(fi >= 9.5 && fi <= 13, `Finale ${fi.toFixed(1)}`);
 });
 
-test('Spielzeit: jede mögliche Auswahl von 6 Kacheln ergibt 60–75 Minuten', () => {
+test('Spielzeit: jede mögliche Auswahl von 6 Kacheln ergibt 60–80 Minuten', () => {
   const idx = regular.map((_, i) => i);
   const combos: number[][] = [];
   const rec = (start: number, cur: number[]) => { if (cur.length === 6) { combos.push(cur.slice()); return; } for (let i = start; i < idx.length; i++) { cur.push(i); rec(i + 1, cur); cur.pop(); } };
@@ -22,5 +22,5 @@ test('Spielzeit: jede mögliche Auswahl von 6 Kacheln ergibt 60–75 Minuten', (
   let min = Infinity, max = 0;
   for (const c of combos) { const m = showSeconds(c.map(i => regular[i]), surprise, final) / 60; min = Math.min(min, m); max = Math.max(max, m); }
   console.log(`# Spielzeit: ${combos.length} Kombinationen, ${min.toFixed(1)}–${max.toFixed(1)} min`);
-  assert.ok(min >= 60 && max <= 75, `${min.toFixed(1)}–${max.toFixed(1)}`);
+  assert.ok(min >= 60 && max <= 80, `${min.toFixed(1)}–${max.toFixed(1)}`);
 });

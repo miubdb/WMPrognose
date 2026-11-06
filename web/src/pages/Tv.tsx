@@ -11,7 +11,7 @@ export const MODE_NAME: Record<string, string> = {
   geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG',
 };
 const MODE_RULES: Record<string, string[]> = {
-  geo: ['Setze auf deinem Handy einen Pin auf die Karte.', 'Du kannst ihn bis zum Absenden verschieben.', 'Gewertet wird die Platzierung nach Entfernung.'],
+  geo: ['Setze auf deinem Handy einen Pin auf die Karte.', 'Du kannst ihn bis zum Absenden verschieben.', 'Je näher dein Pin, desto mehr Punkte – egal, wie die anderen tippen.'],
   rank: ['Fünf Begriffe erscheinen nacheinander.', 'Setze jeden sofort auf einen freien Rangplatz.', 'Endgültig – nichts wird mehr verschoben!'],
   estimate: ['Schätze geheim eine Zahl.', 'Dann siehst du alle Tipps und setzt Punkte auf die Schätzung, der du vertraust.', 'Gewonnener Einsatz: plus. Verlorener: minus.'],
   glitch: ['Merk dir das Bild genau.', 'Dann ändert sich etwas.', 'Tippe auf deinem Handy auf die veränderte Stelle.'],
@@ -225,7 +225,7 @@ function GeoTv({ view, round }: { view: View; round: RoundView }) {
   return (
     <div className="geotv">
       <div className="qcol"><div className="bigq">{d.prompt}</div>
-        {rev ? <PointsList view={view} rows={rev.guesses.map((g: any) => ({ pid: g.pid, points: g.points, note: `Platz ${g.place} · ${g.km.toLocaleString('de-DE')} km` }))} /> : <AnswerRow players={view.players} />}
+        {rev ? <PointsList view={view} rows={rev.guesses.map((g: any) => ({ pid: g.pid, points: g.points, note: `${g.km.toLocaleString('de-DE')} km entfernt` }))} /> : <AnswerRow players={view.players} />}
         {rev && <Explain text={rev.explain} />}
       </div>
       <div className="mapcol"><MapView kind={d.map} mode="show" uiScale={1.5} pins={showPins ? pins : []} answer={rev ? { ...rev.answer } : undefined} fit={showPins} className="tvmap" /></div>
@@ -243,13 +243,17 @@ function RankTv({ view, round }: { view: View; round: RoundView }) {
         <div className="bigq small">{d.prompt}</div>
         <div className="truth"><small>Richtige Reihenfolge</small><div className="cols">{rev.items.map((it: any, i: number) => <div key={i} className="cell good" style={{ animationDelay: `${i * 0.25}s` }}><b>{i + 1}</b><span>{it.text}</span><em>{it.value}</em></div>)}</div></div>
         <div className="rrows">
-          {sorted.map((r: any, ri: number) => { const p = pl(view, r.pid)!; return (
+          {sorted.map((r: any, ri: number) => { const p = pl(view, r.pid)!;
+            // je Begriff: wie viele seiner 4 Paarvergleiche stimmen
+            const okOf = (item: number) => (r.pairs ?? []).filter((x: any) => (x.a === item || x.b === item) && x.ok).length;
+            return (
             <div key={r.pid} className="rrow" style={{ animationDelay: `${1.4 + ri * 0.5}s` }}>
               <div className="who"><Avatar a={p.avatar} size={46} /><b>{p.name}</b></div>
-              <div className="cols">{r.slots.map((s: number, i: number) => <div key={i} className={`cell ${s === i ? 'good' : s < 0 ? 'none' : 'bad'}`}><span>{s >= 0 ? rev.items[s].text : '—'}</span></div>)}</div>
-              <div className="sc"><small>{r.correct}/{r.total} Paare</small><strong>+{r.points}</strong></div>
+              <div className="cols">{r.slots.map((s: number, i: number) => { const k = s >= 0 ? okOf(s) : 0; const cls = s < 0 ? 'none' : k >= 4 ? 'good' : k >= 2 ? 'mid' : 'bad'; return <div key={i} className={`cell ${cls}`}><span>{s >= 0 ? rev.items[s].text : '—'}</span>{s >= 0 && <em>{k}/4 Vergleiche</em>}</div>; })}</div>
+              <div className="sc"><small>{r.correct} von {r.total} Paaren</small><strong>+{r.points}</strong></div>
             </div>); })}
         </div>
+        <p className="rankhow">So wird gewertet: Jedes Begriffspaar ist ein Vergleich („steht der richtige weiter oben?“) – 10 Vergleiche bei 5 Begriffen, <b>je {rev.perPair} Punkte</b>. Die Zahl unter jedem Begriff zeigt, wie viele seiner 4 Vergleiche stimmen.</p>
         <Explain text={rev.explain} />
       </div>
     );
@@ -258,6 +262,7 @@ function RankTv({ view, round }: { view: View; round: RoundView }) {
     <div className="ranktv">
       <div className="bigq small">{d.prompt}</div>
       <div className="rankstage">
+        {d.variant === 'sort' && d.pool && <div className="curitem"><small>Bringe alle fünf Begriffe in die richtige Reihenfolge – auf deinem Handy</small><div className="seen">{d.pool.map((x: any) => <span key={x.idx}>{x.text}</span>)}</div><small>▲ {d.topLabel} · ▼ {d.bottomLabel}</small></div>}
         {round.stage === 'open' && d.item && <div className="curitem" key={d.step}><small>Begriff {d.step + 1} von {d.steps}</small><b>{d.item}</b></div>}
         {round.stage !== 'open' && <div className="curitem"><small>Alle Begriffe vergeben</small><b>Gleich die Auflösung …</b></div>}
         <div className="seen">{d.seen.map((t: string, i: number) => <span key={i}>{t}</span>)}</div>
@@ -291,7 +296,7 @@ function EstimateTv({ view, round }: { view: View; round: RoundView }) {
         </div>
         <div className="estcols">
           <PointsList view={view} rows={view.players.map(p => { const g = guesses.find(x => x.pid === p.id); const b = bets.find(x => x.pid === p.id); return { pid: p.id, points: (g?.points ?? 0) + (b?.delta ?? 0), note: [g ? `Platz ${g.place}` : 'keine Schätzung', b ? `${b.won ? '✅' : '❌'} ${b.amount} auf ${pl(view, b.target)?.name}` : ''].filter(Boolean).join(' · ') }; }).sort((a, b) => b.points - a.points)} />
-          <Explain text={rev.explain} />
+          <div><ul className="estsummary">{(rev.summary ?? []).map((l: string, i: number) => <li key={i}>{l}</li>)}</ul><Explain text={rev.explain} /></div>
         </div>
       </div>
     );
@@ -299,7 +304,7 @@ function EstimateTv({ view, round }: { view: View; round: RoundView }) {
   return (
     <div className="esttv">
       <div className="bigq">{d.prompt}</div>
-      {round.stage === 'open' && <AnswerRow players={view.players} />}
+      {round.stage === 'open' && <><p className="hint big">{d.guessedCount} von {d.total} haben geschätzt</p><AnswerRow players={view.players} /></>}
       {round.stage !== 'open' && (
         <>
           <div className="guesscards">
@@ -309,7 +314,7 @@ function EstimateTv({ view, round }: { view: View; round: RoundView }) {
                 <div className="bets">{on.map(b => { const bp = pl(view, b.pid)!; return <span key={b.pid} className="bet"><Avatar a={bp.avatar} size={30} />{b.amount}</span>; })}</div>
               </div>); })}
           </div>
-          {round.stage === 'bet' && <><p className="hint">Wem vertraust du? Setze jetzt Punkte auf dem Handy.</p><AnswerRow players={view.players} /></>}
+          {round.stage === 'bet' && <><p className="hint big">Wettphase: Wem vertraust du? Setze Punkte auf dem Handy – {d.betCount} von {d.total} haben gesetzt.</p><AnswerRow players={view.players} /></>}
         </>
       )}
     </div>
@@ -327,7 +332,7 @@ function GlitchTv({ view, round }: { view: View; round: RoundView }) {
         {rev ? <><PointsList view={view} rows={rev.rows.map((r: any) => ({ pid: r.pid, points: r.points, note: r.tap ? (r.hit ? 'Treffer!' : r.points ? 'knapp daneben' : 'daneben') : 'keine Abgabe' })).sort((a: any, b: any) => b.points - a.points)} /><Explain text={rev.explain} /></> :
           round.stage === 'view' ? <p className="hint big">Merken, merken, merken …</p> : <AnswerRow players={view.players} />}
       </div>
-      <div className="scenecol"><SceneView scene={d.sceneData} zones={rev?.zones} taps={taps} className="tvscene" /></div>
+      <div className="scenecol">{d.sceneData ? <SceneView scene={d.sceneData} zones={rev?.zones} taps={taps} className="tvscene" /> : <div className="sceneHidden"><div className="big">🔍</div><p>Die Suche läuft jetzt auf den Handys.</p><p className="muted">Das veränderte Bild zeigt der Fernseher erst bei der Auflösung.</p></div>}</div>
     </div>
   );
 }
@@ -411,7 +416,10 @@ function LinkTv({ view, round }: { view: View; round: RoundView }) {
       {rev && (
         <div className="lreveal">
           <div className="lanswer">Gesucht war: <b>{rev.answer}</b></div>
-          <PointsList view={view} rows={rev.rows.filter((r: any) => r.answer).map((r: any) => ({ pid: r.pid, points: r.points, note: r.correct ? `„${r.answer}“ · nach Hinweis ${r.level + 1}` : `„${r.answer}“ · falsch` })).sort((a: any, b: any) => b.points - a.points)} />
+          <table className="linktable"><thead><tr><th>Spieler</th><th>Antwort</th><th>Hinweis</th><th></th><th>Punkte</th></tr></thead><tbody>
+            {rev.rows.slice().sort((a: any, b: any) => b.points - a.points || (a.level ?? 9) - (b.level ?? 9)).map((r: any) => { const p = pl(view, r.pid)!; return (
+              <tr key={r.pid} className={r.answer ? (r.correct ? 'ok' : 'bad') : 'none'}><td><Avatar a={p.avatar} size={40} /> <b>{p.name}</b></td><td>{r.answer ? `„${r.answer}“` : 'keine Abgabe'}</td><td>{r.answer ? `Hinweis ${r.level + 1}` : '–'}</td><td>{r.answer ? (r.correct ? '✅' : '❌') : ''}</td><td className="pts">{r.points > 0 ? `+${r.points}` : '0'}</td></tr>); })}
+          </tbody></table>
           <Explain text={rev.explain} />
         </div>
       )}

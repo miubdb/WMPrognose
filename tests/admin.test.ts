@@ -160,7 +160,7 @@ test('Laufende Show bleibt unverändert, wenn Inhalte/Pakete im Admin geändert 
   assert.equal((await a.post(`/packs/${pack.id}/publish`, { note: 'v2' })).data.version, 2);
   // Show läuft mit alter Version weiter, auch nach Reconnect und Serverneustart des Lesers
   await p0.act({ k: 'submit', payload: { lat: 53.55, lon: 9.99 } });
-  await host.act({ k: 'h.reveal' }); await host.waitFor(v => v.round?.stage === 'reveal');
+  await host.act({ k: 'h.reveal' }); for (const gr of (host.view!.round?.data?.groups ?? [])) if (gr.state === 'unknown') await host.act({ k: 'h.review', groupKey: gr.key, decision: 'invalid' }); await host.act({ k: 'h.reveal' }); await host.waitFor(v => v.round?.stage === 'reveal');
   assert.match(host.view!.round!.title, /Alt 0/); assert.equal(host.view!.round!.points, 500);
   p0.disconnect(); const p0b = new Client(e, 'player', code, toks[0]); await p0b.connect();
   assert.match(p0b.view!.round!.title, /Alt 0/);
@@ -196,7 +196,7 @@ test('Vollständige Multiplayer-Show mit EIGENEN Fragen (Wand → Runde → Übe
       const mode = host.view!.round!.mode;
       if (mode === 'geo') for (let i = 0; i < 3; i++) await clients[i].act({ k: 'submit', payload: guess[i] });
       if (mode === 'unique') { await clients[0].act({ k: 'submit', payload: { answer: 'Rot' } }); await clients[1].act({ k: 'submit', payload: { answer: 'rot' } }); await clients[2].act({ k: 'submit', payload: { answer: 'Grün' } }); await clients[0].act({ k: 'submit', payload: { answer: 'Rot' } }); }
-      await host.act({ k: 'h.reveal' }); await host.waitFor(v => v.round?.stage === 'reveal');
+      await host.act({ k: 'h.reveal' }); for (const gr of (host.view!.round?.data?.groups ?? [])) if (gr.state === 'unknown') await host.act({ k: 'h.review', groupKey: gr.key, decision: 'invalid' }); await host.act({ k: 'h.reveal' }); await host.waitFor(v => v.round?.stage === 'reveal');
       await host.act({ k: 'h.next' });
     }
     await new Promise(r => setTimeout(r, 30));
@@ -286,7 +286,7 @@ test('Glitch-Szenen aus Vorlagen: Unterschiede und Trefferzonen werden exakt erz
   for (const t of tpls) {
     assert.deepEqual(validateTemplate(t), [], t.kind);
     const s = buildScene('x', t); const z = diffZones(s);
-    assert.equal(z.length, 1, t.kind); assert.ok(z[0].x > 0 && z[0].x < 1000 && z[0].y > 0 && z[0].y < 600 && z[0].r >= 40);
+    assert.equal(z.length, 1, t.kind); assert.ok(z[0].x > 0 && z[0].x < 1000 && z[0].y > 0 && z[0].y < 600 && z[0].hw! >= 18 && z[0].hh! >= 18);
   }
   assert.ok(validateTemplate({ ...tpls[0], oddEmoji: '🔵' }).length, 'identisches Symbol = kein Unterschied');
   assert.ok(validateTemplate({ ...tpls[2], newValue: '8' }).length, 'unveränderter Wert');
@@ -311,7 +311,7 @@ test('Analyse: Spielzeit erwartet vs. maximal, Modusverteilung, Fußballanteil m
   const free = analyzeBook(book)!.combos!;
   const limited = analyzeBook({ ...book, rules: { maxFootball: 2, maxPerMode: 2 } }).combos!;
   assert.ok(free.minutesMax.max > free.minutesExpected.max + 5, 'Worst-Case ist deutlich länger');
-  assert.ok(free.minutesExpected.min >= 60 && free.minutesExpected.max <= 75, JSON.stringify(free.minutesExpected));
+  assert.ok(free.minutesExpected.min >= 60 && free.minutesExpected.max <= 80, JSON.stringify(free.minutesExpected));
   assert.ok(limited.footballShare.max <= free.footballShare.max, 'Limit senkt den maximalen Fußballanteil');
   assert.ok(limited.footballShare.max < 0.45, String(limited.footballShare.max));
   console.log('# Analyse Standardpaket:', JSON.stringify({ frei: free, mitLimit: limited }));

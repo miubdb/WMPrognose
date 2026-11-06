@@ -30,7 +30,7 @@ export function normalizeTask(raw: any): TaskDef {
     case 'geo': return { mode: 'geo', prompt: str(r.prompt, 300), map: r.map, answer: { lat: num(r.answer?.lat), lon: num(r.answer?.lon), label: str(r.answer?.label, 80) }, seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 500) } as GeoTask;
     case 'rank': return { mode: 'rank', prompt: str(r.prompt, 200), topLabel: str(r.topLabel, 40), bottomLabel: str(r.bottomLabel, 40),
       items: (Array.isArray(r.items) ? r.items : []).slice(0, 5).map((i: any) => ({ text: str(i?.text, 60), ...(str(i?.value, 30) ? { value: str(i?.value, 30) } : {}) })),
-      order: Array.isArray(r.order) ? r.order.map((x: unknown) => num(x)) : [], secondsPerItem: num(r.secondsPerItem), points: num(r.points), explain: str(r.explain, 500) } as RankTask;
+      order: Array.isArray(r.order) ? r.order.map((x: unknown) => num(x)) : [], secondsPerItem: num(r.secondsPerItem), points: num(r.points), ...(r.variant === 'sort' ? { variant: 'sort' } : {}), explain: str(r.explain, 500) } as RankTask;
     case 'estimate': return { mode: 'estimate', prompt: str(r.prompt, 300), unit: str(r.unit, 30), answer: num(r.answer), seconds: num(r.seconds), betSeconds: num(r.betSeconds), points: num(r.points),
       bets: Array.isArray(r.bets) ? r.bets.map((b: unknown) => num(b)) : [], explain: str(r.explain, 500) } as EstimateTask;
     case 'glitch': return { mode: 'glitch', prompt: str(r.prompt, 200), viewPrompt: str(r.viewPrompt, 120), scene: str(r.scene, 60), viewSeconds: num(r.viewSeconds), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 500),
@@ -44,7 +44,7 @@ export function normalizeTask(raw: any): TaskDef {
       return { mode: 'match', prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x: unknown) => num(x)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) } as MatchTask;
     }
     case 'link': return { mode: 'link', prompt: str(r.prompt, 200), clues: (Array.isArray(r.clues) ? r.clues : []).slice(0, 4).map((c: unknown) => str(c, 220)), answer: str(r.answer, 80), accept: strList(r.accept, 12, 80),
-      clueSeconds: num(r.clueSeconds, 12), points: LINK_POINTS[0], explain: str(r.explain, 500) } as LinkTask;
+      clueSeconds: num(r.clueSeconds, 20), points: LINK_POINTS[0], explain: str(r.explain, 500) } as LinkTask;
     default: return r;
   }
 }
@@ -104,7 +104,7 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
     case 'link':
       if (t.clues.length !== 4 || t.clues.some(c => !c)) e.push('Genau vier Hinweise eintragen');
       if (!t.answer) e.push('Hauptlösung fehlt');
-      if (!inRange(t.clueSeconds, 5, 30)) e.push('Zeit je Hinweis 5–30 Sekunden');
+      if (!inRange(t.clueSeconds, 5, 60)) e.push('Zeit je Hinweis 5–60 Sekunden');
       break;
     case 'unique':
       if (t.valid.length < 3 || t.valid.some(v => !v.name)) e.push('Mindestens drei gültige Antworten eintragen');

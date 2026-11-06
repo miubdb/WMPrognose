@@ -1,3 +1,4 @@
+import { normText } from '../../../shared/util';
 import { useEffect, useState } from 'react';
 import { api, store, useGame } from '../net';
 import { Avatar } from '../ui/Avatar';
@@ -212,7 +213,7 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
         <>
           {st === 'review' && <ReviewList view={view} round={round} run={run} />}
           <div className="row wrap">
-            <button className="btn gold huge" disabled={busy} onClick={() => run({ k: 'h.reveal' })}>✨ Auflösung auf dem TV zeigen</button>
+            <button className="btn gold huge" disabled={busy || (round.data.groups ?? []).some((g: any) => g.state === 'unknown')} title={(round.data.groups ?? []).some((g: any) => g.state === 'unknown') ? 'Erst alle unklaren Antworten prüfen' : ''} onClick={() => run({ k: 'h.reveal' })}>✨ Auflösung auf dem TV zeigen</button>
             {st === 'locked' && round.mode !== 'rank' && <button className="btn ghost" disabled={busy} onClick={() => run({ k: 'h.addTime', seconds: 20 })}>Nachspielzeit +20 s (Antworten wieder öffnen)</button>}
           </div>
         </>
@@ -240,21 +241,27 @@ const STAGE: Record<string, string> = { intro: 'Regelkarte', view: 'Betrachten',
 function ReviewList({ view, round, run }: { view: View; round: RoundView; run: Run }) {
   const groups: any[] = round.data.groups ?? [];
   const valid: string[] = round.data.validNames ?? [];
+  const nameOf = (id: string) => view.players.find(p => p.id === id)?.name ?? '?';
+  const open = groups.filter(g => g.state === 'unknown').length;
+  const Decide = ({ k }: { k: string }) => (
+    <span className="decide">
+      <button className="btn small" onClick={() => run({ k: 'h.review', groupKey: k, decision: 'valid' })}>✓ gültig</button>
+      <button className="btn small ghost" onClick={() => run({ k: 'h.review', groupKey: k, decision: 'invalid' })}>✗ ungültig</button>
+      <select defaultValue="" onChange={e => e.target.value && run({ k: 'h.review', groupKey: k, decision: { mapTo: e.target.value } })}><option value="">= identisch mit …</option>{valid.map(v => <option key={v}>{v}</option>)}</select>
+    </span>
+  );
   return (
     <div className="review">
-      <h3>Antworten prüfen</h3>
+      <h3>Antworten prüfen {open > 0 ? <span className="tag warn">{open} offen – Auflösung gesperrt</span> : <span className="tag ok">alles geprüft</span>}</h3>
       {groups.map(g => (
         <div key={g.key} className={`rgroup ${g.state}`}>
           <b>{g.label}</b>
-          <span className="members">{g.members.map((m: string) => view.players.find(p => p.id === m)?.name).join(', ')}</span>
-          <span className="tag">{g.state === 'valid' ? 'gültig' : g.state === 'invalid' ? 'ungültig' : 'unklar'}</span>
-          {g.key.startsWith('u:') && (
-            <span className="decide">
-              <button className="btn small" onClick={() => run({ k: 'h.review', groupKey: g.key, decision: 'valid' })}>✓ gültig</button>
-              <button className="btn small ghost" onClick={() => run({ k: 'h.review', groupKey: g.key, decision: 'invalid' })}>✗ ungültig</button>
-              <select defaultValue="" onChange={e => e.target.value && run({ k: 'h.review', groupKey: g.key, decision: { mapTo: e.target.value } })}><option value="">= wie …</option>{valid.map(v => <option key={v}>{v}</option>)}</select>
-            </span>
-          )}
+          <span className="tag">{g.state === 'valid' ? 'gültig' : g.state === 'invalid' ? 'ungültig' : 'unklar – bitte entscheiden'}</span>
+          <ul className="rmembers">{g.members.map((m: string) => {
+            const raw = g.raw?.[m]; const auto = g.auto?.includes(m);
+            return <li key={m}><b>{nameOf(m)}</b> schrieb „{raw ?? g.label}“{auto && <> <span className="tag warn">Tippfehler automatisch als „{g.label}“ gewertet</span> <button className="btn tiny ghost" title="Diese Eingabe ist ein anderer Begriff – selbst entscheiden" onClick={() => run({ k: 'h.review', groupKey: 'u:' + normText(raw), decision: 'invalid' })}>✗ war etwas anderes</button></>}</li>;
+          })}</ul>
+          {g.key.startsWith('u:') && <Decide k={g.key} />}
         </div>
       ))}
       {!groups.length && <p className="muted">Keine Antworten.</p>}

@@ -145,7 +145,7 @@ export class Engine {
     const round = room.round, task = this.curTask(room);
     if (!round || !task) return null;
     return {
-      room, round, task, now, players: this.active(room), scenes: this.bk(room).scenes ?? SCENES,
+      room, round, task, now, players: this.active(room), scenes: this.bk(room).scenes ?? SCENES, rules: this.bk(room).rules,
       setStage: (stage, seconds) => {
         round.stage = stage; round.stageStartedAt = now; round.stageSeconds = seconds;
         if (seconds == null) { round.deadline = null; round.pausedLeft = null; }

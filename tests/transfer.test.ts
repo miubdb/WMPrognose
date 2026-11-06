@@ -72,7 +72,7 @@ test('Transfer Online -> Lokal: vollständiger Spieleabend inkl. eigener Glitch-
   assert.deepEqual(importedQs.map(strip).sort(), exportedQs.map(strip).sort(), 'alle Fragen inkl. Antworten, Varianten, Zeiten und Punkte sind identisch');
   const sceneB = (await b.get('/scenes')).data.find((s: any) => s.title === 'Eigene Tabelle'); assert.ok(sceneB && !sceneB.builtin);
   assert.deepEqual(sceneB.template, scene.template); assert.equal(canonical({ items: sceneB.items, changes: sceneB.changes }), canonical({ items: scene.items, changes: scene.changes }));
-  const packB = (await b.get('/packs')).data.find((p: any) => p.id === pr.id); assert.deepEqual(packB.rules, { startCredit: 150, maxFootball: 1, maxPerMode: 6 }); assert.equal(packB.categoryIds.length, 6); assert.equal(packB.currentVersion, 1);
+  const packB = (await b.get('/packs')).data.find((p: any) => p.id === pr.id); assert.deepEqual(packB.rules, { startCredit: 150, maxFootball: 1, maxPerMode: 6, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'Champion' }); assert.equal(packB.categoryIds.length, 6); assert.equal(packB.currentVersion, 1);
   const catTitles = packB.categoryIds.map((id: string) => (imp.idMap.categories && Object.values(imp.idMap.categories).includes(id)) ? id : id);
   assert.equal(catTitles.length, 6);
   const orderB = (await Promise.all(packB.categoryIds.map(async (id: string) => (await b.get('/categories/' + id)).data.title)));
@@ -98,7 +98,7 @@ test('Transfer Online -> Lokal: vollständiger Spieleabend inkl. eigener Glitch-
   const zone = (host.view!.round!.data.zones as any[])[0]; assert.ok(zone, 'Host kennt die Trefferzone');
   await pcs[0].act({ k: 'submit', payload: { x: zone.x, y: zone.y } });               // Treffer
   await pcs[1].act({ k: 'submit', payload: { x: 20, y: 20 } });                        // Fehlschuss
-  await host.act({ k: 'h.reveal' }); await host.waitFor(v => v.round?.stage === 'reveal');
+  await host.act({ k: 'h.reveal' }); for (const gr of (host.view!.round?.data?.groups ?? [])) if (gr.state === 'unknown') await host.act({ k: 'h.review', groupKey: gr.key, decision: 'invalid' }); await host.act({ k: 'h.reveal' }); await host.waitFor(v => v.round?.stage === 'reveal');
   const sc = (id: string) => host.view!.players.find(p => p.id === id)!.score!;
   assert.ok(sc(ids[0]) >= 150 + 700, 'Treffer bringt 70–100 % von 1000 Punkten'); assert.equal(sc(ids[1]), 150); assert.equal(sc(ids[2]), 150);
   assert.match(host.view!.round!.reveal.explain, /Beta hat 2 Siege/);

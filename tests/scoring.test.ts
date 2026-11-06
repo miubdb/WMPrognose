@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  placeFactor, GEO_TABLE, scoreGeo, rankPairs, scoreRank, scoreEstimate, estimateError, scoreGlitch, scoreCode, codeMatches,
+  placeFactor, GEO_TABLE, scoreGeo, geoFraction, geoPoints, rankPairs, scoreRank, scoreEstimate, estimateError, scoreGlitch, scoreCode, codeMatches,
   groupUnique, scoreUnique, applyClamped, matchValid, rankAscending,
 } from '../shared/scoring';
 import { haversineKm, normText, parseNumber } from '../shared/util';
@@ -26,20 +26,32 @@ test('Platzierungstabelle: 7 Spieler = 100/80/65/50/35/20/10 %', () => {
   for (let i = 1; i < six.length; i++) assert.ok(six[i] < six[i - 1]);
 });
 
-test('Geo: Gleichstand bekommt gleichen Platz, fehlende Abgabe = 0, Karte egal', () => {
+test('Geo: Punkte hängen nur von der Entfernung ab (nicht von Mitspielern/Rang), stetig fallend, Treffer = volle Punkte', () => {
   const ans = { lat: 50, lon: 10 };
-  const g = {
-    a: { lat: 50, lon: 10 }, b: { lat: 51, lon: 10 }, c: { lat: 49, lon: 10 }, // b und c praktisch gleich weit (111 km)
-    d: { lat: 0, lon: 0 },
-  };
-  const r = scoreGeo(g, ans, 1000, 7);
-  assert.equal(r.a.place, 1); assert.equal(r.a.points, 1000);
-  assert.equal(r.b.place, 2); assert.equal(r.c.place, 2); assert.equal(r.b.points, r.c.points);
-  assert.equal(r.d.place, 4);
-  assert.equal(r.e, undefined); // nicht abgegeben → kein Eintrag → 0 Punkte
-  // identische Entfernungen → identische Punkte
-  const t = scoreGeo({ x: { lat: 50, lon: 11 }, y: { lat: 50, lon: 11 } }, ans, 250, 4);
-  assert.equal(t.x.points, t.y.points);
+  const g = { a: { lat: 50, lon: 10 }, b: { lat: 51, lon: 10 }, c: { lat: 49, lon: 10 }, d: { lat: 0, lon: 0 } };
+  const r = scoreGeo(g, ans, 1000, 7, 'germany');
+  assert.equal(r.a.points, 1000); assert.equal(r.b.points, r.c.points, 'gleiche Entfernung = gleiche Punkte');
+  assert.ok(r.a.points > r.b.points && r.b.points > r.d.points); assert.equal(r.e, undefined);
+  // unabhängig von den Mitspielern: derselbe Tipp allein oder mit anderen = dieselben Punkte
+  const alone = scoreGeo({ b: g.b }, ans, 1000, 1, 'germany'); assert.equal(alone.b.points, r.b.points);
+  const crowd = scoreGeo({ ...g, x: { lat: 50.01, lon: 10 }, y: { lat: 50.02, lon: 10 } }, ans, 1000, 7, 'germany'); assert.equal(crowd.b.points, r.b.points);
+  // zwei Spieler gleich weit entfernt in verschiedene Richtungen
+  const t = scoreGeo({ x: { lat: 50, lon: 11 }, y: { lat: 50, lon: 11 } }, ans, 250, 4); assert.equal(t.x.points, t.y.points);
+});
+
+test('Geo-Kalibrierung: Skalen für Deutschland / Europa / Welt (Prozent der Maximalpunkte)', () => {
+  const pct = (km: number, m: 'germany' | 'europe' | 'world') => Math.round(geoFraction(km, m) * 100);
+  // Deutschland (S = 200 km)
+  assert.deepEqual([0, 2, 10, 50, 100, 300, 600].map(k => pct(k, 'germany')), [100, 100, 96, 79, 61, 23, 5]);
+  // Europa (S = 700 km)
+  assert.deepEqual([0, 5, 100, 500, 1500, 3000].map(k => pct(k, 'europe')), [100, 100, 87, 49, 12, 1]);
+  // Welt (S = 2000 km)
+  assert.deepEqual([0, 15, 500, 1000, 5000, 10000].map(k => pct(k, 'world')), [100, 100, 78, 61, 8, 1]);
+  // dieselbe Entfernung zählt auf größeren Karten großzügiger
+  assert.ok(geoFraction(300, 'world') > geoFraction(300, 'europe') && geoFraction(300, 'europe') > geoFraction(300, 'germany'));
+  // monoton fallend
+  for (const m of ['germany', 'europe', 'world'] as const) { let prev = 2; for (let k = 0; k <= 20000; k += 50) { const f = geoFraction(k, m); assert.ok(f <= prev + 1e-12); prev = f; } }
+  assert.equal(geoPoints(1234, 300, 'europe'), Math.round(300 * geoFraction(1234, 'europe')));
 });
 
 test('Blind Rank: 10 Paare, Punkte anteilig', () => {
@@ -66,15 +78,33 @@ test('Setz auf mich: Schätzung relativ (log), große Zahlen nicht benachteiligt
   assert.equal(z.b.place, 1);
 });
 
-test('Glitch: Treffer, knapp daneben, Fehlschuss, keine Abgabe', () => {
-  const zones = [{ x: 500, y: 300, r: 50 }];
+test('Glitch: enge Trefferbox + Fingertoleranz, knapp daneben, Fehlschuss, keine Abgabe', () => {
+  // lange Textzeile: 300 breit, 30 hoch → Zone ist eine flache Box, kein riesiger Kreis
+  const zones = [{ x: 500, y: 300, r: 150, hw: 150, hh: 15 }];
   assert.equal(scoreGlitch({ x: 500, y: 300 }, zones, 250).points, 250);
-  const edge = scoreGlitch({ x: 540, y: 300 }, zones, 250);
-  assert.ok(edge.hit && edge.points >= 175 && edge.points < 250);
-  const near = scoreGlitch({ x: 575, y: 300 }, zones, 250);
-  assert.ok(!near.hit && near.points > 0 && near.points < 40);
+  assert.equal(scoreGlitch({ x: 640, y: 310 }, zones, 250).points, 250, 'innerhalb der Box');
+  const finger = scoreGlitch({ x: 500, y: 340 }, zones, 250);   // 25 px unter der Box – noch Fingertoleranz
+  assert.ok(finger.hit && finger.points >= 212 && finger.points < 250, String(finger.points));
+  assert.ok(!scoreGlitch({ x: 500, y: 400 }, zones, 250).hit, '100 px über/unter der Zeile ist kein Treffer (alter Kreis hätte getroffen)');
+  const near = scoreGlitch({ x: 500, y: 360 }, zones, 250);   // 45 px: knapp daneben
+  assert.ok(!near.hit && near.points > 0 && near.points < 25);
   assert.equal(scoreGlitch({ x: 900, y: 500 }, zones, 250).points, 0);
   assert.equal(scoreGlitch(undefined, zones, 250).points, 0);
+  // alte Kreiszonen funktionieren weiter
+  assert.equal(scoreGlitch({ x: 500, y: 300 }, [{ x: 500, y: 300, r: 50 }], 250).points, 250);
+  assert.ok(scoreGlitch({ x: 580, y: 300 }, [{ x: 500, y: 300, r: 50 }], 250).hit);
+});
+
+test('Glitch: alle mitgelieferten Szenen – Zonen eng, plausibel und lesbar', () => {
+  for (const [id, sc] of Object.entries(SCENES)) {
+    const zs = diffZones(sc); assert.equal(zs.length, Object.keys(sc.changes).length, id);
+    for (const z of zs) {
+      assert.ok(z.hw! >= 18 && z.hh! >= 18, id + ' Mindestgröße'); assert.ok(z.hw! <= 260 && z.hh! <= 120, `${id}: Zone zu groß (${z.hw}×${z.hh})`);
+      assert.ok(z.x - z.hw! >= -5 && z.x + z.hw! <= 1005 && z.y - z.hh! >= -5 && z.y + z.hh! <= 605, id + ' innerhalb des Bildes');
+      assert.equal(scoreGlitch({ x: z.x, y: z.y }, zs, 100).points, 100, id + ' Mitte trifft');
+      assert.ok(!scoreGlitch({ x: z.x + z.hw! + 140, y: z.y + z.hh! + 140 }, zs, 100).hit, id + ' weit daneben trifft nicht');
+    }
+  }
 });
 
 test('Codebreak: Hinweise reduzieren, Normalisierung', () => {
@@ -170,10 +200,25 @@ test('Glitch-Szenen: Änderungen sind exakt, Zonen innerhalb der Szene', () => {
     assert.ok(scene, task.scene);
     const zones = glitchZones(task);
     assert.ok(zones.length >= 1, task.scene);
-    for (const z of zones) assert.ok(z.x > 0 && z.x < 1000 && z.y > 0 && z.y < 600 && z.r >= 40);
+    for (const z of zones) assert.ok(z.x > 0 && z.x < 1000 && z.y > 0 && z.y < 600 && z.hw! >= 18);
     // Jede Änderung verändert die Szene tatsächlich
     const a = JSON.stringify(variantItems(scene, 'a')), b = JSON.stringify(variantItems(scene, 'b'));
     assert.notEqual(a, b);
     assert.equal(diffZones(scene).length, Object.keys(scene.changes).length);
   }
+});
+
+test('Einzigartig: vorsichtige Tippfehlererkennung – ähnliche gültige Begriffe werden nie zusammengeführt, Showmaster sieht Auto-Treffer', () => {
+  const valid = [{ name: 'Kamerun', variants: [] }, { name: 'Kamerum', variants: [] }, { name: 'Spanien', variants: ['Espana'] }, { name: 'Schweden', variants: [] }];
+  assert.equal(matchValid('Kamerin', valid), null, 'ähnliche gültige Begriffe → nie automatisch zusammenführen');
+  assert.equal(matchValid('Kamerux', valid), null);
+  assert.equal(matchValid('kamerum', valid), 'Kamerum', 'exakte Schreibweise bleibt automatisch');
+  assert.equal(matchValid('Spanein', valid), 'Spanien', 'eindeutiger Tippfehler, gleicher Anfangsbuchstabe');
+  assert.equal(matchValid('Pani', valid), null); assert.equal(matchValid('Weden', valid), null, 'zu kurz / anderer Anfangsbuchstabe');
+  const g = groupUnique({ a: 'Spanien', b: 'Spanein', c: 'Peruu' }, valid);
+  const sp = g.find(x => x.label === 'Spanien')!; assert.deepEqual(sp.members.sort(), ['a', 'b']); assert.deepEqual(sp.auto, ['b']);
+  assert.equal(g.find(x => x.state === 'unknown')!.members[0], 'c');
+  // Showmaster widerspricht dem Auto-Treffer: Eingabe wird getrennt behandelt
+  const g2 = groupUnique({ a: 'Spanien', b: 'Spanein' }, valid, { 'u:spanein': 'invalid' });
+  assert.equal(scoreUnique(g2, 500, 150).a.points, 500); assert.equal(scoreUnique(g2, 500, 150).b.kind, 'invalid');
 });

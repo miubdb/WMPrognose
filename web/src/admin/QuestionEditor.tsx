@@ -28,7 +28,7 @@ export function newTask(mode: Mode): any {
     case 'glitch': return { mode, prompt: '', viewPrompt: 'Merk dir das Bild!', scene: '', viewSeconds: 12, seconds: 25, points: 250, explain: '' };
     case 'codebreak': return { mode, prompt: '', display: '', input: 'number', answers: [], hints: ['', '', ''], seconds: 90, points: 300, explain: '' };
     case 'match': return { mode, prompt: '', pairs: [0, 1, 2, 3, 4, 5].map(() => ({ left: '', right: '' })), order: [2, 4, 0, 5, 1, 3], seconds: 60, points: 300, explain: '' };
-    case 'link': return { mode, prompt: 'Was oder wer wird gesucht?', clues: ['', '', '', ''], answer: '', accept: [], clueSeconds: 12, points: 300, explain: '' };
+    case 'link': return { mode, prompt: 'Was oder wer wird gesucht?', clues: ['', '', '', ''], answer: '', accept: [], clueSeconds: 20, points: 300, explain: '' };
     case 'unique': return { mode, prompt: '', placeholder: '', valid: [0, 1, 2].map(() => ({ name: '', variants: [] })), seconds: 45, pointsUnique: 500, pointsShared: 150, explain: '' };
   }
 }
@@ -147,7 +147,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
               <Field label="Länge (lon)"><input inputMode="decimal" value={task.answer.lon} onChange={e => set('answer', { ...task.answer, lon: e.target.value })} /></Field>
               {sec('Zeit (Sek.)', 'seconds')}{sec('Punkte', 'points')}
             </>}
-            {m === 'rank' && <>{sec('Sek. pro Begriff', 'secondsPerItem')}{sec('Punkte', 'points')}</>}
+            {m === 'rank' && <>{sec('Sek. pro Begriff', 'secondsPerItem')}{sec('Punkte', 'points')}<label className="field"><span>Bedienung</span><select value={task.variant ?? 'sequence'} onChange={e => set('variant', e.target.value)}><option value="sequence">Begriffe nacheinander (klassisch)</option><option value="sort">Alle fünf sichtbar & sortieren</option></select></label></>}
             {m === 'estimate' && <>{sec('Zeit zum Schätzen (Sek.)', 'seconds')}{sec('Zeit zum Setzen (Sek.)', 'betSeconds')}{sec('Punkte', 'points')}
               <Field label="Erlaubte Einsätze (Komma, mit 0)"><input value={task.bets.join(', ')} onChange={e => set('bets', e.target.value.split(',').map((x: string) => x.trim()).filter(x => x !== ''))} /></Field></>}
             {m === 'glitch' && <>

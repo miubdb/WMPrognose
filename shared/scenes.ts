@@ -33,6 +33,9 @@ export function variantItems(scene: Scene, variant: 'a' | 'b'): Item[] {
   });
 }
 
+/** Mindestgröße (halbe Kantenlänge) kleiner Objekte, damit sie überhaupt anvisierbar sind. */
+const MIN_HALF = 18;
+
 /** Trefferzonen aus dem tatsächlichen Unterschied (Union aus A- und B-Box je geändertem Element). */
 export function diffZones(scene: Scene): GlitchZone[] {
   const a = variantItems(scene, 'a');
@@ -41,11 +44,13 @@ export function diffZones(scene: Scene): GlitchZone[] {
   for (const id of Object.keys(scene.changes)) {
     const ia = a.find(i => i.id === id);
     const ib = b.find(i => i.id === id);
-    const boxes = [ia, ib].filter(Boolean).map(i => bbox(i as Item));
+    // Getippt wird auf das, was die Spieler sehen: das veränderte Objekt in Bild B. Nur wenn es entfernt wurde, zählt die Stelle in Bild A.
+    const boxes = [ib ?? ia].filter(Boolean).map(i => bbox(i as Item));
     if (!boxes.length) continue;
     const x0 = Math.min(...boxes.map(x => x.x0)), y0 = Math.min(...boxes.map(x => x.y0));
     const x1 = Math.max(...boxes.map(x => x.x1)), y1 = Math.max(...boxes.map(x => x.y1));
-    zones.push({ x: Math.round((x0 + x1) / 2), y: Math.round((y0 + y1) / 2), r: Math.max(40, Math.round(Math.hypot(x1 - x0, y1 - y0) / 2)) });
+    const hw = Math.max(MIN_HALF, Math.round((x1 - x0) / 2)), hh = Math.max(MIN_HALF, Math.round((y1 - y0) / 2));   // enge Box um das tatsächlich veränderte Objekt
+    zones.push({ x: Math.round((x0 + x1) / 2), y: Math.round((y0 + y1) / 2), r: Math.max(hw, hh), hw, hh });
   }
   return zones;
 }

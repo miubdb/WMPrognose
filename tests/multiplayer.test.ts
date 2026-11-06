@@ -10,6 +10,7 @@ after(async () => { for (const e of envs) await e.close().catch(() => {}); });
 
 const START = 200; // Startguthaben des Standardpakets
 const geoTile = TILES.find(t => t.id === 'v2-orte-mit-geschichte')!;
+const ANS0 = (geoTile.tasks[0] as any).answer;
 
 async function pickAndBegin(s: Awaited<ReturnType<typeof setupShow>>, tileId: string) {
   const v = await s.host.waitFor(x => x.room.phase === 'wall', 3000, 'wall');
@@ -72,16 +73,16 @@ test('A1–A20: Raum, Lobby, 6 echte Clients, Kategorienwand, Geo-Runde, Wertung
   const rev = await s.tv.waitFor(v => v.round?.stage === 'reveal');
   const g = rev.round!.reveal.guesses as any[];
   assert.equal(g.length, 5);
-  assert.equal(g[0].pid, s.ids[0]); assert.equal(g[0].points, 200);
+  assert.equal(g[0].pid, s.ids[0]); assert.equal(g[0].points, (geoTile.tasks[0] as any).points);
   assert.equal(g[0].km, 0);
   // Punkte serverseitig gespeichert, Rangliste aktuell
-  const me = await s.players[0].waitFor(v => v.me?.score === START + 200);
+  const me = await s.players[0].waitFor(v => v.me?.score === START + (geoTile.tasks[0] as any).points);
   assert.equal(me.me!.rank, 1);
   const p6 = s.players[5].view!.me!;
   assert.equal(p6.score, START);
   // Doppelte Auflösung erzeugt keine doppelten Punkte
   assert.ok((await s.host.act({ k: 'h.reveal' })).ok);
-  assert.equal(s.host.view!.players.find(p => p.id === s.ids[0])!.score, START + 200);
+  assert.equal(s.host.view!.players.find(p => p.id === s.ids[0])!.score, START + (geoTile.tasks[0] as any).points);
   // weiter: nächste Aufgabe derselben Kachel
   assert.ok((await s.host.act({ k: 'h.next' })).ok);
   const nxt = await s.tv.waitFor(v => v.round?.taskIndex === 1);
@@ -99,16 +100,16 @@ test('Doppelte Antwortübertragung: gleiche reqId und gleicher Inhalt → keine 
   const s = await setupShow(e, 3);
   await pickAndBegin(s, geoTile.id);
   const p = s.players[0];
-  const r1 = await p.act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } }, 'REQ-1');
-  const r2 = await p.act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } }, 'REQ-1'); // identische reqId
-  const r3 = await p.act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } }); // neue reqId, gleicher Inhalt
+  const r1 = await p.act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } }, 'REQ-1');
+  const r2 = await p.act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } }, 'REQ-1'); // identische reqId
+  const r3 = await p.act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } }); // neue reqId, gleicher Inhalt
   const r4 = await p.act({ k: 'submit', payload: { lat: 10, lon: 10 } }); // anderer Inhalt → abgelehnt
   assert.ok(r1.ok && !r1.dup); assert.ok(r2.ok && r2.dup); assert.ok(r3.ok && r3.dup);
   assert.equal(r4.ok, false); assert.equal(r4.err, 'already_submitted');
   await s.host.act({ k: 'h.reveal' });
   await s.host.waitFor(v => v.round?.stage === 'reveal');
   const sc = s.host.view!.players.find(x => x.id === s.ids[0])!.score;
-  assert.equal(sc, START + 200);
+  assert.equal(sc, START + (geoTile.tasks[0] as any).points);
   assert.equal(s.host.view!.host!.scoreLog.filter(x => x.pid === s.ids[0] && x.key !== 'start').length, 1);
   closeAll(s);
 });
@@ -140,13 +141,13 @@ test('Verbindungsausfall NACH bestätigter Abgabe: Antwort bleibt gültig, Wiede
   const e = await env();
   const s = await setupShow(e, 3);
   await pickAndBegin(s, geoTile.id);
-  const ack = await s.players[0].act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } });
+  const ack = await s.players[0].act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } });
   assert.ok(ack.ok);
   s.players[0].disconnect();
   await s.host.act({ k: 'h.reveal' });
   const p2 = new Client(e, 'player', s.code, s.tokens[0]); await p2.connect();
   await p2.waitFor(v => v.round?.stage === 'reveal');
-  assert.equal(p2.view!.me!.score, START + 200);
+  assert.equal(p2.view!.me!.score, START + (geoTile.tasks[0] as any).points);
   closeAll(s); p2.disconnect();
 });
 
@@ -155,7 +156,7 @@ test('Wiederverbindung NACH Fristablauf: keine nachträgliche Abgabe; Frist wird
   const s = await setupShow(e, 3);
   await pickAndBegin(s, geoTile.id);
   s.players[2].disconnect();
-  e.clock.now += 41_000; // Server-Uhr springt über die Frist (40 s)
+  e.clock.now += 61_000; // Server-Uhr springt über die Frist (60 s)
   await s.host.waitFor(v => v.round?.stage === 'locked', 3000, 'auto lock');
   const p2 = new Client(e, 'player', s.code, s.tokens[2]); await p2.connect();
   assert.equal(p2.view!.round!.stage, 'locked');
@@ -171,15 +172,15 @@ test('Pause friert den Countdown ein; Zeit verlängern; Fortsetzen', async () =>
   e.clock.now += 10_000;
   await s.host.act({ k: 'h.pause', paused: true });
   const v = await s.tv.waitFor(x => x.round?.pausedLeft != null);
-  assert.equal(v.round!.pausedLeft, 20_000); assert.equal(v.round!.deadline, null);
-  e.clock.now += 120_000; // viel Zeit vergeht → keine Sperre
+  assert.equal(v.round!.pausedLeft, 50_000); assert.equal(v.round!.deadline, null);
+  e.clock.now += 150_000; // viel Zeit vergeht → keine Sperre
   await new Promise(r => setTimeout(r, 150));
   assert.equal(s.tv.view!.round!.stage, 'open');
   await s.host.act({ k: 'h.pause', paused: false });
   const v2 = await s.tv.waitFor(x => x.round?.deadline != null);
-  assert.equal(v2.round!.deadline, e.clock.now + 20_000);
+  assert.equal(v2.round!.deadline, e.clock.now + 50_000);
   await s.host.act({ k: 'h.addTime', seconds: 20 });
-  const v3 = await s.tv.waitFor(x => x.round?.deadline === e.clock.now + 40_000);
+  const v3 = await s.tv.waitFor(x => x.round?.deadline === e.clock.now + 70_000);
   assert.ok(v3);
   closeAll(s);
 });
@@ -227,15 +228,15 @@ test('Gerätewechsel: Wiederherstellungscode übernimmt Identität (Avatar, Punk
   const e = await env();
   const s = await setupShow(e, 3);
   await pickAndBegin(s, geoTile.id);
-  await s.players[0].act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } });
+  await s.players[0].act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } });
   await s.host.act({ k: 'h.reveal' });
-  await s.players[0].waitFor(v => v.me?.score === START + 200);
+  await s.players[0].waitFor(v => v.me?.score === START + (geoTile.tasks[0] as any).points);
   const wrong = await post(e, `/api/rooms/${s.code}/recover`, { code: 'ZZZZZZ' });
   assert.equal(wrong.status, 400);
   const rec = await post(e, `/api/rooms/${s.code}/recover`, { code: s.recov[0].toLowerCase() });
   assert.equal(rec.status, 200); assert.equal(rec.body.playerId, s.ids[0]);
   const n = new Client(e, 'player', s.code, rec.body.token); await n.connect();
-  assert.equal(n.view!.me!.score, START + 200);
+  assert.equal(n.view!.me!.score, START + (geoTile.tasks[0] as any).points);
   assert.equal(n.view!.players.length, 3);
   await s.players[0].waitFor(() => s.players[0].kicked === 'replaced' || s.players[0].closed, 2000);
   // altes Token ist ungültig
@@ -264,11 +265,11 @@ test('Fehlende Spielerantwort = 0 Punkte; Host-Korrektur (auch negativ, nie unte
   const e = await env();
   const s = await setupShow(e, 3);
   await pickAndBegin(s, geoTile.id);
-  await s.players[0].act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } });
+  await s.players[0].act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } });
   await s.host.act({ k: 'h.reveal' });
   await s.host.waitFor(v => v.round?.stage === 'reveal');
   const score = (i: number) => s.host.view!.players.find(p => p.id === s.ids[i])!.score;
-  assert.equal(score(0), START + 200); assert.equal(score(1), START); assert.equal(score(2), START);
+  assert.equal(score(0), START + (geoTile.tasks[0] as any).points); assert.equal(score(1), START); assert.equal(score(2), START);
   await s.host.act({ k: 'h.adjust', pid: s.ids[1], delta: 100, note: 'Verbindungsproblem' });
   await s.host.waitFor(v => v.players.find(p => p.id === s.ids[1])!.score === START + 100);
   await s.host.act({ k: 'h.adjust', pid: s.ids[1], delta: -500, note: 'Test' });
@@ -280,7 +281,7 @@ test('Fehlende Spielerantwort = 0 Punkte; Host-Korrektur (auch negativ, nie unte
   await s.host.waitFor(v => v.round?.stage === 'intro');
   assert.equal(score(0), START);
   await s.host.act({ k: 'h.begin' });
-  const r = await s.players[0].act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } });
+  const r = await s.players[0].act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } });
   assert.ok(r.ok, 'nach Neustart kann erneut abgegeben werden');
   closeAll(s);
 });
@@ -289,7 +290,7 @@ test('Serverneustart: Raum, Spieler, Punkte, Phase und Timer werden aus SQLite w
   const e1 = await startEnv();
   const s = await setupShow(e1, 3);
   await pickAndBegin(s, geoTile.id);
-  await s.players[0].act({ k: 'submit', payload: { lat: 16.7735, lon: -3.0074 } });
+  await s.players[0].act({ k: 'submit', payload: { lat: ANS0.lat, lon: ANS0.lon } });
   const deadline = s.tv.view!.round!.deadline;
   const code = s.code, tokens = s.tokens, hostKey = s.hostKey, ids = s.ids;
   closeAll(s);
@@ -303,12 +304,12 @@ test('Serverneustart: Raum, Spieler, Punkte, Phase und Timer werden aus SQLite w
   assert.equal(h.view!.round!.deadline, deadline);
   const p = new Client(e2, 'player', code, tokens[0]); await p.connect();
   assert.equal(p.view!.me!.id, ids[0]);
-  assert.deepEqual(p.view!.round!.data.mine, { lat: 16.7735, lon: -3.0074 }); // bestätigte Antwort bleibt erhalten
+  assert.deepEqual(p.view!.round!.data.mine, { lat: ANS0.lat, lon: ANS0.lon }); // bestätigte Antwort bleibt erhalten
   const p2 = new Client(e2, 'player', code, tokens[1]); await p2.connect();
   assert.ok((await p2.act({ k: 'submit', payload: { lat: 3, lon: 3 } })).ok);
   await h.act({ k: 'h.reveal' });
   await h.waitFor(v => v.round?.stage === 'reveal');
-  assert.equal(h.view!.players.find(x => x.id === ids[0])!.score, START + 200);
+  assert.equal(h.view!.players.find(x => x.id === ids[0])!.score, START + (geoTile.tasks[0] as any).points);
   assert.equal(e2.app.store.eventCount(code) > 0, true);
   h.disconnect(); p.disconnect(); p2.disconnect();
 });

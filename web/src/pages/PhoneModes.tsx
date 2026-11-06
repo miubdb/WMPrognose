@@ -126,7 +126,37 @@ function GeoPhone({ round, act, room, d }: Props & { d: any }) {
 }
 
 // ---------------------------------------------------------------- RANK
-function RankPhone({ round, act, d, view, pid }: Props & { d: any }) {
+function RankSortPhone({ round, act, d }: Props & { d: any }) {
+  const snd = useSender(act);
+  const pool: { idx: number; text: string }[] = d.pool ?? [];
+  const [order, setOrder] = useState<number[]>(() => pool.map(p => p.idx));
+  const sent = !!(d.mine && d.mine.some((x: string | null) => x));
+  useEffect(() => { if (!sent && pool.length && order.length !== pool.length) setOrder(pool.map(p => p.idx)); /* eslint-disable-next-line */ }, [pool.length]);
+  const text = (i: number) => pool.find(p => p.idx === i)?.text ?? '';
+  const move = (pos: number, dir: -1 | 1) => setOrder(o => { const n = o.slice(); const q = pos + dir; if (q < 0 || q >= n.length) return o; [n[pos], n[q]] = [n[q], n[pos]]; return n; });
+  if (round.stage !== 'open' || sent) return (
+    <div className="rank"><div className="question">{d.prompt}</div>
+      <div className="slots"><small className="edge">▲ {d.topLabel}</small>{(d.mine ?? []).map((t: string | null, i: number) => <div key={i} className="slot filled"><b>{i + 1}</b><span>{t ?? '—'}</span></div>)}<small className="edge">▼ {d.bottomLabel}</small></div>
+      {sent ? <div className="status ok">✓ Abgegeben – endgültig</div> : <Waiting text="Zeit abgelaufen" sub="Gleich kommt die Auflösung." />}</div>
+  );
+  return (
+    <div className="rank">
+      <div className="question">{d.prompt}</div>
+      <p className="muted center small">Bringe alle fünf Begriffe in die richtige Reihenfolge – mit ▲ ▼ verschieben, dann abgeben (endgültig).</p>
+      <div className="slots"><small className="edge">▲ {d.topLabel}</small>
+        {order.map((idx, pos) => (
+          <div key={idx} className="slot filled sortrow"><b>{pos + 1}</b><span>{text(idx)}</span>
+            <button type="button" className="mv" aria-label="nach oben" disabled={pos === 0} onClick={() => move(pos, -1)}>▲</button>
+            <button type="button" className="mv" aria-label="nach unten" disabled={pos === order.length - 1} onClick={() => move(pos, 1)}>▼</button></div>
+        ))}
+        <small className="edge">▼ {d.bottomLabel}</small></div>
+      <Status sent={false} draft={false} sending={snd.state === 'sending'} msg={snd.msg} />
+      <button className="btn primary wide" disabled={snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { order } })}>Reihenfolge abgeben – endgültig</button>
+    </div>
+  );
+}
+function RankPhone(p: Props & { d: any }) { return p.d.variant === 'sort' ? <RankSortPhone {...p} /> : <RankSeqPhone {...p} />; }
+function RankSeqPhone({ round, act, d, view, pid }: Props & { d: any }) {
   const snd = useSender(act);
   const [sel, setSel] = useState<number | null>(null);
   useEffect(() => { setSel(null); snd.reset(); /* eslint-disable-next-line */ }, [d.step]);
@@ -164,6 +194,20 @@ function SlotList({ d, mine, sel, onSel }: { d: any; mine: (string | null)[]; se
 }
 
 // ---------------------------------------------------------------- ESTIMATE
+/** Übersicht der Wette: Punktestand, Einsatz, Guthaben, möglicher Gewinn/Verlust, Ziel. */
+function BetBox({ d, view, amount, target, placed }: { d: any; view: any; amount: number; target: string | null; placed?: boolean }) {
+  const have = d.balance ?? 0; const who = view.players.find((x: any) => x.id === target)?.name;
+  return (
+    <div className="betbox">
+      <span>Dein Punktestand</span><b>{have.toLocaleString('de-DE')}</b>
+      <span>{placed ? 'Dein Einsatz' : 'Gewählter Einsatz'}</span><b>{amount > 0 ? amount : 'keiner'}</b>
+      <span>Verfügbares Guthaben</span><b>{have.toLocaleString('de-DE')}</b>
+      <span>Setzt auf</span><b>{amount > 0 ? (who ?? '— bitte Spieler wählen') : '—'}</b>
+      {amount > 0 && <span className="wide">Gewinn: <b>+{amount}</b> · Verlust: <b>−{Math.min(amount, have)}</b> (nie unter 0)</span>}
+      {amount === 0 && <span className="wide muted">Ohne Einsatz kannst du nichts gewinnen oder verlieren.</span>}
+    </div>
+  );
+}
 function EstimatePhone({ round, act, room, d, view, pid }: Props & { d: any }) {
   const snd = useSender(act);
   const mine = d.mine ?? {};
@@ -181,7 +225,7 @@ function EstimatePhone({ round, act, room, d, view, pid }: Props & { d: any }) {
             <Status sent={false} draft={!!draft} sending={snd.state === 'sending'} msg={snd.msg} />
             <button className="btn primary wide" disabled={!draft.trim() || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { value: draft } })}>Schätzung abgeben</button>
           </>
-        ) : <><Status sent draft={false} /><div className="bignum">{mine.guess.toLocaleString('de-DE')} <small>{d.unit}</small></div><p className="muted center">Warte auf die anderen …</p></>}
+        ) : <><Status sent draft={false} /><div className="bignum">{mine.guess.toLocaleString('de-DE')} <small>{d.unit}</small></div><p className="muted center">Warte auf die anderen … ({d.guessedCount} von {d.total} haben geschätzt)</p></>}
       </div>
     );
   }
@@ -208,14 +252,14 @@ function EstimatePhone({ round, act, room, d, view, pid }: Props & { d: any }) {
             <div className="chips">{d.bets.map((b: number) => (
               <button type="button" key={b} disabled={b > (d.allowance ?? d.balance ?? 0)} className={`chipbtn ${amount === b ? 'sel' : ''}`} onClick={() => setAmount(b)}>{b === 0 ? 'Kein Einsatz' : `${b} Punkte`}</button>
             ))}</div>
-            <p className="muted center small">Du hast {(d.balance ?? 0).toLocaleString('de-DE')} Punkte. Gewonnen: +Einsatz. Verloren: −Einsatz, höchstens so viel, wie du besitzt (nie unter 0).</p>
+            <BetBox d={d} view={view} amount={amount} target={target} />
             <button className="btn primary wide" disabled={snd.state === 'sending' || (amount > 0 && !target)}
               onClick={() => snd.send({ k: 'submit', payload: { amount, target: amount > 0 ? target : null } })}>
               {amount === 0 ? 'Ohne Einsatz weiter' : `${amount} Punkte setzen`}
             </button>
             <Status sent={false} draft={false} sending={snd.state === 'sending'} msg={snd.msg} />
           </>
-        ) : <Status sent draft={false} />}
+) : <><BetBox d={d} view={view} amount={placed.amount} target={placed.target} placed /><Status sent draft={false} /></>}
       </div>
     );
   }
@@ -402,6 +446,12 @@ function PhoneReveal({ round, view, pid }: Props) {
       <div className={`pts ${info.points > 0 ? 'pos' : info.points < 0 ? 'neg' : ''}`}>{info.points > 0 ? '+' : ''}{info.points}</div>
       <p>{info.text}</p>
       {round.mode === 'match' && rev?.rows && <div className="mreveal">{rev.pairs.map((pr: any, i: number) => { const r = rev.rows.find((x: any) => x.pid === pid); return <div key={i} className={`mr ${r?.marks?.[i] ? 'ok' : 'no'}`}>{r?.marks?.[i] ? '✓' : '✗'} {pr.left} → <b>{pr.right}</b></div>; })}</div>}
+      {round.mode === 'rank' && rev && (() => { const r = rev.rows.find((x: any) => x.pid === pid); if (!r || !r.placed) return null; return (
+        <div className="pairs">
+          <p className="small">Gewertet wird jedes Begriffspaar (10 Vergleiche, je {rev.perPair} P.): Steht von zwei Begriffen der richtige weiter oben?</p>
+          {r.pairs.map((pr: any, i: number) => <div key={i} className={`pr ${pr.ok ? 'ok' : 'no'}`}>{pr.ok ? '✓' : '✗'} {rev.items[pr.a].text} <i>vor</i> {rev.items[pr.b].text}</div>)}
+          <p><b>{r.correct} von {r.total} richtig → {r.points} Punkte</b></p>
+        </div>); })()}
       {round.mode === 'link' && rev && <p><b>Lösung: {rev.answer}</b></p>}
       <p className="muted small">{rev?.explain}</p>
     </div>
@@ -411,7 +461,7 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
   const none = { points: 0, title: 'Auflösung', text: 'Keine Abgabe – 0 Punkte.' };
   if (!rev) return none;
   switch (mode) {
-    case 'geo': { const g = rev.guesses.find((x: any) => x.pid === pid); return g ? { points: g.points, title: `Platz ${g.place}`, text: `${g.km.toLocaleString('de-DE')} km daneben` } : none; }
+    case 'geo': { const g = rev.guesses.find((x: any) => x.pid === pid); return g ? { points: g.points, title: `${g.km.toLocaleString('de-DE')} km entfernt`, text: `${g.points} Punkte` } : none; }
     case 'rank': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.placed ? { points: r.points, title: 'Blind Rank', text: `${r.correct} von ${r.total} Paaren richtig` } : none; }
     case 'estimate': {
       const g = rev.guesses.find((x: any) => x.pid === pid); const b = rev.bets.find((x: any) => x.pid === pid);

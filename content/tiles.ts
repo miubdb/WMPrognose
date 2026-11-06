@@ -21,16 +21,16 @@ export const TILES: TileDef[] = [
   {
     id: 'v2-heimspiel', title: 'Heimspiel', topic: 'Fußball-Orte', icon: '🏟️', color: GR, mode: 'geo', kind: 'tile', football: true, blurb: GEO_BLURB,
     tasks: [
-      { mode: 'geo', map: 'germany', seconds: 30, points: 200, prompt: 'Wo steht die Allianz Arena?',
+      { mode: 'geo', map: 'germany', seconds: 60, points: 200, prompt: 'Wo steht die Allianz Arena?',
         answer: { lat: 48.2188, lon: 11.6247, label: 'Allianz Arena, München' },
         explain: 'Die Allianz Arena steht im Münchner Norden, in Fröttmaning, direkt an der Autobahn A9.' },
-      { mode: 'geo', map: 'europe', seconds: 35, points: 250, prompt: 'Wo fand das Champions-League-Finale 2025 zwischen Paris Saint-Germain und Inter Mailand statt?',
+      { mode: 'geo', map: 'europe', seconds: 60, points: 250, prompt: 'Wo fand das Champions-League-Finale 2025 zwischen Paris Saint-Germain und Inter Mailand statt?',
         answer: { lat: 48.2188, lon: 11.6247, label: 'Allianz Arena, München' },
         explain: 'Wieder die Allianz Arena! Dort gewann PSG am 31. Mai 2025 mit 5:0 – der höchste Sieg in einem Champions-League-Finale.' },
-      { mode: 'geo', map: 'europe', seconds: 35, points: 250, prompt: 'Wo liegt Bodø, die Heimat des norwegischen Klubs Bodø/Glimt?',
+      { mode: 'geo', map: 'europe', seconds: 60, points: 250, prompt: 'Wo liegt Bodø, die Heimat des norwegischen Klubs Bodø/Glimt?',
         answer: { lat: 67.2804, lon: 14.4049, label: 'Bodø, Norwegen' },
         explain: 'Bodø liegt in Nordnorwegen, rund 80 km nördlich des Polarkreises – hier wird im Winter bei Dunkelheit und im Sommer bei Mitternachtssonne gespielt.' },
-      { mode: 'geo', map: 'world', seconds: 40, points: 300, prompt: '1930 fand die allererste Fußball-Weltmeisterschaft statt. Wo stand das Finalstadion, das Estadio Centenario?',
+      { mode: 'geo', map: 'world', seconds: 60, points: 300, prompt: '1930 fand die allererste Fußball-Weltmeisterschaft statt. Wo stand das Finalstadion, das Estadio Centenario?',
         answer: { lat: -34.8946, lon: -56.1527, label: 'Montevideo, Uruguay' },
         explain: 'Das Estadio Centenario in Montevideo wurde zum 100. Jahrestag der uruguayischen Verfassung gebaut. Im Finale gewann Gastgeber Uruguay 4:2 gegen Argentinien.' },
     ],
@@ -113,16 +113,16 @@ export const TILES: TileDef[] = [
   {
     id: 'v2-orte-mit-geschichte', title: 'Orte mit Geschichte', topic: 'Märchen, Metal & Weihnachtsmann', icon: '🧭', color: TE, mode: 'geo', kind: 'tile', football: false, blurb: GEO_BLURB,
     tasks: [
-      { mode: 'geo', map: 'germany', seconds: 30, points: 200, prompt: 'Wo steht Schloss Neuschwanstein, das Vorbild für das Märchenschloss von Disney?',
+      { mode: 'geo', map: 'germany', seconds: 60, points: 200, prompt: 'Wo steht Schloss Neuschwanstein, das Vorbild für das Märchenschloss von Disney?',
         answer: { lat: 47.5576, lon: 10.7498, label: 'Schloss Neuschwanstein, Allgäu' },
         explain: 'Neuschwanstein steht bei Füssen im Allgäu, direkt an der Grenze zu Österreich. König Ludwig II. ließ es ab 1869 bauen.' },
-      { mode: 'geo', map: 'germany', seconds: 35, points: 250, prompt: 'Ein Dorf mit rund 2.000 Einwohnern, in dem einmal im Jahr bis zu 85.000 Metal-Fans feiern: Wo liegt Wacken?',
+      { mode: 'geo', map: 'germany', seconds: 60, points: 250, prompt: 'Ein Dorf mit rund 2.000 Einwohnern, in dem einmal im Jahr bis zu 85.000 Metal-Fans feiern: Wo liegt Wacken?',
         answer: { lat: 54.02, lon: 9.3775, label: 'Wacken, Schleswig-Holstein' },
         explain: 'Wacken liegt im Kreis Steinburg in Schleswig-Holstein, nordwestlich von Itzehoe – mitten im flachen Land.' },
-      { mode: 'geo', map: 'europe', seconds: 35, points: 250, prompt: 'Hier wohnt – offiziell – der Weihnachtsmann: Wo liegt das Santa-Claus-Dorf bei Rovaniemi?',
+      { mode: 'geo', map: 'europe', seconds: 60, points: 250, prompt: 'Hier wohnt – offiziell – der Weihnachtsmann: Wo liegt das Santa-Claus-Dorf bei Rovaniemi?',
         answer: { lat: 66.5436, lon: 25.8473, label: 'Rovaniemi, Finnland' },
         explain: 'Rovaniemi liegt in Finnisch-Lappland, genau am Polarkreis. Das Weihnachtsmanndorf erhält jedes Jahr hunderttausende Besucher.' },
-      { mode: 'geo', map: 'world', seconds: 40, points: 300, prompt: 'Timbuktu klingt wie ein Ort aus dem Märchen – aber es gibt ihn wirklich. Wo liegt die Stadt?',
+      { mode: 'geo', map: 'world', seconds: 60, points: 300, prompt: 'Timbuktu klingt wie ein Ort aus dem Märchen – aber es gibt ihn wirklich. Wo liegt die Stadt?',
         answer: { lat: 16.7735, lon: -3.0074, label: 'Timbuktu, Mali' },
         explain: 'Timbuktu liegt im Norden von Mali, am südlichen Rand der Sahara – und war im Mittelalter ein Zentrum des Handels und der Gelehrsamkeit.' },
     ],
@@ -156,7 +156,7 @@ export const TILES: TileDef[] = [
     id: 'v2-wer-oder-was', title: 'Wer oder was?', topic: 'Die gemeinsame Lösung', icon: '🔗', color: BL, mode: 'link', kind: 'tile', football: false,
     blurb: 'Vier Hinweise erscheinen nacheinander – alle führen zur selben Lösung. Je früher du sie nennst, desto mehr Punkte (300 / 225 / 150 / 75). Du hast nur einen Versuch!',
     tasks: [
-      { mode: 'link', prompt: 'Welcher Ort wird gesucht?', clueSeconds: 12, points: 300,
+      { mode: 'link', prompt: 'Welcher Ort wird gesucht?', clueSeconds: 20, points: 300,
         clues: [
           'Unsichtbar unter ihr steckt ein riesiger Wald aus Holzpfählen im Schlamm – ohne ihn würde sie versinken.',
           'Ihre berühmteste Straße ist ein rund 3,8 Kilometer langer, S-förmiger Wasserlauf.',
@@ -164,7 +164,7 @@ export const TILES: TileDef[] = [
           'Man fährt Gondel und die Seufzerbrücke führt zum Dogenpalast.',
         ], answer: 'Venedig', accept: ['Venice', 'Venezia'],
         explain: 'Venedig steht auf Holzpfählen in der Lagune. Der Canal Grande ist rund 3,8 km lang; die Seufzerbrücke verbindet Dogenpalast und Gefängnis.' },
-      { mode: 'link', prompt: 'Welcher Alltagsgegenstand wird gesucht?', clueSeconds: 12, points: 300,
+      { mode: 'link', prompt: 'Welcher Alltagsgegenstand wird gesucht?', clueSeconds: 20, points: 300,
         clues: [
           'Er entstand aus einem Fehlschlag: Ein Chemiker wollte 1968 einen besonders starken Kleber – und erfand das Gegenteil.',
           'Ein Kollege suchte Lesezeichen, die im Gesangbuch halten, ohne beim Umblättern herauszufallen.',
@@ -172,7 +172,7 @@ export const TILES: TileDef[] = [
           'Er klebt an Monitoren und Kühlschranktüren und lässt sich einfach wieder abziehen.',
         ], answer: 'Post-it', accept: ['Haftnotiz', 'Haftnotizen', 'Haftzettel', 'Klebezettel', 'Post it'],
         explain: '3M-Chemiker Spencer Silver entwickelte 1968 einen Kleber, der kaum haftete. Kollege Art Fry erkannte Jahre später den Nutzen – für sein Gesangbuch im Kirchenchor.' },
-      { mode: 'link', prompt: 'Welche Person wird gesucht?', clueSeconds: 12, points: 300,
+      { mode: 'link', prompt: 'Welche Person wird gesucht?', clueSeconds: 20, points: 300,
         clues: [
           'Ihre Notizbücher aus dem 19. Jahrhundert lagern bis heute in Bleikisten, weil sie noch immer strahlen.',
           'Als erste Person überhaupt gewann sie zwei Nobelpreise.',
@@ -223,10 +223,10 @@ export const TILES: TileDef[] = [
     id: 'v2-final', title: 'FINAL LOCK', topic: 'Das große Finale', icon: '🔒', color: GO, mode: 'geo', kind: 'final', football: false,
     blurb: 'Vier Aufgaben, 2.000 Punkte, die Rangliste bleibt verborgen. Erst bei der Siegerehrung zeigt sich, wer wirklich vorne liegt.',
     tasks: [
-      { mode: 'geo', map: 'world', seconds: 45, points: 400, prompt: 'Der abgelegenste dauerhaft bewohnte Ort der Welt: Wo liegt die Insel Tristan da Cunha?',
+      { mode: 'geo', map: 'world', seconds: 60, points: 400, prompt: 'Der abgelegenste dauerhaft bewohnte Ort der Welt: Wo liegt die Insel Tristan da Cunha?',
         answer: { lat: -37.1122, lon: -12.2822, label: 'Tristan da Cunha, Südatlantik' },
         explain: 'Tristan da Cunha liegt mitten im Südatlantik: rund 2.400 km bis zur nächsten bewohnten Insel (St. Helena) und gut 2.700 km bis Kapstadt. Nur per Schiff erreichbar, etwa 250 Einwohner.' },
-      { mode: 'link', prompt: 'Welches Spiel wird gesucht?', clueSeconds: 12, points: 300,
+      { mode: 'link', prompt: 'Welches Spiel wird gesucht?', clueSeconds: 20, points: 300,
         clues: [
           'Erfunden wurde es 1984 in Moskau von einem Informatiker – ursprünglich, um einen neuen Computer zu testen.',
           'Der Name verbindet das griechische Wort für „vier“ mit einer Ballsportart.',
