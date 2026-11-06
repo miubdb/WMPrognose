@@ -32794,7 +32794,7 @@ __export(dist_exports, {
   put: () => put,
   putFromUrl: () => putFromUrl,
   putImage: () => putImage,
-  rename: () => rename,
+  rename: () => rename2,
   uploadPart: () => uploadPart2
 });
 async function del(urlOrPathname, options) {
@@ -33067,7 +33067,7 @@ async function copy(fromUrlOrPathname, toPathname, options) {
     etag: response.etag
   };
 }
-async function rename(fromUrlOrPathname, toPathname, options) {
+async function rename2(fromUrlOrPathname, toPathname, options) {
   if (!options) {
     throw new BlobError("missing options, see usage");
   }
@@ -33480,6 +33480,11 @@ function rankPairs(slots) {
   }
   return { correct, total };
 }
+function scoreRankExact(slots, budget) {
+  const n = 5;
+  const correct = slots ? slots.filter((it, i2) => it === i2).length : 0;
+  return { correct, total: n, points: Math.round(budget * correct / n) };
+}
 function scoreRank(slots, budget) {
   if (!slots) return { correct: 0, total: 10, points: 0 };
   const { correct, total } = rankPairs(slots);
@@ -33519,12 +33524,8 @@ function scoreGlitch(tap, zones, budget) {
     if (e === null || d2 < e) e = d2;
   }
   if (e === null) return { hit: false, points: 0, dist: null, accuracy: 0 };
-  if (e <= GLITCH_TOLERANCE) {
-    const accuracy = 1 - e / GLITCH_TOLERANCE;
-    return { hit: true, points: Math.round(budget * (0.85 + 0.15 * accuracy)), dist: e, accuracy };
-  }
-  if (e <= 2 * GLITCH_TOLERANCE) return { hit: false, points: Math.round(budget * 0.1 * (2 - e / GLITCH_TOLERANCE)), dist: e, accuracy: 0 };
-  return { hit: false, points: 0, dist: e, accuracy: 0 };
+  const hit = e <= GLITCH_TOLERANCE;
+  return { hit, points: hit ? budget : 0, dist: e, accuracy: hit ? 1 : 0 };
 }
 var HINT_FACTORS = [1, 0.75, 0.5, 0.25];
 function scoreCode(correct, hintsUsed, budget) {
@@ -33599,13 +33600,14 @@ function matchValidDetail(input, valid) {
   if (mine.some((m) => others.some((o) => typoDistance(m, o) <= lim + 2))) return null;
   return { name: target, kind: "typo" };
 }
-function groupUnique(answers, valid, overrides = {}) {
+function groupUnique(answers, valid, overrides = {}, closed = false) {
   const groups = /* @__PURE__ */ new Map();
   for (const [pid, raw] of Object.entries(answers)) {
     const n = normText(raw);
     if (!n) continue;
     let key, label, state;
     let autoTypo = false;
+    let autoInvalid = false;
     const md = matchValidDetail(raw, valid);
     const mine = overrides["u:" + n];
     if (md && !(md.kind === "typo" && mine)) {
@@ -33616,8 +33618,10 @@ function groupUnique(answers, valid, overrides = {}) {
     } else {
       key = "u:" + n;
       label = raw.trim();
-      state = "unknown";
+      state = closed ? "invalid" : "unknown";
+      autoInvalid = closed;
       const ov = overrides[key];
+      if (ov) autoInvalid = false;
       if (ov === "valid") state = "valid";
       else if (ov === "invalid") state = "invalid";
       else if (ov && typeof ov === "object") {
@@ -33633,6 +33637,7 @@ function groupUnique(answers, valid, overrides = {}) {
     g.members.push(pid);
     g.raw[pid] = raw;
     if (autoTypo) (g.auto ??= []).push(pid);
+    if (autoInvalid) g.autoInvalid = true;
     groups.set(key, g);
   }
   return [...groups.values()];
@@ -33641,7 +33646,7 @@ function scoreUnique(groups, pointsUnique, pointsShared) {
   const out = {};
   for (const g of groups) {
     for (const pid of g.members) {
-      if (g.state === "valid") out[pid] = g.members.length === 1 ? { points: pointsUnique, kind: "unique" } : { points: pointsShared, kind: "shared" };
+      if (g.state === "valid") out[pid] = g.members.length === 1 ? { points: pointsUnique, kind: "unique" } : { points: 0, kind: "shared" };
       else out[pid] = { points: 0, kind: g.state === "unknown" ? "unknown" : "invalid" };
     }
   }
@@ -33744,6 +33749,7 @@ function normalizeTaskCore(raw) {
         placeholder: str(r.placeholder, 40),
         seconds: num(r.seconds),
         pointsUnique: num(r.pointsUnique),
+        ...r.closed === true ? { closed: true } : {},
         pointsShared: num(r.pointsShared),
         explain: str(r.explain, 500),
         valid: (Array.isArray(r.valid) ? r.valid : []).slice(0, 60).map((v2) => ({ name: str(v2?.name, 60), variants: strList(v2?.variants, 12, 60) }))
@@ -34152,7 +34158,7 @@ function bookHash(book) {
   return sha(canonical({ tiles, rules: book.rules ?? {} }));
 }
 var J2 = (s) => JSON.parse(s);
-var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4 };
+var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: "", winnerLine: "", boardTitle: "" };
 function normalizePack(raw) {
   const r = raw ?? {};
   const s = (v2, m) => typeof v2 === "string" ? v2.trim().slice(0, m) : "";
@@ -34167,7 +34173,20 @@ function normalizePack(raw) {
     surprise: s(r.surprise, 80),
     final: s(r.final, 80),
     ...Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x3) => x3?.k === "board" ? { k: "board" } : (x3?.k === "round" || x3?.k === "surprise" || x3?.k === "final") && s(x3.cat, 80) ? { k: x3.k, cat: s(x3.cat, 80) } : null).filter((x3) => !!x3) } : {},
-    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ["task", "sequence", "sort"].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle, tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6) }
+    rules: {
+      startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3),
+      maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20),
+      maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10),
+      rankVariant: ["task", "sequence", "sort"].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant,
+      showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle,
+      winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle,
+      tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6),
+      estimateBets: Array.isArray(r.rules?.estimateBets) ? [...new Set(r.rules.estimateBets.map((x3) => Math.trunc(Number(x3))).filter((x3) => Number.isFinite(x3) && x3 >= 0 && x3 <= 1e3))].sort((a, b2) => a - b2).slice(0, 5) : [],
+      estimateBonus: n(r.rules?.estimateBonus, 0, 0, 500),
+      tagline: s(r.rules?.tagline, 80),
+      winnerLine: s(r.rules?.winnerLine, 80),
+      boardTitle: s(r.rules?.boardTitle, 30)
+    }
   };
 }
 var ContentService = class {
@@ -34589,9 +34608,9 @@ var ContentService = class {
     if (!errors.length && showSteps) {
       const sa = analyzeShow(book);
       if (sa.modesMissing.length) warnings.push(`Nicht jeder Spielmodus kommt im Showablauf vor (fehlt: ${sa.modesMissing.join(", ")})`);
-      const probes = book.tiles.reduce((a, t) => a + t.tasks.filter((x3) => x3.practice).length, 0);
+      const probes2 = book.tiles.reduce((a, t) => a + t.tasks.filter((x3) => x3.practice).length, 0);
       if (sa.minutesExpected < 60 || sa.minutesExpected > 120) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min (h\xF6chstens ${sa.minutesMax} min) \u2013 f\xFCr einen Spieleabend ungew\xF6hnlich lang/kurz`);
-      else if (sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min, davon ca. ${Math.round(probes * 2.3)} min f\xFCr ${probes} Proberunden (\xFCberspringbar). Ohne Proben ca. ${Math.round(sa.minutesExpected - probes * 2.3)} min.`);
+      else if (sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min, davon ca. ${Math.round(probes2 * 2.3)} min f\xFCr ${probes2} Proberunden (\xFCberspringbar). Ohne Proben ca. ${Math.round(sa.minutesExpected - probes2 * 2.3)} min.`);
       if (showSteps[showSteps.length - 2]?.k !== "board") warnings.push("Empfohlen: vor dem Finale einen \u201EZwischenstand\u201C-Schritt");
     }
     return { book: errors.length ? null : book, errors, warnings };
@@ -35324,12 +35343,12 @@ var rank = {
     const t = c.task;
     const rows = c.players.map((p) => {
       const slots = c.round.pm[p.id]?.slots ?? new Array(t.items.length).fill(-1);
-      const r = scoreRank(c.round.pm[p.id]?.slots, t.points);
+      const r = c.round.m?.sort ? scoreRankExact(c.round.pm[p.id]?.slots, t.points) : scoreRank(c.round.pm[p.id]?.slots, t.points);
       return { pid: p.id, slots, correct: r.correct, total: r.total, points: r.points, placed: slots.filter((s) => s >= 0).length, pairs: rankPairDetail(slots) };
     });
     return {
-      entries: rows.filter((r) => r.placed > 0 || r.points > 0).map((r) => ({ pid: r.pid, delta: r.points, label: `${r.correct} von ${r.total} Paaren richtig` })),
-      reveal: { items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel, perPair: Math.round(t.points / 10 * 10) / 10, maxPoints: t.points }
+      entries: rows.filter((r) => r.placed > 0 || r.points > 0).map((r) => ({ pid: r.pid, delta: r.points, label: c.round.m?.sort ? `${r.correct} von 5 Begriffen auf der richtigen Position` : `${r.correct} von ${r.total} Paaren richtig` })),
+      reveal: { scoring: c.round.m?.sort ? "exact" : "pairs", items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel, perPair: Math.round(t.points / 10 * 10) / 10, perPos: Math.round(t.points / 5), maxPoints: t.points }
     };
   },
   view(c, a) {
@@ -35341,7 +35360,7 @@ var rank = {
       topLabel: t.topLabel,
       bottomLabel: t.bottomLabel,
       slots: t.items.length,
-      variant: c.round.m?.sort ? "sort" : "sequence",
+      variant: rankVariantOf(t, c.rules),
       points: t.points,
       step,
       steps: t.order.length,
@@ -35362,6 +35381,8 @@ var rank = {
     return base;
   }
 };
+var betsOf = (c) => c.rules?.estimateBets?.length ? c.rules.estimateBets : c.task.bets;
+var bonusOf = (c) => Math.max(0, c.rules?.estimateBonus ?? 0);
 var estimate = {
   maxPoints: (t) => t.points + Math.max(...t.bets),
   begin(c) {
@@ -35385,7 +35406,7 @@ var estimate = {
     if (c.round.stage === "bet") {
       const amount = Number(payload?.amount);
       const target = String(payload?.target ?? "");
-      if (!t.bets.includes(amount)) return err2("invalid_bet");
+      if (!betsOf(c).includes(amount)) return err2("invalid_bet");
       if (amount > 0) {
         if (amount > balanceOf(c, pid)) return err2("not_enough_points");
         if (c.round.pm[target]?.guess === void 0) return err2("invalid_target");
@@ -35410,12 +35431,13 @@ var estimate = {
     for (const [pid, pm] of Object.entries(c.round.pm)) if (pm.guess !== void 0 && c.players.some((p) => p.id === pid)) guesses[pid] = pm.guess;
     const res = scoreEstimate(guesses, t.answer, t.points, c.players.length);
     const winners = Object.entries(res).filter(([, r]) => r.best).map(([pid]) => pid);
-    const entries = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points, label: `Sch\xE4tzung Platz ${r.place}` }));
+    const bonus = bonusOf(c);
+    const entries = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points + (r.best ? bonus : 0), label: `Sch\xE4tzung Platz ${r.place}${r.best && bonus ? ` \xB7 Bonus +${bonus}` : ""}` }));
     const bets = [];
     for (const p of c.players) {
       const b2 = c.round.pm[p.id]?.bet;
       if (!b2 || b2.amount <= 0) continue;
-      const have = balanceOf(c, p.id) + (res[p.id]?.points ?? 0);
+      const have = balanceOf(c, p.id) + (res[p.id]?.points ?? 0) + (res[p.id]?.best ? bonus : 0);
       const won = winners.includes(b2.target);
       const delta = won ? b2.amount : -Math.min(b2.amount, have);
       entries.push({ pid: p.id, delta, label: `${won ? "Einsatz gewonnen" : "Einsatz verloren"} (${b2.amount} auf ${nm(c, b2.target)})` });
@@ -35428,11 +35450,11 @@ var estimate = {
         unit: t.unit,
         explain: t.explain,
         winners,
-        guesses: Object.entries(res).map(([pid, r]) => ({ pid, value: guesses[pid], place: r.place, points: r.points, best: r.best })).sort((a, b2) => a.place - b2.place),
+        guesses: Object.entries(res).map(([pid, r]) => ({ pid, value: guesses[pid], place: r.place, points: r.points, bonus: r.best ? bonus : 0, best: r.best })).sort((a, b2) => a.place - b2.place),
         bets,
         // Klartext-Erklärung für TV und Handys: wer lag am besten, welche Wetten gewonnen/verloren
         summary: [
-          winners.length ? `Beste Sch\xE4tzung: ${winners.map((w2) => `${nm(c, w2)} (${guesses[w2].toLocaleString("de-DE")} ${t.unit})`).join(" und ")} \u2013 L\xF6sung: ${t.answer.toLocaleString("de-DE")} ${t.unit}.` : "Es gab keine g\xFCltige Sch\xE4tzung.",
+          winners.length ? `Beste Sch\xE4tzung: ${winners.map((w2) => `${nm(c, w2)} (${guesses[w2].toLocaleString("de-DE")} ${t.unit})`).join(" und ")} \u2013 L\xF6sung: ${t.answer.toLocaleString("de-DE")} ${t.unit}.${bonus ? ` Bonus f\xFCr die beste Sch\xE4tzung: +${bonus} Punkte.` : ""}` : "Es gab keine g\xFCltige Sch\xE4tzung.",
           ...bets.map((b2) => `${nm(c, b2.pid)} setzte ${b2.amount} auf ${nm(c, b2.target)} \u2192 ${b2.won ? `gewonnen (+${b2.delta})` : `verloren (${b2.delta})`}`),
           ...bets.length ? [] : ["Niemand hat gewettet."]
         ]
@@ -35442,7 +35464,7 @@ var estimate = {
   view(c, a) {
     const t = c.task;
     const st = c.round.stage;
-    const base = { prompt: t.prompt, unit: t.unit, bets: t.bets };
+    const base = { prompt: t.prompt, unit: t.unit, bets: betsOf(c), bonus: bonusOf(c) };
     base.guessedCount = c.players.filter((p) => c.round.pm[p.id]?.guess !== void 0).length;
     base.betCount = c.players.filter((p) => !!c.round.pm[p.id]?.bet).length;
     base.total = c.players.length;
@@ -35494,7 +35516,7 @@ var glitch = {
     const zones = glitchZones(t, c.scenes);
     const rows = c.players.map((p) => ({ pid: p.id, tap: c.round.pm[p.id] ?? null, ...scoreGlitch(c.round.pm[p.id], zones, t.points) }));
     return {
-      entries: rows.filter((r) => r.tap).map((r) => ({ pid: r.pid, delta: r.points, label: r.hit ? "Treffer" : r.points > 0 ? "Knapp daneben" : "Daneben" })),
+      entries: rows.filter((r) => r.tap).map((r) => ({ pid: r.pid, delta: r.points, label: r.hit ? "Treffer" : "Daneben" })),
       reveal: { zones, scene: t.scene, explain: t.explain, rows }
     };
   },
@@ -35590,7 +35612,7 @@ function uniqueGroups(c) {
   const t = c.task;
   const answers = {};
   for (const p of c.players) if (c.round.pm[p.id]?.answer) answers[p.id] = c.round.pm[p.id].answer;
-  return groupUnique(answers, t.valid, c.round.m?.overrides ?? {});
+  return groupUnique(answers, t.valid, c.round.m?.overrides ?? {}, !!t.closed);
 }
 var unique = {
   maxPoints: (t) => t.pointsUnique,
@@ -35626,7 +35648,7 @@ var unique = {
     const entries = Object.entries(res).map(([pid, r]) => ({
       pid,
       delta: r.points,
-      label: r.kind === "unique" ? "Einzigartig!" : r.kind === "shared" ? "Mehrfach genannt" : "Ung\xFCltige Antwort"
+      label: r.kind === "unique" ? "Einzigartig!" : r.kind === "shared" ? "Mehrfach genannt \xB7 0 Punkte" : "Ung\xFCltige Antwort"
     }));
     return { entries, reveal: { explain: t.explain, groups, results: res, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared, validNames: t.valid.map((v2) => v2.name) } };
   },
@@ -35636,7 +35658,11 @@ var unique = {
     const base = { prompt: t.prompt, placeholder: t.placeholder, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared };
     if (st === "review" || st === "locked" || st === "reveal") base.groups = uniqueGroups(c);
     if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid] ?? null;
-    if (a.role === "host") base.validNames = t.valid.map((v2) => v2.name);
+    if (a.role === "host") {
+      base.validNames = t.valid.map((v2) => v2.name);
+      base.closed = !!t.closed;
+      if (st === "open") base.live = uniqueGroups(c).flatMap((g) => g.members.map((pid) => ({ pid, answer: g.raw[pid], state: g.state, label: g.label, auto: !!g.auto?.includes(pid), autoInvalid: !!g.autoInvalid })));
+    }
     return base;
   }
 };
@@ -35778,7 +35804,7 @@ var link = {
     const t = c.task;
     const st = c.round.stage;
     const shown = st === "open" ? (c.round.m?.level ?? 0) + 1 : 4;
-    const base = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: clueSecs(t) };
+    const base = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: clueSecs(t), answeredCount: c.players.filter((p) => !!c.round.pm[p.id]?.answer).length, playerCount: c.players.length };
     if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid] ? { answer: c.round.pm[a.pid].answer, level: c.round.pm[a.pid].level } : null;
     if ((st === "review" || st === "locked") && a.role === "host") base.groups = linkGroups(c);
     if (a.role === "host") {
@@ -36205,7 +36231,7 @@ var Engine = class _Engine {
         const finalNext = this.stepKind(room, room.planIdx + 1) === "final";
         const afterSurprise = this.stepKind(room, room.planIdx - 1) === "surprise";
         room.scoreboard = {
-          title: finalNext ? "Letzter sichtbarer Stand" : afterSurprise ? "Zwischenstand nach der \xDCberraschung" : "Zwischenstand",
+          title: finalNext ? "Letzter sichtbarer Stand" : afterSurprise ? "Zwischenstand nach der \xDCberraschung" : this.bk(room).rules?.boardTitle || "Zwischenstand",
           reason: finalNext ? "Im Finale wird die Rangliste verborgen \u2013 alles ist noch m\xF6glich!" : `Nach ${nPlayed} gespielten ${room.flow === "show" ? "Runden" : "Kategorien"}${afterSurprise ? " und der \xDCberraschungsrunde" : ""}`,
           prev
         };
@@ -36260,6 +36286,7 @@ var Engine = class _Engine {
     this.forceLock(c);
     if (MODES2[c.task.mode].blockReveal?.(c)) return { ok: false, err: "review_needed" };
     const res = MODES2[c.task.mode].score(c);
+    res.reveal = { ...res.reveal, missing: c.players.filter((p) => !MODES2[c.task.mode].answered(c, p.id)).map((p) => p.id) };
     if (c.task.practice) {
       r.result = { entries: [], reveal: { ...res.reveal, practice: true } };
     } else {
@@ -36514,7 +36541,7 @@ var Engine = class _Engine {
         act: this.actLabel(room),
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === "show" ? room.plan.filter((x3) => x3.startsWith("tile:")).length : room.plan.filter((s) => s === "wall").length + 2 },
         flow: room.flow ?? "classic",
-        brand: { title: this.bk(room).rules?.showTitle || "OUTPLAY", winner: this.bk(room).rules?.winnerTitle || "OUTPLAY-Champion" },
+        brand: { title: this.bk(room).rules?.showTitle || "OUTPLAY", winner: this.bk(room).rules?.winnerTitle || "OUTPLAY-Champion", tagline: this.bk(room).rules?.tagline || void 0, winnerLine: this.bk(room).rules?.winnerLine || void 0 },
         liveRank: room.liveRank ?? true,
         music: room.music ?? { on: false, vol: 25 },
         ...room.flow === "show" ? { agenda: this.agenda(room) } : {}
@@ -38102,7 +38129,7 @@ var SHOW_ROUNDS = [
     color: PK2,
     kind: "surprise",
     football: false,
-    blurb: "Nenne eine g\xFCltige Antwort \u2013 aber blo\xDF keine, die auch ein anderer nennt! Einzigartige Antworten bringen die meisten Punkte, doppelte nur wenige.",
+    blurb: "Nenne eine g\xFCltige Antwort \u2013 aber blo\xDF keine, die auch ein anderer nennt! Nur eine g\xFCltige Antwort, die kein anderer nennt, bringt Punkte \u2013 doppelte z\xE4hlen 0.",
     taskIds: ["v2-einzigartig-1", "v2-einzigartig-2", "s3-unique-orchester"]
   },
   {
@@ -38166,7 +38193,7 @@ var SHOW_STEPS = [
 // content/show2.ts
 var SHOW2_PACK = {
   id: "show-2",
-  name: "Reus 65 Mio",
+  name: "Reus 65 Mio (Version 1)",
   description: "Der feste Showablauf mit Proberunden: 6 Spielmodi je 4 oder 5 gewertete Aufgaben, \xDCberraschungsrunde EINZIGARTIG und FINAL LOCK. Sieger: Reus65Mio-Champion.",
   rules: { showTitle: "Reus 65 Mio", winnerTitle: "Reus65Mio-Champion", tasksPerMode: 4 }
 };
@@ -38277,7 +38304,7 @@ var SHOW2_ROUNDS = [
     color: COLORS.PK,
     kind: "surprise",
     football: false,
-    blurb: "Nenne eine g\xFCltige Antwort \u2013 aber blo\xDF keine, die auch ein anderer nennt! Einzigartige Antworten bringen die meisten Punkte, doppelte nur wenige.",
+    blurb: "Nenne eine g\xFCltige Antwort \u2013 aber blo\xDF keine, die auch ein anderer nennt! Nur eine g\xFCltige Antwort, die kein anderer nennt, bringt Punkte \u2013 doppelte z\xE4hlen 0.",
     taskIds: ["s4-probe-unique", "v2-einzigartig-1", "v2-einzigartig-2", "s3-unique-orchester"]
   }
 ];
@@ -38296,9 +38323,68 @@ var SHOW2_STEPS = [
 ];
 var SEED_SHOW2 = { pack: SHOW2_PACK, pool: POOL2, rounds: SHOW2_ROUNDS, steps: SHOW2_STEPS };
 
+// content/show3.ts
+var SHOW3_PACK = {
+  id: "show-3",
+  name: "Reus 65 Mio",
+  description: "Der feste Showablauf mit Proberunden, Sortier-Variante bei BLIND RANK und fairerer SETZ-AUF-MICH-Wertung. Sieger: Reus65Mio-Champion.",
+  rules: {
+    showTitle: "Reus 65 Mio",
+    winnerTitle: "Reus65Mio-Champion",
+    tasksPerMode: 4,
+    rankVariant: "sort",
+    estimateBets: [0, 50, 100],
+    estimateBonus: 150,
+    tagline: "Dein pers\xF6nlicher Kickbase-Abend",
+    winnerLine: "Marktwert: unbezahlbar \u2013 die 65 Mio. sind verdient",
+    boardTitle: "Marktwert-Update"
+  }
+};
+var FACTUAL = {
+  geo: "Die Allianz Arena steht im M\xFCnchner Norden (Fr\xF6ttmaning).",
+  match: "Hund bellt, Katze miaut, Kuh muht, Schaf m\xE4ht, Frosch quakt, Hahn kr\xE4ht.",
+  rank: "Merkur (58 Mio. km), Venus (108), Erde (150), Mars (228), Jupiter (778 Mio. km).",
+  estimate: "Deutschland hat 16 Bundesl\xE4nder.",
+  glitch: "Es fehlte ein Spieler, und der Ball lag an einer anderen Stelle.",
+  unique: "Schwarz, Rot, Gold \u2013 nur diese drei sind g\xFCltig. \u201EBlau\u201C geh\xF6rt nicht zur Flagge.",
+  link: "Gesucht war der Mond."
+};
+var probes = POOL2.filter((q2) => q2.id.startsWith("s4-probe-")).map((q2) => {
+  const t = JSON.parse(JSON.stringify(q2.task));
+  t.explain = FACTUAL[t.mode];
+  if (t.mode === "unique") {
+    t.closed = true;
+    t.valid = [{ name: "Schwarz", variants: [] }, { name: "Rot", variants: [] }, { name: "Gold", variants: ["Gelb"] }];
+  }
+  return { id: q2.id.replace("s4-probe-", "s5-probe-"), topic: q2.topic, task: t };
+});
+var POOL3 = probes;
+var rename = (id) => id.replace("s4-probe-", "s5-probe-");
+var BLURB = {
+  "s4-sur": "Nenne eine g\xFCltige Antwort \u2013 aber blo\xDF keine, die auch ein anderer nennt! Nur einzigartige Antworten bringen Punkte, doppelte z\xE4hlen 0.",
+  "s4-r3": "Alle f\xFCnf Begriffe sind sichtbar. Bringe sie auf dem Handy in die richtige Reihenfolge \u2013 je Begriff auf der exakt richtigen Position gibt es 50 Punkte.",
+  "s4-r5": "Erst sch\xE4tzt jeder geheim eine Zahl. Dann setzt du 0, 50 oder 100 Punkte auf die Sch\xE4tzung, der du vertraust \u2013 die beste Sch\xE4tzung bringt zus\xE4tzlich 150 Bonuspunkte.",
+  "s4-r1": "Setze deinen Pin auf der Karte \u2013 du kannst zoomen und ihn verschieben. Je n\xE4her dein Pin, desto mehr Punkte."
+};
+var SHOW3_ROUNDS = SHOW2_ROUNDS.map((r) => ({ ...r, id: r.id.replace("s4-", "s5-"), blurb: BLURB[r.id] ?? r.blurb, taskIds: r.taskIds.map(rename) }));
+var SHOW3_STEPS = [
+  { k: "round", cat: "s5-r1" },
+  { k: "board" },
+  { k: "round", cat: "s5-r2" },
+  { k: "round", cat: "s5-r3" },
+  { k: "board" },
+  { k: "surprise", cat: "s5-sur" },
+  { k: "round", cat: "s5-r4" },
+  { k: "round", cat: "s5-r5" },
+  { k: "round", cat: "s5-r6" },
+  { k: "board" },
+  { k: "final", cat: "s3-final" }
+];
+var SEED_SHOW3 = { pack: SHOW3_PACK, pool: POOL3, rounds: SHOW3_ROUNDS, steps: SHOW3_STEPS };
+
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-var EXTRA_SHOWS = [SEED_SHOW2];
+var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3];
 
 // server/vercel.ts
 var ConflictError = class extends Error {

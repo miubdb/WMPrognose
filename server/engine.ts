@@ -348,7 +348,7 @@ export class Engine {
         const finalNext = this.stepKind(room, room.planIdx + 1) === 'final';
         const afterSurprise = this.stepKind(room, room.planIdx - 1) === 'surprise';
         room.scoreboard = {
-          title: finalNext ? 'Letzter sichtbarer Stand' : afterSurprise ? 'Zwischenstand nach der Überraschung' : 'Zwischenstand',
+          title: finalNext ? 'Letzter sichtbarer Stand' : afterSurprise ? 'Zwischenstand nach der Überraschung' : (this.bk(room).rules?.boardTitle || 'Zwischenstand'),
           reason: finalNext ? 'Im Finale wird die Rangliste verborgen – alles ist noch möglich!' : `Nach ${nPlayed} gespielten ${room.flow === 'show' ? 'Runden' : 'Kategorien'}${afterSurprise ? ' und der Überraschungsrunde' : ''}`,
           prev,
         };
@@ -397,6 +397,7 @@ export class Engine {
     this.forceLock(c);
     if (MODES[c.task.mode].blockReveal?.(c)) return { ok: false, err: 'review_needed' };
     const res = MODES[c.task.mode].score(c);
+    res.reveal = { ...res.reveal, missing: c.players.filter(p => !MODES[c.task.mode].answered(c, p.id)).map(p => p.id) };   // wer nichts abgegeben hat (für die TV-Auflösung)
     if (c.task.practice) {
       // Proberunde: Auflösung wie gewohnt, aber niemals Punkte buchen (gezeigte Punkte = „so wäre es gewertet worden“)
       r.result = { entries: [], reveal: { ...res.reveal, practice: true } };
@@ -601,7 +602,7 @@ export class Engine {
         act: this.actLabel(room),
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === 'show' ? room.plan.filter(x => x.startsWith('tile:')).length : room.plan.filter(s => s === 'wall').length + 2 },
         flow: room.flow ?? 'classic',
-        brand: { title: this.bk(room).rules?.showTitle || 'OUTPLAY', winner: this.bk(room).rules?.winnerTitle || 'OUTPLAY-Champion' },
+        brand: { title: this.bk(room).rules?.showTitle || 'OUTPLAY', winner: this.bk(room).rules?.winnerTitle || 'OUTPLAY-Champion', tagline: this.bk(room).rules?.tagline || undefined, winnerLine: this.bk(room).rules?.winnerLine || undefined },
         liveRank: room.liveRank ?? true, music: room.music ?? { on: false, vol: 25 },
         ...(room.flow === 'show' ? { agenda: this.agenda(room) } : {}),
       },

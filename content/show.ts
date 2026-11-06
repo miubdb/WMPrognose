@@ -145,7 +145,7 @@ export const SHOW_ROUNDS: ShowRound[] = [
   { id: 's3-r3', title: 'Wer war zuerst?', topic: 'Reihenfolgen mit Aha-Effekt', icon: '⏳', color: PK, kind: 'tile', football: true, blurb: RB.rank,
     taskIds: ['v2-wer-war-zuerst-1', 'v2-fussball-zeitreise-1', 'v2-wer-war-zuerst-3', 'v2-fussball-zeitreise-3'] },
   { id: 's3-sur', title: 'EINZIGARTIG', topic: 'Überraschungsrunde', icon: '✨', color: PK, kind: 'surprise', football: false,
-    blurb: 'Nenne eine gültige Antwort – aber bloß keine, die auch ein anderer nennt! Einzigartige Antworten bringen die meisten Punkte, doppelte nur wenige.',
+    blurb: 'Nenne eine gültige Antwort – aber bloß keine, die auch ein anderer nennt! Nur eine gültige Antwort, die kein anderer nennt, bringt Punkte – doppelte zählen 0.',
     taskIds: ['v2-einzigartig-1', 'v2-einzigartig-2', 's3-unique-orchester'] },
   { id: 's3-r4', title: 'Alles im Blick', topic: 'Alltag & Beobachtung', icon: '👁️', color: CY, kind: 'tile', football: false, blurb: RB.glitch,
     taskIds: ['v2-alles-im-blick-1', 'v2-alles-im-blick-2', 'v2-alles-im-blick-3', 'v2-alles-im-blick-4'] },

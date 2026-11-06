@@ -16,7 +16,7 @@ const MODE_RULES: Record<string, string[]> = {
   estimate: ['Schätze geheim eine Zahl.', 'Dann siehst du alle Tipps und setzt Punkte auf die Schätzung, der du vertraust.', 'Gewonnener Einsatz: plus. Verlorener: minus.'],
   glitch: ['Merk dir das Bild genau.', 'Dann ändert sich etwas.', 'Tippe auf deinem Handy auf die veränderte Stelle.'],
   codebreak: ['Knacke das Rätsel mit Logik.', 'Hinweise helfen – kosten aber Punkte.', 'Drei Versuche, Tempo zählt kaum.'],
-  unique: ['Nenne eine gültige Antwort.', 'Nur einzigartige Antworten bringen volle Punkte.', 'Doppelte zählen weniger, Ungültige gar nicht.'],
+  unique: ['Nenne eine gültige Antwort.', 'Nur eine Antwort, die kein anderer nennt, bringt Punkte.', 'Doppelte und ungültige Antworten zählen 0.'],
   match: ['Sechs Begriffe links, sechs Partner rechts.', 'Verbinde auf dem Handy, was zusammengehört.', '50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.'],
   link: ['Vier Hinweise erscheinen nacheinander.', 'Je früher du die Lösung nennst, desto mehr Punkte.', 'Nur ein Versuch – die Antwort bleibt geheim.'],
 };
@@ -114,6 +114,7 @@ function IntroTv({ view }: { view: View }) {
   return (
     <div className="introtv calm">
       <div className="showtitle">{view.room.brand?.title ?? 'OUTPLAY'}</div>
+      {view.room.brand?.tagline && <div className="tagline2">{view.room.brand.tagline}</div>}
       <h1 className="introtitle">Heute im Studio</h1>
       <div className="introgrid">
         {view.players.map((p, i) => (
@@ -171,6 +172,7 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
       {round.stage !== 'intro' && (
         <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.kind === 'final' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</b><small>{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</small></div></div>
       )}
+      {round.stage === 'reveal' && round.mode !== 'match' && <MissingNote view={view} rev={round.reveal} />}
       {round.practice && round.stage === 'reveal' && <div className="probebanner">🎓 Proberunde – so wäre es gewertet worden. Es werden <b>keine Punkte</b> vergeben.</div>}
       <div className="roundbody">
         {round.stage === 'intro' ? <RuleCard round={round} view={view} /> :
@@ -196,6 +198,14 @@ function taskLine(round: RoundView, cat?: string): string {
   return parts.join(' · ');
 }
 
+/** Regeltexte je Modus – variantenabhängig (BLIND RANK: nacheinander/sortieren; SETZ AUF MICH: Einsätze und Bonus aus dem Paket). */
+function rulesFor(round: RoundView): string[] {
+  const d = round.data ?? {};
+  if (round.mode === 'rank' && d.variant === 'sort') return ['Alle fünf Begriffe sind sichtbar.', 'Bringe sie auf deinem Handy in die richtige Reihenfolge.', `Je Begriff auf der exakt richtigen Position: ${d.points ? Math.round(d.points / 5) : 50} Punkte.`];
+  if (round.mode === 'estimate' && d.bets) return ['Schätze geheim eine Zahl.', `Dann siehst du alle Tipps und setzt ${d.bets.filter((b: number) => b > 0).join(' oder ')} Punkte auf eine Schätzung – oder gar nichts.`, d.bonus ? `Die beste Schätzung bringt zusätzlich +${d.bonus} Punkte.` : 'Gewonnener Einsatz: plus. Verlorener: minus.'];
+  return MODE_RULES[round.mode];
+}
+
 function RuleCard({ round, view }: { round: RoundView; view: View }) {
   if (round.taskIndex > 0) {                     // ab der 2. Aufgabe einer Runde: kompakte Karte statt voller Regelkarte (spart Zeit)
     return (
@@ -217,7 +227,7 @@ function RuleCard({ round, view }: { round: RoundView; view: View }) {
         <ol><li style={{ animationDelay: '.4s' }}>① Ein Ort auf der Karte – 400 Punkte</li><li style={{ animationDelay: '.8s' }}>② Eine gemeinsame Lösung – bis 300 Punkte</li><li style={{ animationDelay: '1.2s' }}>③ Eine Sortieraufgabe – 500 Punkte</li><li style={{ animationDelay: '1.6s' }}>④ Schätzen mit Einsatz – bis zu 800 Punkte</li></ol>
       </> : <>
         <h1>{MODE_NAME[round.mode]}</h1>
-        <ol>{MODE_RULES[round.mode].map((r, i) => <li key={i} style={{ animationDelay: `${0.4 + i * 0.5}s` }}>{r}</li>)}</ol>
+        <ol>{rulesFor(round).map((r, i) => <li key={i} style={{ animationDelay: `${0.4 + i * 0.5}s` }}>{r}</li>)}</ol>
       </>}
       <p className="muted">{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</p>
     </div>
@@ -237,7 +247,12 @@ function PointsList({ view, rows }: { view: View; rows: { pid: string; points: n
   );
 }
 
-function Explain({ text }: { text?: string }) { return text ? <div className="explain">💡 {text}</div> : null; }
+function Explain({ text }: { text?: string }) { return text && !/^So funktioniert/.test(text) ? <div className="explain">💡 {text}</div> : null; }
+/** Wer nichts abgegeben hat – in jeder Auflösung sichtbar. */
+function MissingNote({ view, rev }: { view: View; rev: any }) {
+  const ids: string[] = rev?.missing ?? []; if (!ids.length) return null;
+  return <div className="missingnote"><span>Nicht abgegeben · 0 Punkte:</span>{ids.map(id => { const p = pl(view, id); return p ? <em key={id}><Avatar a={p.avatar} size={30} />{p.name}</em> : null; })}</div>;
+}
 
 // ---- GEO
 function GeoTv({ view, round }: { view: View; round: RoundView }) {
@@ -265,17 +280,14 @@ function RankTv({ view, round }: { view: View; round: RoundView }) {
         <div className="bigq small">{d.prompt}</div>
         <div className="truth"><small>Richtige Reihenfolge</small><div className="cols">{rev.items.map((it: any, i: number) => <div key={i} className="cell good" style={{ animationDelay: `${i * 0.25}s` }}><b>{i + 1}</b><span>{it.text}</span><em>{it.value}</em></div>)}</div></div>
         <div className="rrows">
-          {sorted.map((r: any, ri: number) => { const p = pl(view, r.pid)!;
-            // je Begriff: wie viele seiner 4 Paarvergleiche stimmen
-            const okOf = (item: number) => (r.pairs ?? []).filter((x: any) => (x.a === item || x.b === item) && x.ok).length;
-            return (
-            <div key={r.pid} className="rrow" style={{ animationDelay: `${1.4 + ri * 0.5}s` }}>
-              <div className="who"><Avatar a={p.avatar} size={46} /><b>{p.name}</b></div>
-              <div className="cols">{r.slots.map((s: number, i: number) => { const k = s >= 0 ? okOf(s) : 0; const cls = s < 0 ? 'none' : k >= 4 ? 'good' : k >= 2 ? 'mid' : 'bad'; return <div key={i} className={`cell ${cls}`}><span>{s >= 0 ? rev.items[s].text : '—'}</span>{s >= 0 && <em>{k}/4 Vergleiche</em>}</div>; })}</div>
-              <div className="sc"><small>{r.correct} von {r.total} Paaren</small><strong>+{r.points}</strong></div>
+          {sorted.map((r: any, ri: number) => { const p = pl(view, r.pid)!; if (!p || !r.placed) return null; return (
+            <div key={r.pid} className="rrow" style={{ animationDelay: `${1.2 + ri * 0.4}s` }}>
+              <div className="who"><Avatar a={p.avatar} size={42} /><b>{p.name}</b></div>
+              <div className="cols">{r.slots.map((s: number, i: number) => <div key={i} className={`cell ${s < 0 ? 'none' : rev.scoring === 'exact' ? (s === i ? 'good' : 'bad') : (r.pairs ?? []).filter((x: any) => (x.a === s || x.b === s) && x.ok).length >= 3 ? 'good' : 'mid'}`}><span>{s >= 0 ? rev.items[s].text : '—'}</span></div>)}</div>
+              <div className="sc"><small>{rev.scoring === 'exact' ? `${r.correct} von 5 richtig` : `${r.correct} von ${r.total} Paaren`}</small><strong>+{r.points}</strong></div>
             </div>); })}
         </div>
-        <p className="rankhow">So wird gewertet: Jedes Begriffspaar ist ein Vergleich („steht der richtige weiter oben?“) – 10 Vergleiche bei 5 Begriffen, <b>je {rev.perPair} Punkte</b>. Die Zahl unter jedem Begriff zeigt, wie viele seiner 4 Vergleiche stimmen.</p>
+        <p className="rankhow">{rev.scoring === 'exact' ? `Je ${rev.perPos} Punkte für jeden Begriff auf der richtigen Position (grün).` : `Gewertet werden alle 10 Paarvergleiche („steht der richtige Begriff weiter oben?“), je ${rev.perPair} Punkte.`}</p>
         <Explain text={rev.explain} />
       </div>
     );
@@ -317,7 +329,7 @@ function EstimateTv({ view, round }: { view: View; round: RoundView }) {
             </div>); })}
         </div>
         <div className="estcols">
-          <PointsList view={view} rows={view.players.map(p => { const g = guesses.find(x => x.pid === p.id); const b = bets.find(x => x.pid === p.id); return { pid: p.id, points: (g?.points ?? 0) + (b?.delta ?? 0), note: [g ? `Platz ${g.place}` : 'keine Schätzung', b ? `${b.won ? '✅' : '❌'} ${b.amount} auf ${pl(view, b.target)?.name}` : ''].filter(Boolean).join(' · ') }; }).sort((a, b) => b.points - a.points)} />
+          <PointsList view={view} rows={view.players.map(p => { const g = guesses.find(x => x.pid === p.id); const b = bets.find(x => x.pid === p.id); return { pid: p.id, points: (g?.points ?? 0) + (g?.bonus ?? 0) + (b?.delta ?? 0), note: [g ? `Platz ${g.place}${g.bonus ? ` · Bonus +${g.bonus}` : ''}` : 'keine Schätzung', b ? `${b.won ? '✅' : '❌'} ${b.amount} auf ${pl(view, b.target)?.name}` : ''].filter(Boolean).join(' · ') }; }).sort((a, b) => b.points - a.points)} />
           <div><ul className="estsummary">{(rev.summary ?? []).map((l: string, i: number) => <li key={i}>{l}</li>)}</ul><Explain text={rev.explain} /></div>
         </div>
       </div>
@@ -410,9 +422,15 @@ function MatchTv({ view, round }: { view: View; round: RoundView }) {
       )}
       {rev && (
         <div className="mtreveal">
-          <div className="mtpairs">{rev.pairs.map((p: any, i: number) => <div key={i} className="mtpair" style={{ animationDelay: `${i * 0.45}s` }}><span>{p.left}</span><i>→</i><b>{p.right}</b></div>)}</div>
-          <PointsList view={view} rows={rev.rows.filter((r: any) => r.submitted).map((r: any) => ({ pid: r.pid, points: r.points, note: `${r.correct} von 6 richtig` })).sort((a: any, b: any) => b.points - a.points)} />
-          <Explain text={rev.explain} />
+          <div className="mtpairs compact">{rev.pairs.map((p: any, i: number) => <div key={i} className="mtpair" style={{ animationDelay: `${i * 0.3}s` }}><span>{p.left}</span><i>→</i><b>{p.right}</b></div>)}</div>
+          <div className="mtplayers">
+            {rev.rows.slice().sort((a: any, b: any) => b.points - a.points).map((r: any) => { const p = pl(view, r.pid); if (!p) return null; return (
+              <div key={r.pid} className={`mtp ${r.submitted ? '' : 'none'}`}>
+                <div className="who"><Avatar a={p.avatar} size={38} /><b>{p.name}</b></div>
+                {r.submitted ? <div className="marks">{rev.pairs.map((pp: any, i: number) => <span key={i} className={r.marks?.[i] ? 'ok' : 'no'} title={pp.left}>{r.marks?.[i] ? '✓' : '✗'}<small>{pp.left}</small></span>)}</div> : <div className="marks"><em>Nicht abgegeben</em></div>}
+                <strong>{r.submitted ? `${r.correct}/6 · +${r.points}` : '0 Punkte'}</strong>
+              </div>); })}
+          </div>
         </div>
       )}
     </div>
@@ -432,7 +450,7 @@ function LinkTv({ view, round }: { view: View; round: RoundView }) {
           ? <div key={i} className={`lclue ${!rev && round.stage === 'open' && i === d.level ? 'new' : ''}`}><b className="ln">{i + 1}</b><span>{clues[i]}</span><em>{(rev?.points ?? d.points)[i]} P.</em></div>
           : <div key={i} className="lclue hidden"><b className="ln">{i + 1}</b><span>?</span><em>{d.points[i]} P.</em></div>)}
       </div>
-      {!rev && round.stage === 'open' && <div className="lnow">Jetzt richtig: <b>{d.points[d.level]} Punkte</b></div>}
+      {!rev && round.stage === 'open' && <div className="lnow">Jetzt richtig: <b>{d.points[d.level]} Punkte</b> · {d.answeredCount} von {d.playerCount} Antworten abgegeben</div>}
       {!rev && round.stage !== 'open' && <div className="lnow">{round.stage === 'review' ? 'Der Showmaster prüft die Antworten …' : 'Alle Antworten sind drin!'}</div>}
       {!rev && <AnswerRow players={view.players} />}
       {rev && (
@@ -498,7 +516,7 @@ function CeremonyTv({ view }: { view: View }) {
           </div>); })}
       </div>
       {winner && <div className="confetti">{Array.from({ length: 60 }, (_, i) => <i key={i} style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 12) * 0.25}s`, background: ['#f5b82e', '#8b5cf6', '#14d9c0', '#3b82f6', '#ec4899'][i % 5] }} />)}</div>}
-      {winner && <div className="winnerbanner"><small>Der {view.room.brand?.winner ?? 'OUTPLAY-Champion'}</small><b>{winner.name}</b><span className="trophy">🏆</span></div>}
+      {winner && <div className="winnerbanner"><small>Der {view.room.brand?.winner ?? 'OUTPLAY-Champion'}</small><b>{winner.name}</b><span className="trophy">🏆</span>{view.room.brand?.winnerLine && <em className="wline">{view.room.brand.winnerLine}</em>}</div>}
     </div>
   );
 }

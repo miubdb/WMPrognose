@@ -2,7 +2,7 @@
 import type { Stage, TaskDef, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, GlitchZone } from '../shared/types';
 import type { PlayerRec, Room, RoundState } from './model';
 import {
-  scoreGeo, scoreRank, rankVariantOf, rankSortSeconds, rankPairDetail, scoreEstimate, scoreGlitch, scoreCode, codeMatches, groupUnique, scoreUnique, rankPairs,
+  scoreGeo, scoreRank, scoreRankExact, rankVariantOf, rankSortSeconds, rankPairDetail, scoreEstimate, scoreGlitch, scoreCode, codeMatches, groupUnique, scoreUnique, rankPairs,
   scoreMatch, clueSecs, validMatching, MATCH_PAIRS, MATCH_PAIR_POINTS, LINK_POINTS, linkMatch,
 } from '../shared/scoring';
 import { normText } from '../shared/util';
@@ -158,12 +158,12 @@ const rank: ModeImpl = {
     const t = c.task as RankTask;
     const rows = c.players.map(p => {
       const slots: number[] = c.round.pm[p.id]?.slots ?? new Array(t.items.length).fill(-1);
-      const r = scoreRank(c.round.pm[p.id]?.slots, t.points);
+      const r = c.round.m?.sort ? scoreRankExact(c.round.pm[p.id]?.slots, t.points) : scoreRank(c.round.pm[p.id]?.slots, t.points);
       return { pid: p.id, slots, correct: r.correct, total: r.total, points: r.points, placed: slots.filter(s => s >= 0).length, pairs: rankPairDetail(slots) };
     });
     return {
-      entries: rows.filter(r => r.placed > 0 || r.points > 0).map(r => ({ pid: r.pid, delta: r.points, label: `${r.correct} von ${r.total} Paaren richtig` })),
-      reveal: { items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel, perPair: Math.round(t.points / 10 * 10) / 10, maxPoints: t.points },
+      entries: rows.filter(r => r.placed > 0 || r.points > 0).map(r => ({ pid: r.pid, delta: r.points, label: c.round.m?.sort ? `${r.correct} von 5 Begriffen auf der richtigen Position` : `${r.correct} von ${r.total} Paaren richtig` })),
+      reveal: { scoring: c.round.m?.sort ? 'exact' : 'pairs', items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel, perPair: Math.round(t.points / 10 * 10) / 10, perPos: Math.round(t.points / 5), maxPoints: t.points },
     };
   },
   view(c, a) {
@@ -172,7 +172,7 @@ const rank: ModeImpl = {
     const showItem = c.round.stage === 'open' || c.round.stage === 'locked' || c.round.stage === 'review';
     const base: any = {
       prompt: t.prompt, topLabel: t.topLabel, bottomLabel: t.bottomLabel, slots: t.items.length,
-      variant: c.round.m?.sort ? 'sort' : 'sequence', points: t.points,
+      variant: rankVariantOf(t, c.rules), points: t.points,
       step, steps: t.order.length,
       // Sortier-Variante: alle Begriffe in gemischter (nicht der richtigen) Reihenfolge, gleich für alle
       pool: c.round.m?.sort && (c.round.stage === 'open' || c.round.stage === 'locked') ? t.order.map(i => ({ idx: i, text: t.items[i].text })) : null,
@@ -196,6 +196,9 @@ const rank: ModeImpl = {
 // =====================================================================
 // ESTIMATE (SETZ AUF MICH)
 // =====================================================================
+/** Wirksame Einsatzstufen und Bonus: Paketregel überschreibt die Fragenwerte (nur wenn gesetzt). */
+const betsOf = (c: Ctx) => (c.rules?.estimateBets?.length ? c.rules.estimateBets : (c.task as EstimateTask).bets);
+const bonusOf = (c: Ctx) => Math.max(0, c.rules?.estimateBonus ?? 0);
 const estimate: ModeImpl = {
   maxPoints: t => (t as EstimateTask).points + Math.max(...(t as EstimateTask).bets),
   begin(c) { c.setStage('open', (c.task as EstimateTask).seconds); },
@@ -217,7 +220,7 @@ const estimate: ModeImpl = {
     if (c.round.stage === 'bet') {
       const amount = Number(payload?.amount);
       const target = String(payload?.target ?? '');
-      if (!t.bets.includes(amount)) return err('invalid_bet');
+      if (!betsOf(c).includes(amount)) return err('invalid_bet');
       if (amount > 0) {
         if (amount > balanceOf(c, pid)) return err('not_enough_points');
         if (c.round.pm[target]?.guess === undefined) return err('invalid_target');
@@ -242,12 +245,13 @@ const estimate: ModeImpl = {
     for (const [pid, pm] of Object.entries<any>(c.round.pm)) if (pm.guess !== undefined && c.players.some(p => p.id === pid)) guesses[pid] = pm.guess;
     const res = scoreEstimate(guesses, t.answer, t.points, c.players.length);
     const winners = Object.entries(res).filter(([, r]) => r.best).map(([pid]) => pid);
-    const entries: Draft[] = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points, label: `Schätzung Platz ${r.place}` }));
+    const bonus = bonusOf(c);
+    const entries: Draft[] = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points + (r.best ? bonus : 0), label: `Schätzung Platz ${r.place}${r.best && bonus ? ` · Bonus +${bonus}` : ''}` }));
     const bets: any[] = [];
     for (const p of c.players) {
       const b = c.round.pm[p.id]?.bet;
       if (!b || b.amount <= 0) continue;
-      const have = balanceOf(c, p.id) + (res[p.id]?.points ?? 0);
+      const have = balanceOf(c, p.id) + (res[p.id]?.points ?? 0) + (res[p.id]?.best ? bonus : 0);
       const won = winners.includes(b.target);
       const delta = won ? b.amount : -Math.min(b.amount, have);
       entries.push({ pid: p.id, delta, label: `${won ? 'Einsatz gewonnen' : 'Einsatz verloren'} (${b.amount} auf ${nm(c, b.target)})` });
@@ -257,13 +261,13 @@ const estimate: ModeImpl = {
       entries,
       reveal: {
         answer: t.answer, unit: t.unit, explain: t.explain, winners,
-        guesses: Object.entries(res).map(([pid, r]) => ({ pid, value: guesses[pid], place: r.place, points: r.points, best: r.best }))
+        guesses: Object.entries(res).map(([pid, r]) => ({ pid, value: guesses[pid], place: r.place, points: r.points, bonus: r.best ? bonus : 0, best: r.best }))
           .sort((a, b) => a.place - b.place),
         bets,
         // Klartext-Erklärung für TV und Handys: wer lag am besten, welche Wetten gewonnen/verloren
         summary: [
           winners.length
-            ? `Beste Schätzung: ${winners.map(w => `${nm(c, w)} (${guesses[w].toLocaleString('de-DE')} ${t.unit})`).join(' und ')} – Lösung: ${t.answer.toLocaleString('de-DE')} ${t.unit}.`
+            ? `Beste Schätzung: ${winners.map(w => `${nm(c, w)} (${guesses[w].toLocaleString('de-DE')} ${t.unit})`).join(' und ')} – Lösung: ${t.answer.toLocaleString('de-DE')} ${t.unit}.${bonus ? ` Bonus für die beste Schätzung: +${bonus} Punkte.` : ''}`
             : 'Es gab keine gültige Schätzung.',
           ...bets.map(b => `${nm(c, b.pid)} setzte ${b.amount} auf ${nm(c, b.target)} → ${b.won ? `gewonnen (+${b.delta})` : `verloren (${b.delta})`}`),
           ...(bets.length ? [] : ['Niemand hat gewettet.']),
@@ -274,7 +278,7 @@ const estimate: ModeImpl = {
   view(c, a) {
     const t = c.task as EstimateTask;
     const st = c.round.stage;
-    const base: any = { prompt: t.prompt, unit: t.unit, bets: t.bets };
+    const base: any = { prompt: t.prompt, unit: t.unit, bets: betsOf(c), bonus: bonusOf(c) };
     // Wie viele haben schon geschätzt / gewettet (ohne Inhalte)
     base.guessedCount = c.players.filter(p => c.round.pm[p.id]?.guess !== undefined).length;
     base.betCount = c.players.filter(p => !!c.round.pm[p.id]?.bet).length;
@@ -328,7 +332,7 @@ const glitch: ModeImpl = {
     const zones = glitchZones(t, c.scenes);
     const rows = c.players.map(p => ({ pid: p.id, tap: c.round.pm[p.id] ?? null, ...scoreGlitch(c.round.pm[p.id], zones, t.points) }));
     return {
-      entries: rows.filter(r => r.tap).map(r => ({ pid: r.pid, delta: r.points, label: r.hit ? 'Treffer' : r.points > 0 ? 'Knapp daneben' : 'Daneben' })),
+      entries: rows.filter(r => r.tap).map(r => ({ pid: r.pid, delta: r.points, label: r.hit ? 'Treffer' : 'Daneben' })),
       reveal: { zones, scene: t.scene, explain: t.explain, rows },
     };
   },
@@ -417,7 +421,7 @@ function uniqueGroups(c: Ctx) {
   const t = c.task as UniqueTask;
   const answers: Record<string, string> = {};
   for (const p of c.players) if (c.round.pm[p.id]?.answer) answers[p.id] = c.round.pm[p.id].answer;
-  return groupUnique(answers, t.valid, c.round.m?.overrides ?? {});
+  return groupUnique(answers, t.valid, c.round.m?.overrides ?? {}, !!t.closed);
 }
 const unique: ModeImpl = {
   maxPoints: t => (t as UniqueTask).pointsUnique,
@@ -445,7 +449,7 @@ const unique: ModeImpl = {
     const res = scoreUnique(groups, t.pointsUnique, t.pointsShared);
     const entries: Draft[] = Object.entries(res).map(([pid, r]) => ({
       pid, delta: r.points,
-      label: r.kind === 'unique' ? 'Einzigartig!' : r.kind === 'shared' ? 'Mehrfach genannt' : 'Ungültige Antwort',
+      label: r.kind === 'unique' ? 'Einzigartig!' : r.kind === 'shared' ? 'Mehrfach genannt · 0 Punkte' : 'Ungültige Antwort',
     }));
     return { entries, reveal: { explain: t.explain, groups, results: res, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared, validNames: t.valid.map(v => v.name) } };
   },
@@ -455,7 +459,12 @@ const unique: ModeImpl = {
     const base: any = { prompt: t.prompt, placeholder: t.placeholder, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared };
     if (st === 'review' || st === 'locked' || st === 'reveal') base.groups = uniqueGroups(c);
     if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid] ?? null;
-    if (a.role === 'host') base.validNames = t.valid.map(v => v.name);
+    if (a.role === 'host') {
+      base.validNames = t.valid.map(v => v.name);
+      base.closed = !!t.closed;
+      // Der Showmaster sieht jede eingehende Antwort sofort (nur in seiner privaten Ansicht), inkl. automatischer Einordnung
+      if (st === 'open') base.live = uniqueGroups(c).flatMap(g => g.members.map(pid => ({ pid, answer: g.raw[pid], state: g.state, label: g.label, auto: !!g.auto?.includes(pid), autoInvalid: !!g.autoInvalid })));
+    }
     return base;
   },
 };
@@ -576,7 +585,7 @@ const link: ModeImpl = {
   view(c, a) {
     const t = c.task as LinkTask; const st = c.round.stage;
     const shown = st === 'open' ? (c.round.m?.level ?? 0) + 1 : 4;
-    const base: any = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: clueSecs(t) };
+    const base: any = { prompt: t.prompt, clues: t.clues.slice(0, shown), level: shown - 1, total: 4, points: LINK_POINTS, clueSeconds: clueSecs(t), answeredCount: c.players.filter(p => !!c.round.pm[p.id]?.answer).length, playerCount: c.players.length };
     if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid] ? { answer: c.round.pm[a.pid].answer, level: c.round.pm[a.pid].level } : null;
     // Antworten bleiben bis zur Auflösung verborgen – nur der Showmaster sieht sie zur Prüfung
     if ((st === 'review' || st === 'locked') && a.role === 'host') base.groups = linkGroups(c);

@@ -43,7 +43,7 @@ function normalizeTaskCore(raw: any): TaskDef {
       ...(Array.isArray(r.zones) && r.zones.length ? { zones: r.zones.map((z: any) => ({ x: num(z?.x), y: num(z?.y), r: num(z?.r) })) } : {}) } as GlitchTask;
     case 'codebreak': return { mode: 'codebreak', prompt: str(r.prompt, 400), ...(str(r.display, 400) ? { display: str(r.display, 400) } : {}), input: r.input === 'text' ? 'text' : 'number',
       answers: strList(r.answers, 8), hints: strList(r.hints, 3, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 500) } as CodeTask;
-    case 'unique': return { mode: 'unique', prompt: str(r.prompt, 300), placeholder: str(r.placeholder, 40), seconds: num(r.seconds), pointsUnique: num(r.pointsUnique), pointsShared: num(r.pointsShared), explain: str(r.explain, 500),
+    case 'unique': return { mode: 'unique', prompt: str(r.prompt, 300), placeholder: str(r.placeholder, 40), seconds: num(r.seconds), pointsUnique: num(r.pointsUnique), ...(r.closed === true ? { closed: true } : {}), pointsShared: num(r.pointsShared), explain: str(r.explain, 500),
       valid: (Array.isArray(r.valid) ? r.valid : []).slice(0, 60).map((v: any) => ({ name: str(v?.name, 60), variants: strList(v?.variants, 12, 60) })) } as UniqueTask;
     case 'match': {
       const pairs = (Array.isArray(r.pairs) ? r.pairs : []).slice(0, MATCH_PAIRS).map((p: any) => ({ left: str(p?.left, 50), right: str(p?.right, 50) }));

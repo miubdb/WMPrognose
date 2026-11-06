@@ -89,6 +89,11 @@ export function rankPairs(slots: number[]): { correct: number; total: number } {
   }
   return { correct, total };
 }
+/** Sortier-Variante: je Begriff auf exakt richtiger Position budget/5 Punkte (bei 250 → 50 je Begriff). */
+export function scoreRankExact(slots: number[] | undefined, budget: number) {
+  const n = 5; const correct = slots ? slots.filter((it, i) => it === i).length : 0;
+  return { correct, total: n, points: Math.round(budget * correct / n) };
+}
 export function scoreRank(slots: number[] | undefined, budget: number) {
   if (!slots) return { correct: 0, total: 10, points: 0 };
   const { correct, total } = rankPairs(slots);
@@ -127,15 +132,13 @@ export function zoneEdgeDistance(tap: { x: number; y: number }, z: GlitchZone): 
   return Math.hypot(dx, dy);
 }
 export function scoreGlitch(tap: { x: number; y: number } | undefined, zones: GlitchZone[], budget: number) {
+  // Nur zwei Ergebnisse: Treffer (innerhalb Objektbox + Fingertoleranz) = volle Punkte; sonst oder ohne Abgabe = 0. Keine Trostpunkte.
   if (!tap) return { hit: false, points: 0, dist: null as number | null, accuracy: 0 };
   let e: number | null = null;
   for (const z of zones) { const d = zoneEdgeDistance(tap, z); if (e === null || d < e) e = d; }
   if (e === null) return { hit: false, points: 0, dist: null, accuracy: 0 };
-  // Treffer: innerhalb der Objektbox + Fingertoleranz. Innen volle Punkte, im Toleranzrand 85–100 %.
-  if (e <= GLITCH_TOLERANCE) { const accuracy = 1 - e / GLITCH_TOLERANCE; return { hit: true, points: Math.round(budget * (0.85 + 0.15 * accuracy)), dist: e, accuracy }; }
-  // knapp daneben (bis 2× Toleranz): kleiner Trostpreis, nie ein „Treffer“
-  if (e <= 2 * GLITCH_TOLERANCE) return { hit: false, points: Math.round(budget * 0.1 * (2 - e / GLITCH_TOLERANCE)), dist: e, accuracy: 0 };
-  return { hit: false, points: 0, dist: e, accuracy: 0 };
+  const hit = e <= GLITCH_TOLERANCE;
+  return { hit, points: hit ? budget : 0, dist: e, accuracy: hit ? 1 : 0 };
 }
 
 // ---------- CODEBREAK ----------
@@ -200,6 +203,8 @@ export interface UniqueGroup {
   raw: Record<string, string>; // pid -> Originaleingabe
   /** pids, deren Eingabe nur per Tippfehlererkennung zugeordnet wurde (Showmaster sieht sie und kann widersprechen) */
   auto?: string[];
+  /** vollständige Antwortliste: unbekannte Antwort automatisch als ungültig gewertet (Showmaster kann korrigieren) */
+  autoInvalid?: boolean;
 }
 /**
  * Ordnet eine Eingabe der Liste gültiger Antworten zu.
@@ -240,18 +245,19 @@ export function groupUnique(
   answers: Record<string, string>,
   valid: UniqueTask['valid'],
   overrides: Record<string, 'valid' | 'invalid' | { mapTo: string }> = {},
+  closed = false,
 ): UniqueGroup[] {
   const groups = new Map<string, UniqueGroup>();
   for (const [pid, raw] of Object.entries(answers)) {
     const n = normText(raw);
     if (!n) continue;
-    let key: string, label: string, state: UniqueGroup['state']; let autoTypo = false;
+    let key: string, label: string, state: UniqueGroup['state']; let autoTypo = false; let autoInvalid = false;
     const md = matchValidDetail(raw, valid);
     const mine = overrides['u:' + n];
     if (md && !(md.kind === 'typo' && mine)) { key = 'v:' + normText(md.name); label = md.name; state = 'valid'; autoTypo = md.kind === 'typo'; }
     else {
-      key = 'u:' + n; label = raw.trim(); state = 'unknown';
-      const ov = overrides[key];
+      key = 'u:' + n; label = raw.trim(); state = closed ? 'invalid' : 'unknown'; autoInvalid = closed;
+      const ov = overrides[key]; if (ov) autoInvalid = false;
       if (ov === 'valid') state = 'valid';
       else if (ov === 'invalid') state = 'invalid';
       else if (ov && typeof ov === 'object') {
@@ -263,6 +269,7 @@ export function groupUnique(
     g.members.push(pid);
     g.raw[pid] = raw;
     if (autoTypo) (g.auto ??= []).push(pid);
+    if (autoInvalid) g.autoInvalid = true;
     groups.set(key, g);
   }
   return [...groups.values()];
@@ -271,7 +278,7 @@ export function scoreUnique(groups: UniqueGroup[], pointsUnique: number, pointsS
   const out: Record<string, { points: number; kind: 'unique' | 'shared' | 'invalid' | 'unknown' }> = {};
   for (const g of groups) {
     for (const pid of g.members) {
-      if (g.state === 'valid') out[pid] = g.members.length === 1 ? { points: pointsUnique, kind: 'unique' } : { points: pointsShared, kind: 'shared' };
+      if (g.state === 'valid') out[pid] = g.members.length === 1 ? { points: pointsUnique, kind: 'unique' } : { points: 0, kind: 'shared' };   // mehrfach genannt = 0 Punkte (pointsShared ist veraltet)
       else out[pid] = { points: 0, kind: g.state === 'unknown' ? 'unknown' : 'invalid' };
     }
   }

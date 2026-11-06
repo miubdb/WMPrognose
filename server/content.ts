@@ -26,7 +26,7 @@ export function bookHash(book: Book): string {
 const J = <T>(s: string) => JSON.parse(s) as T;
 
 export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules>; /** fester Showablauf (optional) */ show?: ShowStep[] }
-export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4 };
+export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: '', winnerLine: '', boardTitle: '' };
 
 export function normalizePack(raw: any): PackData {
   const r = raw ?? {};
@@ -36,7 +36,9 @@ export function normalizePack(raw: any): PackData {
     name: s(r.name, 60), description: s(r.description, 300), categoryIds: Array.isArray(r.categoryIds) ? [...new Set<string>(r.categoryIds.map((x: unknown) => s(x, 80)).filter(Boolean))].slice(0, 20) : [],
     surprise: s(r.surprise, 80), final: s(r.final, 80),
     ...(Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x: any): ShowStep | null => (x?.k === 'board' ? { k: 'board' } : (x?.k === 'round' || x?.k === 'surprise' || x?.k === 'final') && s(x.cat, 80) ? { k: x.k, cat: s(x.cat, 80) } : null)).filter((x: ShowStep | null): x is ShowStep => !!x) } : {}),
-    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ['task', 'sequence', 'sort'].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle, tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6) },
+    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ['task', 'sequence', 'sort'].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle, tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6),
+      estimateBets: Array.isArray(r.rules?.estimateBets) ? [...new Set<number>(r.rules.estimateBets.map((x: unknown) => Math.trunc(Number(x))).filter((x: number) => Number.isFinite(x) && x >= 0 && x <= 1000))].sort((a: number, b: number) => a - b).slice(0, 5) : [],
+      estimateBonus: n(r.rules?.estimateBonus, 0, 0, 500), tagline: s(r.rules?.tagline, 80), winnerLine: s(r.rules?.winnerLine, 80), boardTitle: s(r.rules?.boardTitle, 30) },
   };
 }
 

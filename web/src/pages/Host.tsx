@@ -201,6 +201,10 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
       {st === 'intro' && <div><p>Regelkarte läuft auf dem TV. Wenn alle bereit sind:</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.begin' })}>{round.practice ? '▶ Proberunde starten' : `▶ Aufgabe ${round.scoredIndex} starten`}</button>{round.practice && <button className="btn ghost" disabled={busy} title="Probe überspringen – direkt zur ersten gewerteten Aufgabe" onClick={() => run({ k: 'h.skipTask' })}>⏭ Probe überspringen</button>}</div>}
 
       {st !== 'intro' && d?.solution && <div className="solution">🔑 Lösung (nur Host): <b>{Array.isArray(d.solution) ? d.solution.join(' › ') : d.solution}</b></div>}
+      {round.mode === 'unique' && st === 'open' && (round.data.live ?? []).length > 0 && (
+        <div className="card livein"><b>Eingehende Antworten</b> <span className="muted small">(nur in deiner Ansicht{round.data.closed ? ' · Liste vollständig: Unbekanntes wird automatisch ungültig' : ''})</span>
+          <ul className="rmembers">{round.data.live.map((l: any) => <li key={l.pid}><b>{view.players.find(p => p.id === l.pid)?.name}</b>: „{l.answer}“ <span className={`tag ${l.state === 'valid' ? 'ok' : l.state === 'invalid' ? 'warn' : ''}`}>{l.state === 'valid' ? `gültig${l.auto ? ' (Tippfehler → ' + l.label + ')' : l.label !== l.answer ? ' → ' + l.label : ''}` : l.state === 'invalid' ? 'ungültig (automatisch)' : 'unbekannt – wird geprüft'}</span></li>)}</ul></div>
+      )}
       {st !== 'intro' && st !== 'reveal' && <div className="muted">Abgegeben: <b>{answered}/{view.players.length}</b></div>}
 
       {timed && (
@@ -259,7 +263,7 @@ function ReviewList({ view, round, run }: { view: View; round: RoundView; run: R
       {groups.map(g => (
         <div key={g.key} className={`rgroup ${g.state}`}>
           <b>{g.label}</b>
-          <span className="tag">{g.state === 'valid' ? 'gültig' : g.state === 'invalid' ? 'ungültig' : 'unklar – bitte entscheiden'}</span>
+          <span className="tag">{g.state === 'valid' ? 'gültig' : g.state === 'invalid' ? (g.autoInvalid ? 'automatisch ungültig – korrigierbar' : 'ungültig') : 'unklar – bitte entscheiden'}</span>
           <ul className="rmembers">{g.members.map((m: string) => {
             const raw = g.raw?.[m]; const auto = g.auto?.includes(m);
             return <li key={m}><b>{nameOf(m)}</b> schrieb „{raw ?? g.label}“{auto && <> <span className="tag warn">Tippfehler automatisch als „{g.label}“ gewertet</span> <button className="btn tiny ghost" title="Diese Eingabe ist ein anderer Begriff – selbst entscheiden" onClick={() => run({ k: 'h.review', groupKey: 'u:' + normText(raw), decision: 'invalid' })}>✗ war etwas anderes</button></>}</li>;

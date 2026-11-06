@@ -78,21 +78,15 @@ test('Setz auf mich: Schätzung relativ (log), große Zahlen nicht benachteiligt
   assert.equal(z.b.place, 1);
 });
 
-test('Glitch: enge Trefferbox + Fingertoleranz, knapp daneben, Fehlschuss, keine Abgabe', () => {
-  // lange Textzeile: 300 breit, 30 hoch → Zone ist eine flache Box, kein riesiger Kreis
-  const zones = [{ x: 500, y: 300, r: 150, hw: 150, hh: 15 }];
+test('Glitch: nur Treffer (volle Punkte) oder 0 – keine Trostpunkte; enge Box + Fingertoleranz; kein Fehlalarm', () => {
+  const zones = [{ x: 500, y: 300, r: 150, hw: 150, hh: 15 }];   // lange Textzeile: flache Box
   assert.equal(scoreGlitch({ x: 500, y: 300 }, zones, 250).points, 250);
   assert.equal(scoreGlitch({ x: 640, y: 310 }, zones, 250).points, 250, 'innerhalb der Box');
-  const finger = scoreGlitch({ x: 500, y: 340 }, zones, 250);   // 25 px unter der Box – noch Fingertoleranz
-  assert.ok(finger.hit && finger.points >= 212 && finger.points < 250, String(finger.points));
-  assert.ok(!scoreGlitch({ x: 500, y: 400 }, zones, 250).hit, '100 px über/unter der Zeile ist kein Treffer (alter Kreis hätte getroffen)');
-  const near = scoreGlitch({ x: 500, y: 360 }, zones, 250);   // 45 px: knapp daneben
-  assert.ok(!near.hit && near.points > 0 && near.points < 25);
-  assert.equal(scoreGlitch({ x: 900, y: 500 }, zones, 250).points, 0);
+  assert.equal(scoreGlitch({ x: 500, y: 340 }, zones, 250).points, 250, '25 px unter der Box = Fingertoleranz → volle Punkte');
+  for (const dy of [51, 60, 80, 100, 200]) { const r = scoreGlitch({ x: 500, y: 300 + dy }, zones, 250); assert.equal(r.hit, false); assert.equal(r.points, 0, `dy=${dy}: keine Trostpunkte`); }
   assert.equal(scoreGlitch(undefined, zones, 250).points, 0);
-  // alte Kreiszonen funktionieren weiter
-  assert.equal(scoreGlitch({ x: 500, y: 300 }, [{ x: 500, y: 300, r: 50 }], 250).points, 250);
-  assert.ok(scoreGlitch({ x: 580, y: 300 }, [{ x: 500, y: 300, r: 50 }], 250).hit);
+  assert.equal(scoreGlitch({ x: 500, y: 300 }, [{ x: 500, y: 300, r: 50 }], 250).points, 250, 'alte Kreiszonen funktionieren weiter');
+  assert.equal(scoreGlitch({ x: 600, y: 300 }, [{ x: 500, y: 300, r: 50 }], 250).points, 0);
 });
 
 test('Glitch: alle mitgelieferten Szenen – Zonen eng, plausibel und lesbar', () => {
@@ -123,14 +117,14 @@ test('Einzigartig: Schreibweisen, Synonyme, Duplikate, Host-Entscheidung', () =>
   assert.equal(matchValid('Peru', valid), null);
   const groups = groupUnique({ a: 'Schweden', b: 'schweden', c: 'Serbien', d: 'Peru', e: 'Peru' }, valid);
   const res = scoreUnique(groups, 500, 150);
-  assert.equal(res.a.points, 150); assert.equal(res.b.points, 150);
+  assert.equal(res.a.points, 0, 'mehrfach genannt = 0'); assert.equal(res.b.points, 0);
   assert.equal(res.c.points, 500); assert.equal(res.d.points, 0); assert.equal(res.d.kind, 'unknown');
   // Host gibt "Peru" frei (wird als gültig, mehrfach gewertet) bzw. mappt auf Serbien
   const g2 = groupUnique({ a: 'Peru', b: 'Serbien' }, valid, { 'u:peru': 'valid' });
   assert.equal(scoreUnique(g2, 500, 150).a.points, 500);
   const g3 = groupUnique({ a: 'Peru', b: 'Serbien' }, valid, { 'u:peru': { mapTo: 'Serbien' } });
   const r3 = scoreUnique(g3, 500, 150);
-  assert.equal(r3.a.points, 150); assert.equal(r3.b.points, 150);
+  assert.equal(r3.a.points, 0); assert.equal(r3.b.points, 0);
   const g4 = groupUnique({ a: 'Peru' }, valid, { 'u:peru': 'invalid' });
   assert.equal(scoreUnique(g4, 500, 150).a.kind, 'invalid');
 });

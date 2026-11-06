@@ -7,7 +7,7 @@ import type { SeedShow } from '../server/content';
 
 export const SHOW2_PACK = {
   id: 'show-2',
-  name: 'Reus 65 Mio',
+  name: 'Reus 65 Mio (Version 1)',
   description: 'Der feste Showablauf mit Proberunden: 6 Spielmodi je 4 oder 5 gewertete Aufgaben, Überraschungsrunde EINZIGARTIG und FINAL LOCK. Sieger: Reus65Mio-Champion.',
   rules: { showTitle: 'Reus 65 Mio', winnerTitle: 'Reus65Mio-Champion', tasksPerMode: 4 },
 };
@@ -58,7 +58,7 @@ export const SHOW2_ROUNDS: SeedShow['rounds'] = [
   mk('s4-r5', 'SETZ AUF MICH', '🎯', C.GO, false, RB.est, ['s4-probe-estimate', 'v2-wahnsinnszahlen-1', 'v2-sport-und-pop-2', 'v2-sport-und-pop-1', 'v2-wahnsinnszahlen-2', 's3-est-isner']),
   mk('s4-r6', 'DIE VERBINDUNG', '🔗', C.BL, true, RB.link, ['s4-probe-link', 'v2-wer-oder-was-2', 'v2-wer-oder-was-1', 's3-link-pele', 'v2-wer-oder-was-3', 's3-link-oktoberfest']),
   { id: 's4-sur', title: 'EINZIGARTIG', topic: 'Überraschungsrunde', icon: '✨', color: C.PK, kind: 'surprise' as const, football: false,
-    blurb: 'Nenne eine gültige Antwort – aber bloß keine, die auch ein anderer nennt! Einzigartige Antworten bringen die meisten Punkte, doppelte nur wenige.',
+    blurb: 'Nenne eine gültige Antwort – aber bloß keine, die auch ein anderer nennt! Nur eine gültige Antwort, die kein anderer nennt, bringt Punkte – doppelte zählen 0.',
     taskIds: ['s4-probe-unique', 'v2-einzigartig-1', 'v2-einzigartig-2', 's3-unique-orchester'] },
 ];
 

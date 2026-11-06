@@ -88,6 +88,8 @@ export interface CodeTask {
 export interface UniqueTask {
   mode: 'unique';
   prompt: string;
+  /** Antwortliste ist vollständig: Unbekanntes wird automatisch als ungültig gewertet (z. B. Farben der Flagge) */
+  closed?: boolean;
   placeholder: string;
   valid: { name: string; variants: string[] }[];
   seconds: number;
@@ -133,6 +135,10 @@ export interface PackRules {
   showTitle?: string; winnerTitle?: string;
   /** Gewertete Aufgaben je regulärem Spielmodus im festen Showablauf: 4 = kompakte, 5 = längere Show (Proberunden zählen nicht). */
   tasksPerMode?: number;
+  /** SETZ AUF MICH: eigene Einsatzstufen (leer = je Frage) und Bonus für die beste Schätzung (0 = kein Bonus) */
+  estimateBets?: number[]; estimateBonus?: number;
+  /** persönliche Note: Zeile unter dem Showtitel, Zeile unter dem Sieger, Titel der Zwischenstände (z. B. „Marktwert-Update“) */
+  tagline?: string; winnerLine?: string; boardTitle?: string;
 }
 /** Ablaufmodell eines Raums: fester Showablauf (Standard) oder klassische Kategorienwand. */
 export type Flow = 'show' | 'classic';
@@ -243,7 +249,7 @@ export interface View {
     flow: Flow;
     /** Programmübersicht der festen Show (nur Flow 'show') */
     /** Branding aus den Paketregeln */
-    brand?: { title: string; winner: string };
+    brand?: { title: string; winner: string; tagline?: string; winnerLine?: string };
     /** kleines Live-Ranking am TV-Rand (Showmaster schaltet) */
     liveRank?: boolean;
     /** Hintergrundmusik (Showmaster): an/aus und Lautstärke 0–100 */

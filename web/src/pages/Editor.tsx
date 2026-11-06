@@ -5,11 +5,11 @@ import { Avatar, ACC_NAMES, BGS, FACE_NAMES, HAIR_COLORS, HAIR_NAMES, HAT_NAMES,
 
 type Tab = 'face' | 'hair' | 'hat' | 'shirt' | 'acc' | 'color';
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'face', label: 'Gesicht' }, { id: 'hair', label: 'Frisur' }, { id: 'hat', label: 'Kopf' }, { id: 'shirt', label: 'Trikot' }, { id: 'acc', label: 'Extras' }, { id: 'color', label: 'Farben' },
+  { id: 'color', label: '① Farben' }, { id: 'face', label: '② Gesicht' }, { id: 'hair', label: 'Frisur' }, { id: 'hat', label: 'Kopf' }, { id: 'shirt', label: 'Trikot' }, { id: 'acc', label: 'Extras' },
 ];
 
 export function AvatarEditor({ value, onChange }: { value: AvatarT; onChange: (a: AvatarT) => void }) {
-  const [tab, setTab] = useState<Tab>('face');
+  const [tab, setTab] = useState<Tab>('color');
   const set = (k: keyof AvatarT, v: number) => onChange({ ...value, [k]: v });
   const opts = (k: keyof AvatarT, names: string[]) => (
     <div className="optgrid">

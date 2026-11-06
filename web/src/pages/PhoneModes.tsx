@@ -413,7 +413,6 @@ function LinkPhone({ round, act, room, d }: Props & { d: any }) {
   const snd = useSender(act);
   const mine = d.mine;
   const [draft, setDraft, clear] = useDraft<string>(`${room}.${round.rid}.link`, '');
-  const [armed, setArmed] = useState(false);
   useEffect(() => { if (mine) clear(); /* eslint-disable-next-line */ }, [!!mine]);
   const now = d.points[d.level];
   const next = d.points[d.level + 1];
@@ -425,10 +424,11 @@ function LinkPhone({ round, act, room, d }: Props & { d: any }) {
       {round.stage === 'open' && !mine && <div className="center linkpts"><b>{now} Punkte</b> für eine richtige Antwort jetzt{next !== undefined ? <> · mit dem nächsten Hinweis nur noch {next}</> : ' (letzter Hinweis)'}</div>}
       {round.stage === 'open' && !mine ? (
         <>
-          <div className="inputrow"><input autoComplete="off" autoCapitalize="words" placeholder="Deine Lösung" value={draft} maxLength={80} onChange={e => { setDraft(e.target.value); setArmed(false); }} /></div>
+          <div className="inputrow"><input autoComplete="off" autoCapitalize="words" placeholder="Deine Lösung" value={draft} maxLength={80} onChange={e => setDraft(e.target.value)} /></div>
           <Status sent={false} draft={!!draft} sending={snd.state === 'sending'} msg={snd.msg} />
-          <button className={`btn wide ${armed ? 'gold' : 'primary'}`} disabled={!draft.trim() || snd.state === 'sending'} onClick={async () => { if (!armed) { setArmed(true); return; } await snd.send({ k: 'submit', payload: { answer: draft } }); setArmed(false); }}>
-            {armed ? 'Wirklich endgültig abgeben? (nur ein Versuch!)' : 'Lösung abgeben'}</button>
+          <button className="btn wide primary" disabled={!draft.trim() || snd.state === 'sending'} onClick={async () => { await snd.send({ k: 'submit', payload: { answer: draft } }); }}>
+            Endgültige Antwort abgeben</button>
+          <p className="muted center small">Du hast nur eine Antwort – nach dem Absenden ist sie endgültig.</p>
         </>
       ) : mine ? <><Status sent draft={false} /><div className="bignum">{mine.answer}</div><p className="muted center">Abgegeben nach Hinweis {mine.level + 1}. Die Antwort bleibt bis zur Auflösung verborgen.</p></>
         : <Waiting text="Zeit abgelaufen" sub="Gleich kommt die Auflösung." />}
@@ -447,7 +447,8 @@ function PhoneReveal({ round, view, pid }: Props) {
       <div className={`pts ${info.points > 0 ? 'pos' : info.points < 0 ? 'neg' : ''}`}>{info.points > 0 ? '+' : ''}{info.points}</div>
       <p>{info.text}</p>
       {round.mode === 'match' && rev?.rows && <div className="mreveal">{rev.pairs.map((pr: any, i: number) => { const r = rev.rows.find((x: any) => x.pid === pid); return <div key={i} className={`mr ${r?.marks?.[i] ? 'ok' : 'no'}`}>{r?.marks?.[i] ? '✓' : '✗'} {pr.left} → <b>{pr.right}</b></div>; })}</div>}
-      {round.mode === 'rank' && rev && (() => { const r = rev.rows.find((x: any) => x.pid === pid); if (!r || !r.placed) return null; return (
+      {round.mode === 'rank' && rev && rev.scoring === 'exact' && (() => { const r = rev.rows.find((x: any) => x.pid === pid); if (!r || !r.placed) return null; return <p className="small">{r.correct} von 5 Begriffen auf der richtigen Position – je {rev.perPos} Punkte.</p>; })()}
+      {round.mode === 'rank' && rev && rev.scoring !== 'exact' && (() => { const r = rev.rows.find((x: any) => x.pid === pid); if (!r || !r.placed) return null; return (
         <div className="pairs">
           <p className="small">Gewertet wird jedes Begriffspaar (10 Vergleiche, je {rev.perPair} P.): Steht von zwei Begriffen der richtige weiter oben?</p>
           {r.pairs.map((pr: any, i: number) => <div key={i} className={`pr ${pr.ok ? 'ok' : 'no'}`}>{pr.ok ? '✓' : '✗'} {rev.items[pr.a].text} <i>vor</i> {rev.items[pr.b].text}</div>)}
@@ -463,11 +464,11 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
   if (!rev) return none;
   switch (mode) {
     case 'geo': { const g = rev.guesses.find((x: any) => x.pid === pid); return g ? { points: g.points, title: `${g.km.toLocaleString('de-DE')} km entfernt`, text: `${g.points} Punkte` } : none; }
-    case 'rank': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.placed ? { points: r.points, title: 'Blind Rank', text: `${r.correct} von ${r.total} Paaren richtig` } : none; }
+    case 'rank': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.placed ? { points: r.points, title: 'Blind Rank', text: rev.scoring === 'exact' ? `${r.correct} von 5 Begriffen richtig platziert` : `${r.correct} von ${r.total} Paaren richtig` } : none; }
     case 'estimate': {
       const g = rev.guesses.find((x: any) => x.pid === pid); const b = rev.bets.find((x: any) => x.pid === pid);
-      const pts = (g?.points ?? 0) + (b?.delta ?? 0);
-      const t = [g ? `Schätzung: Platz ${g.place}${g.best ? ' 🎯' : ''}` : 'Keine Schätzung', b ? (b.won ? `Einsatz gewonnen (+${b.amount})` : `Einsatz verloren (${b.delta})`) : ''].filter(Boolean).join(' · ');
+      const pts = (g?.points ?? 0) + (g?.bonus ?? 0) + (b?.delta ?? 0);
+      const t = [g ? `Schätzung: Platz ${g.place}${g.best ? ' 🎯' : ''}${g.bonus ? ` · Bonus +${g.bonus}` : ''}` : 'Keine Schätzung', b ? (b.won ? `Einsatz gewonnen (+${b.amount})` : `Einsatz verloren (${b.delta})`) : ''].filter(Boolean).join(' · ');
       return { points: pts, title: `Lösung: ${rev.answer.toLocaleString('de-DE')} ${rev.unit}`, text: t };
     }
     case 'glitch': { const r = rev.rows.find((x: any) => x.pid === pid); return r?.tap ? { points: r.points, title: r.hit ? 'Treffer!' : 'Daneben', text: r.hit ? 'Genau erkannt.' : r.points ? 'Knapp daneben.' : 'Nicht getroffen.' } : none; }

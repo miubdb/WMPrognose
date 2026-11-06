@@ -429,6 +429,16 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
             <label className="field"><span>Showtitel (TV-Eröffnung)</span><input value={p.rules.showTitle ?? ''} maxLength={40} placeholder="OUTPLAY" onChange={e => set('rules', { ...p.rules, showTitle: e.target.value })} /></label>
             <label className="field"><span>Gewinnerbezeichnung (Siegerehrung)</span><input value={p.rules.winnerTitle ?? ''} maxLength={40} placeholder="OUTPLAY-Champion" onChange={e => set('rules', { ...p.rules, winnerTitle: e.target.value })} /></label>
           </div>
+          <div className="form2">
+            <label className="field"><span>SETZ AUF MICH – Einsatzstufen (Komma, leer = je Frage)</span><input value={(p.rules.estimateBets ?? []).join(', ')} placeholder="0, 50, 100" onChange={e => set('rules', { ...p.rules, estimateBets: e.target.value.split(/[ ,;]+/).filter(Boolean).map(Number).filter(n => Number.isFinite(n)) })} /></label>
+            <label className="field"><span>Bonus für die beste Schätzung (Punkte)</span><input inputMode="numeric" value={p.rules.estimateBonus ?? 0} onChange={e => set('rules', { ...p.rules, estimateBonus: Number(e.target.value) || 0 })} /></label>
+          </div>
+          <div className="card small"><b>Punktebalance SETZ AUF MICH:</b> je Aufgabe Rangpunkte nach Genauigkeit (bis zur Aufgabenpunktzahl, i. d. R. 300) {p.rules.estimateBonus ? <>+ <b>{p.rules.estimateBonus} Bonus</b> für die beste Schätzung (bei Gleichstand für alle Besten)</> : '(kein Bonus)'}; Wetten {(p.rules.estimateBets?.length ? p.rules.estimateBets : [0, 100, 200]).join(' / ')}: Gewinn = Einsatz, Verlust = Einsatz (nie unter 0) – reine Umverteilung. {p.rules.estimateBonus ? `Der Bonus ist größer als der höchste Einsatz (${Math.max(0, ...(p.rules.estimateBets ?? [0]))}) – wer am besten schätzt, gewinnt die Aufgabe, nicht der beste Wetter.` : ''}</div>
+          <div className="form2">
+            <label className="field"><span>Zeile unter dem Showtitel</span><input value={p.rules.tagline ?? ''} maxLength={80} placeholder="z. B. Dein persönlicher Kickbase-Abend" onChange={e => set('rules', { ...p.rules, tagline: e.target.value })} /></label>
+            <label className="field"><span>Zeile unter dem Sieger</span><input value={p.rules.winnerLine ?? ''} maxLength={80} onChange={e => set('rules', { ...p.rules, winnerLine: e.target.value })} /></label>
+            <label className="field"><span>Titel der Zwischenstände</span><input value={p.rules.boardTitle ?? ''} maxLength={30} placeholder="Zwischenstand" onChange={e => set('rules', { ...p.rules, boardTitle: e.target.value })} /></label>
+          </div>
           <p className="muted small">Paketname oben ändern. Änderungen gelten für neue Räume, sobald du das Paket neu veröffentlichst (neue Version); laufende Räume bleiben unverändert.</p>
         </details>
         {ana && <details className="more" open={ana.errors.length > 0}><summary>{ana.errors.length ? `⚠ ${ana.errors.length} Fehler` : '✓ Prüfung'}{a?.combos ? ` · ca. ${a.combos.minutesExpected.min}–${a.combos.minutesExpected.max} min` : ''}</summary>

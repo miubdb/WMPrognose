@@ -296,7 +296,7 @@ test('Einzigartig: Host kann unklare Antwort freigeben, mappen oder verwerfen', 
   pl(2, { k: 'submit', payload: { answer: 'Slowakai' } });   // Tippfehler → Slowakei
   assert.equal(room.round!.stage, 'review');
   host({ k: 'h.reveal' });
-  assert.equal(room.players[0].score, 150); assert.equal(room.players[1].score, 150); assert.equal(room.players[2].score, 500);
+  assert.equal(room.players[0].score, 0); assert.equal(room.players[1].score, 0); assert.equal(room.players[2].score, 500);   // mehrfach genannt = 0 Punkte
 });
 
 test('Einsatz nur aus vorhandenen Punkten: 0 Punkte = kein positiver Einsatz, Verlust exakt der Einsatz', () => {

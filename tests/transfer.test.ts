@@ -58,7 +58,7 @@ test('Transfer Online -> Lokal: vollständiger Spieleabend inkl. eigener Glitch-
   const dry = (await b.post('/import', { data: file, dryRun: true, publish: true })).data;
   assert.equal(dry.dryRun, true); assert.equal(dry.questions.created, 10); assert.equal(dry.scenes.created, 1);
   assert.equal((await b.get('/questions')).data.length, baseQ); assert.equal((await b.get('/scenes')).data.length, baseS);
-  assert.equal((await b.get('/packs')).data.length, 3, 'Trockenlauf legt kein Paket an');
+  assert.equal((await b.get('/packs')).data.length, 4, 'Trockenlauf legt kein Paket an');
   // 7) echter Import mit Prüfung + Veröffentlichung
   const imp = (await b.post('/import', { data: file, publish: true })).data;
   assert.deepEqual(imp.errors, []); assert.deepEqual(imp.warnings, []);
@@ -72,7 +72,7 @@ test('Transfer Online -> Lokal: vollständiger Spieleabend inkl. eigener Glitch-
   assert.deepEqual(importedQs.map(strip).sort(), exportedQs.map(strip).sort(), 'alle Fragen inkl. Antworten, Varianten, Zeiten und Punkte sind identisch');
   const sceneB = (await b.get('/scenes')).data.find((s: any) => s.title === 'Eigene Tabelle'); assert.ok(sceneB && !sceneB.builtin);
   assert.deepEqual(sceneB.template, scene.template); assert.equal(canonical({ items: sceneB.items, changes: sceneB.changes }), canonical({ items: scene.items, changes: scene.changes }));
-  const packB = (await b.get('/packs')).data.find((p: any) => p.id === pr.id); assert.deepEqual(packB.rules, { startCredit: 150, maxFootball: 1, maxPerMode: 6, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4 }); assert.equal(packB.categoryIds.length, 6); assert.equal(packB.currentVersion, 1);
+  const packB = (await b.get('/packs')).data.find((p: any) => p.id === pr.id); assert.deepEqual(packB.rules, { startCredit: 150, maxFootball: 1, maxPerMode: 6, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: '', winnerLine: '', boardTitle: '' }); assert.equal(packB.categoryIds.length, 6); assert.equal(packB.currentVersion, 1);
   const catTitles = packB.categoryIds.map((id: string) => (imp.idMap.categories && Object.values(imp.idMap.categories).includes(id)) ? id : id);
   assert.equal(catTitles.length, 6);
   const orderB = (await Promise.all(packB.categoryIds.map(async (id: string) => (await b.get('/categories/' + id)).data.title)));

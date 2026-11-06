@@ -66,10 +66,10 @@ test('BLIND RANK: Standard bleibt „nacheinander“; Paketregel „sort“ zeig
   const rev = g.view('tv').round!.reveal; const pts = (task: any) => task.points;
   const t = g.eng.curTask(g.room) as any; void pts;
   const row = (i: number) => rev.rows.find((r: any) => r.pid === g.ids[i]);
-  assert.equal(row(0).correct, 10); assert.equal(row(0).points, t.points); assert.equal(row(1).correct, 0); assert.equal(row(1).points, 0);
-  assert.equal(row(2).correct, 9); assert.equal(row(2).points, Math.round(t.points * 9 / 10));
-  assert.equal(row(2).pairs.length, 10); assert.equal(row(2).pairs.filter((p: any) => !p.ok).length, 1);
-  assert.equal(rankPairs(row(2).slots).correct, 9);
+  assert.equal(row(0).correct, 5); assert.equal(row(0).points, t.points);
+  assert.equal(rev.scoring, 'exact'); assert.equal(row(0).correct, 5);
+  assert.equal(row(2).correct, 3, 'Sortier-Variante: je Begriff auf exakt richtiger Position (2 vertauscht → 3 von 5)'); assert.equal(row(2).points, Math.round(t.points * 3 / 5));
+  assert.equal(row(1).correct, 1, 'umgekehrt: nur die Mitte stimmt'); assert.equal(row(1).points, Math.round(t.points / 5));
 });
 
 test('SETZ AUF MICH: Wettphase startet automatisch, bei Zeitablauf trotz fehlender Spieler, immer volle Wettzeit; Zähler und Erklärung', () => {
@@ -157,7 +157,7 @@ function reusGame(book: Book = REUS_COMPACT, n = 7) {
 }
 
 test('Reus 65 Mio: Paketname, Branding, Ablauf mit Zwischenständen nach R1, R3 und vor dem Finale', () => {
-  assert.equal(CS2.listPublished().find((p: any) => p.id === 'show-2')!.name, 'Reus 65 Mio');
+  assert.equal(CS2.listPublished().find((p: any) => p.id === 'show-3')!.name, 'Reus 65 Mio');
   assert.equal(REUS_COMPACT.rules!.winnerTitle, 'Reus65Mio-Champion'); assert.equal(REUS_COMPACT.rules!.showTitle, 'Reus 65 Mio');
   assert.deepEqual(REUS_COMPACT.show!.map(s => (s.k === 'board' ? 'board' : s.cat)), ['s4-r1', 'board', 's4-r2', 's4-r3', 'board', 's4-sur', 's4-r4', 's4-r5', 's4-r6', 'board', 's3-final']);
   const g = reusGame(); const v = g.view('tv'); assert.equal(v.room.brand!.winner, 'Reus65Mio-Champion'); assert.equal(v.room.brand!.title, 'Reus 65 Mio');
@@ -221,4 +221,111 @@ test('Alle sieben Probe-Aufgaben: spielbar bis zur Auflösung ohne Punktebuchung
     assert.equal(g.room.round?.tileId, tile, `phase=${g.room.phase} round=${g.room.round?.tileId}`); modes.add(playProbe());
   }
   assert.equal(modes.size, 7); assert.equal(total0(), start, 'Proberunden buchen niemals Punkte');
+});
+
+
+// ---------------------------------------------------------------- Praxistest 2
+const R3: Book = CS2.resolveBook('show-3@1');
+function r3game(n = 7, book: Book = R3) {
+  const eng = new Engine(() => book);
+  let now = 1_800_000_000_000;
+  const { room } = eng.newRoom('R3', now, 'show-3@1', 'show');
+  const ids: string[] = [];
+  for (let i = 0; i < n; i++) { const r = eng.join(room, `Bot${i + 1}`, AV, now); if (r.ok) ids.push(r.player.id); }
+  let rq = 0;
+  const host = (a: Action): any => eng.act(room, { role: 'host' }, `h${++rq}`, a, now);
+  const pl = (i: number, a: Action): any => eng.act(room, { role: 'player', pid: ids[i] }, `p${i}-${++rq}`, a, now);
+  const view = (who: number | 'host' | 'tv'): View => eng.buildView(room, who === 'host' ? { role: 'host' } : who === 'tv' ? { role: 'tv' } : { role: 'player', pid: ids[who] }, now);
+  const advance = (ms: number) => { now += ms; eng.tick(room, now); };
+  host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
+  const goto = (tile: string, task = 0) => {
+    for (let i = 0; i < 30 && (room.round?.tileId !== tile || room.phase !== 'round'); i++) host({ k: (room.phase as string) === 'scoreboard' ? 'h.continue' : 'h.skipTile' });
+    for (let i = 0; i < task; i++) host({ k: 'h.skipTask' });
+    assert.equal(room.round!.tileId, tile); assert.equal(room.round!.taskIndex, task);
+  };
+  return { eng, room, ids, host, pl, view, advance, goto };
+}
+
+test('Reus 65 Mio v2: Standard Sortier-Variante (50 Punkte je richtiger Position), Einsätze 0/50/100, Bonus 150, Branding/Kickbase-Note', () => {
+  assert.equal(R3.rules!.rankVariant, 'sort'); assert.deepEqual(R3.rules!.estimateBets, [0, 50, 100]); assert.equal(R3.rules!.estimateBonus, 150);
+  const g = r3game(); const b = g.view('tv').room.brand!; assert.equal(b.tagline, 'Dein persönlicher Kickbase-Abend'); assert.match(b.winnerLine!, /65 Mio/);
+  assert.equal(g.view('tv').room.agenda!.filter(a => a.k === 'board').length, 3);
+});
+
+test('BLIND RANK Reus: Sortier-Variante wertet je Begriff auf exakt richtiger Position 50 Punkte (max 250); klassische Variante bleibt Paarvergleich', () => {
+  const g = r3game(); g.goto('s5-r3', 1); g.host({ k: 'h.begin' });
+  const t = g.eng.curTask(g.room) as any; assert.equal(t.points, 250); assert.equal(g.view(0).round!.data.variant, 'sort');
+  const orders = [[0, 1, 2, 3, 4], [1, 0, 2, 3, 4], [4, 3, 2, 1, 0], [0, 1, 2, 4, 3], [1, 2, 3, 4, 0], [0, 1, 2, 3, 4]];
+  orders.forEach((o, i) => g.pl(i, { k: 'submit', payload: { order: o } }));   // Spieler 7 (Index 6) gibt nicht ab
+  g.advance(60_000); assert.equal(g.room.round!.stage, 'locked'); g.host({ k: 'h.reveal' });
+  const rev = g.view('tv').round!.reveal; const row = (i: number) => rev.rows.find((r: any) => r.pid === g.ids[i]);
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(i => row(i).points), [250, 150, 50, 150, 0, 250]);
+  assert.deepEqual(rev.missing, [g.ids[6]], 'Spieler ohne Abgabe steht in der Auflösung');
+  // klassisch (Paketregel „sequence“): Paarwertung bleibt
+  const c = r3game(7, { ...R3, rules: { ...R3.rules, rankVariant: 'sequence' } }); c.goto('s5-r3', 1); c.host({ k: 'h.begin' }); assert.equal(c.view(0).round!.data.variant, 'sequence');
+  for (let step = 0; step < 5 && c.room.round!.stage === 'open'; step++) { const tt = c.eng.curTask(c.room) as any; const st = c.room.round!.m.step; c.ids.forEach((_, i) => c.pl(i, { k: 'submit', payload: { step: st, slot: tt.order[st] } })); }
+  c.host({ k: 'h.reveal' }); const rv = c.view('tv').round!.reveal; assert.equal(rv.scoring, 'pairs'); assert.ok(rv.rows[0].pairs.length === 10);
+});
+
+test('SETZ AUF MICH Reus: nur Einsätze 0/50/100; beste Schätzung +150 (auch bei Gleichstand); beste Schätzung schlägt erfolgreiche Wette', () => {
+  const g = r3game(4); g.goto('s5-r5', 1); g.host({ k: 'h.begin' }); const t = g.eng.curTask(g.room) as any;
+  // A (0) beste Schätzung, B (1) 2. Platz, C (2) schlecht, D (3) schlecht aber setzt 100 auf A
+  [t.answer * 1.12, t.answer * 0.7, t.answer * 3, t.answer * 4].forEach((v, i) => g.pl(i, { k: 'submit', payload: { value: v } }));
+  assert.equal(g.room.round!.stage, 'bet'); assert.deepEqual(g.view(0).round!.data.bets, [0, 50, 100]); assert.equal(g.view(0).round!.data.bonus, 150);
+  assert.equal(g.pl(3, { k: 'submit', payload: { amount: 200, target: g.ids[0] } }).ok, false, '200 ist keine erlaubte Stufe mehr');
+  assert.ok(g.pl(3, { k: 'submit', payload: { amount: 100, target: g.ids[0] } }).ok); assert.ok(g.pl(1, { k: 'submit', payload: { amount: 50, target: g.ids[2] } }).ok);
+  g.pl(0, { k: 'submit', payload: { amount: 0, target: null } }); g.pl(2, { k: 'submit', payload: { amount: 0, target: null } });
+  const before = g.room.players.map(p => p.score); g.host({ k: 'h.reveal' });
+  const d = g.room.players.map((p, i) => p.score - before[i]);
+  assert.ok(d[0] >= 150, 'A: Rangpunkte + 150 Bonus'); assert.ok(d[0] > d[3], 'beste Schätzung schlägt erfolgreiche Wette (D: Rangpunkte + 100)');
+  assert.equal(d[1] <= (g.eng.curTask(g.room) as any).points - 50 + 1, true);
+  const rev = g.view('tv').round!.reveal; assert.equal(rev.guesses.find((x: any) => x.best).bonus, 150); assert.match(rev.summary[0], /Bonus/);
+  // Gleichstand der besten Schätzung → beide Bonus
+  const h = r3game(3); h.goto('s5-r5', 1); h.host({ k: 'h.begin' }); const tt = h.eng.curTask(h.room) as any;
+  [tt.answer * 0.9, tt.answer * 0.9, tt.answer * 5].forEach((v, i) => h.pl(i, { k: 'submit', payload: { value: v } }));
+  h.advance(60_000); h.host({ k: 'h.reveal' }); const r2 = h.view('tv').round!.reveal; assert.equal(r2.guesses.filter((x: any) => x.bonus === 150).length, 2);
+});
+
+test('EINZIGARTIG Reus-Probe: Flagge = vollständige Liste → „Blau“ automatisch ungültig, Gelb = Gold; Mehrfach = 0; Host sieht Eingänge live nur privat und kann korrigieren', () => {
+  const g = r3game(); g.goto('s5-sur'); g.host({ k: 'h.begin' }); const t = g.eng.curTask(g.room) as any; assert.equal(t.closed, true);
+  g.pl(0, { k: 'submit', payload: { answer: 'Blau' } }); g.pl(1, { k: 'submit', payload: { answer: 'Rot' } }); g.pl(2, { k: 'submit', payload: { answer: 'rot' } }); g.pl(3, { k: 'submit', payload: { answer: 'Gelb' } });
+  const live = g.view('host').round!.data.live; assert.equal(live.length, 4); assert.equal(live.find((l: any) => l.answer === 'Blau').state, 'invalid'); assert.equal(live.find((l: any) => l.answer === 'Gelb').label, 'Gold');
+  for (const who of [5, 'tv'] as const) assert.equal(JSON.stringify(g.view(who).round!.data).includes('Blau'), false, 'Eingänge nur in der Host-Ansicht');
+  g.advance(60_000); assert.equal(g.room.round!.stage, 'review');
+  const groups = g.view('host').round!.data.groups; assert.equal(groups.find((x: any) => x.label === 'Blau').autoInvalid, true);
+  assert.ok(g.host({ k: 'h.reveal' }).ok, 'bei vollständiger Liste keine manuelle Prüfung nötig');
+  const res = g.view('tv').round!.reveal.results; assert.equal(res[g.ids[0]].points, 0); assert.equal(res[g.ids[1]].points, 0, 'Rot doppelt = 0'); assert.equal(res[g.ids[2]].points, 0); assert.equal(res[g.ids[3]].points, 500, 'Gelb = Gold, einmalig');
+  // Korrektur vor der Auflösung: Host erklärt „Blau“ ausnahmsweise für gültig
+  const h = r3game(); h.goto('s5-sur'); h.host({ k: 'h.begin' }); h.pl(0, { k: 'submit', payload: { answer: 'Blau' } }); h.advance(60_000);
+  const gr = h.view('host').round!.data.groups.find((x: any) => x.label === 'Blau'); h.host({ k: 'h.review', groupKey: gr.key, decision: 'valid' }); h.host({ k: 'h.reveal' });
+  assert.equal(h.view('tv').round!.reveal.results[h.ids[0]].points, 500);
+  // offene Liste (normale Frage): Unbekanntes bleibt „unklar“ und blockiert
+  const o = r3game(); o.goto('s5-sur', 1); o.host({ k: 'h.begin' }); o.pl(0, { k: 'submit', payload: { answer: 'Fantasiewort' } }); o.advance(60_000);
+  assert.equal(o.host({ k: 'h.reveal' }).ok, false);
+});
+
+test('Alle Spieler in jeder Auflösung: Nicht-Abgeber stehen in reveal.missing (Geo, Glitch, Match, Link)', () => {
+  for (const [tile, task] of [['s5-r1', 1], ['s5-r4', 1], ['s5-r2', 1], ['s5-r6', 1]] as [string, number][]) {
+    const g = r3game(); g.goto(tile, task); g.host({ k: 'h.begin' }); const t = g.eng.curTask(g.room) as any;
+    for (let s = 0; s < 6 && ['view', 'open'].includes(g.room.round!.stage); s++) { if (g.room.round!.stage === 'view') { g.advance(30_000); continue; } if (t.mode === 'geo') g.pl(0, { k: 'submit', payload: { lat: t.answer.lat, lon: t.answer.lon } }); if (t.mode === 'glitch') g.pl(0, { k: 'submit', payload: { x: 5, y: 5 } }); if (t.mode === 'match') g.pl(0, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5], final: true } }); if (t.mode === 'link') g.pl(0, { k: 'submit', payload: { answer: 'x' } }); g.host({ k: 'h.lock' }); }
+    for (const gr of (g.view('host').round!.data.groups ?? [])) if (gr.state === 'unknown') g.host({ k: 'h.review', groupKey: gr.key, decision: 'invalid' });
+    g.host({ k: 'h.reveal' }); const rev = g.view('tv').round!.reveal;
+    assert.deepEqual([...rev.missing].sort(), g.ids.slice(1).sort(), `${tile}: ${t.mode}`);
+    if (t.mode === 'match') assert.equal(rev.rows.length, 7, 'Match: alle 7 Zeilen vorhanden'), assert.equal(rev.rows.filter((r: any) => !r.submitted).length, 6);
+  }
+});
+
+test('GLITCH (Reus): Treffer = volle Punkte, Daneben/keine Abgabe = 0, keine Trostpunkte, Trefferzonen aller Reus-Szenen enthalten das Zentrum', () => {
+  const g = r3game(); g.goto('s5-r4', 1); g.host({ k: 'h.begin' }); const t = g.eng.curTask(g.room) as any; g.advance(t.viewSeconds * 1000 + 500); const z = g.view('host').round!.data.zones[0];
+  g.pl(0, { k: 'submit', payload: { x: z.x, y: z.y } }); g.pl(1, { k: 'submit', payload: { x: z.x + z.hw + 45, y: z.y } }); g.pl(2, { k: 'submit', payload: { x: z.x + z.hw + 80, y: z.y } });
+  g.host({ k: 'h.lock' }); g.host({ k: 'h.reveal' }); const rows = g.view('tv').round!.reveal.rows;
+  assert.equal(rows.find((r: any) => r.pid === g.ids[0]).points, t.points);
+  for (const i of [1, 2, 3]) assert.equal(rows.find((r: any) => r.pid === g.ids[i]).points, 0, `Spieler ${i + 1}: keine Trostpunkte`);
+});
+
+test('DIE VERBINDUNG: Antwort in einem Schritt abgegeben, TV-Zähler „x von y“, Eingaben bleiben geheim', () => {
+  const g = r3game(); g.goto('s5-r6', 1); g.host({ k: 'h.begin' }); const t = g.eng.curTask(g.room) as any;
+  g.pl(0, { k: 'submit', payload: { answer: t.answer } }); g.pl(1, { k: 'submit', payload: { answer: 'GeheimeAntwort' } });
+  const d = g.view('tv').round!.data; assert.equal(d.answeredCount, 2); assert.equal(d.playerCount, 7);
+  for (const who of ['tv', 3] as const) assert.equal(JSON.stringify(g.view(who).round!).includes('GeheimeAntwort'), false);
 });
