@@ -84,7 +84,7 @@ const click = async (re, ms = 6000) => { const b = hostPage.getByRole('button', 
 await hostPage.waitForFunction(n => document.querySelectorAll('.plist li').length === n, 7);
 await click(/Lobby schließen/);
 await tv.waitForSelector('.introgrid'); check(true, 'TV zeigt Eröffnung (Kandidatenvorstellung)');
-await sleep(1500); check(await tv.locator('.agenda').count() === 0 && (await tv.locator('.showtitle').innerText()).includes('Reus 65 Mio'), 'Eröffnung: ruhig, ohne Modus-Liste, mit Showtitel „Reus 65 Mio“');
+await sleep(1500); check(await tv.locator('.agenda').count() === 0 && (await tv.locator('.showtitle').textContent()).includes('Reus 65 Mio'), 'Eröffnung: ruhig, ohne Modus-Liste, mit Showtitel „Reus 65 Mio“');
 await sleep(5200);
 await click(/Weiter zur ersten Runde/);
 await sleep(800);
@@ -174,7 +174,7 @@ console.log('  Endstand:', hostView.players.map(p => `${p.name} ${p.score}`).joi
 for (let i = 0; i < 12 && (hostView.ceremony?.step ?? 0) < hostView.ceremony.steps - 1; i++) { await click(/Nächster Schritt/); await sleep(700); if (i === 0) await shot(tv, `${SHOTS}/tv-ceremony-1.png`); }
 await sleep(800); await shot(tv, `${SHOTS}/tv-ceremony-end.png`);
 check(hostView.ceremony.step === hostView.ceremony.steps - 1, 'Siegerehrung bis zum Schluss durchgeklickt');
-brandOk = (await tv.locator('.winnerbanner').innerText().catch(() => '')).includes('Reus65Mio-Champion');
+brandOk = (await tv.locator('.winnerbanner').textContent().catch(() => '')).includes('Reus65Mio-Champion');
 check(brandOk, 'Siegerehrung zeigt „Reus65Mio-Champion“');
 await browser.close(); await phoneBrowser.close(); srv.kill('SIGKILL');
 console.log(failures ? `\n${failures} FEHLER` : '\nALLES OK'); process.exit(failures ? 1 : 0);
