@@ -723,7 +723,7 @@ export class Engine {
       blurb: tile.blurb, taskIndex: r.taskIndex, taskCount: tile.tasks.length, practice: !!c.task.practice,
       scoredIndex: c.task.practice ? 0 : tile.tasks.slice(0, r.taskIndex + 1).filter(x => !x.practice).length, scoredCount: tile.tasks.filter(x => !x.practice).length, stage: r.stage,
       deadline: r.deadline, pausedLeft: r.pausedLeft, stageSeconds: r.stageSeconds,
-      points: mode.maxPoints(c.task), data, reveal,
+      points: c.task.mode === 'unique' && c.rules?.uniquePoints ? c.rules.uniquePoints : mode.maxPoints(c.task), data, reveal,
     };
   }
   private revealView(rev: any, _aud: Audience) { return rev ?? null; }

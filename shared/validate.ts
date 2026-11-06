@@ -31,6 +31,7 @@ const strList = (v: unknown, max: number, len = 80) => (Array.isArray(v) ? v.map
 export function normalizeTask(raw: any): TaskDef {
   const t = normalizeTaskCore(raw);
   if (raw?.practice === true) (t as any).practice = true;
+  if (typeof raw?.review === 'string' && raw.review.trim()) (t as any).review = raw.review.trim().slice(0, 400);
   return t;
 }
 function normalizeTaskCore(raw: any): TaskDef {
@@ -134,7 +135,7 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
 export const CATEGORY_KINDS = ['tile', 'surprise', 'final'] as const;
 export type CategoryKind = typeof CATEGORY_KINDS[number];
 export interface CategoryData { title: string; topic: string; icon: string; color: string; kind: CategoryKind; football: boolean; blurb: string; taskIds: string[]; disabled?: boolean }
-export const BUDGET: Record<CategoryKind, number> = { tile: 1500, surprise: 1500, final: 2000 };
+export const BUDGET: Record<CategoryKind, number> = { tile: 1800, surprise: 3000, final: 2000 };
 
 export function normalizeCategory(raw: any): CategoryData {
   const r = raw ?? {};

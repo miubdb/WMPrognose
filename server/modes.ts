@@ -423,6 +423,7 @@ function uniqueGroups(c: Ctx) {
   for (const p of c.players) if (c.round.pm[p.id]?.answer) answers[p.id] = c.round.pm[p.id].answer;
   return groupUnique(answers, t.valid, c.round.m?.overrides ?? {}, !!t.closed);
 }
+const uniquePts = (c: Ctx) => (c.rules?.uniquePoints ? c.rules.uniquePoints : (c.task as UniqueTask).pointsUnique);
 const unique: ModeImpl = {
   maxPoints: t => (t as UniqueTask).pointsUnique,
   begin(c) { c.round.m = { overrides: {} }; c.setStage('open', (c.task as UniqueTask).seconds); },
@@ -446,17 +447,17 @@ const unique: ModeImpl = {
   score(c) {
     const t = c.task as UniqueTask;
     const groups = uniqueGroups(c);
-    const res = scoreUnique(groups, t.pointsUnique, t.pointsShared);
+    const res = scoreUnique(groups, uniquePts(c), t.pointsShared);
     const entries: Draft[] = Object.entries(res).map(([pid, r]) => ({
       pid, delta: r.points,
       label: r.kind === 'unique' ? 'Einzigartig!' : r.kind === 'shared' ? 'Mehrfach genannt · 0 Punkte' : 'Ungültige Antwort',
     }));
-    return { entries, reveal: { explain: t.explain, groups, results: res, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared, validNames: t.valid.map(v => v.name) } };
+    return { entries, reveal: { explain: t.explain, groups, results: res, pointsUnique: uniquePts(c), pointsShared: 0, validNames: t.valid.map(v => v.name) } };
   },
   view(c, a) {
     const t = c.task as UniqueTask;
     const st = c.round.stage;
-    const base: any = { prompt: t.prompt, placeholder: t.placeholder, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared };
+    const base: any = { prompt: t.prompt, placeholder: t.placeholder, pointsUnique: uniquePts(c), pointsShared: 0 };
     if (st === 'review' || st === 'locked' || st === 'reveal') base.groups = uniqueGroups(c);
     if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid] ?? null;
     if (a.role === 'host') {

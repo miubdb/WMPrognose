@@ -61,3 +61,13 @@ Die vorhandene Hintergrundmusik ist im Browser getestet: startet nicht von selbs
 ## Zurückgestellt
 - **Eigenes Foto statt Avatar:** nicht umgesetzt (Foto-Daten würden in jedem Live-Zustand an alle Geräte gehen – Risiko für den Spieleabend). Umgesetzt ist nur die neue Reihenfolge im Avatar-Editor: zuerst **① Farben**, dann **② Gesicht**, dann Frisur/Kopf/Trikot/Extras.
 - Keine Kartenänderung, keine Neu-Downloads.
+
+
+---
+
+# Best of 42 installieren (ohne Datenverlust)
+1. Server beenden, Ordner `data` kopieren (Sicherung). `git pull origin claude/upbeat-galileo-4el50u`, `OUTPLAY-STARTEN.bat` – nichts wird dabei verändert oder automatisch installiert (per Test auf einer bestehenden DB nachgewiesen).
+2. `/admin` → **Daten** → Karte „Neues Showpaket & Fragenpool verfügbar“ → **Installieren**. Der Server legt zuerst `data\backups\outplay-vor-installation-….db` an und ergänzt dann nur Fehlendes: 30 neue Fragen, 4 neue GLITCH-Szenen, 8 Kategorien und die Pakete **`show-4` „Reus 65 Mio – Best of 42“** und **`show-3z`** (Finale KICKBASE-KONSENS). Bestehende Fragen, Szenen, Kategorien und alle Paketversionen (`show-1`, `show-2`, `show-3`, `show-2k`, `standard-2`) bleiben byte-identisch.
+3. Admin → Pakete → „Best of 42“ → **Prüfen**: Die Warnungen zeigen die offenen Redaktionspunkte (siehe `docs/BESTOF42-REDAKTION.md`). Nicht freigegebene Aufgaben (v. a. C09 BVB-Ablösen, T05 Debütalter) bitte klären oder ersetzen.
+4. `/host` wählt automatisch das neueste Paket (Best of 42). **Sicherer Fallback:** `show-3` „Reus 65 Mio“ (31 Aufgaben, FINAL LOCK) bzw. `show-2k` – jederzeit im Paket-Dropdown wählbar.
+5. Die Datei `data\maps\outplay-karte.mbtiles` wird nie angefasst.

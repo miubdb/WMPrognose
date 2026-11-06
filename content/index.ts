@@ -6,5 +6,6 @@ export const BOOK: Book = { tiles: TILES };
 export const SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
 import { SEED_SHOW2 } from './show2';
 import { SEED_SHOW3, SEED_SHOW4 } from './show3';
-export const EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4];
-export { TILES, SEED_PACK, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4 };
+import { SEED_SHOW_B42, SEED_SHOW_B42K } from './bestof';
+export const EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K];
+export { TILES, SEED_PACK, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K };

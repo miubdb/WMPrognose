@@ -58,7 +58,7 @@ test('Initiale Vorlagen: alle bisherigen Inhalte sind im Admin sichtbar (Fragen,
   const cats = (await a.get('/categories')).data; assert.equal(cats.length, TILES.length + SEED_SHOW.rounds.length + EXTRA_SHOWS.reduce((n, x) => n + x.rounds.length, 0));
   assert.ok(cats.every((c: any) => c.problems.length === 0), JSON.stringify(cats.filter((c: any) => c.problems.length)));
   const packs = (await a.get('/packs')).data; const std = packs.find((p: any) => p.id === 'standard-2'); assert.ok(std); assert.equal(std.currentVersion, 1); assert.equal(std.status, 'published'); assert.ok(packs.some((p: any) => p.id === 'show-1' && p.status === 'published'));
-  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[]).map((p: any) => p.ref).sort().join(), 'show-1@1,show-2@1,show-2k@1,show-3@1,standard-2@1');
+  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[]).map((p: any) => p.ref).sort().join(), 'show-1@1,show-2@1,show-2k@1,show-3@1,show-3z@1,show-4@1,standard-2@1');
   // Filter & Suche
   assert.ok((await a.get('/questions?mode=geo')).data.every((q: any) => q.mode === 'geo'));
   assert.ok((await a.get('/questions?q=timbuktu')).data.length === 1);

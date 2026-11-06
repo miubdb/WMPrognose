@@ -9,7 +9,8 @@ import { mkdirSync, rmSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const { chromium, devices } = require('playwright');
 const { WebSocket } = require('ws');
-const { TILES, SEED_SHOW, SEED_SHOW2, SEED_SHOW3 } = await import('../../content/index.ts');
+const { TILES, SEED_SHOW, SEED_SHOW2, SEED_SHOW3, SEED_SHOW_B42 } = await import('../../content/index.ts');
+const BEST = process.env.PACK === 'best42';
 
 const PORT = 8092, BASE = `http://localhost:${PORT}`, DATA = '/tmp/outplay-show-e2e';
 const SHOTS = process.env.SHOTS ?? '/tmp/claude-0/shots-show';
@@ -22,8 +23,8 @@ const check = (c, m) => { if (c) console.log('• ✓', m); else { failures++; c
 // ---------- Aufgaben-Lookup (für sinnvolle Bot-Antworten) ----------
 const Q = new Map();
 for (const t of TILES) t.tasks.forEach((task, i) => Q.set(`${t.id}-${i + 1}`, task));
-for (const q of [...SEED_SHOW.pool, ...SEED_SHOW2.pool, ...SEED_SHOW3.pool]) Q.set(q.id, q.task);
-const ROUND = new Map([...SEED_SHOW.rounds, ...SEED_SHOW3.rounds].map(r => [r.id, r]));
+for (const q of [...SEED_SHOW.pool, ...SEED_SHOW2.pool, ...SEED_SHOW3.pool, ...SEED_SHOW_B42.pool]) Q.set(q.id, q.task);
+const ROUND = new Map([...SEED_SHOW.rounds, ...SEED_SHOW3.rounds, ...SEED_SHOW_B42.rounds].map(r => [r.id, r]));
 const taskOf = (tileId, idx) => Q.get(ROUND.get(tileId).taskIds[idx]);
 
 // ---------- Server ----------
@@ -110,7 +111,7 @@ const waitHost = async (pred, ms = 8000) => { const t0 = Date.now(); while (!pre
 // 6. Fahrplan
 const played = [], modesSeen = new Set(), tilesOrder = [], boards = [], shotModes = new Set();
 let liveSeen = 0, liveInFinal = 0, brandOk = false; let restarted = false, firstGeoUi = false, leaks = 0, safety = 0;
-const TILEIDS = ['s5-r1', 's5-r2', 's5-r3', 's5-sur', 's5-r4', 's5-r5', 's5-r6', 's3-final'];
+const P = BEST ? 'b42' : 's5'; const TILEIDS = [`${P}-r1`, `${P}-r2`, `${P}-r3`, `${P}-sur`, `${P}-r4`, `${P}-r5`, `${P}-r6`, 's3-final'];
 const practiceSeen = [];
 while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
   const v = hostView, ph = v.room.phase;
@@ -139,7 +140,7 @@ while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
       for (let i = 1; i < 6; i++) await send(phones[i], { lat: task.answer.lat + i, lon: task.answer.lon - i });
     } else await answer(mode, task, r.stage);
     // Serverneustart mitten in der Runde (einmalig, in Runde 2 / Aufgabe 2 nach abgegebenen Antworten)
-    if (!restarted && r.tileId === 's5-r2' && r.taskIndex === 2) {
+    if (!restarted && r.tileId === `${P}-r2` && r.taskIndex === 2) {
       restarted = true; const before = JSON.stringify({ t: hostView.round.tileId, i: hostView.round.taskIndex, sc: hostView.players.map(p => p.score) });
       hws.terminate(); phones.forEach(ph => ph.ws.terminate()); await stopServer(); await startServer(); await connectHost(); for (const ph of phones) await connectPhone(ph);
       const after = JSON.stringify({ t: hostView.round.tileId, i: hostView.round.taskIndex, sc: hostView.players.map(p => p.score) });
@@ -162,7 +163,7 @@ while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
   await sleep(250);
 }
 check(hostView.room.phase === 'ceremony', 'Siegerehrung erreicht');
-check(played.length === 38 && practiceSeen.length === 7, `31 gewertete Aufgaben + 7 Proberunden gespielt (${played.length}, davon Proben ${practiceSeen.length})`);
+const EXP = BEST ? 53 : 38; check(played.length === EXP && practiceSeen.length === 7, `${EXP - 7} gewertete Aufgaben (inkl. 4 Finale) + 7 Proberunden gespielt (${played.length}, davon Proben ${practiceSeen.length})`);
 check(JSON.stringify(tilesOrder) === JSON.stringify(TILEIDS), 'Rundenreihenfolge fest: ' + tilesOrder.join(' → '));
 check(modesSeen.size === 7, 'alle sieben Spielmodi gespielt: ' + [...modesSeen].join(', '));
 check(boards.length === 3, `genau 3 Zwischenstände vor dem Finale (${boards.length}): ` + boards.join(' // '));

@@ -17884,9 +17884,9 @@ var require_client_h1 = __commonJS({
         client2.emit("disconnect", client2[kUrl], [client2], err3);
         client2[kResume]();
       });
-      let closed = false;
+      let closed2 = false;
       socket.on("close", () => {
-        closed = true;
+        closed2 = true;
       });
       return {
         version: "h1",
@@ -17898,7 +17898,7 @@ var require_client_h1 = __commonJS({
           resumeH1(client);
         },
         destroy(err3, callback) {
-          if (closed) {
+          if (closed2) {
             queueMicrotask(callback);
           } else {
             socket.destroy(err3).on("close", callback);
@@ -18524,9 +18524,9 @@ var require_client_h2 = __commonJS({
         client.emit("disconnect", client[kUrl], [client], err3);
         client[kResume]();
       });
-      let closed = false;
+      let closed2 = false;
       socket.on("close", () => {
-        closed = true;
+        closed2 = true;
       });
       return {
         version: "h2",
@@ -18538,7 +18538,7 @@ var require_client_h2 = __commonJS({
           resumeH2(client);
         },
         destroy(err3, callback) {
-          if (closed) {
+          if (closed2) {
             queueMicrotask(callback);
           } else {
             socket.destroy(err3).on("close", callback);
@@ -33600,7 +33600,7 @@ function matchValidDetail(input, valid) {
   if (mine.some((m) => others.some((o) => typoDistance(m, o) <= lim + 2))) return null;
   return { name: target, kind: "typo" };
 }
-function groupUnique(answers, valid, overrides = {}, closed = false) {
+function groupUnique(answers, valid, overrides = {}, closed2 = false) {
   const groups = /* @__PURE__ */ new Map();
   for (const [pid, raw] of Object.entries(answers)) {
     const n = normText(raw);
@@ -33618,8 +33618,8 @@ function groupUnique(answers, valid, overrides = {}, closed = false) {
     } else {
       key = "u:" + n;
       label = raw.trim();
-      state = closed ? "invalid" : "unknown";
-      autoInvalid = closed;
+      state = closed2 ? "invalid" : "unknown";
+      autoInvalid = closed2;
       const ov = overrides[key];
       if (ov) autoInvalid = false;
       if (ov === "valid") state = "valid";
@@ -33689,6 +33689,7 @@ var strList = (v2, max2, len = 80) => Array.isArray(v2) ? v2.map((x3) => str(x3,
 function normalizeTask(raw) {
   const t = normalizeTaskCore(raw);
   if (raw?.practice === true) t.practice = true;
+  if (typeof raw?.review === "string" && raw.review.trim()) t.review = raw.review.trim().slice(0, 400);
   return t;
 }
 function normalizeTaskCore(raw) {
@@ -33848,7 +33849,7 @@ function validateTask(t, sceneExists = () => true) {
   return e;
 }
 var CATEGORY_KINDS = ["tile", "surprise", "final"];
-var BUDGET = { tile: 1500, surprise: 1500, final: 2e3 };
+var BUDGET = { tile: 1800, surprise: 3e3, final: 2e3 };
 function normalizeCategory(raw) {
   const r = raw ?? {};
   return {
@@ -34001,26 +34002,26 @@ var AVG = 0.85;
 var SLOW = 1.3;
 function taskSeconds(t, m = "expected") {
   const a = m === "max" ? 1 : AVG;
-  const rv = (x3) => m === "max" ? x3 * SLOW : x3;
+  const rv2 = (x3) => m === "max" ? x3 * SLOW : x3;
   switch (t.mode) {
     case "geo":
-      return { play: (t.practice ? t.seconds : Math.max(60, t.seconds)) * a, reveal: rv(38) };
+      return { play: (t.practice ? t.seconds : Math.max(60, t.seconds)) * a, reveal: rv2(38) };
     case "rank":
-      return { play: t.items.length * (t.secondsPerItem * (m === "max" ? 1 : 0.75) + 1.5), reveal: rv(55) };
+      return { play: t.items.length * (t.secondsPerItem * (m === "max" ? 1 : 0.75) + 1.5), reveal: rv2(55) };
     case "estimate":
-      return { play: t.seconds * a + t.betSeconds * a, reveal: rv(55) };
+      return { play: t.seconds * a + t.betSeconds * a, reveal: rv2(55) };
     case "glitch":
-      return { play: t.viewSeconds + t.seconds * a, reveal: rv(32) };
+      return { play: t.viewSeconds + t.seconds * a, reveal: rv2(32) };
     case "codebreak":
-      return { play: t.seconds * a, reveal: rv(38) };
+      return { play: t.seconds * a, reveal: rv2(38) };
     case "match":
-      return { play: t.seconds * (m === "max" ? 1 : 0.9), reveal: rv(45) };
+      return { play: t.seconds * (m === "max" ? 1 : 0.9), reveal: rv2(45) };
     case "vote":
-      return { play: t.seconds * a, reveal: rv(40) };
+      return { play: t.seconds * a, reveal: rv2(40) };
     case "link":
-      return { play: t.clues.length * clueSecs(t) * (m === "max" ? 1 : 0.8) + (m === "max" ? 40 : 15), reveal: rv(45) };
+      return { play: t.clues.length * clueSecs(t) * (m === "max" ? 1 : 0.8) + (m === "max" ? 40 : 15), reveal: rv2(45) };
     case "unique":
-      return { play: t.seconds * a + (m === "max" ? 60 : 30), reveal: rv(50) };
+      return { play: t.seconds * a + (m === "max" ? 60 : 30), reveal: rv2(50) };
   }
 }
 function tileSeconds(tile, m = "expected", fixed = false) {
@@ -34169,7 +34170,7 @@ function bookHash(book) {
   return sha(canonical({ tiles, rules: book.rules ?? {} }));
 }
 var J2 = (s) => JSON.parse(s);
-var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: "", winnerLine: "", boardTitle: "" };
+var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: "", winnerLine: "", boardTitle: "", uniquePoints: 0 };
 function normalizePack(raw) {
   const r = raw ?? {};
   const s = (v2, m) => typeof v2 === "string" ? v2.trim().slice(0, m) : "";
@@ -34196,7 +34197,8 @@ function normalizePack(raw) {
       estimateBonus: n(r.rules?.estimateBonus, 0, 0, 500),
       tagline: s(r.rules?.tagline, 80),
       winnerLine: s(r.rules?.winnerLine, 80),
-      boardTitle: s(r.rules?.boardTitle, 30)
+      boardTitle: s(r.rules?.boardTitle, 30),
+      uniquePoints: n(r.rules?.uniquePoints, 0, 0, 1e3)
     }
   };
 }
@@ -34560,7 +34562,7 @@ var ContentService = class {
         for (const p of q2.problems) errors.push(`${label} \xB7 \u201E${q2.task.prompt.slice(0, 40)}\u201C: ${p}`);
         tasks.push(q2.task);
       }
-      if (kind === "tile" && pack.show?.length) {
+      if ((kind === "tile" || kind === "surprise") && pack.show?.length) {
         let reg2 = 0;
         const keep = [];
         for (const t of tasks) {
@@ -34573,6 +34575,7 @@ var ContentService = class {
         tasks.length = 0;
         tasks.push(...keep);
       }
+      for (const t of tasks) if (t.review) warnings.push(`${label} \xB7 \u201E${("prompt" in t ? t.prompt : "").slice(0, 45)}\u201C: Redaktion \u2013 ${t.review}`);
       if (c.points < c.budget * 0.8 && !c.problems.length && c.mode !== "estimate") warnings.push(`${label}: nur ${c.points} von ${c.budget} Punkten verteilt`);
       tiles.push({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, mode: tasks[0]?.mode ?? "geo", kind, football: c.football, blurb: c.blurb, tasks: JSON.parse(JSON.stringify(tasks)) });
     };
@@ -35233,6 +35236,89 @@ reg((() => {
   ];
   return { id: "ticket1", title: "Eintrittskarte", bg: "#241a3a", items, changes: { v5: { text: "21" } } };
 })());
+reg((() => {
+  const rows = [["Marco Reus", "Kauf", "6,5 Mio. \u20AC"], ["Jamal Musiala", "Kauf", "8,4 Mio. \u20AC"], ["Serhou Guirassy", "Verkauf", "7,9 Mio. \u20AC"], ["Florian Wirtz", "Kauf", "9,2 Mio. \u20AC"]];
+  const items = [
+    { id: "bg", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#0f1e14" },
+    { id: "hdr", t: "rect", x: 0, y: 0, w: 1e3, h: 90, fill: "#14532d" },
+    T4("hdr-t", 40, 58, "TRANSFERMARKT \xB7 MEINE LIGA (fiktiv)", 30, "#ffffff", { weight: 800 }),
+    T4("h0", 40, 140, "SPIELER", 18, "#86efac"),
+    T4("h1", 560, 140, "AKTION", 18, "#86efac"),
+    T4("h2", 960, 140, "PREIS", 18, "#86efac", { anchor: "end" })
+  ];
+  rows.forEach(([n, a, p], i2) => {
+    const y2 = 210 + i2 * 90;
+    items.push({ id: `bg${i2}`, t: "rect", x: 20, y: y2 - 44, w: 960, h: 72, fill: i2 % 2 ? "#132a1b" : "#18331f", rx: 10 });
+    items.push(T4(`n${i2}`, 40, y2, n, 34, "#ffffff", { weight: 700 }));
+    items.push(T4(`a${i2}`, 560, y2, a, 30, a === "Kauf" ? "#4ade80" : "#fca5a5"));
+    items.push(T4(i2 === 0 ? "reus-price" : `p${i2}`, 960, y2, p, 34, "#fde68a", { anchor: "end", mono: true, weight: 800 }));
+  });
+  return { id: "transfer1", title: "Transfer\xFCbersicht", bg: "#0f1e14", items, changes: { "reus-price": { text: "65,0 Mio. \u20AC" } } };
+})());
+reg((() => {
+  const rows = [["beer", "Bier 0,5 l", "5,20 \u20AC"], ["spezi", "Spezi 0,5 l", "4,00 \u20AC"], ["breze", "Breze", "3,00 \u20AC"], ["pfand", "Pfand", "2,00 \u20AC"]];
+  const items = [
+    { id: "bg", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#1c2a3a" },
+    { id: "board", t: "rect", x: 120, y: 30, w: 760, h: 540, fill: "#f8fafc", rx: 16 },
+    T4("title", 500, 110, "STADIONKIOSK \xB7 NORD", 40, "#0f172a", { anchor: "middle", weight: 800 }),
+    { id: "sep", t: "line", x: 170, y: 140, x2: 830, y2: 140, stroke: "#94a3b8", sw: 3 }
+  ];
+  rows.forEach(([id, n, p], i2) => {
+    const y2 = 235 + i2 * 85;
+    items.push(T4(id === "beer" ? "beer-name" : `n-${id}`, 180, y2, n, 40, "#0f172a", { weight: 700 }));
+    items.push(T4(`p-${id}`, 820, y2, p, 40, "#0f172a", { anchor: "end", mono: true, weight: 800 }));
+  });
+  return { id: "kiosk1", title: "Stadionkiosk", bg: "#1c2a3a", items, changes: { "beer-name": { text: "Bier 0,4 l" } } };
+})());
+reg((() => {
+  const rows = [
+    // Team, Sp, S, U, N, Tore für, Tore gegen
+    ["FC Nordstern", 10, 7, 2, 1, 22],
+    ["SV Rheinblick", 10, 6, 3, 1, 19],
+    ["Union Elbe", 10, 5, 3, 2, 17],
+    ["Dynamo S\xFCd", 10, 4, 3, 3, 15],
+    ["Borussia Ost", 10, 3, 3, 4, 12],
+    ["FSV K\xFCste", 10, 1, 2, 7, 9]
+  ];
+  const against = [8, 9, 11, 13, 14, 21];
+  const items = [
+    { id: "bg", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#111827" },
+    T4("title", 40, 60, "LIGATABELLE \xB7 10. SPIELTAG (fiktiv)", 30, "#fbbf24", { weight: 800 }),
+    T4("h0", 40, 112, "TEAM", 18, "#94a3b8"),
+    T4("h1", 520, 112, "SP", 18, "#94a3b8", { anchor: "end" }),
+    T4("h2", 600, 112, "TORE", 18, "#94a3b8", { anchor: "end" }),
+    T4("h3", 760, 112, "DIFF", 18, "#94a3b8", { anchor: "end" }),
+    T4("h4", 940, 112, "PKT", 18, "#94a3b8", { anchor: "end" })
+  ];
+  rows.forEach(([n, sp, w2, d2, , gf], i2) => {
+    const y2 = 172 + i2 * 74, diff = gf - against[i2];
+    items.push({ id: `bg${i2}`, t: "rect", x: 20, y: y2 - 42, w: 960, h: 62, fill: i2 % 2 ? "#1f2937" : "#273449", rx: 8 });
+    items.push(T4(`n${i2}`, 40, y2, `${i2 + 1}. ${n}`, 28, "#ffffff", { weight: 600 }));
+    items.push(T4(`sp${i2}`, 520, y2, String(sp), 28, "#cbd5e1", { anchor: "end", mono: true }));
+    items.push(T4(`g${i2}`, 640, y2, `${gf}:${against[i2]}`, 28, "#cbd5e1", { anchor: "end", mono: true }));
+    items.push(T4(i2 === 0 ? "diff-first" : `df${i2}`, 760, y2, (diff > 0 ? "+" : diff < 0 ? "\u2212" : "") + Math.abs(diff), 28, "#38bdf8", { anchor: "end", mono: true, weight: 800 }));
+    items.push(T4(`p${i2}`, 940, y2, String(3 * w2 + d2), 30, "#fbbf24", { anchor: "end", weight: 800, mono: true }));
+  });
+  return { id: "table2", title: "Tabelle mit Tordifferenz", bg: "#111827", items, changes: { "diff-first": { text: "\u221214" } } };
+})());
+reg((() => {
+  const rows = [["4 Helles", "20,00 \u20AC"], ["2 Spezi", "8,00 \u20AC"], ["K\xE4sesp\xE4tzle", "13,50 \u20AC"], ["2 Pommes", "11,00 \u20AC"]];
+  const items = [
+    { id: "bg", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#3a3a44" },
+    { id: "paper", t: "rect", x: 230, y: 10, w: 540, h: 580, fill: "#f6f1e4", rx: 6 },
+    T4("title", 500, 70, "BIERGARTEN AM ECK", 30, "#222222", { anchor: "middle", weight: 800 }),
+    { id: "sep0", t: "line", x: 260, y: 95, x2: 740, y2: 95, stroke: "#999999", sw: 2 }
+  ];
+  rows.forEach(([n, p], i2) => {
+    const y2 = 170 + i2 * 70;
+    items.push(T4(`n${i2}`, 265, y2, n, 30, "#222222"));
+    items.push(T4(`p${i2}`, 735, y2, p, 30, "#222222", { anchor: "end", mono: true }));
+  });
+  items.push({ id: "sep1", t: "line", x: 260, y: 470, x2: 740, y2: 470, stroke: "#999999", sw: 2 });
+  items.push(T4("sum", 265, 535, "SUMME", 34, "#222222", { weight: 800 }));
+  items.push(T4("sum-value", 735, 535, "52,50 \u20AC", 34, "#222222", { anchor: "end", weight: 800, mono: true }));
+  return { id: "receipt2", title: "Kassenbon", bg: "#3a3a44", items, changes: { "sum-value": { text: "525,00 \u20AC" } } };
+})());
 
 // server/modes.ts
 var err2 = (e) => ({ ok: false, err: e });
@@ -35625,6 +35711,7 @@ function uniqueGroups(c) {
   for (const p of c.players) if (c.round.pm[p.id]?.answer) answers[p.id] = c.round.pm[p.id].answer;
   return groupUnique(answers, t.valid, c.round.m?.overrides ?? {}, !!t.closed);
 }
+var uniquePts = (c) => c.rules?.uniquePoints ? c.rules.uniquePoints : c.task.pointsUnique;
 var unique = {
   maxPoints: (t) => t.pointsUnique,
   begin(c) {
@@ -35655,18 +35742,18 @@ var unique = {
   score(c) {
     const t = c.task;
     const groups = uniqueGroups(c);
-    const res = scoreUnique(groups, t.pointsUnique, t.pointsShared);
+    const res = scoreUnique(groups, uniquePts(c), t.pointsShared);
     const entries = Object.entries(res).map(([pid, r]) => ({
       pid,
       delta: r.points,
       label: r.kind === "unique" ? "Einzigartig!" : r.kind === "shared" ? "Mehrfach genannt \xB7 0 Punkte" : "Ung\xFCltige Antwort"
     }));
-    return { entries, reveal: { explain: t.explain, groups, results: res, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared, validNames: t.valid.map((v2) => v2.name) } };
+    return { entries, reveal: { explain: t.explain, groups, results: res, pointsUnique: uniquePts(c), pointsShared: 0, validNames: t.valid.map((v2) => v2.name) } };
   },
   view(c, a) {
     const t = c.task;
     const st = c.round.stage;
-    const base = { prompt: t.prompt, placeholder: t.placeholder, pointsUnique: t.pointsUnique, pointsShared: t.pointsShared };
+    const base = { prompt: t.prompt, placeholder: t.placeholder, pointsUnique: uniquePts(c), pointsShared: 0 };
     if (st === "review" || st === "locked" || st === "reveal") base.groups = uniqueGroups(c);
     if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid] ?? null;
     if (a.role === "host") {
@@ -36776,7 +36863,7 @@ var Engine = class _Engine {
       deadline: r.deadline,
       pausedLeft: r.pausedLeft,
       stageSeconds: r.stageSeconds,
-      points: mode.maxPoints(c.task),
+      points: c.task.mode === "unique" && c.rules?.uniquePoints ? c.rules.uniquePoints : mode.maxPoints(c.task),
       data,
       reveal
     };
@@ -38483,9 +38570,332 @@ var SEED_SHOW4 = {
   steps: SHOW4_STEPS
 };
 
+// content/bestof.ts
+var rv = (q2, note) => ({ ...q2, task: { ...q2.task, review: note } });
+var closed = (q2) => ({ ...q2, task: { ...q2.task, closed: true } });
+var BESTOF_NEW = [
+  // ===== WO ZUR HÖLLE? (60 s, Punkte nach Entfernung)
+  geo2(
+    "b42-geo-c02",
+    "Fu\xDFball",
+    "world",
+    60,
+    250,
+    "Marco Reus gewann mit 35 Jahren seinen ersten Meistertitel. Wo wurde der entscheidende Titel gewonnen?",
+    33.8644,
+    -118.2611,
+    "Dignity Health Sports Park, Carson (Kalifornien, USA)",
+    "MLS-Cup-Finale LA Galaxy \u2013 New York Red Bulls 2:1 am 7. Dezember 2024. Zw\xF6lf Jahre beim BVB ohne Meisterschale, dann nach vier Monaten in Los Angeles Meister."
+  ),
+  rv(
+    geo2(
+      "b42-geo-c04",
+      "Andere Themen",
+      "europe",
+      60,
+      250,
+      "In welchem Ort st\xFCrzen sich jedes Jahr Menschen einen extrem steilen Hang hinunter, weil vor ihnen ein K\xE4selaib ins Tal rollt?",
+      51.8299,
+      -2.1581,
+      "Cooper\u2019s Hill bei Brockworth, Gloucestershire (England)",
+      "2025 gewann ein YouTuber aus M\xFCnchen zum zweiten Mal in Folge. Der K\xE4se rollt vorweg \u2013 und wird fast nie eingeholt."
+    ),
+    "Koordinate gepr\xFCft (Wikipedia 51,8299 N / 2,1581 W). Reveal-Detail \u201EYouTuber aus M\xFCnchen 2025\u201C stammt aus der Jury-Karte (AP-Quelle genannt), von uns nicht erneut belegt."
+  ),
+  geo2(
+    "b42-geo-t01",
+    "Fu\xDFball",
+    "europe",
+    60,
+    250,
+    "F\xFCr die EM 2004 baute ein europ\xE4ischer Verein ein Fu\xDFballstadion in einen ehemaligen Steinbruch. Hinter einem Tor steht eine riesige Felswand. Wo?",
+    41.5625,
+    -8.43,
+    "Est\xE1dio Municipal de Braga, Portugal",
+    "Nur zwei gro\xDFe Seitentrib\xFCnen und eine steile Felswand hinter dem Tor \u2013 das \u201EEst\xE1dio Municipal de Braga\u201C hei\xDFt auch \u201EA Pedreira\u201C, der Steinbruch."
+  ),
+  geo2(
+    "b42-geo-c05",
+    "Andere Themen",
+    "world",
+    60,
+    250,
+    "Markiere den Punkt auf der Erde, der weiter von jedem St\xFCck Land entfernt ist als jeder andere Ort!",
+    -48.8767,
+    -123.3933,
+    "Point Nemo, S\xFCdpazifik",
+    "Point Nemo liegt rund 2.688 km vom n\xE4chsten Land entfernt (NOAA). Befindet sich die ISS genau dar\xFCber, sind Astronauten n\xE4her als Menschen an Land."
+  ),
+  // ===== MATCHMAKER (sechs eindeutige Paare)
+  rv(
+    match2("b42-match-t03", "Fu\xDFball", "Ordne jeden Star dem Verein zu, f\xFCr den er unmittelbar vor seinem gro\xDFen n\xE4chsten Transfersprung spielte.", [
+      ["Erling Haaland", "Molde FK"],
+      ["Mohamed Salah", "FC Basel"],
+      ["Jude Bellingham", "Birmingham City"],
+      ["Kevin De Bruyne", "KRC Genk"],
+      ["Robert Lewandowski", "Lech Posen"],
+      ["Heung-min Son", "Hamburger SV"]
+    ], [3, 5, 1, 4, 0, 2], "Nicht das teuerste Team, sondern der \xFCbersehene letzte Schritt vor dem Durchbruch ist entscheidend."),
+    "Vorbehalt: \u201ETransfersprung\u201C muss eindeutig definiert werden. Haaland wechselte von Molde zun\xE4chst zu Red Bull Salzburg (nicht zum BVB). Die \xFCbrigen f\xFCnf Zuordnungen sind unstrittig (Salah \u2192 Chelsea, Bellingham \u2192 BVB, De Bruyne \u2192 Chelsea, Lewandowski \u2192 BVB, Son \u2192 Leverkusen)."
+  ),
+  rv(
+    match2("b42-match-c08", "Andere Themen", "Wozu wurde dieses Produkt urspr\xFCnglich entwickelt bzw. woraus entstand es?", [
+      ["Play-Doh", "Tapetenreiniger"],
+      ["Luftpolsterfolie", "dekorative Struktur-Tapete"],
+      ["Slinky", "Feder zur Stabilisierung von Schiffs-Instrumenten"],
+      ["Listerine", "antiseptisches Mittel"],
+      ["Viagra", "Behandlung von Angina pectoris"],
+      ["Coca-Cola", "als Tonikum verkauftes Apothekengetr\xE4nk"]
+    ], [2, 4, 0, 5, 1, 3], "Tapetenreiniger wird Knete, missgl\xFCckte Tapete wird Verpackungsmaterial."),
+    "Teilgepr\xFCft: Slinky (Schiffsinstrumente), Listerine (antiseptisch) und Viagra (Herzmittel: Bluthochdruck/Angina) sind nur durch Sekund\xE4rquellen gest\xFCtzt \u2013 vor dem Abend je Produkt eine Prim\xE4rquelle erg\xE4nzen."
+  ),
+  rv(
+    match2("b42-match-c06", "Fu\xDFball", "Sechs Maskottchen \u2013 welcher Bundesliga-Verein geh\xF6rt dazu?", [
+      ["Fritzle", "VfB Stuttgart"],
+      ["Hoffi", "TSG Hoffenheim"],
+      ["Emma", "Borussia Dortmund"],
+      ["J\xFCnter", "Borussia M\xF6nchengladbach"],
+      ["Bulli", "RB Leipzig"],
+      ["Berni", "FC Bayern"]
+    ], [5, 2, 0, 4, 3, 1], "Echte \xDCberraschungen: Ein Krokodil, ein Elch, eine Biene, ein Fohlen, ein Bulle und ein B\xE4r."),
+    "Zuordnung per Websuche best\xE4tigt (Fritzle = Krokodil, Hoffi = Elch, Emma = Biene, J\xFCnter = Fohlen, Berni = B\xE4r; Bulli = RB-Leipzig-Bulle laut Jury). Optional: Maskottchenfotos bei der Aufl\xF6sung."
+  ),
+  rv(
+    match2("b42-match-c07", "Andere Themen", "Was bedeutet der Name dieser Marke wirklich?", [
+      ["Audi", "lateinisch f\xFCr \u201EHorch!\u201C"],
+      ["LEGO", "d\xE4nisch f\xFCr \u201Espiel gut\u201C"],
+      ["Haribo", "Hans Riegel, Bonn"],
+      ["IKEA", "Gr\xFCnderinitialen, Hof und Dorf"],
+      ["Nivea", "lateinisch: \u201Eschneewei\xDF\u201C"],
+      ["H\xE4agen-Dazs", "frei erfundener Kunstname"]
+    ], [4, 0, 5, 2, 1, 3], "Der pseudo-d\xE4nische Name H\xE4agen-Dazs ist gerade nicht D\xE4nisch."),
+    "Allgemein bekannte Markenherkunft (Audi = \xDCbersetzung von \u201EHorch\u201C, LEGO = \u201Eleg godt\u201C, HARIBO = Hans Riegel Bonn, IKEA = Ingvar Kamprad Elmtaryd Agunnaryd, Nivea = lat. niveus, H\xE4agen-Dazs = erfunden); Prim\xE4rquellen je Marke noch zu dokumentieren."
+  ),
+  // ===== WER WAR ZUERST? / SORTIEREN (alle fünf sichtbar, 50 Punkte je richtiger Position)
+  rv(
+    rank2("b42-rank-c09", "Fu\xDFball", "Ordne die gezahlten Sockelabl\xF6sen des BVB (ohne sp\xE4tere Boni), g\xFCnstigster Einkauf zuerst: Kagawa 2010, Sancho 2017, Haaland 2020, Bellingham 2020, Hummels-R\xFCckkehr 2019.", "g\xFCnstigster Einkauf", "teuerster Einkauf", [
+      ["Shinji Kagawa (2010)", "ca. 0,35 Mio. \u20AC"],
+      ["Jadon Sancho (2017)", "ca. 7,8 Mio. \u20AC"],
+      ["Erling Haaland (2020)", "ca. 20 Mio. \u20AC"],
+      ["Jude Bellingham (2020)", "ca. 23\u201325 Mio. \u20AC"],
+      ["Mats Hummels (2019)", "ca. 30,5 Mio. \u20AC"]
+    ], [3, 0, 4, 2, 1], "Der teuerste Einkauf war ein R\xFCckkehrer \u2013 der g\xFCnstigste ein Japaner f\xFCr Kleingeld."),
+    "NICHT FREIGEGEBEN: Abl\xF6sesummen widersprechen sich je nach Quelle (u. a. Sancho 7,8 vs. 20,6 Mio., Haaland 20 vs. 21,4 Mio., Hummels 30,5 vs. 38 Mio. inkl. Boni). Die Reihenfolge Sancho/Haaland ist definitionsabh\xE4ngig. Vor dem Abend eine einheitliche Quelle (z. B. Transfermarkt, Sockelabl\xF6se) festlegen oder die Aufgabe im Admin ersetzen (Vorschlag: v2-fussball-zeitreise-1, Gr\xFCndungsjahre)."
+  ),
+  rv(
+    rank2("b42-rank-c10", "Andere Themen", "Sortiere chronologisch, \xE4ltestes Ereignis zuerst.", "am l\xE4ngsten her", "am j\xFCngsten", [
+      ["Bau der Cheops-Pyramide", "um 2560 v. Chr."],
+      ["Die letzten Mammuts auf der Wrangelinsel", "um 2000 v. Chr."],
+      ["Beginn der Regentschaft Kleopatras", "51 v. Chr."],
+      ["Beginn des Lehrbetriebs in Oxford", "ab ca. 1096"],
+      ["Gr\xFCndung von Tenochtitlan", "1325"]
+    ], [2, 4, 0, 3, 1], "Mammuts lebten nach dem Pyramidenbau; in Oxford wurde schon vor der Gr\xFCndung der Aztekenhauptstadt gelehrt."),
+    "Jahreswerte antiker Vorg\xE4nge sind N\xE4herungen (Abst\xE4nde sind gro\xDF genug, Reihenfolge ist stabil). Mammut-Datum (Wrangelinsel, ca. 4.000 Jahre) aus der Jury-Karte."
+  ),
+  rv(
+    rank2("b42-rank-t05", "Fu\xDFball", "Sortiere nach Alter beim ersten Bundesligaspiel, j\xFCngster zuerst.", "j\xFCngster Deb\xFCtant", "\xE4ltester Deb\xFCtant", [
+      ["Niko Ili\u010Devi\u0107", "16 Jahre, 1 Tag"],
+      ["Linus G\xFCther", "16 Jahre, 3 Tage"],
+      ["Paul Wanner", "16 Jahre, 15 Tage"],
+      ["Louis Lemke", "16 Jahre, 214 Tage"],
+      ["Tom Bischof", "16 Jahre, 264 Tage"]
+    ], [4, 1, 3, 0, 2], "Ili\u010Devi\u0107 stellte am 1. November 2026 Moukokos Rekord ein; Moukoko ist bewusst nicht dabei, weil er den Rekord teilt."),
+    "VORBEHALT: Belegt sind Ili\u010Devi\u0107 (gleichauf mit Moukoko, 16 J. 1 Tag), G\xFCther (16 J. 3 Tage, Bundesliga.com) und Wanner (16 J. 15 Tage). Die Alter von Lemke (214 Tage) und Bischof (264 Tage) wurden nicht gefunden \u2013 vor der Show gegen Bundesliga.com pr\xFCfen; sonst im Admin ersetzen (Vorschlag: v2-fussball-zeitreise-1)."
+  ),
+  // ===== GLITCH (Original auf TV, Veränderung nur auf den Handys)
+  glitch2("b42-glitch-t07", "transfer1", "Merk dir die Transfer\xFCbersicht! (alle Daten fiktiv)", "Was hat sich ver\xE4ndert? Tippe darauf.", "Der Reus-Kaufpreis wurde von 6,5 auf 65,0 Mio. \u20AC verzehnfacht \u2013 der Name der Show taucht pl\xF6tzlich als Transferkatastrophe auf."),
+  glitch2("b42-glitch-c16", "kiosk1", "Merk dir die Preistafel!", "Was hat sich ver\xE4ndert? Tippe darauf.", "Aus \u201EBier 0,5 l\u201C wurde \u201EBier 0,4 l\u201C \u2013 weniger Bier zum selben Preis: der schlimmste Glitch Bayerns."),
+  glitch2("b42-glitch-c14", "table2", "Merk dir die Tabelle! (alle Daten fiktiv)", "Was hat sich ver\xE4ndert? Tippe darauf.", "Beim FC Nordstern stand das Torverh\xE4ltnis 22:8 \u2013 die Tordifferenz ist +14, nicht \u221214."),
+  glitch2("b42-glitch-t08", "receipt2", "Merk dir den Kassenbon!", "Was hat sich ver\xE4ndert? Tippe darauf.", "Gleiche Bestellung, pl\xF6tzlich zehnfacher Preis: Die Summe steht auf 525,00 \u20AC statt 52,50 \u20AC."),
+  // ===== SETZ AUF MICH (Einsätze/Bonus aus der Paketregel)
+  est("b42-est-t09", "Fu\xDFball", "Wie viele Tore erzielte Youssoufa Moukoko laut BVB-Angabe in seinen insgesamt 88 Eins\xE4tzen f\xFCr die U17 und U19 von Borussia Dortmund?", "Tore", 141, "In der Jugend erzielte er etwa 1,6 Treffer pro Spiel."),
+  est("b42-est-c18", "Fu\xDFball", "Wie viel wiegt der Original-WM-Pokal der M\xE4nner laut FIFA, in Gramm?", "Gramm", 6175, "Das Original verl\xE4sst die FIFA nur zu besonderen Anl\xE4ssen; die Sieger erhalten nach der Feier eine andere Ausf\xFChrung."),
+  rv(
+    est("b42-est-c19", "Andere Themen", "Wie viele Millionen Ma\xDF Bier wurden laut vorl\xE4ufiger Oktoberfest-Bilanz 2025 ausgeschenkt? Auf 0,1 Millionen Ma\xDF gerundet!", "Mio. Ma\xDF", 6.5, "Auch die Besucherzahl lag bei rund 6,5 Millionen."),
+    "VORBEHALT: \u201Evorl\xE4ufige Bilanz\u201C (Festwirte-Sch\xE4tzung) = rund 6,5 Mio. Ma\xDF; der st\xE4dtische Bericht nennt 6.712.700 verkaufte Ma\xDF (\u2248 6,7 Mio.). Die Frage gilt nur mit dem Zusatz \u201Evorl\xE4ufig\u201C \u2013 nicht als exakten Wert darstellen."
+  ),
+  est("b42-est-t10", "Andere Themen", "Wie viele Kilometer lang ist der regul\xE4re Linienflug zwischen Westray und Papa Westray in Schottland, laut Guinness World Records? Gib die Entfernung auf zwei Nachkommastellen an.", "km", 2.74, "Einmal wurde die Strecke in nur 53 Sekunden geflogen."),
+  // ===== DIE VERBINDUNG (Hinweise schwer → leicht)
+  link2("b42-link-t11", "Fu\xDFball", "Welcher Verein wird gesucht?", [
+    "Mein gr\xF6\xDFtes Wunder begann eine Saison vor dem Triumph in der zweiten Liga.",
+    "1996 stieg ich aus der Bundesliga ab, gewann aber noch den DFB-Pokal.",
+    "Im Jahr 1998 wurde ich unter Otto Rehhagel als frisch aufgestiegener Verein deutscher Meister.",
+    "Mein Stadion hei\xDFt Fritz-Walter-Stadion und steht auf dem Betzenberg."
+  ], "1. FC Kaiserslautern", ["Kaiserslautern", "FCK", "FC Kaiserslautern", "1.FC Kaiserslautern", "Der FCK"], "Bis heute einzigartiger Bundesliga-Meistertitel eines direkten Aufsteigers."),
+  rv(
+    link2("b42-link-c22", "Andere Themen", "Was wird gesucht?", [
+      "Bei Volkswagen gibt es mich unter der Teilenummer 199 398 500 A.",
+      "Die Urheberin meiner ber\xFChmten Berliner Saucenvariante lie\xDF 1959 die Marke \u201EChillup\u201C eintragen.",
+      "Berlin, Hamburg und Duisburg beanspruchen meine Erfindungsgeschichte.",
+      "Ich bin eine Wurst mit Ketchup und Currypulver."
+    ], "Currywurst", ["Curry Wurst", "Curry-Wurst", "Curryw\xFCrste"], "Bitte \u201EMarke\u201C statt \u201EPatent\u201C sagen: Das Deutsche Patent- und Markenamt widerspricht dem Patentmythos ausdr\xFCcklich."),
+    "Quelle laut Jury: DPMA (Chillup als Marke, 1959). VW-Teilenummer 199 398 500 A nicht per Websuche belegt."
+  ),
+  rv(
+    link2("b42-link-c24", "Fu\xDFball", "Was wird gesucht?", [
+      "Das aserbaidschanische Tofiq-Bahramov-Stadion tr\xE4gt den Namen eines Mannes, der \xFCber mich mitentschied.",
+      "Vier Monate zuvor spielte ein Hund beim verschwundenen WM-Pokal eine Hauptrolle.",
+      "2010 gab es im WM-Spiel Deutschland\u2013England eine ber\xFChmte fast spiegelbildliche Szene.",
+      "Geoff Hurst, Lattenunterkante, Torlinie \u2013 Wembley 1966."
+    ], "Das Wembley-Tor", ["Wembley-Tor", "Wembleytor", "Wembley Tor", "Das Wembleytor", "Wembley 1966", "Wembley"], "Der Linienrichter war aus Aserbaidschan, nicht aus Russland."),
+    "Bahramov/Stadion Baku per Websuche best\xE4tigt. \u201EHund Pickles / verschwundener WM-Pokal (M\xE4rz 1966)\u201C nicht per Suche belegt (allgemein bekannt)."
+  ),
+  rv(
+    link2("b42-link-c23", "Andere Themen", "Was wird gesucht?", [
+      "Ein Exemplar von mir \xFCberstand 1991 eine Explosion w\xE4hrend des Golfkriegs und konnte danach weiterlaufen.",
+      "Mein urspr\xFCnglicher Bildschirm zeigte vier Graustufen auf gr\xFCnlichem Grund.",
+      "Mein Verkauf wurde durch ein sowjetisches Puzzlespiel enorm angeschoben.",
+      "Pok\xE9mon Rot und Blau erschienen f\xFCr mich."
+    ], "Nintendo Game Boy", ["Game Boy", "Gameboy", "Nintendo Gameboy", "GameBoy", "Game Boy Classic", "Der Game Boy"], "Das verkohlte Exemplar wurde jahrelang in einem Nintendo-Store gezeigt."),
+    "Story best\xE4tigt (Golfkrieg 1990/91, Exemplar des US-Soldaten Stephan Scoggins, Display im Nintendo-Store New York bis 2023). Die genaue Ursache variiert in den Berichten (Kasernenbombardement vs. nahe Explosion) \u2013 \u201EExplosion\u201C ist die sichere Formulierung."
+  ),
+  // ===== EINZIGARTIG (eine gültige, nur einmal genannte Antwort = Punkte)
+  closed(unique2("b42-unique-t13", "Fu\xDFball", "Eine Nation \u2026", "Nenne eine Nation, die von 1930 bis einschlie\xDFlich 2026 mindestens einmal Gastgeber der M\xE4nner-Fu\xDFball-WM war. Co-Gastgeber z\xE4hlen.", [
+    ["Uruguay", []],
+    ["Italien", ["Italy"]],
+    ["Frankreich", ["France"]],
+    ["Brasilien", ["Brazil"]],
+    ["Schweiz", ["Switzerland"]],
+    ["Schweden", ["Sweden"]],
+    ["Chile", []],
+    ["England", []],
+    ["Mexiko", ["Mexico"]],
+    ["Deutschland", ["BRD", "Westdeutschland", "Bundesrepublik Deutschland", "Germany"]],
+    ["Argentinien", ["Argentina"]],
+    ["Spanien", ["Spain"]],
+    ["USA", ["Vereinigte Staaten", "United States", "Amerika", "Vereinigte Staaten von Amerika"]],
+    ["Japan", []],
+    ["S\xFCdkorea", ["Korea", "Republik Korea", "South Korea"]],
+    ["S\xFCdafrika", ["South Africa"]],
+    ["Russland", ["Russia"]],
+    ["Katar", ["Qatar"]],
+    ["Kanada", ["Canada"]]
+  ], "Kanada kam 2026 neu hinzu. \u201EDeutschland\u201C umfasst 1974 und 2006.")),
+  rv(
+    unique2("b42-unique-c27", "Fu\xDFball", "Ein Profi \u2026", "Nenne einen Profi, der mindestens ein Pflichtspiel der M\xE4nner-Ersten f\xFCr beide Vereine FC Bayern und Borussia Dortmund absolviert hat (Leihen z\xE4hlen, reine Jugendstationen nicht).", [
+      ["Robert Lewandowski", ["Lewandowski", "Lewy"]],
+      ["Mario G\xF6tze", ["G\xF6tze", "Goetze"]],
+      ["Mats Hummels", ["Hummels"]],
+      ["Niklas S\xFCle", ["S\xFCle", "Suele"]],
+      ["Rapha\xEBl Guerreiro", ["Guerreiro", "Raphael Guerreiro"]],
+      ["Emre Can", ["Can"]],
+      ["Marcel Sabitzer", ["Sabitzer"]],
+      ["Ivan Peri\u0161i\u0107", ["Peri\u0161i\u0107", "Perisic", "Ivan Perisic"]],
+      ["Sebastian Rode", ["Rode"]],
+      ["Torsten Frings", ["Frings"]],
+      ["J\xFCrgen Kohler", ["Kohler"]],
+      ["Stefan Reuter", ["Reuter"]],
+      ["Thomas Helmer", ["Helmer"]],
+      ["Michael Rummenigge", ["Rummenigge"]],
+      ["Markus Feulner", ["Feulner"]],
+      ["Robert Kova\u010D", ["Kova\u010D", "Kovac", "Robert Kovac"]],
+      ["Christian Nerlinger", ["Nerlinger"]],
+      ["J\xFCrgen Wegmann", ["Wegmann"]],
+      ["Toni Schumacher", ["Schumacher", "Harald Schumacher", "Harald Toni Schumacher"]]
+    ], "Fu\xDFballgeschichten und Gruppentaktik: Wer nennt den Namen, den keiner sonst auf dem Zettel hat?"),
+    "OFFENE LISTE \u2013 nicht als vollst\xE4ndig markieren: Die Jury-Karte enth\xE4lt best\xE4tigte Beispiele, keine belegte historische Positivliste (je nach Definition 16/18/22 Namen). Unbekannte Namen pr\xFCft der Showmaster (Aufl\xF6sung bleibt gesperrt, bis gekl\xE4rt). Vor dem Abend eine vollst\xE4ndige Liste mit Stichtag und Pflichtspielregel dokumentieren. \u201ERummenigge\u201C allein ist mehrdeutig (Karl-Heinz spielte nie f\xFCr den BVB)."
+  ),
+  closed(unique2("b42-unique-t14", "Andere Themen", "Ein Element \u2026", "Nenne ein chemisches Element, dessen offizielles Elementsymbol aus exakt einem Buchstaben besteht.", [
+    ["Wasserstoff", ["H", "Hydrogen"]],
+    ["Bor", ["B", "Boron"]],
+    ["Kohlenstoff", ["C", "Carbon"]],
+    ["Stickstoff", ["N", "Nitrogen"]],
+    ["Sauerstoff", ["O", "Oxygen"]],
+    ["Fluor", ["F", "Fluorine"]],
+    ["Phosphor", ["P", "Phosphorus"]],
+    ["Schwefel", ["S", "Sulfur", "Sulphur"]],
+    ["Kalium", ["K", "Potassium"]],
+    ["Vanadium", ["V"]],
+    ["Yttrium", ["Y"]],
+    ["Iod", ["I", "Jod", "Iodine"]],
+    ["Wolfram", ["W", "Tungsten"]],
+    ["Uran", ["U", "Uranium"]]
+  ], "Nicht nur H und O, sondern auch Y und W sind wertvoll.")),
+  closed(unique2("b42-unique-p20", "Fu\xDFball", "Ein Verein \u2026", "Nenne einen Verein, der sp\xE4testens 2026 den Europapokal der Landesmeister oder die Champions League gewann \u2013 aber nicht aus England, Deutschland oder Spanien stammt. M\xE4nnerwettbewerb seit 1955/56.", [
+    ["AC Mailand", ["AC Milan", "Milan"]],
+    ["Inter Mailand", ["Inter", "Internazionale", "FC Internazionale"]],
+    ["Juventus Turin", ["Juventus", "Juve"]],
+    ["Ajax Amsterdam", ["Ajax"]],
+    ["PSV Eindhoven", ["PSV"]],
+    ["Feyenoord Rotterdam", ["Feyenoord"]],
+    ["Benfica Lissabon", ["Benfica", "SL Benfica"]],
+    ["FC Porto", ["Porto"]],
+    ["Olympique Marseille", ["Marseille", "OM"]],
+    ["Paris Saint-Germain", ["PSG", "Paris SG", "Paris"]],
+    ["Celtic Glasgow", ["Celtic"]],
+    ["Steaua Bukarest", ["Steaua", "FCSB"]],
+    ["Roter Stern Belgrad", ["Roter Stern", "Crvena Zvezda", "Red Star Belgrade"]]
+  ], "2025 und 2026 gewann PSG die Champions League; das \xE4ltere Format z\xE4hlt genauso. Nur die CL ab 1992 zu z\xE4hlen w\xFCrde den Katalog ver\xE4ndern."))
+];
+var vote3 = (id, prompt, explain) => ({ id, topic: "Gruppenfrage", task: { mode: "vote", prompt, seconds: 45, points: 600, explain } });
+var BESTOF_KK = [
+  vote3("b42-kk-1", "Wer von uns w\xFCrde am ehesten 65 Millionen f\xFCr einen Spieler bieten, nur damit ein Konkurrent ihn nicht bekommt?", "Der Konsens zeigt, wem die Gruppe das gr\xF6\xDFte Blockade-Gebot zutraut."),
+  vote3("b42-kk-2", "Wer von uns kontrolliert seine Kickbase-Aufstellung f\xFCnf Minuten vor Anpfiff noch einmal panisch?", "Menschenkenntnis statt Fu\xDFballwissen."),
+  vote3("b42-kk-3", "Wer von uns verkauft am ehesten einen Spieler eine Woche, bevor dieser pl\xF6tzlich durch die Decke geht?", "Timing ist alles \u2013 im Kickbase-Markt.")
+];
+var BESTOF_PLAN = {
+  geo: [["v2-heimspiel-2", 1], ["v2-orte-mit-geschichte-2", 0], ["b42-geo-c02", 1], ["b42-geo-c04", 0], ["b42-geo-t01", 1], ["b42-geo-c05", 0]].map(([id, fb]) => ({ id, fb: !!fb })),
+  match: [["s3-match-spitznamen", 1], ["s4-match-tierrekorde", 0], ["b42-match-t03", 1], ["b42-match-c08", 0], ["b42-match-c06", 1], ["b42-match-c07", 0]].map(([id, fb]) => ({ id, fb: !!fb })),
+  rank: [["v2-fussball-zeitreise-2", 1], ["s3-rank-olympia", 0], ["b42-rank-c09", 1], ["b42-rank-c10", 0], ["b42-rank-t05", 1], ["v2-wer-war-zuerst-3", 0]].map(([id, fb]) => ({ id, fb: !!fb })),
+  glitch: [["b42-glitch-t07", 1], ["b42-glitch-c16", 0], ["b42-glitch-c14", 1], ["s3-glitch-abfahrt", 0], ["v2-alles-im-blick-4", 1], ["b42-glitch-t08", 0]].map(([id, fb]) => ({ id, fb: !!fb })),
+  estimate: [["b42-est-t09", 1], ["s3-est-isner", 0], ["b42-est-c18", 1], ["b42-est-c19", 0], ["v2-sport-und-pop-1", 1], ["b42-est-t10", 0]].map(([id, fb]) => ({ id, fb: !!fb })),
+  link: [["s3-link-pele", 1], ["v2-wer-oder-was-2", 0], ["b42-link-t11", 1], ["b42-link-c22", 0], ["b42-link-c24", 1], ["b42-link-c23", 0]].map(([id, fb]) => ({ id, fb: !!fb })),
+  unique: [["b42-unique-t13", 1], ["v2-einzigartig-1", 0], ["b42-unique-c27", 1], ["b42-unique-t14", 0], ["b42-unique-p20", 1], ["s3-unique-orchester", 0]].map(([id, fb]) => ({ id, fb: !!fb }))
+};
+var PROBE = (m) => `s5-probe-${m}`;
+var ROUND_DEF = [
+  { key: "geo", id: "b42-r1", probe: PROBE("geo"), src: "s5-r1" },
+  { key: "match", id: "b42-r2", probe: PROBE("match"), src: "s5-r2" },
+  { key: "rank", id: "b42-r3", probe: PROBE("rank"), src: "s5-r3" },
+  { key: "unique", id: "b42-sur", probe: PROBE("unique"), src: "s5-sur" },
+  { key: "glitch", id: "b42-r4", probe: PROBE("glitch"), src: "s5-r4" },
+  { key: "estimate", id: "b42-r5", probe: PROBE("estimate"), src: "s5-r5" },
+  { key: "link", id: "b42-r6", probe: PROBE("link"), src: "s5-r6" }
+];
+var BESTOF_ROUNDS = ROUND_DEF.map((d2) => {
+  const base = SHOW3_ROUNDS.find((r) => r.id === d2.src);
+  return { ...base, id: d2.id, taskIds: [d2.probe, ...BESTOF_PLAN[d2.key].map((x3) => x3.id)] };
+});
+var BESTOF_STEPS = [
+  { k: "round", cat: "b42-r1" },
+  { k: "board" },
+  { k: "round", cat: "b42-r2" },
+  { k: "round", cat: "b42-r3" },
+  { k: "board" },
+  { k: "surprise", cat: "b42-sur" },
+  { k: "round", cat: "b42-r4" },
+  { k: "round", cat: "b42-r5" },
+  { k: "round", cat: "b42-r6" },
+  { k: "board" },
+  { k: "final", cat: "s3-final" }
+];
+var RULES = { ...SHOW3_PACK.rules, tasksPerMode: 6, uniquePoints: 300 };
+var SEED_SHOW_B42 = {
+  pack: { id: "show-4", name: "Reus 65 Mio \u2013 Best of 42", description: "7 Spielmodi \xD7 1 Probe + 6 Wertungsfragen (42, davon 21 Fu\xDFball/Kickbase), FINAL LOCK, 3 Marktwert-Updates. Sieger: Reus65Mio-Champion. Sehr lange Show (ca. 2,5 Std.).", rules: RULES },
+  pool: BESTOF_NEW,
+  rounds: BESTOF_ROUNDS,
+  steps: BESTOF_STEPS
+};
+var SEED_SHOW_B42K = {
+  pack: { id: "show-3z", name: "Reus 65 Mio \u2013 Best of 42 \xB7 Finale KICKBASE-KONSENS", description: "Wie \u201EBest of 42\u201C, aber mit dem Gruppenspiel KICKBASE-KONSENS als Finale (optional, FINAL LOCK bleibt Standard).", rules: RULES },
+  pool: BESTOF_KK,
+  rounds: [{
+    id: "b42-final-kk",
+    title: "KICKBASE-KONSENS",
+    topic: "Das gro\xDFe Finale",
+    icon: "\u{1F91D}",
+    color: COLORS.GR,
+    kind: "final",
+    football: false,
+    blurb: "Drei Gruppenfragen, 1.800 Punkte, die Rangliste bleibt verborgen. W\xE4hle geheim einen Mitspieler \u2013 Punkte gibt es f\xFCr die Wahl mit den meisten Stimmen.",
+    taskIds: ["b42-kk-1", "b42-kk-2", "b42-kk-3"]
+  }],
+  steps: BESTOF_STEPS.map((s) => s.k === "final" ? { k: "final", cat: "b42-final-kk" } : s)
+};
+
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4];
+var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K];
 
 // server/vercel.ts
 var ConflictError = class extends Error {

@@ -303,3 +303,84 @@ reg((() => {
   ];
   return { id: 'ticket1', title: 'Eintrittskarte', bg: '#241a3a', items, changes: { v5: { text: '21' } } } as Scene;
 })());
+
+// ---------------------------------------------------------------- Best-of-42: vier neue Glitch-Szenen (jeweils GENAU eine Änderung, alle anderen Elemente identisch)
+
+/** T07 · Fiktive Kickbase-Transferübersicht: nur der Reus-Kaufpreis ändert sich (6,5 → 65,0 Mio. €). */
+reg((() => {
+  const rows: [string, string, string][] = [['Marco Reus', 'Kauf', '6,5 Mio. €'], ['Jamal Musiala', 'Kauf', '8,4 Mio. €'], ['Serhou Guirassy', 'Verkauf', '7,9 Mio. €'], ['Florian Wirtz', 'Kauf', '9,2 Mio. €']];
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#0f1e14' },
+    { id: 'hdr', t: 'rect', x: 0, y: 0, w: 1000, h: 90, fill: '#14532d' },
+    T('hdr-t', 40, 58, 'TRANSFERMARKT · MEINE LIGA (fiktiv)', 30, '#ffffff', { weight: 800 }),
+    T('h0', 40, 140, 'SPIELER', 18, '#86efac'), T('h1', 560, 140, 'AKTION', 18, '#86efac'), T('h2', 960, 140, 'PREIS', 18, '#86efac', { anchor: 'end' }),
+  ];
+  rows.forEach(([n, a, p], i) => {
+    const y = 210 + i * 90;
+    items.push({ id: `bg${i}`, t: 'rect', x: 20, y: y - 44, w: 960, h: 72, fill: i % 2 ? '#132a1b' : '#18331f', rx: 10 });
+    items.push(T(`n${i}`, 40, y, n, 34, '#ffffff', { weight: 700 }));
+    items.push(T(`a${i}`, 560, y, a, 30, a === 'Kauf' ? '#4ade80' : '#fca5a5'));
+    items.push(T(i === 0 ? 'reus-price' : `p${i}`, 960, y, p, 34, '#fde68a', { anchor: 'end', mono: true, weight: 800 }));
+  });
+  return { id: 'transfer1', title: 'Transferübersicht', bg: '#0f1e14', items, changes: { 'reus-price': { text: '65,0 Mio. €' } } } as Scene;
+})());
+
+/** C16 · Preistafel Stadionkiosk: nur „Bier 0,5 l“ wird zu „Bier 0,4 l“ (Preis bleibt). */
+reg((() => {
+  const rows: [string, string, string][] = [['beer', 'Bier 0,5 l', '5,20 €'], ['spezi', 'Spezi 0,5 l', '4,00 €'], ['breze', 'Breze', '3,00 €'], ['pfand', 'Pfand', '2,00 €']];
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#1c2a3a' },
+    { id: 'board', t: 'rect', x: 120, y: 30, w: 760, h: 540, fill: '#f8fafc', rx: 16 },
+    T('title', 500, 110, 'STADIONKIOSK · NORD', 40, '#0f172a', { anchor: 'middle', weight: 800 }),
+    { id: 'sep', t: 'line', x: 170, y: 140, x2: 830, y2: 140, stroke: '#94a3b8', sw: 3 },
+  ];
+  rows.forEach(([id, n, p], i) => {
+    const y = 235 + i * 85;
+    items.push(T(id === 'beer' ? 'beer-name' : `n-${id}`, 180, y, n, 40, '#0f172a', { weight: 700 }));
+    items.push(T(`p-${id}`, 820, y, p, 40, '#0f172a', { anchor: 'end', mono: true, weight: 800 }));
+  });
+  return { id: 'kiosk1', title: 'Stadionkiosk', bg: '#1c2a3a', items, changes: { 'beer-name': { text: 'Bier 0,4 l' } } } as Scene;
+})());
+
+/** C14 · Fußballtabelle (fiktiv) mit Tordifferenz: nur eine Differenz kippt von +14 auf −14. Alle Differenzen passen sonst zu den Toren. */
+reg((() => {
+  const rows: [string, number, number, number, number, number][] = [   // Team, Sp, S, U, N, Tore für, Tore gegen
+    ['FC Nordstern', 10, 7, 2, 1, 22], ['SV Rheinblick', 10, 6, 3, 1, 19], ['Union Elbe', 10, 5, 3, 2, 17], ['Dynamo Süd', 10, 4, 3, 3, 15], ['Borussia Ost', 10, 3, 3, 4, 12], ['FSV Küste', 10, 1, 2, 7, 9],
+  ];
+  const against = [8, 9, 11, 13, 14, 21];            // Gegentore → Differenzen: +14, +10, +6, +2, −2, −12
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#111827' },
+    T('title', 40, 60, 'LIGATABELLE · 10. SPIELTAG (fiktiv)', 30, '#fbbf24', { weight: 800 }),
+    T('h0', 40, 112, 'TEAM', 18, '#94a3b8'), T('h1', 520, 112, 'SP', 18, '#94a3b8', { anchor: 'end' }), T('h2', 600, 112, 'TORE', 18, '#94a3b8', { anchor: 'end' }), T('h3', 760, 112, 'DIFF', 18, '#94a3b8', { anchor: 'end' }), T('h4', 940, 112, 'PKT', 18, '#94a3b8', { anchor: 'end' }),
+  ];
+  rows.forEach(([n, sp, w, d, , gf], i) => {
+    const y = 172 + i * 74, diff = gf - against[i];
+    items.push({ id: `bg${i}`, t: 'rect', x: 20, y: y - 42, w: 960, h: 62, fill: i % 2 ? '#1f2937' : '#273449', rx: 8 });
+    items.push(T(`n${i}`, 40, y, `${i + 1}. ${n}`, 28, '#ffffff', { weight: 600 }));
+    items.push(T(`sp${i}`, 520, y, String(sp), 28, '#cbd5e1', { anchor: 'end', mono: true }));
+    items.push(T(`g${i}`, 640, y, `${gf}:${against[i]}`, 28, '#cbd5e1', { anchor: 'end', mono: true }));
+    items.push(T(i === 0 ? 'diff-first' : `df${i}`, 760, y, (diff > 0 ? '+' : diff < 0 ? '−' : '') + Math.abs(diff), 28, '#38bdf8', { anchor: 'end', mono: true, weight: 800 }));
+    items.push(T(`p${i}`, 940, y, String(3 * w + d), 30, '#fbbf24', { anchor: 'end', weight: 800, mono: true }));
+  });
+  return { id: 'table2', title: 'Tabelle mit Tordifferenz', bg: '#111827', items, changes: { 'diff-first': { text: '−14' } } } as Scene;
+})());
+
+/** T08 · Kassenbon eines Biergartens: nur die Summe ändert sich (52,50 € → 525,00 €). Positionen: 20,00 + 8,00 + 13,50 + 11,00 = 52,50. */
+reg((() => {
+  const rows: [string, string][] = [['4 Helles', '20,00 €'], ['2 Spezi', '8,00 €'], ['Käsespätzle', '13,50 €'], ['2 Pommes', '11,00 €']];
+  const items: Item[] = [
+    { id: 'bg', t: 'rect', x: 0, y: 0, w: 1000, h: 600, fill: '#3a3a44' },
+    { id: 'paper', t: 'rect', x: 230, y: 10, w: 540, h: 580, fill: '#f6f1e4', rx: 6 },
+    T('title', 500, 70, 'BIERGARTEN AM ECK', 30, '#222222', { anchor: 'middle', weight: 800 }),
+    { id: 'sep0', t: 'line', x: 260, y: 95, x2: 740, y2: 95, stroke: '#999999', sw: 2 },
+  ];
+  rows.forEach(([n, p], i) => {
+    const y = 170 + i * 70;
+    items.push(T(`n${i}`, 265, y, n, 30, '#222222'));
+    items.push(T(`p${i}`, 735, y, p, 30, '#222222', { anchor: 'end', mono: true }));
+  });
+  items.push({ id: 'sep1', t: 'line', x: 260, y: 470, x2: 740, y2: 470, stroke: '#999999', sw: 2 });
+  items.push(T('sum', 265, 535, 'SUMME', 34, '#222222', { weight: 800 }));
+  items.push(T('sum-value', 735, 535, '52,50 €', 34, '#222222', { anchor: 'end', weight: 800, mono: true }));
+  return { id: 'receipt2', title: 'Kassenbon', bg: '#3a3a44', items, changes: { 'sum-value': { text: '525,00 €' } } } as Scene;
+})());

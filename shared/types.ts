@@ -123,7 +123,7 @@ export interface LinkTask {
   explain: string;
 }
 /** Proberunde: interaktive Beispielaufgabe ohne Wertung (Punkte werden nie vergeben). */
-export interface TaskBase { practice?: boolean }
+export interface TaskBase { practice?: boolean; /** Redaktionshinweis: offene Prüfpflicht / Vorbehalt – erscheint als Warnung bei der Paketprüfung */ review?: string }
 /** KICKBASE-KONSENS (nur Finale): alle beantworten dieselbe Gruppenfrage, indem sie geheim einen Mitspieler wählen; Punkte für die Wahl(en) mit den meisten Stimmen. */
 export interface VoteTask { mode: 'vote'; prompt: string; seconds: number; points: number; explain: string }
 export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask | VoteTask) & TaskBase;
@@ -141,6 +141,8 @@ export interface PackRules {
   estimateBets?: number[]; estimateBonus?: number;
   /** persönliche Note: Zeile unter dem Showtitel, Zeile unter dem Sieger, Titel der Zwischenstände (z. B. „Marktwert-Update“) */
   tagline?: string; winnerLine?: string; boardTitle?: string;
+  /** EINZIGARTIG: Punkte für eine einmalige gültige Antwort (0 = je Frage) */
+  uniquePoints?: number;
 }
 /** Ablaufmodell eines Raums: fester Showablauf (Standard) oder klassische Kategorienwand. */
 export type Flow = 'show' | 'classic';
