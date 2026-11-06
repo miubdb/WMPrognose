@@ -71,3 +71,19 @@ Die vorhandene Hintergrundmusik ist im Browser getestet: startet nicht von selbs
 3. Admin → Pakete → „Best of 42“ → **Prüfen**: Die Warnungen zeigen die offenen Redaktionspunkte (siehe `docs/BESTOF42-REDAKTION.md`). Nicht freigegebene Aufgaben (v. a. C09 BVB-Ablösen, T05 Debütalter) bitte klären oder ersetzen.
 4. `/host` wählt automatisch das neueste Paket (Best of 42). **Sicherer Fallback:** `show-3` „Reus 65 Mio“ (31 Aufgaben, FINAL LOCK) bzw. `show-2k` – jederzeit im Paket-Dropdown wählbar.
 5. Die Datei `data\maps\outplay-karte.mbtiles` wird nie angefasst.
+
+---
+
+# Praxistest 3 – Änderungen und Aktualisierung
+
+## Neu
+- **Geo-Kurve (gilt sofort für alle Pakete):** Europa Skala 180 km (250 Punkte: 9 km ≈ 245, 113 km ≈ 137, 300 km ≈ 49), Deutschland 50 km, Welt 600 km; 0–5 km (D: 0–2, Welt: 0–15) = volle Punkte, nie negativ, gleiche Entfernung = gleiche Punkte.
+- **SORTIER’S!** (statt BLIND RANK – nur die klassische Nacheinander-Variante heißt weiter so): fünf **gemischte Karten**, nummerierte Plätze 1–5, **Drag & Drop** oder erst Karte, dann Platz antippen, Tauschen durch Antippen/Ziehen, große Touchflächen, Abgabe erst nach „Ja, endgültig abgeben“. Wertung unverändert: 50 Punkte je Karte auf exakt richtiger Position (max. 250). Die Karten erscheinen nie in richtiger Reihenfolge.
+- **Hintergrundmusik neu:** statt Dauer-Akkord ein dezenter, leicht rhythmischer Groove (96 BPM, E-Piano-Stöße, Bass-Zupfer, sanfter Puls, kaum hörbare Hi-Hats, kurzes Echo), selbst erzeugt, offline, Standard aus, Ein/Aus + Lautstärke wie bisher, stoppt bei „Show pausieren“ und läuft nach „Show fortsetzen“ weiter. **Ich kann nicht hören:** geprüft sind Ablauf und Pegel (Offline-Rendering), nicht der Klang. Gefällt er nicht: im Pult aus lassen – die Show-Soundeffekte bleiben.
+- **Show pausieren** war bereits zuverlässig; ergänzt: der Timer-Schalter kann eine Show-Pause nicht mehr versehentlich aufheben.
+
+## Neue Paketversion (nicht-destruktiv): `show-5` „Reus 65 Mio – Best of 42“ (+ `show-4z` mit Finale KICKBASE-KONSENS)
+Gegenüber `show-4`: **CL-Finale 2028** („In welchem Stadion wird das Champions-League-Finale 2028 stattfinden?“ → Allianz Arena, München; Reveal: bereits 2012 und 2025, UEFA-Entscheidung vom 15.09.2026), **Käserennen auf der Weltkarte**, **MATCHMAKER: Spielfiguren ↔ Videospiele** (`s3-match-spiele`) statt Produktursprünge, **SORTIER’S! mit Youssoufa Moukoko** (Moukoko 16 J. 1 T. · Güther 3 T. · Wanner 15 T. · Lemke 214 T. · Bischof 264 T. laut Bundesliga.com; Iličević-Gleichstand im Reveal). Alle anderen Fragen unverändert; `show-4`, `show-3`, `show-2k` bleiben unberührt (neue IDs `show-5`, `show-4z`, `b43-*`).
+
+## Aktualisierung auf dem Windows-Laptop (ohne Datenverlust)
+1. Server beenden, Ordner `data` kopieren. 2. `git pull origin claude/upbeat-galileo-4el50u`, `OUTPLAY-STARTEN.bat`. (Geo-Kurve, SORTIER’S!-Bedienung und Musik gelten sofort; laufende Räume behalten ihre Paketversion.) 3. `/admin` → Daten → **Installieren** (automatische Vor-Sicherung in `data\backups`). 4. `/host` wählt automatisch `show-5`; `show-4` bleibt als Fallback wählbar (im Admin archivierbar). Datenbank und `outplay-karte.mbtiles` werden nie überschrieben.

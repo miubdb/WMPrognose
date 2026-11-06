@@ -161,7 +161,7 @@ function RankSortPhone({ round, act, room, d }: Props & { d: any }) {
     window.addEventListener('pointermove', move, { passive: false }); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   };
   const card = (idx: number, where: 'pool' | 'slot') => (
-    <div role="button" tabIndex={0} key={idx} data-card={idx} className={`scard ${sel === idx ? 'sel' : ''} ${drag?.idx === idx ? 'dragging' : ''} ${where}`} onPointerDown={e => startDrag(e, idx)}
+    <div role="button" tabIndex={0} key={idx} data-card={idx} className={`scard ${sel === idx ? 'sel' : ''} ${drag?.idx === idx ? 'dragging' : ''} ${where}`} onPointerDown={e => startDrag(e, idx)} onClick={e => e.stopPropagation()}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') tapCard(idx); }}>{text(idx)}</div>
   );
   if (round.stage !== 'open' || sent) return (

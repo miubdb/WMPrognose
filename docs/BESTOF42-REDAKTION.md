@@ -72,3 +72,13 @@ Geklärt in der Schlussrunde: C09 (Transfermarkt.de-Abgleich durch den Auftragge
 | Best of 42 (KICKBASE-KONSENS) | ≈ 127 min | ≈ 162 min |
 | zum Vergleich `show-3` (4 je Modus) | ≈ 100 min | ≈ 127 min |
 Annahmen wie in `docs/INHALTE-REDAKTION.md`; EINZIGARTIG enthält pauschal 30 s Host-Prüfzeit je Aufgabe. Sieben Proben ≈ 16 min (überspringbar) → ohne Proben ≈ 115 min. Realistisch für einen Abend: Proben überspringen oder die Aufgabenzahl je Modus auf 4/5 reduzieren (Paketregel „Länge der Show“, neue Paketversion).
+
+
+## Version 2 (Praxistest 3) – `show-5` / `show-4z`
+| Änderung | Quelle / Prüfung |
+|---|---|
+| WO ZUR HÖLLE? #1: „In welchem Stadion wird das Champions-League-Finale 2028 stattfinden?“ → Allianz Arena, München (Koordinaten wie die Probe); Reveal: Rückbezug auf 2012 und 2025 | UEFA-Meldung vom 15.09.2026 (https://de.uefa.com/uefachampionsleague/news/02a9-2198b672cf8b-a6df3d2e2ce4-1000--champions-league-finale-2028-findet-in-munchen-statt/): gelesen, bestätigt München 2028 und frühere Finals 2012/2025; UEFA nennt das Stadion „Fußball Arena München“ (= Allianz Arena, steht im Reveal) |
+| WO ZUR HÖLLE? #4 Käserennen: Karte Welt statt Europa, Ziel unverändert (51,8299 / −2,1581) | Koordinate Wikipedia |
+| MATCHMAKER #4: `s3-match-spiele` (Master Chief–Halo, Kratos–God of War, Geralt–The Witcher, Link–Zelda, Samus Aran–Metroid, Lara Croft–Tomb Raider) statt Produktursprünge (C08); weiter 6 Fragen, 3 Fußball / 3 andere | Bestandsfrage unverändert |
+| SORTIER’S! #5: Youssoufa Moukoko statt Niko Iličević; Reveal nennt Iličević (1.11.2026, Eintracht Frankfurt) | Bundesliga.com (https://www.bundesliga.com/de/bundesliga/news/jungste-spieler-geschichte-moukoko-borussia-dortmund-bvb-frankfurt-ilicevic-13630): Moukoko 16 J. 1 T., Güther 16 J. 3 T., Wanner 16 J. 15 T., Lemke 16 J. 214 T., **Bischof 16 J. 264 T.** (Bischof-Wert damit korrigiert: 264) |
+Die C08-Warnung entfällt in `show-5`; die Warnung zur Iličević/T05-Frage ebenfalls (alle Alter laut Bundesliga.com).
