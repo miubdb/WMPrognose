@@ -25,7 +25,7 @@ Legende: ✅ belegt/unstrittig · 🟡 Vorbehalt (im Admin als Warnung sichtbar)
 | | 6 | Markennamen | Jury C07 | 🟡 allgemein bekannt, Primärquellen je Marke offen |
 | WER WAR ZUERST? | 1 ⚽ | Fußballgeschichte | Bestand `v2-fussball-zeitreise-2` | ✅ |
 | | 2 | Olympische Sommerspiele | Bestand `s3-rank-olympia` | ✅ |
-| | 3 ⚽ | BVB-Neuzugänge nach Transfermarkt-Ablöse | Jury C09 | 🟡 Maßstab jetzt ausdrücklich Transfermarkt.de (0,35 / 7,84 / 20,00 / 25,00 / 30,50 Mio. €); Transfermarkt war nicht abrufbar → Zahlen aus Medienberichten, **einmal direkt auf Transfermarkt.de gegenlesen**; Reihenfolge in allen Quellen identisch |
+| | 3 ⚽ | BVB-Neuzugänge nach Transfermarkt-Ablöse | Jury C09 | ✅ Einheitlicher Maßstab Transfermarkt.de (Vereinsübersichten, vom Auftraggeber direkt geprüft): Kagawa ablösefrei (0 €) → Haaland 20,00 → Sancho 20,59 → Bellingham 30,15 → Hummels 30,50 Mio. € |
 | | 4 | Pyramiden/Mammuts/Oxford/Tenochtitlan | Jury C10 | 🟡 antike Jahre = Näherungen, Reihenfolge stabil |
 | | 5 ⚽ | Jüngste Bundesliga-Debütanten | Jury T05 | ✅ Güther 16 J. 3 T., Wanner 16 J. 15 T., **Lemke 16 J. 214 T. (HSV, 10.5.2026)**, **Bischof 16 J. 263 T. (Hoffenheim, 19.3.2022; Karte nannte 264)**; 🟡 Iličević-Gleichstand nur über Bundesliga.com-Meldung |
 | | 6 | Bauwerke nach Höhe | Bestand `v2-wer-war-zuerst-3` | ✅ |
@@ -57,14 +57,13 @@ Legende: ✅ belegt/unstrittig · 🟡 Vorbehalt (im Admin als Warnung sichtbar)
 **Proben (ungewertet, unverändert aus `show-3`):** `s5-probe-geo` (Allianz Arena – **direkt danach** CL-Finale 2025), `-match` (Tierlaute), `-rank` (Planeten), `-glitch` (Aufstellungstafel), `-estimate` (16 Bundesländer), `-link` (Mond), `-unique` (Flagge, vollständige Liste).
 
 ## Offene Fakten – bleiben als Warnung im Admin
-1. **C09:** Transfermarkt.de war in der Redaktionsumgebung nicht abrufbar – die fünf Zahlen bitte einmal direkt gegenlesen (Frage bleibt im Paket).
 2. **C04:** Reveal „YouTuber aus München gewann 2025“ nur laut Jury-Karte (AP).
 3. **C08/C07:** Primärquellen für Slinky/Listerine/Viagra bzw. die Markennamen fehlen (allgemein bekannt, nur Sekundärquellen).
 4. **C22/C24:** VW-Teilenummer bzw. „Hund/verschwundener WM-Pokal 1966“ nicht per Suche belegt.
 5. **C10:** antike Jahreszahlen sind Näherungen (Reihenfolge stabil).
 6. **C27:** vollständige Positivliste fehlt – bewusst offene Liste mit manueller Host-Prüfung.
 7. **T03:** Stationen allgemein bekannt, nicht einzeln belegt; **T05:** Iličević-Gleichstand nur über Bundesliga.com.
-Geklärt in der Schlussrunde: C09-Maßstab (Transfermarkt), T03-Haaland, T05 Lemke/Bischof, C19 (vorläufige Bilanz), C06/C23 (Warnung entfernt). Nicht per Websuche geprüft: T13-/P20-Listen außer PSG, Moderationskarten-Reveals, „allgemein bekannte“ Fakten.
+Geklärt in der Schlussrunde: C09 (Transfermarkt.de-Abgleich durch den Auftraggeber: Kagawa 0, Haaland 20,00, Sancho 20,59, Bellingham 30,15, Hummels 30,50 Mio. €), T03-Haaland, T05 Lemke/Bischof, C19 (vorläufige Bilanz), C06/C23 (Warnung entfernt). Nicht per Websuche geprüft: T13-/P20-Listen außer PSG, Moderationskarten-Reveals, „allgemein bekannte“ Fakten.
 
 ## Dauer (Modell, keine Messung)
 | Variante | erwartet | maximal |

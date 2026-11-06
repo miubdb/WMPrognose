@@ -38674,13 +38674,13 @@ var BESTOF_NEW = [
   // ===== WER WAR ZUERST? / SORTIEREN (alle fünf sichtbar, 50 Punkte je richtiger Position)
   rv(
     rank2("b42-rank-c09", "Fu\xDFball", "Sortiere diese f\xFCnf BVB-Neuzug\xE4nge nach ihrer auf Transfermarkt.de angegebenen Abl\xF6sesumme \u2013 vom g\xFCnstigsten zum teuersten.", "g\xFCnstigste Abl\xF6se", "teuerste Abl\xF6se", [
-      ["Shinji Kagawa (2010)", "0,35 Mio. \u20AC"],
-      ["Jadon Sancho (2017)", "7,84 Mio. \u20AC"],
+      ["Shinji Kagawa (2010)", "abl\xF6sefrei (0 \u20AC)"],
       ["Erling Haaland (2020)", "20,00 Mio. \u20AC"],
-      ["Jude Bellingham (2020)", "25,00 Mio. \u20AC"],
+      ["Jadon Sancho (2017)", "20,59 Mio. \u20AC"],
+      ["Jude Bellingham (2020)", "30,15 Mio. \u20AC"],
       ["Mats Hummels (2019)", "30,50 Mio. \u20AC"]
-    ], [3, 0, 4, 2, 1], "Laut Transfermarkt.de war der teuerste Einkauf ein R\xFCckkehrer \u2013 der g\xFCnstigste ein Japaner f\xFCr Kleingeld."),
-    "Ma\xDFstab ist ausdr\xFCcklich Transfermarkt.de (Fragetext). Transfermarkt war in der Redaktionsumgebung nicht abrufbar: Die Werte st\xFCtzen sich auf Medienberichte (Kagawa 0,35 / Sancho ca. 7,5\u20137,84 / Haaland 20 / Bellingham ca. 25 / Hummels 30,5 Mio. \u20AC). Bitte die f\xFCnf Zahlen einmal direkt auf Transfermarkt.de gegenlesen. Die Reihenfolge ist in allen Quellen identisch."
+    ], [3, 0, 4, 2, 1], "Laut Transfermarkt.de lagen Haaland und Sancho nur 0,59 Mio. \u20AC auseinander, Bellingham und Hummels sogar nur 0,35 Mio. \u20AC \u2013 und der g\xFCnstigste Neuzugang kam abl\xF6sefrei."),
+    ""
   ),
   rv(
     rank2("b42-rank-c10", "Andere Themen", "Sortiere chronologisch, \xE4ltestes Ereignis zuerst.", "am l\xE4ngsten her", "am j\xFCngsten", [

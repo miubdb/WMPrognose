@@ -46,9 +46,9 @@ export const BESTOF_NEW: PoolQuestion[] = [
 
   // ===== WER WAR ZUERST? / SORTIEREN (alle fünf sichtbar, 50 Punkte je richtiger Position)
   rv(rank('b42-rank-c09', 'Fußball', 'Sortiere diese fünf BVB-Neuzugänge nach ihrer auf Transfermarkt.de angegebenen Ablösesumme – vom günstigsten zum teuersten.', 'günstigste Ablöse', 'teuerste Ablöse', [
-    ['Shinji Kagawa (2010)', '0,35 Mio. €'], ['Jadon Sancho (2017)', '7,84 Mio. €'], ['Erling Haaland (2020)', '20,00 Mio. €'], ['Jude Bellingham (2020)', '25,00 Mio. €'], ['Mats Hummels (2019)', '30,50 Mio. €'],
-  ], [3, 0, 4, 2, 1], 'Laut Transfermarkt.de war der teuerste Einkauf ein Rückkehrer – der günstigste ein Japaner für Kleingeld.'),
-    'Maßstab ist ausdrücklich Transfermarkt.de (Fragetext). Transfermarkt war in der Redaktionsumgebung nicht abrufbar: Die Werte stützen sich auf Medienberichte (Kagawa 0,35 / Sancho ca. 7,5–7,84 / Haaland 20 / Bellingham ca. 25 / Hummels 30,5 Mio. €). Bitte die fünf Zahlen einmal direkt auf Transfermarkt.de gegenlesen. Die Reihenfolge ist in allen Quellen identisch.'),
+    ['Shinji Kagawa (2010)', 'ablösefrei (0 €)'], ['Erling Haaland (2020)', '20,00 Mio. €'], ['Jadon Sancho (2017)', '20,59 Mio. €'], ['Jude Bellingham (2020)', '30,15 Mio. €'], ['Mats Hummels (2019)', '30,50 Mio. €'],
+  ], [3, 0, 4, 2, 1], 'Laut Transfermarkt.de lagen Haaland und Sancho nur 0,59 Mio. € auseinander, Bellingham und Hummels sogar nur 0,35 Mio. € – und der günstigste Neuzugang kam ablösefrei.'),
+    ''),
   rv(rank('b42-rank-c10', 'Andere Themen', 'Sortiere chronologisch, ältestes Ereignis zuerst.', 'am längsten her', 'am jüngsten', [
     ['Bau der Cheops-Pyramide', 'um 2560 v. Chr.'], ['Die letzten Mammuts auf der Wrangelinsel', 'um 2000 v. Chr.'], ['Beginn der Regentschaft Kleopatras', '51 v. Chr.'], ['Beginn des Lehrbetriebs in Oxford', 'ab ca. 1096'], ['Gründung von Tenochtitlan', '1325'],
   ], [2, 4, 0, 3, 1], 'Mammuts lebten nach dem Pyramidenbau; in Oxford wurde schon vor der Gründung der Aztekenhauptstadt gelehrt.'),
