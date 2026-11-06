@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Mode } from '../../../shared/types';
-import { ACTIVE_MODES as MODES, MODE_LABEL, taskMax } from '../../../shared/validate';
+import { ACTIVE_MODES, MODE_LABEL, taskMax } from '../../../shared/validate';
+const MODES: Mode[] = [...ACTIVE_MODES, 'vote'];
 import type { Scene } from '../../../shared/scenes';
 import type { ShowStep } from '../../../shared/types';
 import { adm, download, errText } from './api';

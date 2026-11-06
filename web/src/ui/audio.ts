@@ -56,6 +56,8 @@ export function play(name: Name) {
 // über einer wiederkehrenden Akkordfolge (Am – F – C – G, je 8 s). Läuft komplett offline. Nur eine Instanz; setMusic ist idempotent.
 let mus: { gain: GainNode; oscs: OscillatorNode[]; timer: number } | null = null;
 const CHORDS = [[110, 220, 261.63, 329.63], [87.31, 174.61, 220, 261.63], [130.81, 196, 261.63, 329.63], [98, 196, 246.94, 293.66]];
+/** Diagnose für Tests/Fehlersuche: läuft gerade ein Musik-Klangteppich? */
+if (typeof window !== 'undefined') (window as any).__outplayMusic = () => !!mus;
 export function setMusic(on: boolean, vol: number) {
   try {
     const target = on && enabled && ctx && ctx.state === 'running' ? Math.max(0, Math.min(100, vol)) / 100 * 0.07 : 0;   // sehr leise: max. ≈ −23 dB

@@ -329,3 +329,44 @@ test('DIE VERBINDUNG: Antwort in einem Schritt abgegeben, TV-Zähler „x von y�
   const d = g.view('tv').round!.data; assert.equal(d.answeredCount, 2); assert.equal(d.playerCount, 7);
   for (const who of ['tv', 3] as const) assert.equal(JSON.stringify(g.view(who).round!).includes('GeheimeAntwort'), false);
 });
+
+// ---------------------------------------------------------------- KICKBASE-KONSENS (Finale-Variante)
+const KK: Book = CS2.resolveBook('show-2k@1');
+function kkgame(n = 7) {
+  const eng = new Engine(() => KK); let now = 1_800_000_000_000;
+  const { room } = eng.newRoom('KK', now, 'show-2k@1', 'show'); const ids: string[] = [];
+  for (let i = 0; i < n; i++) { const r = eng.join(room, `Bot${i + 1}`, AV, now); if (r.ok) ids.push(r.player.id); }
+  let rq = 0;
+  const host = (a: Action): any => eng.act(room, { role: 'host' }, `h${++rq}`, a, now);
+  const pl = (i: number, a: Action): any => eng.act(room, { role: 'player', pid: ids[i] }, `p${i}-${++rq}`, a, now);
+  const view = (who: number | 'host' | 'tv'): View => eng.buildView(room, who === 'host' ? { role: 'host' } : who === 'tv' ? { role: 'tv' } : { role: 'player', pid: ids[who] }, now);
+  const advance = (ms: number) => { now += ms; eng.tick(room, now); };
+  host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
+  for (let i = 0; i < 40 && !(room.round?.tileId === 's5-final-kk' && room.phase === 'round'); i++) host({ k: (room.phase as string) === 'scoreboard' ? 'h.continue' : 'h.skipTile' });
+  assert.equal(room.round!.tileId, 's5-final-kk');
+  return { eng, room, ids, host, pl, view, advance };
+}
+
+test('KICKBASE-KONSENS: geheime Wahl, Punkte für die Mehrheitswahl, Gleichstand beide anerkannt, nicht für sich selbst, Rangliste verborgen, Siegerehrung funktioniert', () => {
+  assert.deepEqual(KK.tiles.find(t => t.id === 's5-final-kk')!.tasks.map(t => t.mode), ['vote', 'vote', 'vote']);
+  assert.equal(CS2.resolveBook('show-3@1').tiles.find(t => t.kind === 'final')!.tasks[0].mode, 'geo', 'FINAL LOCK bleibt Standard/Fallback in show-3');
+  const g = kkgame(); assert.equal(g.room.hideScores, true, 'Rangliste im Finale verborgen'); assert.equal(g.view('tv').room.hideScores, true);
+  const start = g.room.players.map(p => p.score);
+  g.host({ k: 'h.begin' });
+  assert.equal(g.pl(0, { k: 'submit', payload: { target: g.ids[0] } }).err, 'self_vote'); assert.equal(g.pl(0, { k: 'submit', payload: { target: 'unbekannt' } }).err, 'invalid_target');
+  // Stimmen: Ben ×3 (Spieler 0,2,3), Cem ×3 (1,4,5) → Gleichstand der häufigsten Wahlen; Spieler 7 (Index 6) enthält sich
+  [[0, 1], [1, 2], [2, 1], [3, 1], [4, 2], [5, 2]].forEach(([i, t]) => assert.ok(g.pl(i, { k: 'submit', payload: { target: g.ids[t] } }).ok));
+  assert.equal(g.pl(0, { k: 'submit', payload: { target: g.ids[3] } }).err, 'already_submitted'); assert.ok(g.pl(0, { k: 'submit', payload: { target: g.ids[1] } }).dup);
+  for (const who of ['tv', 5] as const) { const j = JSON.stringify(g.view(who).round!.data); assert.equal(j.includes('"target"') && who === 'tv', false, 'Stimmen bleiben bis zur Auflösung geheim'); }
+  assert.equal(g.view('tv').round!.data.answeredCount, 6);
+  g.advance(50_000); assert.equal(g.room.round!.stage, 'locked'); assert.ok(g.host({ k: 'h.reveal' }).ok);
+  const rev = g.view('tv').round!.reveal; assert.deepEqual([...rev.winners].sort(), [g.ids[1], g.ids[2]].sort(), 'Gleichstand: beide anerkannt'); assert.equal(rev.max, 3);
+  assert.deepEqual(rev.missing, [g.ids[6]]);
+  const d = g.room.players.map((p, i) => p.score - start[i]); assert.deepEqual(d, [600, 600, 600, 600, 600, 600, 0].map((x, i) => (i === 6 ? 0 : x)));
+  assert.equal(g.view('tv').room.hideScores, true, 'auch nach der Auflösung bleibt das Ranking verborgen');
+  // alle drei Fragen + Siegerehrung
+  g.host({ k: 'h.next' }); g.host({ k: 'h.begin' }); g.ids.forEach((_, i) => g.pl(i, { k: 'submit', payload: { target: g.ids[(i + 1) % 7] } }));   // alle verschieden → alle Wahlen gleichauf = alle anerkannt
+  assert.equal(g.room.round!.stage, 'locked'); g.host({ k: 'h.reveal' }); assert.ok(g.room.players.every(p => p.score >= 0));
+  g.host({ k: 'h.next' }); g.host({ k: 'h.begin' }); g.ids.forEach((_, i) => g.pl(i, { k: 'submit', payload: { target: g.ids[i === 0 ? 1 : 0] } })); g.host({ k: 'h.reveal' });
+  g.host({ k: 'h.next' }); assert.equal(g.room.phase, 'ceremony', 'nach der letzten Konsens-Frage startet die Siegerehrung'); assert.equal(g.view('tv').ceremony!.steps, 1 + 3 + 4);
+});

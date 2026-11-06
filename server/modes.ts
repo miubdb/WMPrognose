@@ -1,5 +1,5 @@
 // Die sechs Spielmodi: Eingabe-Validierung, Stage-Übergänge, Wertung, Sichten.
-import type { Stage, TaskDef, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, GlitchZone } from '../shared/types';
+import type { Stage, TaskDef, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, VoteTask, GlitchZone } from '../shared/types';
 import type { PlayerRec, Room, RoundState } from './model';
 import {
   scoreGeo, scoreRank, scoreRankExact, rankVariantOf, rankSortSeconds, rankPairDetail, scoreEstimate, scoreGlitch, scoreCode, codeMatches, groupUnique, scoreUnique, rankPairs,
@@ -594,5 +594,48 @@ const link: ModeImpl = {
   },
 };
 
-export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique, match, link };
+// =====================================================================
+// KICKBASE-KONSENS (nur Finale): geheime Wahl eines Mitspielers, Punkte für die Wahl mit den meisten Stimmen
+// =====================================================================
+const voteVotes = (c: Ctx) => {
+  const counts: Record<string, string[]> = {};
+  for (const p of c.players) { const tg = c.round.pm[p.id]?.target; if (tg && c.players.some(x => x.id === tg)) (counts[tg] ??= []).push(p.id); }
+  return counts;
+};
+const vote: ModeImpl = {
+  maxPoints: t => (t as VoteTask).points,
+  begin(c) { c.setStage('open', (c.task as VoteTask).seconds); },
+  advance(c) { c.setStage('locked', null); },
+  submit(c, pid, payload) {
+    if (c.round.stage !== 'open') return err('closed');
+    const target = String(payload?.target ?? '');
+    if (!c.players.some(p => p.id === target)) return err('invalid_target');
+    if (target === pid && c.players.length > 2) return err('self_vote');          // nicht für sich selbst stimmen (ab 3 Spielern)
+    const cur = c.round.pm[pid];
+    if (cur) return cur.target === target ? { ok: true, dup: true } : err('already_submitted');
+    c.round.pm[pid] = { target };
+    return OK;
+  },
+  answered: (c, pid) => !!c.round.pm[pid]?.target,
+  complete(c) { return c.round.stage === 'open' && c.players.length > 0 && c.players.every(p => !!c.round.pm[p.id]?.target); },
+  score(c) {
+    const t = c.task as VoteTask;
+    const counts = voteVotes(c);
+    const max = Math.max(0, ...Object.values(counts).map(v => v.length));
+    const winners = Object.entries(counts).filter(([, v]) => v.length === max && max > 0).map(([k]) => k);   // Gleichstand: alle häufigsten Wahlen werden anerkannt
+    const rows = c.players.map(p => { const tg = c.round.pm[p.id]?.target ?? null; const ok = !!tg && winners.includes(tg); return { pid: p.id, target: tg, correct: ok, points: ok ? t.points : 0 }; });
+    return {
+      entries: rows.filter(r => r.target).map(r => ({ pid: r.pid, delta: r.points, label: r.correct ? `Mehrheit: ${nm(c, r.target!)}` : 'nicht die Mehrheit' })),
+      reveal: { prompt: t.prompt, explain: t.explain, points: t.points, winners, max, counts: c.players.map(p => ({ pid: p.id, votes: (counts[p.id] ?? []).length, voters: counts[p.id] ?? [] })).sort((a, b) => b.votes - a.votes), rows },
+    };
+  },
+  view(c, a) {
+    const t = c.task as VoteTask;
+    const base: any = { prompt: t.prompt, points: t.points, answeredCount: c.players.filter(p => !!c.round.pm[p.id]?.target).length, playerCount: c.players.length };
+    if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid]?.target ?? null;
+    return base;
+  },
+};
+
+export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote };
 export { rankPairs };

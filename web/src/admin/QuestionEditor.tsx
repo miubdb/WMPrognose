@@ -8,7 +8,7 @@ import { Preview } from './Preview';
 import { SceneBuilder, ScenePair } from './SceneBuilder';
 import { SceneView, sceneVariant } from '../ui/SceneView';
 
-export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨', match: '🧲', link: '🔗' };
+export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨', match: '🧲', link: '🔗', vote: '🤝' };
 export const MODE_HELP: Record<string, string> = {
   geo: 'Spieler setzen einen Pin auf der Karte. Gewertet wird die Platzierung nach Entfernung.',
   rank: 'Fünf Begriffe erscheinen nacheinander; jeder muss sofort auf einen Rangplatz. Gewertet werden richtig angeordnete Paare.',
@@ -28,6 +28,7 @@ export function newTask(mode: Mode): any {
     case 'glitch': return { mode, prompt: '', viewPrompt: 'Merk dir das Bild!', scene: '', viewSeconds: 12, seconds: 25, points: 250, explain: '' };
     case 'codebreak': return { mode, prompt: '', display: '', input: 'number', answers: [], hints: ['', '', ''], seconds: 90, points: 300, explain: '' };
     case 'match': return { mode, prompt: '', pairs: [0, 1, 2, 3, 4, 5].map(() => ({ left: '', right: '' })), order: [2, 4, 0, 5, 1, 3], seconds: 60, points: 300, explain: '' };
+    case 'vote': return { mode, prompt: '', seconds: 45, points: 600, explain: '' };
     case 'link': return { mode, prompt: 'Was oder wer wird gesucht?', clues: ['', '', '', ''], answer: '', accept: [], clueSeconds: 20, points: 300, explain: '' };
     case 'unique': return { mode, prompt: '', closed: false, placeholder: '', valid: [0, 1, 2].map(() => ({ name: '', variants: [] })), seconds: 45, pointsUnique: 500, pointsShared: 150, explain: '' };
   }
@@ -155,6 +156,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
               <Field label="Hinweis beim Betrachten"><input value={task.viewPrompt} maxLength={120} onChange={e => set('viewPrompt', e.target.value)} /></Field>
               {sec('Betrachtungszeit (Sek.)', 'viewSeconds')}{sec('Suchzeit (Sek.)', 'seconds')}{sec('Punkte', 'points')}</>}
             {m === 'match' && <>{sec('Zeit (Sek.)', 'seconds')}<p className="small muted">Fest: 50 Punkte je richtigem Paar (max. 300), keine Minuspunkte.</p></>}
+            {m === 'vote' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Punkte je richtiger Wahl', 'points')}<p className="small muted">Nur im Finale einsetzbar. Jeder wählt geheim einen Mitspieler; Punkte für alle, die die Wahl mit den meisten Stimmen getroffen haben (bei Gleichstand beide Wahlen).</p></>}
             {m === 'link' && <>{sec('Sekunden je Hinweis', 'clueSeconds')}<p className="small muted">Fest: 300 / 225 / 150 / 75 Punkte, eine endgültige Antwort je Spieler.</p></>}
             {m === 'unique' && <>
               <Field label="Platzhalter im Eingabefeld"><input value={task.placeholder} maxLength={40} onChange={e => set('placeholder', e.target.value)} /></Field>

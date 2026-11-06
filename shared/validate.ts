@@ -1,13 +1,15 @@
 // Validierung und Normalisierung von Aufgaben/Kategorien (Server UND Admin-Oberfläche verwenden dieselben Regeln).
-import type { TaskDef, Mode, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask } from './types';
+import type { TaskDef, Mode, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, VoteTask } from './types';
 import { LINK_POINTS, MATCH_PAIRS, MATCH_PAIR_POINTS } from './scoring';
 
 /** Alle Modi, die gespeicherte Inhalte enthalten dürfen (inkl. Altmodus). */
-export const MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link', 'codebreak'];
+export const MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link', 'vote', 'codebreak'];
 /** Die sieben aktiven Modi (Auswahl im Editor, neue Pakete). */
+/** Nur im Finale einsetzbarer Zusatzmodus (zählt nicht zu den sieben Modi, die jede Show enthält). */
+export const FINAL_ONLY_MODES: Mode[] = ['vote'];
 export const ACTIVE_MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link'];
 export const isLegacyMode = (m: string) => m === 'codebreak';
-export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', codebreak: 'CODEBREAK (veraltet)' };
+export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS', codebreak: 'CODEBREAK (veraltet)' };
 
 export function taskMax(t: TaskDef): number {
   if (t.practice) return 0;                          // Proberunden zählen nie zu den Punkten
@@ -16,6 +18,7 @@ export function taskMax(t: TaskDef): number {
     case 'unique': return t.pointsUnique;
     case 'match': return MATCH_PAIRS * MATCH_PAIR_POINTS;
     case 'link': return LINK_POINTS[0];
+    case 'vote': return t.points;
     default: return t.points;
   }
 }
@@ -49,6 +52,7 @@ function normalizeTaskCore(raw: any): TaskDef {
       const pairs = (Array.isArray(r.pairs) ? r.pairs : []).slice(0, MATCH_PAIRS).map((p: any) => ({ left: str(p?.left, 50), right: str(p?.right, 50) }));
       return { mode: 'match', prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x: unknown) => num(x)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) } as MatchTask;
     }
+    case 'vote': return { mode: 'vote', prompt: str(r.prompt, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 300) } as VoteTask;
     case 'link': return { mode: 'link', prompt: str(r.prompt, 200), clues: (Array.isArray(r.clues) ? r.clues : []).slice(0, 4).map((c: unknown) => str(c, 220)), answer: str(r.answer, 80), accept: strList(r.accept, 12, 80),
       clueSeconds: num(r.clueSeconds, 20), points: LINK_POINTS[0], explain: str(r.explain, 500) } as LinkTask;
     default: return r;
@@ -62,7 +66,7 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
   const e: string[] = [];
   if (!t || !MODES.includes(t.mode)) return ['Unbekannter Spielmodus'];
   if (!t.prompt) e.push(t.mode === 'link' ? 'Überschrift fehlt (z. B. „Wer oder was wird gesucht?“)' : 'Fragetext fehlt');
-  if (t.mode !== 'unique' && t.mode !== 'match' && t.mode !== 'link' && !inRange((t as any).points, 1, 1000)) e.push('Punkte müssen zwischen 1 und 1000 liegen');
+  if (t.mode !== 'unique' && t.mode !== 'match' && t.mode !== 'link' && t.mode !== 'vote' && !inRange((t as any).points, 1, 1000)) e.push('Punkte müssen zwischen 1 und 1000 liegen');
   if (!t.explain) e.push('Eine Lösungserklärung (für die TV-Auflösung) fehlt');
   switch (t.mode) {
     case 'geo':
@@ -107,6 +111,10 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
       if (!inRange(t.seconds, 30, 120)) e.push('Zeitlimit 30–120 Sekunden');
       break;
     }
+    case 'vote':
+      if (!inRange(t.seconds, 10, 180)) e.push('Zeitlimit 10–180 Sekunden');
+      if (!inRange(t.points, 50, 1000)) e.push('Punkte 50–1000');
+      break;
     case 'link':
       if (t.clues.length !== 4 || t.clues.some(c => !c)) e.push('Genau vier Hinweise eintragen');
       if (!t.answer) e.push('Hauptlösung fehlt');

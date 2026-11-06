@@ -33660,7 +33660,8 @@ var CLUE_SECONDS_DEFAULT = 20;
 var clueSecs = (t) => t.clueSeconds === 12 ? CLUE_SECONDS_DEFAULT : t.clueSeconds;
 
 // shared/validate.ts
-var MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "codebreak"];
+var MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "vote", "codebreak"];
+var FINAL_ONLY_MODES = ["vote"];
 var ACTIVE_MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link"];
 function taskMax(t) {
   if (t.practice) return 0;
@@ -33673,6 +33674,8 @@ function taskMax(t) {
       return MATCH_PAIRS * MATCH_PAIR_POINTS;
     case "link":
       return LINK_POINTS[0];
+    case "vote":
+      return t.points;
     default:
       return t.points;
   }
@@ -33758,6 +33761,8 @@ function normalizeTaskCore(raw) {
       const pairs = (Array.isArray(r.pairs) ? r.pairs : []).slice(0, MATCH_PAIRS).map((p) => ({ left: str(p?.left, 50), right: str(p?.right, 50) }));
       return { mode: "match", prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x3) => num(x3)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) };
     }
+    case "vote":
+      return { mode: "vote", prompt: str(r.prompt, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 300) };
     case "link":
       return {
         mode: "link",
@@ -33778,7 +33783,7 @@ function validateTask(t, sceneExists = () => true) {
   const e = [];
   if (!t || !MODES.includes(t.mode)) return ["Unbekannter Spielmodus"];
   if (!t.prompt) e.push(t.mode === "link" ? "\xDCberschrift fehlt (z. B. \u201EWer oder was wird gesucht?\u201C)" : "Fragetext fehlt");
-  if (t.mode !== "unique" && t.mode !== "match" && t.mode !== "link" && !inRange(t.points, 1, 1e3)) e.push("Punkte m\xFCssen zwischen 1 und 1000 liegen");
+  if (t.mode !== "unique" && t.mode !== "match" && t.mode !== "link" && t.mode !== "vote" && !inRange(t.points, 1, 1e3)) e.push("Punkte m\xFCssen zwischen 1 und 1000 liegen");
   if (!t.explain) e.push("Eine L\xF6sungserkl\xE4rung (f\xFCr die TV-Aufl\xF6sung) fehlt");
   switch (t.mode) {
     case "geo":
@@ -33823,6 +33828,10 @@ function validateTask(t, sceneExists = () => true) {
       if (!inRange(t.seconds, 30, 120)) e.push("Zeitlimit 30\u2013120 Sekunden");
       break;
     }
+    case "vote":
+      if (!inRange(t.seconds, 10, 180)) e.push("Zeitlimit 10\u2013180 Sekunden");
+      if (!inRange(t.points, 50, 1e3)) e.push("Punkte 50\u20131000");
+      break;
     case "link":
       if (t.clues.length !== 4 || t.clues.some((c) => !c)) e.push("Genau vier Hinweise eintragen");
       if (!t.answer) e.push("Hauptl\xF6sung fehlt");
@@ -34006,6 +34015,8 @@ function taskSeconds(t, m = "expected") {
       return { play: t.seconds * a, reveal: rv(38) };
     case "match":
       return { play: t.seconds * (m === "max" ? 1 : 0.9), reveal: rv(45) };
+    case "vote":
+      return { play: t.seconds * a, reveal: rv(40) };
     case "link":
       return { play: t.clues.length * clueSecs(t) * (m === "max" ? 1 : 0.8) + (m === "max" ? 40 : 15), reveal: rv(45) };
     case "unique":
@@ -34393,7 +34404,7 @@ var ContentService = class {
   }
   createQuestion(raw, id, opts = {}) {
     const task = this.cleanTask(raw.task);
-    if (!opts.allowLegacy && !ACTIVE_MODES.includes(task.mode)) throw new ApiError(422, "Dieser Spielmodus wird nicht mehr verwendet (CODEBREAK). Bitte einen der sieben aktiven Modi w\xE4hlen.");
+    if (!opts.allowLegacy && !ACTIVE_MODES.includes(task.mode) && !FINAL_ONLY_MODES.includes(task.mode)) throw new ApiError(422, "Dieser Spielmodus wird nicht mehr verwendet (CODEBREAK). Bitte einen der sieben aktiven Modi w\xE4hlen.");
     const qid = id ?? nid("q_"), t = this.now();
     this.db.prepare("INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)").run(qid, task.mode, String(raw.topic ?? "").trim().slice(0, 60), JSON.stringify(task), t, t);
     return this.getQuestion(qid);
@@ -34929,7 +34940,7 @@ function bbox(it) {
     case "line":
       return { x0: Math.min(it.x, it.x2), y0: Math.min(it.y, it.y2), x1: Math.max(it.x, it.x2), y1: Math.max(it.y, it.y2) };
     case "text": {
-      const w2 = it.text.length * it.size * (it.mono ? 0.6 : 0.55);
+      const w2 = it.text.length * it.size * (it.mono ? 0.6 : 0.5);
       const x0 = it.anchor === "middle" ? it.x - w2 / 2 : it.anchor === "end" ? it.x - w2 : it.x;
       return { x0, y0: it.y - it.size, x1: x0 + w2, y1: it.y + it.size * 0.25 };
     }
@@ -35814,7 +35825,59 @@ var link = {
     return base;
   }
 };
-var MODES2 = { geo, rank, estimate, glitch, codebreak: code, unique, match, link };
+var voteVotes = (c) => {
+  const counts = {};
+  for (const p of c.players) {
+    const tg = c.round.pm[p.id]?.target;
+    if (tg && c.players.some((x3) => x3.id === tg)) (counts[tg] ??= []).push(p.id);
+  }
+  return counts;
+};
+var vote = {
+  maxPoints: (t) => t.points,
+  begin(c) {
+    c.setStage("open", c.task.seconds);
+  },
+  advance(c) {
+    c.setStage("locked", null);
+  },
+  submit(c, pid, payload) {
+    if (c.round.stage !== "open") return err2("closed");
+    const target = String(payload?.target ?? "");
+    if (!c.players.some((p) => p.id === target)) return err2("invalid_target");
+    if (target === pid && c.players.length > 2) return err2("self_vote");
+    const cur = c.round.pm[pid];
+    if (cur) return cur.target === target ? { ok: true, dup: true } : err2("already_submitted");
+    c.round.pm[pid] = { target };
+    return OK;
+  },
+  answered: (c, pid) => !!c.round.pm[pid]?.target,
+  complete(c) {
+    return c.round.stage === "open" && c.players.length > 0 && c.players.every((p) => !!c.round.pm[p.id]?.target);
+  },
+  score(c) {
+    const t = c.task;
+    const counts = voteVotes(c);
+    const max2 = Math.max(0, ...Object.values(counts).map((v2) => v2.length));
+    const winners = Object.entries(counts).filter(([, v2]) => v2.length === max2 && max2 > 0).map(([k2]) => k2);
+    const rows = c.players.map((p) => {
+      const tg = c.round.pm[p.id]?.target ?? null;
+      const ok = !!tg && winners.includes(tg);
+      return { pid: p.id, target: tg, correct: ok, points: ok ? t.points : 0 };
+    });
+    return {
+      entries: rows.filter((r) => r.target).map((r) => ({ pid: r.pid, delta: r.points, label: r.correct ? `Mehrheit: ${nm(c, r.target)}` : "nicht die Mehrheit" })),
+      reveal: { prompt: t.prompt, explain: t.explain, points: t.points, winners, max: max2, counts: c.players.map((p) => ({ pid: p.id, votes: (counts[p.id] ?? []).length, voters: counts[p.id] ?? [] })).sort((a, b2) => b2.votes - a.votes), rows }
+    };
+  },
+  view(c, a) {
+    const t = c.task;
+    const base = { prompt: t.prompt, points: t.points, answeredCount: c.players.filter((p) => !!c.round.pm[p.id]?.target).length, playerCount: c.players.length };
+    if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid]?.target ?? null;
+    return base;
+  }
+};
+var MODES2 = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote };
 
 // server/engine.ts
 var ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -36727,14 +36790,15 @@ var Engine = class _Engine {
 var av = (i2) => ({ face: i2 % 8, skin: i2 * 2 % 6, hair: i2 * 3 % 9, hairColor: i2 * 5 % 8, hat: i2 === 1 ? 4 : 0, shirt: i2 % 5, shirtColor: i2 * 3 % 10, acc: i2 === 2 ? 2 : 0, bg: i2 * 2 % 8 });
 var SAMPLE_NAMES = ["Anna", "Ben", "Cem", "Dana"];
 var FORMULAS = {
-  geo: "Platzierung nach Entfernung (km, Gro\xDFkreis): 100 % / 80 % / 65 % / 50 % / 35 % / 20 % / 10 % des Budgets bei 7 Spielern (sonst interpoliert). Gleiche Entfernung = gleicher Platz. Keine Abgabe = 0.",
-  rank: "Budget \xD7 richtig angeordnete Paare \xF7 10 (bei 5 Begriffen gibt es 10 Paare). Nicht platzierte Begriffe z\xE4hlen nicht.",
+  geo: "Punkte nach tats\xE4chlicher Entfernung (Gro\xDFkreis, km): Maximalpunkte \xD7 e^(\u2212(km \u2212 Treffertoleranz)/Skala); Skala Deutschland 200 km, Europa 700 km, Welt 2000 km. Gleiche Entfernung = gleiche Punkte, unabh\xE4ngig von den Mitspielern. Keine Abgabe = 0.",
+  rank: "Nacheinander-Variante: Budget \xD7 richtig angeordnete Paare \xF7 10 (10 Paarvergleiche bei 5 Begriffen). Sortier-Variante (alle f\xFCnf sichtbar): Budget \xF7 5 f\xFCr jeden Begriff auf der exakt richtigen Position (bei 250 Punkten: 50 je Begriff).",
   estimate: "Beste Sch\xE4tzung = volles Budget, danach nach Platz abgestuft (100/75/55/40/28/18/10 %); Rangfolge nach |ln(Tipp/L\xF6sung)|. Einsatz: +Einsatz bei Treffer auf den besten Tipp, sonst \u2212Einsatz (h\xF6chstens so viel, wie man besitzt).",
-  glitch: "Treffer in der Zone: 70\u2013100 % (je genauer), knapp daneben (bis 2\xD7 Zonenradius) bis 15 %, sonst 0.",
+  glitch: "Nur zwei Ergebnisse: Treffer (innerhalb der Objektbox plus Fingertoleranz) = volle Punkte, sonst oder keine Abgabe = 0. Keine Trostpunkte.",
   codebreak: "Ohne Hinweis 100 %, mit 1/2/3 Hinweisen 75/50/25 %. Falsch = 0. Geschwindigkeit z\xE4hlt nicht.",
   match: "50 Punkte je richtig verbundenem Paar, h\xF6chstens 300. Keine Minuspunkte, kein Zeitbonus \u2013 nur die Richtigkeit z\xE4hlt. Die Zuordnung z\xE4hlt, wie sie bei Ablauf der Zeit (oder bei der endg\xFCltigen Abgabe) steht.",
   link: "Eine endg\xFCltige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.",
-  unique: "Einzigartige g\xFCltige Antwort = Punkte \u201Eeinzigartig\u201C, mehrfach genannte g\xFCltige Antwort = Punkte \u201Emehrfach\u201C, ung\xFCltig = 0."
+  vote: "KICKBASE-KONSENS: Jeder w\xE4hlt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte \u2013 bei Gleichstand alle h\xE4ufigsten Wahlen. Ab 3 Spielern nicht f\xFCr sich selbst.",
+  unique: "Nur eine g\xFCltige, einmalige Antwort bringt Punkte. Mehrfach genannte g\xFCltige Antworten und ung\xFCltige Antworten = 0. Bei \u201Evollst\xE4ndiger Antwortliste\u201C wird Unbekanntes automatisch ung\xFCltig, sonst pr\xFCft der Showmaster."
 };
 function buildPreview(rawTask, scenes, meta = {}) {
   const task = normalizeTask(rawTask);
@@ -36855,6 +36919,17 @@ function buildPreview(rawTask, scenes, meta = {}) {
       P3(1, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map((i2, k2) => k2 < 3 ? posOf(i2) : posOf((i2 + 1) % 6)), final: true } });
       P3(2, { k: "submit", payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
       snap("Antworten abgegeben");
+      H3({ k: "h.lock" });
+      snap("Gesperrt");
+      break;
+    }
+    case "vote": {
+      snap("Aufgabe l\xE4uft");
+      P3(0, { k: "submit", payload: { target: ids[1] } });
+      P3(1, { k: "submit", payload: { target: ids[2] } });
+      P3(2, { k: "submit", payload: { target: ids[1] } });
+      P3(3, { k: "submit", payload: { target: ids[1] } });
+      snap("Stimmen abgegeben");
       H3({ k: "h.lock" });
       snap("Gesperrt");
       break;
@@ -38381,10 +38456,36 @@ var SHOW3_STEPS = [
   { k: "final", cat: "s3-final" }
 ];
 var SEED_SHOW3 = { pack: SHOW3_PACK, pool: POOL3, rounds: SHOW3_ROUNDS, steps: SHOW3_STEPS };
+var vote2 = (id, prompt, explain) => ({ id, topic: "Gruppenfrage", task: { mode: "vote", prompt, seconds: 45, points: 600, explain } });
+var POOL4 = [
+  vote2("s5-kk-1", "Wer von uns w\xFCrde 65 Millionen f\xFCr Marco Reus ausgeben?", "Der Konsens zeigt, wem die Gruppe die gr\xF6\xDFte Kaufwut zutraut."),
+  vote2("s5-kk-2", "Wer von uns w\xFCrde im Kickbase-Spiel zuerst sein ganzes Budget auf einen einzigen Spieler setzen?", "Mut zum Risiko \u2013 oder einfach \xDCbermut?"),
+  vote2("s5-kk-3", "Wer von uns w\xFCrde einen Spieler nur deshalb kaufen, weil ihm der Name gef\xE4llt?", "Fachwissen ist nicht n\xF6tig \u2013 nur Menschenkenntnis.")
+];
+var SHOW4_ROUNDS = [
+  {
+    id: "s5-final-kk",
+    title: "KICKBASE-KONSENS",
+    topic: "Das gro\xDFe Finale",
+    icon: "\u{1F91D}",
+    color: COLORS.GR,
+    kind: "final",
+    football: false,
+    blurb: "Drei Gruppenfragen, 1.800 Punkte, die Rangliste bleibt verborgen. W\xE4hle geheim einen Mitspieler \u2013 Punkte gibt es f\xFCr die Wahl mit den meisten Stimmen.",
+    taskIds: ["s5-kk-1", "s5-kk-2", "s5-kk-3"]
+  }
+];
+var SHOW4_STEPS = SHOW3_STEPS.map((s) => s.k === "final" ? { k: "final", cat: "s5-final-kk" } : s);
+var SEED_SHOW4 = {
+  pack: { id: "show-2k", name: "Reus 65 Mio \xB7 Finale KICKBASE-KONSENS", description: "Wie \u201EReus 65 Mio\u201C, aber mit dem Gruppenspiel KICKBASE-KONSENS als Finale (statt FINAL LOCK). Optional \u2013 FINAL LOCK bleibt der bew\xE4hrte Standard.", rules: SHOW3_PACK.rules },
+  pool: POOL4,
+  rounds: SHOW4_ROUNDS,
+  steps: SHOW4_STEPS
+};
 
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3];
+var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4];
 
 // server/vercel.ts
 var ConflictError = class extends Error {

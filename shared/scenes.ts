@@ -16,7 +16,7 @@ export function bbox(it: Item): { x0: number; y0: number; x1: number; y1: number
     case 'circle': return { x0: it.x - it.r, y0: it.y - it.r, x1: it.x + it.r, y1: it.y + it.r };
     case 'line': return { x0: Math.min(it.x, it.x2), y0: Math.min(it.y, it.y2), x1: Math.max(it.x, it.x2), y1: Math.max(it.y, it.y2) };
     case 'text': {
-      const w = it.text.length * it.size * (it.mono ? 0.6 : 0.55);
+      const w = it.text.length * it.size * (it.mono ? 0.6 : 0.5);
       const x0 = it.anchor === 'middle' ? it.x - w / 2 : it.anchor === 'end' ? it.x - w : it.x;
       return { x0, y0: it.y - it.size, x1: x0 + w, y1: it.y + it.size * 0.25 };
     }

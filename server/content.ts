@@ -1,7 +1,7 @@
 // Inhaltsverwaltung: Fragen-Bibliothek, Kategorien, Spielepakete (Entwurf -> Veröffentlichung -> unveränderliche Version), Szenen, Import/Export.
 import { createHash, randomBytes } from 'node:crypto';
 import type { Book, Flow, PackRules, ShowStep, TaskDef, TileDef } from '../shared/types';
-import { ACTIVE_MODES, BUDGET, MODES, normalizeCategory, normalizeTask, taskMax, validateCategory, validateTask, type CategoryData } from '../shared/validate';
+import { ACTIVE_MODES, FINAL_ONLY_MODES, BUDGET, MODES, normalizeCategory, normalizeTask, taskMax, validateCategory, validateTask, type CategoryData } from '../shared/validate';
 import { buildScene, validateTemplate, type SceneTemplate } from '../shared/sceneTemplates';
 import { analyzeBook, analyzeShow } from '../shared/analysis';
 import type { Scene } from '../shared/scenes';
@@ -185,7 +185,7 @@ export class ContentService {
   }
   createQuestion(raw: { task: any; topic?: string }, id?: string, opts: { allowLegacy?: boolean } = {}) {
     const task = this.cleanTask(raw.task);
-    if (!opts.allowLegacy && !ACTIVE_MODES.includes(task.mode)) throw new ApiError(422, 'Dieser Spielmodus wird nicht mehr verwendet (CODEBREAK). Bitte einen der sieben aktiven Modi wählen.');
+    if (!opts.allowLegacy && !ACTIVE_MODES.includes(task.mode) && !FINAL_ONLY_MODES.includes(task.mode)) throw new ApiError(422, 'Dieser Spielmodus wird nicht mehr verwendet (CODEBREAK). Bitte einen der sieben aktiven Modi wählen.');
     const qid = id ?? nid('q_'), t = this.now();
     this.db.prepare('INSERT INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)').run(qid, task.mode, String(raw.topic ?? '').trim().slice(0, 60), JSON.stringify(task), t, t);
     return this.getQuestion(qid);

@@ -10,14 +10,15 @@ const av = (i: number): Avatar => ({ face: i % 8, skin: (i * 2) % 6, hair: (i * 
 export const SAMPLE_NAMES = ['Anna', 'Ben', 'Cem', 'Dana'];
 
 export const FORMULAS: Record<string, string> = {
-  geo: 'Platzierung nach Entfernung (km, Großkreis): 100 % / 80 % / 65 % / 50 % / 35 % / 20 % / 10 % des Budgets bei 7 Spielern (sonst interpoliert). Gleiche Entfernung = gleicher Platz. Keine Abgabe = 0.',
-  rank: 'Budget × richtig angeordnete Paare ÷ 10 (bei 5 Begriffen gibt es 10 Paare). Nicht platzierte Begriffe zählen nicht.',
+  geo: 'Punkte nach tatsächlicher Entfernung (Großkreis, km): Maximalpunkte × e^(−(km − Treffertoleranz)/Skala); Skala Deutschland 200 km, Europa 700 km, Welt 2000 km. Gleiche Entfernung = gleiche Punkte, unabhängig von den Mitspielern. Keine Abgabe = 0.',
+  rank: 'Nacheinander-Variante: Budget × richtig angeordnete Paare ÷ 10 (10 Paarvergleiche bei 5 Begriffen). Sortier-Variante (alle fünf sichtbar): Budget ÷ 5 für jeden Begriff auf der exakt richtigen Position (bei 250 Punkten: 50 je Begriff).',
   estimate: 'Beste Schätzung = volles Budget, danach nach Platz abgestuft (100/75/55/40/28/18/10 %); Rangfolge nach |ln(Tipp/Lösung)|. Einsatz: +Einsatz bei Treffer auf den besten Tipp, sonst −Einsatz (höchstens so viel, wie man besitzt).',
-  glitch: 'Treffer in der Zone: 70–100 % (je genauer), knapp daneben (bis 2× Zonenradius) bis 15 %, sonst 0.',
+  glitch: 'Nur zwei Ergebnisse: Treffer (innerhalb der Objektbox plus Fingertoleranz) = volle Punkte, sonst oder keine Abgabe = 0. Keine Trostpunkte.',
   codebreak: 'Ohne Hinweis 100 %, mit 1/2/3 Hinweisen 75/50/25 %. Falsch = 0. Geschwindigkeit zählt nicht.',
   match: '50 Punkte je richtig verbundenem Paar, höchstens 300. Keine Minuspunkte, kein Zeitbonus – nur die Richtigkeit zählt. Die Zuordnung zählt, wie sie bei Ablauf der Zeit (oder bei der endgültigen Abgabe) steht.',
   link: 'Eine endgültige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.',
-  unique: 'Einzigartige gültige Antwort = Punkte „einzigartig“, mehrfach genannte gültige Antwort = Punkte „mehrfach“, ungültig = 0.',
+  vote: 'KICKBASE-KONSENS: Jeder wählt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte – bei Gleichstand alle häufigsten Wahlen. Ab 3 Spielern nicht für sich selbst.',
+  unique: 'Nur eine gültige, einmalige Antwort bringt Punkte. Mehrfach genannte gültige Antworten und ungültige Antworten = 0. Bei „vollständiger Antwortliste“ wird Unbekanntes automatisch ungültig, sonst prüft der Showmaster.',
 };
 
 export interface PreviewMeta { title?: string; topic?: string; icon?: string; color?: string; blurb?: string; kind?: 'tile' | 'surprise' | 'final' }
@@ -98,6 +99,11 @@ export function buildPreview(rawTask: unknown, scenes: Record<string, Scene>, me
       P(1, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5].map((i, k) => (k < 3 ? posOf(i) : posOf((i + 1) % 6))), final: true } });
       P(2, { k: 'submit', payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
       snap('Antworten abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'vote': {
+      snap('Aufgabe läuft');
+      P(0, { k: 'submit', payload: { target: ids[1] } }); P(1, { k: 'submit', payload: { target: ids[2] } }); P(2, { k: 'submit', payload: { target: ids[1] } }); P(3, { k: 'submit', payload: { target: ids[1] } });
+      snap('Stimmen abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
     }
     case 'link': {
       snap('Hinweis 1');

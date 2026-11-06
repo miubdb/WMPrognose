@@ -94,6 +94,7 @@ function PhoneBody(p: Props & { me?: PlayerPublic }) {
     case 'unique': return <UniquePhone {...p} d={d} />;
     case 'match': return <MatchPhone {...p} d={d} />;
     case 'link': return <LinkPhone {...p} d={d} />;
+    case 'vote': return <VotePhone {...p} d={d} />;
   }
 }
 
@@ -408,6 +409,25 @@ function MatchPhone({ round, act, d }: Props & { d: any }) {
   );
 }
 
+// ---------------------------------------------------------------- KICKBASE-KONSENS
+function VotePhone({ round, act, view, pid, d }: Props & { d: any }) {
+  const snd = useSender(act);
+  const [sel, setSel] = useState<string | null>(null);
+  const mine: string | null = d.mine ?? null;
+  const others = view.players.filter(p => p.id !== pid || view.players.length <= 2);
+  if (round.stage !== 'open') return <Waiting text={mine ? 'Stimme abgegeben' : 'Zeit abgelaufen'} sub="Gleich werden die Stimmen enthüllt …" />;
+  if (mine) return <div className="vote"><div className="question">{d.prompt}</div><Status sent draft={false} /><p className="center">Du hast gewählt: <b>{view.players.find(p => p.id === mine)?.name}</b></p><p className="muted center">Warte auf die anderen … ({d.answeredCount} von {d.playerCount} haben gewählt)</p></div>;
+  return (
+    <div className="vote">
+      <div className="question">{d.prompt}</div>
+      <p className="muted center small">Wähle geheim einen Mitspieler. Punkte gibt es, wenn deine Wahl die meisten Stimmen bekommt.</p>
+      <div className="votegrid">{others.map(p => <button type="button" key={p.id} className={`votecard ${sel === p.id ? 'sel' : ''}`} onClick={() => setSel(p.id)}><Avatar a={p.avatar} size={72} /><b>{p.name}</b></button>)}</div>
+      <Status sent={false} draft={!!sel} sending={snd.state === 'sending'} msg={snd.msg} />
+      <button className="btn primary wide" disabled={!sel || snd.state === 'sending'} onClick={() => sel && snd.send({ k: 'submit', payload: { target: sel } })}>{sel ? `Stimme für ${view.players.find(p => p.id === sel)?.name} abgeben` : 'Mitspieler antippen'}</button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- DIE VERBINDUNG
 function LinkPhone({ round, act, room, d }: Props & { d: any }) {
   const snd = useSender(act);
@@ -474,6 +494,7 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
     case 'glitch': { const r = rev.rows.find((x: any) => x.pid === pid); return r?.tap ? { points: r.points, title: r.hit ? 'Treffer!' : 'Daneben', text: r.hit ? 'Genau erkannt.' : r.points ? 'Knapp daneben.' : 'Nicht getroffen.' } : none; }
     case 'codebreak': { const r = rev.rows.find((x: any) => x.pid === pid); return r ? { points: r.points, title: `Lösung: ${rev.answer}`, text: r.solved ? (r.hints ? `Gelöst mit ${r.hints} Hinweis(en)` : 'Gelöst ohne Hinweis!') : 'Nicht gelöst.' } : none; }
     case 'match': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.submitted ? { points: r.points, title: 'MATCHMAKER', text: `${r.correct} von 6 Paaren richtig` } : none; }
+    case 'vote': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.target ? { points: r.points, title: r.correct ? 'Konsens getroffen! 🤝' : 'Nicht die Mehrheit', text: `Du hast ${view.players.find(p => p.id === r.target)?.name ?? '?'} gewählt.` } : none; }
     case 'link': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? `Richtig nach Hinweis ${r.level + 1}!` : 'Leider falsch', text: `Deine Antwort: ${r.answer}` } : none; }
     case 'unique': { const r = rev.results[pid]; return r ? { points: r.points, title: r.kind === 'unique' ? 'EINZIGARTIG! ✨' : r.kind === 'shared' ? 'Mehrfach genannt' : 'Ungültig', text: rev.groups.find((g: any) => g.members.includes(pid))?.label ?? '' } : none; }
   }

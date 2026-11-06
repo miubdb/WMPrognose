@@ -9,7 +9,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const { chromium, devices } = require('playwright');
 const { WebSocket } = require('ws');
-const { TILES, SEED_SHOW, SEED_SHOW2 } = await import('../../content/index.ts');
+const { TILES, SEED_SHOW, SEED_SHOW2, SEED_SHOW3 } = await import('../../content/index.ts');
 
 const PORT = 8092, BASE = `http://localhost:${PORT}`, DATA = '/tmp/outplay-show-e2e';
 const SHOTS = process.env.SHOTS ?? '/tmp/claude-0/shots-show';
@@ -22,8 +22,8 @@ const check = (c, m) => { if (c) console.log('• ✓', m); else { failures++; c
 // ---------- Aufgaben-Lookup (für sinnvolle Bot-Antworten) ----------
 const Q = new Map();
 for (const t of TILES) t.tasks.forEach((task, i) => Q.set(`${t.id}-${i + 1}`, task));
-for (const q of [...SEED_SHOW.pool, ...SEED_SHOW2.pool]) Q.set(q.id, q.task);
-const ROUND = new Map([...SEED_SHOW.rounds, ...SEED_SHOW2.rounds].map(r => [r.id, r]));
+for (const q of [...SEED_SHOW.pool, ...SEED_SHOW2.pool, ...SEED_SHOW3.pool]) Q.set(q.id, q.task);
+const ROUND = new Map([...SEED_SHOW.rounds, ...SEED_SHOW3.rounds].map(r => [r.id, r]));
 const taskOf = (tileId, idx) => Q.get(ROUND.get(tileId).taskIds[idx]);
 
 // ---------- Server ----------
@@ -96,8 +96,9 @@ async function answer(mode, task, stage) {
   if (mode === 'geo') { for (let i = 0; i < 7; i++) { if (i === 6) continue; await send(ps[i], { lat: task.answer.lat + (i - 3) * 1.5, lon: task.answer.lon + (i - 2) * 2 }); } }
   else if (mode === 'estimate') {
     if (stage === 'open') for (let i = 0; i < 7; i++) await send(ps[i], { value: Math.round(task.answer * (0.5 + i * 0.15)) });
-    else { const gs = ps.map(p => p.pid); for (let i = 0; i < 7; i++) await send(ps[i], { amount: task.bets[i % task.bets.length], target: gs[(i + 1) % 7] }); }
+    else { const gs = ps.map(p => p.pid); const bets = hostView.round.data.bets; for (let i = 0; i < 7; i++) await send(ps[i], { amount: bets[i % bets.length], target: gs[(i + 1) % 7] }); }
   }
+  else if (mode === 'rank' && hostView.round.data.variant === 'sort') { const perfect = [0, 1, 2, 3, 4]; for (let i = 0; i < 7; i++) await send(ps[i], { order: i % 3 === 0 ? perfect : i % 3 === 1 ? [1, 0, 2, 3, 4] : [4, 3, 2, 1, 0] }); }
   else if (mode === 'rank') { for (let step = 0; step < task.order.length; step++) { await waitHost(v => v.round?.stage === 'open' && v.round.data.step === step || v.round?.stage !== 'open', 15000); if (hostView.round.stage !== 'open') break; for (let i = 0; i < 7; i++) await send(ps[i], { step, slot: i % 2 ? task.order[step] : (task.order[step] + i) % task.items.length }); await sleep(250); } }
   else if (mode === 'glitch') { const z = task.zone ?? task.zones?.[0]; const pt = hostView.round.data.zones?.[0]; for (let i = 0; i < 7; i++) await send(ps[i], i % 3 === 0 && pt ? { x: pt.x, y: pt.y } : { x: 100 + i * 80, y: 120 + i * 40 }); }
   else if (mode === 'unique') { const names = task.valid.map(v => v.name); for (let i = 0; i < 7; i++) await send(ps[i], { answer: i < 2 ? names[0] : i === 2 ? 'Atlantis' : names[i % names.length] }); }
@@ -109,7 +110,7 @@ const waitHost = async (pred, ms = 8000) => { const t0 = Date.now(); while (!pre
 // 6. Fahrplan
 const played = [], modesSeen = new Set(), tilesOrder = [], boards = [], shotModes = new Set();
 let liveSeen = 0, liveInFinal = 0, brandOk = false; let restarted = false, firstGeoUi = false, leaks = 0, safety = 0;
-const TILEIDS = ['s4-r1', 's4-r2', 's4-r3', 's4-sur', 's4-r4', 's4-r5', 's4-r6', 's3-final'];
+const TILEIDS = ['s5-r1', 's5-r2', 's5-r3', 's5-sur', 's5-r4', 's5-r5', 's5-r6', 's3-final'];
 const practiceSeen = [];
 while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
   const v = hostView, ph = v.room.phase;
@@ -138,7 +139,7 @@ while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
       for (let i = 1; i < 6; i++) await send(phones[i], { lat: task.answer.lat + i, lon: task.answer.lon - i });
     } else await answer(mode, task, r.stage);
     // Serverneustart mitten in der Runde (einmalig, in Runde 2 / Aufgabe 2 nach abgegebenen Antworten)
-    if (!restarted && r.tileId === 's4-r2' && r.taskIndex === 2) {
+    if (!restarted && r.tileId === 's5-r2' && r.taskIndex === 2) {
       restarted = true; const before = JSON.stringify({ t: hostView.round.tileId, i: hostView.round.taskIndex, sc: hostView.players.map(p => p.score) });
       hws.terminate(); phones.forEach(ph => ph.ws.terminate()); await stopServer(); await startServer(); await connectHost(); for (const ph of phones) await connectPhone(ph);
       const after = JSON.stringify({ t: hostView.round.tileId, i: hostView.round.taskIndex, sc: hostView.players.map(p => p.score) });

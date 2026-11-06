@@ -8,7 +8,7 @@ import { initAudio, play, setMusic, setSoundEnabled } from '../ui/audio';
 import type { PlayerPublic, RoundView, View } from '../../../shared/types';
 
 export const MODE_NAME: Record<string, string> = {
-  geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG',
+  geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS',
 };
 const MODE_RULES: Record<string, string[]> = {
   geo: ['Setze auf deinem Handy einen Pin auf die Karte.', 'Du kannst ihn bis zum Absenden verschieben.', 'Je näher dein Pin, desto mehr Punkte – egal, wie die anderen tippen.'],
@@ -18,6 +18,7 @@ const MODE_RULES: Record<string, string[]> = {
   codebreak: ['Knacke das Rätsel mit Logik.', 'Hinweise helfen – kosten aber Punkte.', 'Drei Versuche, Tempo zählt kaum.'],
   unique: ['Nenne eine gültige Antwort.', 'Nur eine Antwort, die kein anderer nennt, bringt Punkte.', 'Doppelte und ungültige Antworten zählen 0.'],
   match: ['Sechs Begriffe links, sechs Partner rechts.', 'Verbinde auf dem Handy, was zusammengehört.', '50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.'],
+  vote: ['Alle bekommen dieselbe Gruppenfrage.', 'Du wählst geheim einen Mitspieler – nicht dich selbst.', 'Punkte gibt es für die Wahl mit den meisten Stimmen.'],
   link: ['Vier Hinweise erscheinen nacheinander.', 'Je früher du die Lösung nennst, desto mehr Punkte.', 'Nur ein Versuch – die Antwort bleibt geheim.'],
 };
 
@@ -170,7 +171,7 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
       {showLive && <LiveRank view={view} />}
       <Header view={view} right={timer ? <Countdown round={round} serverNow={serverNow} size={140} onTick={s => { if (s > 0 && s <= 5 && round.pausedLeft === null) play('tick'); }} /> : undefined} />
       {round.stage !== 'intro' && (
-        <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.kind === 'final' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</b><small>{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</small></div></div>
+        <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.kind === 'final' && round.mode !== 'vote' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</b><small>{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</small></div></div>
       )}
       {round.stage === 'reveal' && round.mode !== 'match' && <MissingNote view={view} rev={round.reveal} />}
       {round.practice && round.stage === 'reveal' && <div className="probebanner">🎓 Proberunde – so wäre es gewertet worden. Es werden <b>keine Punkte</b> vergeben.</div>}
@@ -183,6 +184,7 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
           round.mode === 'codebreak' ? <CodeTv view={view} round={round} /> :
           round.mode === 'match' ? <MatchTv view={view} round={round} /> :
           round.mode === 'link' ? <LinkTv view={view} round={round} /> :
+          round.mode === 'vote' ? <VoteTv view={view} round={round} /> :
           <UniqueTv view={view} round={round} />}
       </div>
     </div>
@@ -211,7 +213,7 @@ function RuleCard({ round, view }: { round: RoundView; view: View }) {
     return (
       <div className="rulecard compact">
         <div className="flip"><div className="bigic">{round.icon}</div></div>
-        <h1>{round.kind === 'final' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</h1>
+        <h1>{round.kind === 'final' && round.mode !== 'vote' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</h1>
         <p className="muted">{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</p>
       </div>
     );
@@ -222,7 +224,7 @@ function RuleCard({ round, view }: { round: RoundView; view: View }) {
       {round.kind === 'surprise' && !round.practice && <div className="kicker surprise">⚡ ÜBERRASCHUNG ⚡</div>}
       {round.kind === 'final' && <div className="kicker final">🔒 Rangliste ab jetzt verborgen</div>}
       <div className="flip"><div className="bigic">{round.icon}</div></div>
-      {round.kind === 'final' && round.taskIndex === 0 ? <>
+      {round.kind === 'final' && round.taskIndex === 0 && round.mode !== 'vote' ? <>
         <h1>FINAL LOCK</h1>
         <ol><li style={{ animationDelay: '.4s' }}>① Ein Ort auf der Karte – 400 Punkte</li><li style={{ animationDelay: '.8s' }}>② Eine gemeinsame Lösung – bis 300 Punkte</li><li style={{ animationDelay: '1.2s' }}>③ Eine Sortieraufgabe – 500 Punkte</li><li style={{ animationDelay: '1.6s' }}>④ Schätzen mit Einsatz – bis zu 800 Punkte</li></ol>
       </> : <>
@@ -433,6 +435,31 @@ function MatchTv({ view, round }: { view: View; round: RoundView }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---- KICKBASE-KONSENS
+function VoteTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal;
+  if (!rev) return (
+    <div className="votetv"><div className="bigq">{d.prompt}</div>
+      <p className="hint big">{d.answeredCount} von {d.playerCount} haben gewählt – die Stimmen bleiben geheim.</p><AnswerRow players={view.players} /></div>
+  );
+  const max = Math.max(1, rev.max);
+  return (
+    <div className="votetv reveal"><div className="bigq small">{rev.prompt}</div>
+      <div className="votebars">
+        {rev.counts.map((c: any, i: number) => { const p = pl(view, c.pid); if (!p) return null; const win = rev.winners.includes(c.pid); return (
+          <div key={c.pid} className={`vbar ${win ? 'win' : ''}`} style={{ animationDelay: `${0.3 + i * 0.35}s` }}>
+            <div className="who"><Avatar a={p.avatar} size={52} /><b>{p.name}</b></div>
+            <div className="track"><div className="fill" style={{ width: `${(c.votes / max) * 100}%` }} /></div>
+            <div className="voters">{c.voters.map((v: string) => { const vp = pl(view, v); return vp ? <Avatar key={v} a={vp.avatar} size={30} /> : null; })}</div>
+            <strong>{c.votes}{win ? ' 🤝' : ''}</strong>
+          </div>); })}
+      </div>
+      <p className="rankhow">Wer die meisten Stimmen bekommt, gewinnt den Konsens – wer ihn gewählt hat, erhält je <b>{rev.points} Punkte</b>{rev.winners.length > 1 ? ' (Gleichstand: alle häufigsten Wahlen zählen)' : ''}.</p>
+      <Explain text={rev.explain} />
     </div>
   );
 }

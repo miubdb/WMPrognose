@@ -1,7 +1,7 @@
 // Gemeinsame Typen für Server, Inhalte und Client.
 
 /** 'codebreak' ist ein Altmodus: wird nicht mehr angeboten, bestehende Inhalte/Pakete bleiben aber les- und spielbar. */
-export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique' | 'match' | 'link';
+export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique' | 'match' | 'link' | 'vote';
 export type MapKind = 'world' | 'europe' | 'germany';
 
 // ---------- Avatar ----------
@@ -124,7 +124,9 @@ export interface LinkTask {
 }
 /** Proberunde: interaktive Beispielaufgabe ohne Wertung (Punkte werden nie vergeben). */
 export interface TaskBase { practice?: boolean }
-export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask) & TaskBase;
+/** KICKBASE-KONSENS (nur Finale): alle beantworten dieselbe Gruppenfrage, indem sie geheim einen Mitspieler wählen; Punkte für die Wahl(en) mit den meisten Stimmen. */
+export interface VoteTask { mode: 'vote'; prompt: string; seconds: number; points: number; explain: string }
+export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask | VoteTask) & TaskBase;
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
 export interface PackRules {

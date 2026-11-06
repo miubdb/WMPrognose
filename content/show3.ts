@@ -54,3 +54,22 @@ export const SHOW3_STEPS: ShowStep[] = [
 ];
 
 export const SEED_SHOW3: SeedShow = { pack: SHOW3_PACK, pool: POOL3, rounds: SHOW3_ROUNDS, steps: SHOW3_STEPS };
+
+// ---------------------------------------------------------------- Variante mit Abschlussmodus KICKBASE-KONSENS (statt FINAL LOCK)
+// Eigenes Paket (id „show-2k“), damit das bewährte FINAL LOCK (show-3) der Standard und Fallback bleibt. Wird erst nach Test bewusst gewählt.
+const vote = (id: string, prompt: string, explain: string): PoolQuestion => ({ id, topic: 'Gruppenfrage', task: { mode: 'vote', prompt, seconds: 45, points: 600, explain } });
+export const POOL4: PoolQuestion[] = [
+  vote('s5-kk-1', 'Wer von uns würde 65 Millionen für Marco Reus ausgeben?', 'Der Konsens zeigt, wem die Gruppe die größte Kaufwut zutraut.'),
+  vote('s5-kk-2', 'Wer von uns würde im Kickbase-Spiel zuerst sein ganzes Budget auf einen einzigen Spieler setzen?', 'Mut zum Risiko – oder einfach Übermut?'),
+  vote('s5-kk-3', 'Wer von uns würde einen Spieler nur deshalb kaufen, weil ihm der Name gefällt?', 'Fachwissen ist nicht nötig – nur Menschenkenntnis.'),
+];
+export const SHOW4_ROUNDS: SeedShow['rounds'] = [
+  { id: 's5-final-kk', title: 'KICKBASE-KONSENS', topic: 'Das große Finale', icon: '🤝', color: C.GR, kind: 'final', football: false,
+    blurb: 'Drei Gruppenfragen, 1.800 Punkte, die Rangliste bleibt verborgen. Wähle geheim einen Mitspieler – Punkte gibt es für die Wahl mit den meisten Stimmen.',
+    taskIds: ['s5-kk-1', 's5-kk-2', 's5-kk-3'] },
+];
+export const SHOW4_STEPS: ShowStep[] = SHOW3_STEPS.map(s => (s.k === 'final' ? { k: 'final' as const, cat: 's5-final-kk' } : s));
+export const SEED_SHOW4: SeedShow = {
+  pack: { id: 'show-2k', name: 'Reus 65 Mio · Finale KICKBASE-KONSENS', description: 'Wie „Reus 65 Mio“, aber mit dem Gruppenspiel KICKBASE-KONSENS als Finale (statt FINAL LOCK). Optional – FINAL LOCK bleibt der bewährte Standard.', rules: SHOW3_PACK.rules },
+  pool: POOL4, rounds: SHOW4_ROUNDS, steps: SHOW4_STEPS,
+};
