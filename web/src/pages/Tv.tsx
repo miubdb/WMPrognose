@@ -121,6 +121,11 @@ function IntroTv({ view }: { view: View }) {
           </div>
         ))}
       </div>
+      {view.room.agenda && (
+        <div className="agenda" aria-label="Programm">
+          {view.room.agenda.map((a, i) => <div key={i} className={`ag ${a.k}`}><span>{a.icon ?? '📊'}</span><b>{a.k === 'board' ? 'Stand' : a.title}</b></div>)}
+        </div>
+      )}
     </div>
   );
 }
@@ -171,6 +176,15 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
 }
 
 function RuleCard({ round }: { round: RoundView }) {
+  if (round.taskIndex > 0) {                     // ab der 2. Aufgabe einer Runde: kompakte Karte statt voller Regelkarte (spart Zeit)
+    return (
+      <div className="rulecard compact">
+        <div className="flip"><div className="bigic">{round.icon}</div></div>
+        <h1>Aufgabe {round.taskIndex + 1} von {round.taskCount}</h1>
+        <p className="muted">{MODE_NAME[round.mode]} · bis zu {round.points} Punkte</p>
+      </div>
+    );
+  }
   return (
     <div className="rulecard">
       {round.kind === 'surprise' && <div className="kicker surprise">⚡ ÜBERRASCHUNG ⚡</div>}

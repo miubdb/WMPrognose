@@ -75,3 +75,38 @@ WM 2014: **171 Tore** (64 Spiele) · „Bohemian Rhapsody“: **355 s** (5:55).
 ## Offene Punkte / Hinweise
 - Kanada (WM 2026) gilt in der Gastgeber-Aufgabe als gültig. Fehlt eine Schreibweise, entscheidet der Showmaster in der Prüfung.
 - Wer Namen/Schreibweisen ergänzen will, kann sie im Admin je Frage ändern (Varianten, Synonyme).
+
+---
+
+# Showpaket „Spieleabend – fester Ablauf“ (`show-1`) und erweiterter Fragenpool
+
+**Fragenpool: 60 Aufgaben** (34 aus `standard-2` + 26 neue) · **Showpaket: 31 Aufgaben** in fester Reihenfolge, davon 29 aus dem Pool der bestehenden Fragen bzw. neuen Alternativen (siehe unten). Die 29 nicht gespielten Aufgaben sind Reserve/Alternativen: im Admin über „Aufgabe ersetzen“ austauschbar, ohne den Ablauf zu verändern.
+
+## Ablauf (Standard, „Showmodus“)
+Eröffnung → **R1 Wo zur Hölle?** (4 · Geo) → **R2 Passt zusammen** (4 · Matchmaker) → **R3 Wer war zuerst?** (4 · Blind Rank) → *Zwischenstand* → **Überraschung EINZIGARTIG** (3) → **R4 Alles im Blick** (4 · Glitch) → **R5 Schätz mal!** (4 · Setz auf mich) → **R6 Wer oder was?** (4 · Die Verbindung) → *letzter sichtbarer Zwischenstand* → **FINAL LOCK** (4 gemischte Aufgaben: Geo, Match/Link/Rank – Modusmix) → Siegerehrung. Jeder der sieben Modi kommt garantiert vor. Nach jeder Auflösung führt „Weiter“ automatisch zur nächsten Station; **eine Aufgabe startet nie von selbst** – der Showmaster gibt sie bewusst frei („Aufgabe N starten“ bzw. „Weiter & Aufgabe N sofort starten“).
+
+## Neue Aufgaben (26) und warum
+| ID | Modus | Zweck |
+|---|---|---|
+| s3-geo-helgoland, -zugspitze, -montsaintmichel, -anfield, -maracana, -ushuaia | Geo | Alternativen zu den vorhandenen Geo-Fragen: abwechslungsreiche Entfernungen (national/europäisch/global), 2 Stadien für den Fußballanteil |
+| s3-rank-berge, -olympia, -tech | Rank | zusätzliche Reihenfolgen mit eindeutigen, abgeschlossenen Werten (Höhen, Jahre); `s3-rank-tech` ist die Finale-Aufgabe |
+| s3-est-dombau, -isner, -saarland | Schätzen | Alternativen mit „Aha“-Zahlen, eindeutig definiert (Dombau-Dauer, längstes Tennismatch in Minuten, Saarland in Fußballfeldern) |
+| s3-glitch-abfahrt, -kassenzettel, -marktwerte, -tabelle | Glitch | Alternativen: Szenen mit klar nachrechenbarer Manipulation |
+| s3-match-spitznamen (im Show-Paket), -spiele, -baender | Match | Spitznamen (Fußball) im Showpaket, 2 Alternativen |
+| s3-link-pele (im Show-Paket), -mozart, -everest, -oktoberfest | Verbindung | Pelé im Showpaket (Fußball), 3 Alternativen |
+| s3-unique-orchester (im Show-Paket), -spanisch, -fluesse | Einzigartig | 3. Aufgabe der Überraschungsrunde nötig (3 statt 2), 2 Alternativen |
+
+Im Showpaket neu gespielt: `s3-match-spitznamen`, `s3-unique-orchester`, `s3-link-pele`, `s3-rank-tech` (damit R2/Überraschung/R6/Finale auf 4 bzw. 3 Aufgaben kommen). Alle anderen 27 gespielten Aufgaben sind **unveränderte bestehende Fragen** (gleiche IDs, keine Kopien).
+
+**Fußball:** 9 von 31 gespielten Aufgaben = **29 %** (Ziel 25–35 %). Die Allianz-Arena-Aufgabe (R1, Aufgabe 1) und ihr Rückbezug im Champions-League-Finale 2025 kommen **genau einmal**; ein Test prüft das.
+
+**Fakten:** Die neuen Aufgaben wurden beim Erstellen gegen gängiges Standardwissen geprüft (nur abgeschlossene, eindeutig definierte Werte; Erklärtexte nennen den Wert). Eine zusätzliche Quellenprüfung per Websuche für die 26 neuen Aufgaben fand in dieser Runde **nicht** erneut statt – bitte vor dem 7.11. die Show im Admin (Vorschau) einmal überfliegen; die Antworten stehen je Aufgabe im Admin.
+
+## Änderung an bestehenden Inhalten (Punkte)
+Die vorhandenen Rank-Aufgaben wurden in `content/tiles.ts` von 330–340 auf **250 Punkte** gesenkt, damit eine Runde mit 4 Rank-Aufgaben auf das Rundenbudget 1000 kommt (R3). Folge: in **frischen** Datenbanken haben klassische Rank-Kacheln (3 Aufgaben) 750 statt 1000 Punkte. **Bereits installierte Datenbanken behalten die gespeicherten Punkte** (Installer überschreibt nie); dort ist R3 dann 1340 Punkte statt 1000 – im Admin als Hinweis, kein Fehler. Wer die 250 will, ändert die Punkte der vier Fragen im Admin.
+
+## Punkte-Balance (Erwartungswerte, 7 Spieler, Startguthaben 200 / Einsätze)
+Je Runde sind erreichbare Punkte: R1 1000 · R2 1200 · R3 1000 · Überraschung 1500 · R4 1000 · R5 2000 (inkl. Einsatz-Spielgeld) · R6 1200 · Finale 2000 → **max. 10 900**. Finale-Anteil 18 %: reicht, um Spannung zu erzeugen, aber nicht, um einen großen Rückstand sicher zu drehen. Erwartete Ausbeute je Modus (Modell aus den Wertungsregeln, Durchschnittsspieler): Geo ≈ 51 %, Schätzen ≈ 47 % (Einsätze annähernd nullsumme), Rank ≈ 65 %, Glitch ≈ 55 %, Match ≈ 55 %, Verbindung ≈ 40 %, Einzigartig ≈ 35 % → kein Modus dominiert. Fehlende Antworten = 0 Punkte, Punktestände sind nie negativ (getestet, 7 Bots mit unterschiedlicher Stärke, Spieler 7 gibt teils nichts ab).
+
+## Spieldauer (neu berechnet)
+Erwartet **82,5 min** (max. 105 min bei voll ausgeschöpften Zeitlimits) – Ziel 75–90 min. Annahmen: Regelkarte nur bei der ersten Aufgabe einer Runde ausführlich (Aufgaben 2–4 kompakt), 10 s Pause bis zur Freigabe durch den Showmaster, Auflösung ~12–20 s je Aufgabe, 2 Zwischenstände à ~1 min, Eröffnung ~3 min, Siegerehrung ~4 min. Antwortzeiten wurden **nicht** gekürzt; Übergänge wurden optimiert (kompakte Regelkarte, „Weiter & sofort starten“). Reale Dauer hängt vom Tempo des Showmasters ab – Richtwert, keine Garantie.

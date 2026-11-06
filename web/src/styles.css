@@ -290,3 +290,9 @@ details summary { cursor: pointer; font-weight: 700; }
 
 .linktv.rev .bigq, .matchtv.rev .bigq { font-size: 1.9em; margin: .1em 0 .3em; } .linktv.rev .lclues { gap: .35em .6em; margin: 0 0 .3em; } .linktv.rev .lclue { font-size: 1em; padding: .35em .7em; } .linktv.rev .lanswer { font-size: 2em; margin: .1em 0 .2em; }
 .linktv.rev .pointslist .prow, .matchtv.rev .pointslist .prow { padding-top: .1em; padding-bottom: .1em; } .linktv.rev .pointslist .prow b, .matchtv.rev .pointslist .prow b { font-size: 1.1em; } .linktv.rev .pointslist .prow .note { font-size: .9em; } .matchtv.rev .mtpair { font-size: 1.1em; padding: .25em .6em; } .linktv.rev .explain, .matchtv.rev .explain { font-size: .9em; }
+
+/* ---- Showablauf ---- */
+.agenda { display: flex; flex-wrap: wrap; gap: .5em; justify-content: center; margin-top: 1.2em; } .agenda .ag { display: flex; align-items: center; gap: .4em; padding: .35em .8em; border-radius: 99px; background: var(--panel); font-size: 1.3em; } .agenda .ag.board { opacity: .6; } .agenda .ag.final { background: rgba(245,184,46,.25); } .agenda .ag.surprise { background: rgba(236,72,153,.25); }
+.rulecard.compact h1 { font-size: 3.4em; margin: .2em 0; } .rulecard.compact .flip { transform: scale(.8); }
+.agendahost { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; } .agendahost .ah { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--panel); font-size: .9rem; } .agendahost .ah.now { background: var(--violet); color: #fff; font-weight: 800; } .agendahost .ah.done { opacity: .45; } .agendahost .ah small { margin-left: auto; color: var(--muted); }
+.linkbtn { background: none; border: 0; color: inherit; text-align: left; padding: 0; font: inherit; cursor: pointer; } .showstep.open { background: rgba(255,255,255,.03); border-radius: 12px; } .showtasks { padding: 4px 10px 10px 30px; }

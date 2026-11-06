@@ -39,19 +39,19 @@ export const TILES: TileDef[] = [
   {
     id: 'v2-wer-war-zuerst', title: 'Wer war zuerst?', topic: 'Marken, Technik & Zeitreisen', icon: '⏳', color: PK, mode: 'rank', kind: 'tile', football: false, blurb: RANK_BLURB,
     tasks: [
-      { mode: 'rank', secondsPerItem: 12, points: 340, prompt: 'Was gibt es schon am längsten? – die älteste Marke zuerst', topLabel: 'am ältesten', bottomLabel: 'am jüngsten',
+      { mode: 'rank', secondsPerItem: 12, points: 250, prompt: 'Was gibt es schon am längsten? – die älteste Marke zuerst', topLabel: 'am ältesten', bottomLabel: 'am jüngsten',
         items: [
           { text: 'Coca-Cola', value: '1886 (erfunden)' }, { text: 'Nintendo', value: '1889 (Spielkarten)' }, { text: 'LEGO', value: '1932' },
           { text: 'PlayStation', value: '1994 (Japan)' }, { text: 'Netflix', value: '1997' },
         ], order: [3, 0, 4, 2, 1],
         explain: 'Coca-Cola (1886), Nintendo (1889), LEGO (1932), PlayStation (1994) und Netflix (1997). Nintendo war schon über 100 Jahre alt, als die PlayStation erschien!' },
-      { mode: 'rank', secondsPerItem: 12, points: 330, prompt: 'Was geschah zuerst? – das älteste Ereignis zuerst', topLabel: 'am längsten her', bottomLabel: 'am jüngsten',
+      { mode: 'rank', secondsPerItem: 12, points: 250, prompt: 'Was geschah zuerst? – das älteste Ereignis zuerst', topLabel: 'am längsten her', bottomLabel: 'am jüngsten',
         items: [
           { text: 'Eröffnung des Suezkanals', value: '1869' }, { text: 'Erste Olympische Spiele der Neuzeit', value: '1896' }, { text: 'Erster Motorflug der Brüder Wright', value: '1903' },
           { text: 'Untergang der Titanic', value: '1912' }, { text: 'Gagarin fliegt als erster Mensch ins All', value: '1961' },
         ], order: [2, 4, 1, 3, 0],
         explain: 'Suezkanal (1869), Olympia in Athen (1896), Wright-Flug (1903), Titanic (1912), Gagarin (1961). Zwischen dem ersten Motorflug und dem ersten Menschen im All liegen nur 58 Jahre.' },
-      { mode: 'rank', secondsPerItem: 12, points: 330, prompt: 'Wie hoch ist es? – das höchste Bauwerk zuerst', topLabel: 'am höchsten', bottomLabel: 'am niedrigsten',
+      { mode: 'rank', secondsPerItem: 12, points: 250, prompt: 'Wie hoch ist es? – das höchste Bauwerk zuerst', topLabel: 'am höchsten', bottomLabel: 'am niedrigsten',
         items: [
           { text: 'Burj Khalifa (Dubai)', value: '828 m' }, { text: 'Eiffelturm (Paris)', value: 'ca. 330 m' }, { text: 'Kölner Dom', value: '157 m' },
           { text: 'Big Ben (Elizabeth Tower)', value: '96 m' }, { text: 'Schiefer Turm von Pisa', value: '56 m' },
@@ -131,19 +131,19 @@ export const TILES: TileDef[] = [
   {
     id: 'v2-fussball-zeitreise', title: 'Fußball-Zeitreise', topic: 'Vereine, Regeln & Rekorde', icon: '⚽', color: GR, mode: 'rank', kind: 'tile', football: true, blurb: RANK_BLURB,
     tasks: [
-      { mode: 'rank', secondsPerItem: 12, points: 340, prompt: 'Gründungsjahr des Klubs – der älteste zuerst', topLabel: 'ältester Klub', bottomLabel: 'jüngster Klub',
+      { mode: 'rank', secondsPerItem: 12, points: 250, prompt: 'Gründungsjahr des Klubs – der älteste zuerst', topLabel: 'ältester Klub', bottomLabel: 'jüngster Klub',
         items: [
           { text: 'Manchester United', value: '1878 (als Newton Heath)' }, { text: 'Juventus Turin', value: '1897' }, { text: 'FC Barcelona', value: '1899' },
           { text: 'FC Bayern München', value: '1900' }, { text: 'Real Madrid', value: '1902' },
         ], order: [3, 0, 4, 1, 2],
         explain: 'Manchester United (1878), Juventus (1897), Barcelona (1899), Bayern (1900) – und ausgerechnet Real Madrid (1902) ist der jüngste dieser fünf Giganten.' },
-      { mode: 'rank', secondsPerItem: 12, points: 330, prompt: 'Was geschah zuerst? – Fußball-Geschichte, das älteste Ereignis zuerst', topLabel: 'am längsten her', bottomLabel: 'am jüngsten',
+      { mode: 'rank', secondsPerItem: 12, points: 250, prompt: 'Was geschah zuerst? – Fußball-Geschichte, das älteste Ereignis zuerst', topLabel: 'am längsten her', bottomLabel: 'am jüngsten',
         items: [
           { text: 'Die erste Europameisterschaft', value: '1960' }, { text: 'Start der Bundesliga', value: '1963' }, { text: 'Die erste Frauen-Weltmeisterschaft', value: '1991' },
           { text: 'Die Rückpassregel für Torhüter', value: '1992' }, { text: 'Der Videobeweis in der Bundesliga', value: '2017' },
         ], order: [2, 4, 1, 3, 0],
         explain: 'EM (1960), Bundesliga-Start (1963), Frauen-WM (1991), Rückpassregel (1992) und Videobeweis (2017). Die Rückpassregel ist erst gut 30 Jahre alt!' },
-      { mode: 'rank', secondsPerItem: 12, points: 330, prompt: 'Länderspiele für Deutschland – die meisten zuerst', topLabel: 'meiste Länderspiele', bottomLabel: 'wenigste Länderspiele',
+      { mode: 'rank', secondsPerItem: 12, points: 250, prompt: 'Länderspiele für Deutschland – die meisten zuerst', topLabel: 'meiste Länderspiele', bottomLabel: 'wenigste Länderspiele',
         items: [
           { text: 'Lothar Matthäus', value: '150' }, { text: 'Miroslav Klose', value: '137' }, { text: 'Lukas Podolski', value: '130' },
           { text: 'Bastian Schweinsteiger', value: '121' }, { text: 'Philipp Lahm', value: '113' },

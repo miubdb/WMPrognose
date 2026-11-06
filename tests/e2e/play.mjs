@@ -24,7 +24,7 @@ tv.on('pageerror', e => console.log('TV pageerror', e.message));
 
 // 1. Host erstellt Raum
 await host.goto(BASE + '/host');
-await host.getByText('Spielraum erstellen').click();
+await host.getByRole('button', { name: /Klassisch/ }).click(); await host.getByText('Spielraum erstellen').click();
 await host.waitForSelector('.roomtag b');
 const code = (await host.locator('.roomtag b').first().innerText()).trim();
 check(/^[A-Z0-9]{4,5}$/.test(code), `Raum erstellt: ${code}`);
@@ -91,7 +91,7 @@ for (const ph of phones) {
   const box = await ph.p.locator('.mapsvg, canvas.maplibregl-canvas').first().boundingBox();
   await ph.p.mouse.click(box.x + box.width * (0.45 + 0.06 * i), box.y + box.height * (0.35 + 0.04 * i));
   i++;
-  await ph.p.getByRole('button', { name: 'Tipp abgeben' }).click();
+  await ph.p.getByRole('button', { name: 'Tipp abgeben' }).click({ force: true });
   await ph.p.waitForSelector('.status.ok');
 }
 await phones[0].p.screenshot({ path: `${SHOTS}/phone-geo-sent.png` });
@@ -104,7 +104,7 @@ await phones[1].p.waitForSelector('.status.ok');
 check(true, 'Reload: Spieler 2 ist wieder drin, Antwort bleibt gespeichert');
 
 // 8. Host löst auf
-await host.getByText('Sofort auflösen').click();
+await host.screenshot({ path: `${SHOTS}/host-before-reveal.png` }); await host.getByText(/Sofort auflösen|Auflösung auf dem TV zeigen/).first().click();
 await tv.waitForSelector('.pointslist .prow');
 await sleep(4500);
 await sleep(3500); await tv.screenshot({ path: `${SHOTS}/tv-geo-reveal.png` });

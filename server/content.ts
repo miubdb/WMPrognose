@@ -1,9 +1,9 @@
 // Inhaltsverwaltung: Fragen-Bibliothek, Kategorien, Spielepakete (Entwurf -> Veröffentlichung -> unveränderliche Version), Szenen, Import/Export.
 import { createHash, randomBytes } from 'node:crypto';
-import type { Book, PackRules, TaskDef, TileDef } from '../shared/types';
+import type { Book, Flow, PackRules, ShowStep, TaskDef, TileDef } from '../shared/types';
 import { ACTIVE_MODES, BUDGET, MODES, normalizeCategory, normalizeTask, taskMax, validateCategory, validateTask, type CategoryData } from '../shared/validate';
 import { buildScene, validateTemplate, type SceneTemplate } from '../shared/sceneTemplates';
-import { analyzeBook } from '../shared/analysis';
+import { analyzeBook, analyzeShow } from '../shared/analysis';
 import type { Scene } from '../shared/scenes';
 import type { Store } from './store';
 
@@ -25,7 +25,7 @@ export function bookHash(book: Book): string {
 }
 const J = <T>(s: string) => JSON.parse(s) as T;
 
-export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules> }
+export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules>; /** fester Showablauf (optional) */ show?: ShowStep[] }
 export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2 };
 
 export function normalizePack(raw: any): PackData {
@@ -35,13 +35,21 @@ export function normalizePack(raw: any): PackData {
   return {
     name: s(r.name, 60), description: s(r.description, 300), categoryIds: Array.isArray(r.categoryIds) ? [...new Set<string>(r.categoryIds.map((x: unknown) => s(x, 80)).filter(Boolean))].slice(0, 20) : [],
     surprise: s(r.surprise, 80), final: s(r.final, 80),
+    ...(Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x: any): ShowStep | null => (x?.k === 'board' ? { k: 'board' } : (x?.k === 'round' || x?.k === 'surprise' || x?.k === 'final') && s(x.cat, 80) ? { k: x.k, cat: s(x.cat, 80) } : null)).filter((x: ShowStep | null): x is ShowStep => !!x) } : {}),
     rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10) },
   };
 }
 
+export interface SeedShow {
+  pack: { id: string; name: string; description: string };
+  pool: { id: string; topic: string; task: TaskDef }[];
+  rounds: { id: string; title: string; topic: string; icon: string; color: string; kind: 'tile' | 'surprise' | 'final'; football: boolean; blurb: string; taskIds: string[] }[];
+  steps: ShowStep[];
+}
+
 export class ContentService {
   private cache = new Map<string, Book>();
-  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene>; pack?: { id: string; name: string; description: string } }, private now: () => number = Date.now) {
+  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene>; pack?: { id: string; name: string; description: string }; show?: SeedShow }, private now: () => number = Date.now) {
     if (!this.setting('seeded')) { this.installSeed(); this.setSetting('seeded', '1'); this.wasSeeded = true; }
   }
   private get db() { return this.store.db; }
@@ -67,7 +75,7 @@ export class ContentService {
    */
   installSeed(opts: { archiveOlder?: boolean } = {}) {
     const t = this.now();
-    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [] as string[], ref: '' };
+    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [] as string[], ref: '', showRef: '', showCreated: false };
     this.tx(() => {
       const pk = this.seedPack;
       const had = !!this.db.prepare('SELECT 1 FROM packs WHERE id=?').get(pk.id);
@@ -85,7 +93,7 @@ export class ContentService {
         report.created.categories += run('INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)', tile.id, JSON.stringify(cat), t, t);
         if (tile.kind === 'tile') ids.push(tile.id); else if (tile.kind === 'surprise') surprise = tile.id; else final = tile.id;
       }
-      if (!had) {
+      if (!had && this.seed.tiles.length) {
         const pack: PackData = { name: pk.name, description: pk.description, categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
         this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pk.id, JSON.stringify(pack), t, t);
         const pub = this.publish(pk.id, 'Mitgeliefertes Standardpaket (aus content/tiles.ts)');
@@ -93,7 +101,23 @@ export class ContentService {
         if (opts.archiveOlder) {
           for (const old of this.listPacks()) if (old.id !== pk.id && /^standard-\d+$/.test(old.id) && old.status !== 'archived') { this.setPackStatus(old.id, 'archived'); report.archived.push(old.id); }
         }
-      } else { report.alreadyInstalled = true; const row = this.listPacks().find(p => p.id === pk.id); report.ref = row?.currentVersion ? `${pk.id}@${row.currentVersion}` : ''; }
+      } else if (had) { report.alreadyInstalled = true; const row = this.listPacks().find(p => p.id === pk.id); report.ref = row?.currentVersion ? `${pk.id}@${row.currentVersion}` : ''; }
+      // ---- Showpaket (fester Ablauf) + erweiterter Fragenpool: ebenfalls nur ergänzend (INSERT OR IGNORE)
+      const sh = this.seed.show;
+      if (sh) {
+        for (const q of sh.pool) report.created.questions += run('INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)', q.id, q.task.mode, q.topic, JSON.stringify(q.task), t, t);
+        for (const r of sh.rounds) {
+          const cat: CategoryData = { title: r.title, topic: r.topic, icon: r.icon, color: r.color, kind: r.kind, football: r.football, blurb: r.blurb, taskIds: r.taskIds };
+          report.created.categories += run('INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)', r.id, JSON.stringify(cat), t, t);
+        }
+        const exists = !!this.db.prepare('SELECT 1 FROM packs WHERE id=?').get(sh.pack.id);
+        if (!exists) {
+          const pack: PackData = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: '', final: '', rules: { ...DEFAULT_RULES }, show: sh.steps };
+          this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(sh.pack.id, JSON.stringify(pack), t, t);
+          report.showRef = this.publish(sh.pack.id, 'Mitgeliefertes Showpaket (fester Ablauf)').ref; report.created.packs++; report.showCreated = true;
+        } else { const row = this.listPacks().find(p => p.id === sh.pack.id); report.showRef = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : ''; report.alreadyInstalled = report.alreadyInstalled && true; }
+        if (report.showCreated) report.alreadyInstalled = false;
+      }
     });
     return report;
   }
@@ -101,7 +125,8 @@ export class ContentService {
   seedStatus() {
     const pk = this.seedPack;
     const row = this.listPacks().find(p => p.id === pk.id);
-    return { id: pk.id, name: pk.name, installed: !!row, status: row?.status ?? null, olderPacks: this.listPacks().filter(p => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== 'archived').map(p => ({ id: p.id, name: p.data.name })) };
+    const sh = this.seed.show; const shRow = sh ? this.listPacks().find(p => p.id === sh.pack.id) : undefined;
+    return { id: pk.id, name: pk.name, installed: !!row && (!sh || (!!shRow && !sh.pool.some(q => !this.db.prepare('SELECT 1 FROM questions WHERE id=?').get(q.id)))), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: sh ? sh.pool.filter(q => !this.db.prepare('SELECT 1 FROM questions WHERE id=?').get(q.id)).length : 0, status: row?.status ?? null, olderPacks: this.listPacks().filter(p => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== 'archived').map(p => ({ id: p.id, name: p.data.name })) };
   }
 
   // ------------------------------------------------------------- Szenen
@@ -194,7 +219,8 @@ export class ContentService {
     const modes = [...new Set(tasks.map((q: any) => q.mode))];
     if (c.data.kind !== 'final' && modes.length > 1) problems.push('Eine Kategorie darf nur Fragen eines Spielmodus enthalten');
     const points = tasks.reduce((a: number, q: any) => a + taskMax(q.task), 0);
-    const budget = BUDGET[c.data.kind];
+    const betPart = tasks.reduce((a: number, q: any) => a + (q.task.mode === 'estimate' ? Math.max(0, ...q.task.bets) : 0), 0);
+    const budget = BUDGET[c.data.kind] + betPart;                 // Wettgewinne sind Umverteilung und zählen nicht zum Rundenbudget
     if (points > budget) problems.push(`Punkte (${points}) überschreiten das Budget von ${budget}`);
     if (!tasks.length) problems.push('Keine Fragen zugeordnet');
     if (modes.includes('codebreak')) problems.push('Enthält CODEBREAK-Fragen – dieser Modus wird nicht mehr verwendet. Bitte durch Fragen eines aktiven Modus ersetzen.');
@@ -287,30 +313,56 @@ export class ContentService {
         for (const p of q.problems) errors.push(`${label} · „${q.task.prompt.slice(0, 40)}“: ${p}`);
         tasks.push(q.task);
       }
-      if (c.points < c.budget && !c.problems.length) warnings.push(`${label}: nur ${c.points} von ${c.budget} Punkten verteilt`);
+      if (c.points < c.budget * 0.8 && !c.problems.length && c.mode !== 'estimate') warnings.push(`${label}: nur ${c.points} von ${c.budget} Punkten verteilt`);
       tiles.push({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, mode: (tasks[0]?.mode ?? 'geo'), kind, football: c.football, blurb: c.blurb, tasks: JSON.parse(JSON.stringify(tasks)) });
     };
-    pack.categoryIds.forEach(id => add(id, 'tile'));
-    if (pack.categoryIds.length < 6) errors.push(`Mindestens 6 Kategorien nötig (aktuell ${pack.categoryIds.length}); empfohlen sind 8–9`);
-    else if (pack.categoryIds.length < 8) warnings.push('Empfohlen: 8–9 Kategorien, damit die Spieler wirklich wählen können');
-    add(pack.surprise, 'surprise'); add(pack.final, 'final');
+    const hasShow = !!pack.show?.length;
+    const classic = !hasShow || pack.categoryIds.length > 0 || !!pack.surprise || !!pack.final;   // Wand-Modus ist optional, sobald ein fester Showablauf existiert
+    if (classic) {
+      pack.categoryIds.forEach(id => add(id, 'tile'));
+      if (pack.categoryIds.length < 6) errors.push(`Klassischer Modus: Mindestens 6 Kategorien nötig (aktuell ${pack.categoryIds.length}); empfohlen sind 8–9`);
+      else if (pack.categoryIds.length < 8) warnings.push('Empfohlen: 8–9 Kategorien, damit die Spieler wirklich wählen können');
+      add(pack.surprise, 'surprise'); add(pack.final, 'final');
+    }
+    let showSteps: ShowStep[] | undefined;
+    if (hasShow) {
+      const seenCat = new Set<string>(); let finals = 0, rounds = 0;
+      for (const [i, st] of pack.show!.entries()) {
+        if (st.k === 'board') continue;
+        if (seenCat.has(st.cat)) { errors.push(`Showablauf, Schritt ${i + 1}: Kategorie „${cats.get(st.cat)?.title ?? st.cat}“ kommt doppelt vor`); continue; }
+        seenCat.add(st.cat);
+        if (st.k === 'final') finals++; else if (st.k === 'round') rounds++;
+        if (!tiles.some(t => t.id === st.cat)) add(st.cat, st.k === 'round' ? 'tile' : st.k);
+        else if (cats.get(st.cat)?.kind !== (st.k === 'round' ? 'tile' : st.k)) errors.push(`Showablauf, Schritt ${i + 1}: falscher Kategorietyp`);
+      }
+      if (rounds < 1) errors.push('Showablauf: mindestens eine Runde nötig');
+      if (finals !== 1) errors.push('Showablauf: genau ein Finale nötig');
+      else if (pack.show![pack.show!.length - 1]?.k !== 'final') errors.push('Showablauf: das Finale muss der letzte Schritt sein');
+      showSteps = pack.show!.map(x => ({ ...x }));
+    }
     const used: Record<string, Scene> = {};
     for (const t of tiles) for (const k of t.tasks) if (k.mode === 'glitch' && scenes[k.scene]) used[k.scene] = scenes[k.scene];
-    const book: Book = { tiles, scenes: used, rules: { ...pack.rules } };
-    if (!errors.length) {
+    const book: Book = { tiles, scenes: used, rules: { ...pack.rules }, ...(showSteps ? { show: showSteps, classic } : {}) };
+    if (!errors.length && classic) {
       const a = analyzeBook(book);
       if (a.combos) {
         if (a.combos.minutesExpected.min < 55 || a.combos.minutesExpected.max > 80) warnings.push(`Erwartete Spieldauer ${a.combos.minutesExpected.min}–${a.combos.minutesExpected.max} min liegt außerhalb des Ziels 60–75 min`);
         if (a.combos.footballShare.max > 0.45) warnings.push(`Fußballanteil kann bis ${(a.combos.footballShare.max * 100).toFixed(0)} % steigen`);
       }
     }
+    if (!errors.length && showSteps) {
+      const sa = analyzeShow(book)!;
+      if (sa.modesMissing.length) warnings.push(`Nicht jeder Spielmodus kommt im Showablauf vor (fehlt: ${sa.modesMissing.join(', ')})`);
+      if (sa.minutesExpected < 70 || sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min liegt außerhalb des Ziels 75–90 min`);
+      if (showSteps[showSteps.length - 2]?.k !== 'board') warnings.push('Empfohlen: vor dem Finale einen „Zwischenstand“-Schritt');
+    }
     return { book: errors.length ? null : book, errors, warnings };
   }
   analysis(packId: string) {
     const b = this.buildBook(packId);
-    if (b.book) return { ok: true, errors: b.errors, warnings: b.warnings, analysis: analyzeBook(b.book) };
+    if (b.book) return { ok: true, errors: b.errors, warnings: b.warnings, analysis: b.book.show && !(b.book.tiles.filter(t => t.kind === 'tile').length >= 6 && b.book.tiles.some(t => t.kind === 'surprise')) ? null : analyzeBook(b.book), show: analyzeShow(b.book) };
     // Auch bei Fehlern eine Analyse versuchen (ohne harte Validierung)
-    return { ok: false, errors: b.errors, warnings: b.warnings, analysis: null };
+    return { ok: false, errors: b.errors, warnings: b.warnings, analysis: null, show: null };
   }
   publish(packId: string, note = '') {
     const { book, errors, warnings } = this.buildBook(packId);
@@ -337,9 +389,14 @@ export class ContentService {
   }
   /** Veröffentlichte, für neue Räume wählbare Pakete (öffentlich, ohne Lösungen). */
   listPublished() {
-    return this.listPacks().filter(p => p.status === 'published' && p.currentVersion !== null).map(p => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion!, ref: `${p.id}@${p.currentVersion}` }));
+    return this.listPacks().filter(p => p.status === 'published' && p.currentVersion !== null).map(p => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion!, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
   }
-  defaultRef(): string { return this.listPublished()[0]?.ref ?? this.legacyRef(); }
+  /** Welche Ablaufmodelle ein veröffentlichter Stand unterstützt. */
+  flowsOf(ref: string): { show: boolean; classic: boolean } {
+    try { const b = this.resolveBook(ref); return { show: !!b.show?.length, classic: b.show?.length ? !!b.classic : true }; }
+    catch { return { show: false, classic: true }; }
+  }
+    defaultRef(): string { return this.listPublished()[0]?.ref ?? this.legacyRef(); }
   /** Ältere Räume ohne Paketangabe (bookId 'legacy') laufen mit dem ersten mitgelieferten Stand, der in dieser Datenbank existiert. */
   private legacyRef(): string { for (const id of ['standard-1', 'standard-2']) if (this.db.prepare('SELECT 1 FROM pack_versions WHERE id=?').get(id + '@1')) return id + '@1'; return this.seedPack.id + '@1'; }
   /** Fester Stand für einen Raum (Cache, da unveränderlich). */
@@ -368,10 +425,10 @@ export class ContentService {
       out.scenes = this.listScenes().map(s => ({ id: s.id, title: s.title, builtin: !!s.builtin, template: s.template ?? null, data: { id: s.id, title: s.title, bg: s.bg, items: s.items, changes: s.changes } })).filter(s => !s.builtin || qs.some(q => (q.task as any).scene === s.id));
     } else {
       let catIds: Set<string> | null = null;
-      const packRow = (p: any, withVersions: boolean) => ({ id: p.id, name: p.name, description: p.description, categoryIds: p.categoryIds, surprise: p.surprise, final: p.final, rules: p.rules, status: p.status, currentVersion: p.currentVersion,
+      const packRow = (p: any, withVersions: boolean) => ({ id: p.id, name: p.name, description: p.description, categoryIds: p.categoryIds, surprise: p.surprise, final: p.final, rules: p.rules, ...(p.show ? { show: p.show } : {}), status: p.status, currentVersion: p.currentVersion,
         ...(p.currentVersion ? (() => { const b = this.resolveBook(`${p.id}@${p.currentVersion}`); return { book: b, bookHash: bookHash(b) }; })() : {}),
         ...(withVersions ? { versions: this.versions(p.id).map(v => ({ ...v, book: this.resolveBook(v.ref), bookHash: bookHash(this.resolveBook(v.ref)) })) } : {}) });
-      if (typeof scope === 'object') { const p = this.getPack(scope.pack); catIds = new Set([...p.categoryIds, p.surprise, p.final]); out.packs = [packRow(p, false)]; }
+      if (typeof scope === 'object') { const p = this.getPack(scope.pack); catIds = new Set([...p.categoryIds, p.surprise, p.final, ...(p.show ?? []).flatMap(x => (x.k === 'board' ? [] : [x.cat]))].filter(Boolean)); out.packs = [packRow(p, false)]; }
       else out.packs = this.listPacksView().map(p => packRow(p, true));
       const cats = this.listCategories().filter(c => !catIds || catIds.has(c.id));
       out.categories = cats.map(c => ({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, kind: c.kind, football: c.football, blurb: c.blurb, taskIds: c.taskIds, disabled: !!c.disabled }));
@@ -459,7 +516,8 @@ export class ContentService {
       // ---- Pakete
       for (const p of Array.isArray(data.packs) ? data.packs : []) {
         if (!p?.id) continue;
-        const d = normalizePack({ ...p, categoryIds: (p.categoryIds ?? []).map((x: string) => maps.c.get(x) ?? x), surprise: maps.c.get(p.surprise) ?? p.surprise, final: maps.c.get(p.final) ?? p.final });
+        const d = normalizePack({ ...p, categoryIds: (p.categoryIds ?? []).map((x: string) => maps.c.get(x) ?? x), surprise: maps.c.get(p.surprise) ?? p.surprise, final: maps.c.get(p.final) ?? p.final,
+          show: Array.isArray(p.show) ? p.show.map((x: any) => (x?.k === 'board' ? x : { ...x, cat: maps.c.get(x?.cat) ?? x?.cat })) : undefined });
         if (!d.name) { res.errors.push(`Paket ${p.id}: Name fehlt`); continue; }
         const placed = place('p', 'packs', 'p_', p.id, canonical(d), res.packs);
         const pid: string = placed ?? maps.p.get(p.id) ?? p.id;           // identisch/übersprungen: vorhandenes Paket weiterverwenden

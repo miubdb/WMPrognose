@@ -1,5 +1,5 @@
 // Interner (persistenter) Zustand eines Raums.
-import type { Avatar, Phase, Stage, ScoreEntry, LogLine } from '../shared/types';
+import type { Avatar, Phase, Stage, ScoreEntry, LogLine, Flow } from '../shared/types';
 
 export interface PlayerRec {
   id: string;
@@ -14,7 +14,8 @@ export interface PlayerRec {
   removed?: boolean;
 }
 
-export type PlanStep = 'wall' | 'surprise' | 'board' | 'final';
+/** 'tile:<id>' = feste Show: diese Kachel direkt starten. */
+export type PlanStep = 'wall' | 'surprise' | 'board' | 'final' | `tile:${string}`;
 
 export interface RoundState {
   tileId: string;
@@ -38,6 +39,8 @@ export interface Room {
   code: string;
   /** Paketversion (Inhaltsstand) dieses Raums, z. B. "standard-1@1" */
   bookId?: string;
+  /** Ablaufmodell; fehlt bei älteren Räumen → klassisch (Kategorienwand) */
+  flow?: Flow;
   createdAt: number;
   hostKeyHash: string;
   hostPin: string;

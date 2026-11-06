@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Mode } from '../../../shared/types';
 import { ACTIVE_MODES as MODES, MODE_LABEL, taskMax } from '../../../shared/validate';
 import type { Scene } from '../../../shared/scenes';
+import type { ShowStep } from '../../../shared/types';
 import { adm, download, errText } from './api';
 import { MODE_HELP, MODE_ICON, QuestionEditor } from './QuestionEditor';
 import { Preview } from './Preview';
@@ -243,7 +244,7 @@ function Packs({ rev, bump }: { rev: number; bump: () => void }) {
           <button className="catmain" aria-label="Öffnen" onClick={() => setEdit(p)}>
             <span className="ic">📦</span>
             <span className="cattext"><b>{p.name}</b>
-              <span className="qmeta"><span className={`badge ${p.status === 'published' ? 'ok' : ''}`}>{p.status === 'published' ? `Veröffentlicht · v${p.currentVersion}` : p.status === 'archived' ? 'Archiviert' : 'Entwurf'}</span> {p.categoryIds.length} Kategorien</span></span>
+              <span className="qmeta"><span className={`badge ${p.status === 'published' ? 'ok' : ''}`}>{p.status === 'published' ? `Veröffentlicht · v${p.currentVersion}` : p.status === 'archived' ? 'Archiviert' : 'Entwurf'}</span> {p.show?.length ? <span className="badge">🎬 Show · {p.show.filter((x: any) => x.k !== 'board').length} Runden</span> : null}{p.categoryIds.length ? <span>{p.categoryIds.length} Kategorien</span> : null}</span></span>
           </button>
           <button className="btn small gold" title="Spieleabend exportieren" onClick={async () => { const r = await adm('GET', `/export?scope=pack:${p.id}`); if (r.ok) download(`OUTPLAY-Spieleabend-${p.id}.json`, r.data); else t.show(errText(r)); }}>📤</button>
           <RowMenu>
@@ -259,10 +260,103 @@ function Packs({ rev, bump }: { rev: number; bump: () => void }) {
   );
 }
 
+/** Fester Showablauf eines Pakets: Reihenfolge, Runden, Aufgaben tauschen, Dauer/Punkte. Nutzt die bestehende Kategorien-/Fragenverwaltung. */
+function ShowEditor({ p, set, cats, lib, reloadCats, onChanged, show }: { p: any; set: (k: string, v: any) => void; cats: any[]; lib: any[]; reloadCats: () => void; onChanged: () => void; show: any }) {
+  const steps: ShowStep[] = p.show ?? [];
+  const [open, setOpen] = useState<number | null>(null);
+  const [swap, setSwap] = useState<{ cat: string; idx: number } | null>(null);
+  const [msg, setMsg] = useState('');
+  const byId = new Map(cats.map((c: any) => [c.id, c]));
+  const qById = new Map(lib.map((q: any) => [q.id, q]));
+  const setSteps = (a: ShowStep[]) => set('show', a);
+  const move = (i: number, d: number) => { const a = steps.slice(); const j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; setSteps(a); };
+  const rounds = show?.rounds as any[] | undefined;
+  let rn = 0; const minutes: Record<number, any> = {}; steps.forEach((st, i) => { if (st.k !== 'board') minutes[i] = rounds?.[rn++]; });
+  const template = () => {
+    const used = new Set<string>(); const pick = (kind: string, mode?: string) => { const c = cats.find((x: any) => x.kind === kind && !x.disabled && !used.has(x.id) && (!mode || x.mode === mode) && !x.problems.length); if (c) used.add(c.id); return c; };
+    const seq: [ShowStep['k'] | 'board', string?][] = [['round', 'geo'], ['round', 'match'], ['round', 'rank'], ['board'], ['surprise'], ['round', 'glitch'], ['round', 'estimate'], ['round', 'link'], ['board'], ['final']];
+    const out: ShowStep[] = []; const missing: string[] = [];
+    for (const [k, mode] of seq) { if (k === 'board') { out.push({ k: 'board' }); continue; } const c = pick(k === 'round' ? 'tile' : k, mode); if (c) out.push({ k: k as any, cat: c.id }); else missing.push(mode ?? k); }
+    setSteps(out); setMsg(missing.length ? `Für diese Abschnitte fehlt eine passende Kategorie: ${missing.join(', ')}` : 'Vorlage eingefügt – bitte prüfen.');
+  };
+  const replaceTask = async (cat: any, idx: number, newId: string) => {
+    const ids = cat.taskIds.slice(); ids[idx] = newId;
+    const r = await adm('PUT', '/categories/' + cat.id, { ...cat, taskIds: ids, ifUpdated: cat.updated });
+    if (!r.ok) { setMsg(errText(r)); return; }
+    setSwap(null); setMsg('Aufgabe ersetzt ✓'); reloadCats(); onChanged();
+  };
+  const moveTask = async (cat: any, idx: number, d: number) => {
+    const ids = cat.taskIds.slice(); const j = idx + d; if (j < 0 || j >= ids.length) return; [ids[idx], ids[j]] = [ids[j], ids[idx]];
+    const r = await adm('PUT', '/categories/' + cat.id, { ...cat, taskIds: ids, ifUpdated: cat.updated });
+    if (!r.ok) { setMsg(errText(r)); return; } reloadCats(); onChanged();
+  };
+  const kindOf = (st: ShowStep) => (st.k === 'round' ? 'tile' : st.k);
+  if (!steps.length) return (
+    <div className="card">
+      <h3>🎬 Fester Showablauf</h3>
+      <p className="small muted">Alle Runden in bewusst festgelegter Reihenfolge statt Kategorienwand. Du kannst eine Vorlage einfügen (6 Runden, Überraschung, Finale) und danach Runden und Aufgaben anpassen.</p>
+      <button className="btn" onClick={template}>＋ Showablauf aus Vorlage anlegen</button>{msg && <div className="status">{msg}</div>}
+    </div>
+  );
+  return (
+    <div className="card showed">
+      <h3>🎬 Fester Showablauf</h3>
+      {show && <div className="stats">
+        <div><b>{show.tasksTotal}</b><small>Aufgaben in {show.rounds.length} Runden</small></div>
+        <div><b>{show.minutesExpected} min</b><small>erwartete Dauer (max. {show.minutesMax} min)</small></div>
+        <div><b>{show.pointsMax.toLocaleString('de-DE')}</b><small>Maximalpunkte (ohne Startguthaben und Wetten); Finale {Math.round(show.finalShare * 100)} %</small></div>
+        <div><b>{7 - show.modesMissing.length} / 7</b><small>Spielmodi{show.modesMissing.length ? ` – fehlt: ${show.modesMissing.join(', ')}` : ' – alle kommen vor'}</small></div>
+      </div>}
+      {steps.map((st, i) => {
+        if (st.k === 'board') return (
+          <div key={i} className="row taskrow"><span className="rankno">{i + 1}</span><span className="ordtext">📊 Zwischenstand</span>
+            <button className="btn tiny ghost" aria-label="Nach oben" onClick={() => move(i, -1)}>▲</button><button className="btn tiny ghost" aria-label="Nach unten" onClick={() => move(i, 1)}>▼</button>
+            <button className="btn tiny ghost" aria-label="Entfernen" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>✕</button></div>);
+        const c: any = byId.get(st.cat); const m = minutes[i];
+        return (
+          <div key={i} className={`showstep ${open === i ? 'open' : ''}`}>
+            <div className="row taskrow">
+              <span className="rankno">{i + 1}</span>
+              <button className="ordtext linkbtn" onClick={() => setOpen(open === i ? null : i)}>{c ? `${c.icon} ${c.title}` : st.cat}
+                <small className="muted"> · {st.k === 'round' ? 'Runde' : st.k === 'surprise' ? 'Überraschung' : 'Finale'}{c ? ` · ${c.taskCount} Aufg. · ${c.points} P.` : ' · fehlt!'}{m ? ` · ca. ${m.expectedMin} min` : ''}{c?.problems?.length ? ' · ⚠' : ''}</small></button>
+              <button className="btn tiny ghost" aria-label="Nach oben" onClick={() => move(i, -1)}>▲</button><button className="btn tiny ghost" aria-label="Nach unten" onClick={() => move(i, 1)}>▼</button>
+              <button className="btn tiny ghost" aria-label="Entfernen" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>✕</button>
+            </div>
+            {open === i && c && (
+              <div className="showtasks">
+                <label className="field"><span>Kategorie für diesen Abschnitt</span>
+                  <select value={st.cat} onChange={e => setSteps(steps.map((x, j) => (j === i ? { ...x, cat: e.target.value } as ShowStep : x)))}>{cats.filter((x: any) => x.kind === kindOf(st) && !x.disabled).map((x: any) => <option key={x.id} value={x.id}>{x.icon} {x.title} ({MODE_LABEL[x.mode as Mode] ?? '–'}, {x.taskCount} Aufg.)</option>)}</select></label>
+                {c.usedInPacks.length > 1 && <p className="small muted">⚠ Diese Runde wird auch in {c.usedInPacks.filter((x: any) => x.id !== p.id).map((x: any) => x.name).join(', ')} verwendet – Änderungen an den Aufgaben gelten dort ebenso.</p>}
+                {c.taskIds.map((qid: string, k: number) => { const q: any = qById.get(qid); return (
+                  <div key={qid + k} className="row taskrow"><span className="rankno">{k + 1}</span>
+                    <span className="ordtext">{q ? `${MODE_ICON[q.mode]} ${q.task.prompt || '(ohne Text)'}` : qid} <small className="muted">· {q ? taskMax(q.task) : '?'} P.</small></span>
+                    <button className="btn tiny ghost" aria-label="Nach oben" onClick={() => moveTask(c, k, -1)}>▲</button><button className="btn tiny ghost" aria-label="Nach unten" onClick={() => moveTask(c, k, 1)}>▼</button>
+                    <button className="btn tiny" onClick={() => setSwap(!!swap && swap.cat === c.id && swap.idx === k ? null : { cat: c.id, idx: k })}>↻ ersetzen</button></div>); })}
+                {swap && swap.cat === c.id && (
+                  <div className="pickbox"><p className="small muted">Alternative aus dem Fragenpool wählen (gleicher Spielmodus):</p>
+                    {lib.filter((q: any) => (c.kind === 'final' ? true : q.mode === c.mode) && !c.taskIds.includes(q.id) && !q.problems.length).slice(0, 60).map((q: any) => (
+                      <button key={q.id} className="pickrow" onClick={() => replaceTask(c, swap!.idx, q.id)}>{MODE_ICON[q.mode]} {q.task.prompt} <small className="muted">{q.topic} · {taskMax(q.task)} P.</small></button>))}
+                  </div>)}
+              </div>)}
+          </div>);
+      })}
+      <div className="row wrap">
+        <button className="btn small ghost" onClick={() => setSteps([...steps, { k: 'board' }])}>＋ Zwischenstand</button>
+        <select value="" onChange={e => { const c = cats.find((x: any) => x.id === e.target.value); if (c) setSteps([...steps.slice(0, c.kind === 'final' ? steps.length : steps.length), { k: c.kind === 'tile' ? 'round' : c.kind, cat: c.id } as ShowStep]); }} style={{ width: 'auto', maxWidth: 260 }}>
+          <option value="">＋ Runde hinzufügen …</option>{cats.filter((x: any) => !x.disabled && !steps.some(s => s.k !== 'board' && s.cat === x.id)).map((x: any) => <option key={x.id} value={x.id}>{x.icon} {x.title} ({x.kind === 'tile' ? 'Runde' : x.kind === 'surprise' ? 'Überraschung' : 'Finale'})</option>)}</select>
+        <button className="btn small ghost" onClick={template}>Vorlage neu einfügen</button>
+      </div>
+      {msg && <div className="status">{msg}</div>}
+    </div>
+  );
+}
+
 function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
   const [p, setP] = useState<any>(pack);
   const [msg, setMsg] = useState(''); const [ana, setAna] = useState<any>(null); const [vers, setVers] = useState<any[]>([]);
-  const { data: cats } = useList<any>('/categories', 0);
+  const { data: cats, reload: reloadCats } = useList<any>('/categories', 0);
+  const { data: lib } = useList<any>('/questions?archived=0', 0);
+  const [rev, setRev] = useState(0);
   const set = (k: string, v: any) => setP({ ...p, [k]: v });
   const setRule = (k: string, v: string) => set('rules', { ...p.rules, [k]: v === '' ? '' : Number(v) });
   const tiles = cats.filter((c: any) => c.kind === 'tile'), byId = new Map(cats.map((c: any) => [c.id, c]));
@@ -274,7 +368,7 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
     if (!r.ok) { setMsg(errText(r)); return false; }
     setP(r.data); setMsg('Entwurf gespeichert ✓'); return true;
   };
-  useEffect(() => { if (p.id) adm('GET', `/packs/${p.id}/analysis`).then(r => r.ok && setAna(r.data)); }, [p.id, msg]);
+  useEffect(() => { if (p.id) adm('GET', `/packs/${p.id}/analysis`).then(r => r.ok && setAna(r.data)); }, [p.id, msg, rev]);
   const doPublish = async () => {
     const r0 = await put();
     if (!r0.ok) { setMsg(errText(r0)); return; }
@@ -292,6 +386,8 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
       <div className="modalbox wide editor" onClick={e => e.stopPropagation()}>
         <div className="row between sticky-top"><h2>📦 {p.id ? 'Paket bearbeiten' : 'Neues Paket'}</h2><button className="btn small ghost" onClick={onClose}>Schließen ✕</button></div>
         <label className="field"><span>Name</span><input value={p.name} maxLength={60} placeholder="z. B. Spieleabend November" onChange={e => set('name', e.target.value)} /></label>
+        <ShowEditor p={p} set={set} cats={cats} lib={lib} reloadCats={reloadCats} onChanged={() => setRev(x => x + 1)} show={ana?.show} />
+        {p.show?.length ? <details className="more"><summary>Klassischer Modus (Kategorienwand, optional)</summary>
         <h3>Kategorien <small className="muted">({p.categoryIds.length}, empfohlen 8–9)</small></h3>
         {p.categoryIds.map((id: string, i: number) => { const c: any = byId.get(id); return (
           <div className="row taskrow" key={id}><span className="rankno">{i + 1}</span><span className="ordtext">{c ? `${c.icon} ${c.title}` : id} {c && <small className="muted">· {MODE_LABEL[c.mode as Mode] ?? '–'}{c.football ? ' · ⚽' : ''}{c.disabled ? ' · deaktiviert!' : ''}{c.problems.length ? ' · ⚠' : ''}</small>}</span>
@@ -303,6 +399,19 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
           <label className="field"><span>Überraschungsrunde</span><select value={p.surprise} onChange={e => set('surprise', e.target.value)}><option value="">– wählen –</option>{cats.filter((c: any) => c.kind === 'surprise').map((c: any) => <option key={c.id} value={c.id}>{c.icon} {c.title}</option>)}</select></label>
           <label className="field"><span>Finale</span><select value={p.final} onChange={e => set('final', e.target.value)}><option value="">– wählen –</option>{cats.filter((c: any) => c.kind === 'final').map((c: any) => <option key={c.id} value={c.id}>{c.icon} {c.title}</option>)}</select></label>
         </div>
+</details> : <>
+        <h3>Kategorien <small className="muted">({p.categoryIds.length}, empfohlen 8–9)</small></h3>
+        {p.categoryIds.map((id: string, i: number) => { const c: any = byId.get(id); return (
+          <div className="row taskrow" key={id}><span className="rankno">{i + 1}</span><span className="ordtext">{c ? `${c.icon} ${c.title}` : id} {c && <small className="muted">· {MODE_LABEL[c.mode as Mode] ?? '–'}{c.football ? ' · ⚽' : ''}{c.disabled ? ' · deaktiviert!' : ''}{c.problems.length ? ' · ⚠' : ''}</small>}</span>
+            <button className="btn tiny ghost" aria-label="Nach oben" onClick={() => moveCat(i, -1)}>▲</button><button className="btn tiny ghost" aria-label="Nach unten" onClick={() => moveCat(i, 1)}>▼</button>
+            <button className="btn tiny ghost" aria-label="Entfernen" onClick={() => set('categoryIds', p.categoryIds.filter((x: string) => x !== id))}>✕</button></div>); })}
+        <label className="field"><span>＋ Kategorie hinzufügen</span>
+          <select value="" onChange={e => e.target.value && addCat(e.target.value)}><option value="">wählen …</option>{tiles.filter((c: any) => !p.categoryIds.includes(c.id)).map((c: any) => <option key={c.id} value={c.id}>{c.icon} {c.title} ({MODE_LABEL[c.mode as Mode] ?? '–'}){c.disabled ? ' – deaktiviert' : ''}</option>)}</select></label>
+        <div className="form2">
+          <label className="field"><span>Überraschungsrunde</span><select value={p.surprise} onChange={e => set('surprise', e.target.value)}><option value="">– wählen –</option>{cats.filter((c: any) => c.kind === 'surprise').map((c: any) => <option key={c.id} value={c.id}>{c.icon} {c.title}</option>)}</select></label>
+          <label className="field"><span>Finale</span><select value={p.final} onChange={e => set('final', e.target.value)}><option value="">– wählen –</option>{cats.filter((c: any) => c.kind === 'final').map((c: any) => <option key={c.id} value={c.id}>{c.icon} {c.title}</option>)}</select></label>
+        </div>
+</>}
         <details className="more"><summary>Spielregeln</summary>
           <label className="field"><span>Beschreibung</span><input value={p.description} maxLength={300} onChange={e => set('description', e.target.value)} /></label>
           <div className="form2">
@@ -402,9 +511,9 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
       <h2>Daten</h2>
       {std && !std.installed && (
         <div className="card warnbox">
-          <h3>🆕 Neues Standardpaket verfügbar</h3>
-          <p className="small">„{std.name}“ ist in diesem Bestand noch nicht vorhanden. Beim Installieren wird nichts überschrieben oder gelöscht – ein gelaufenes Standardpaket wird nur archiviert.</p>
-          <div className="row wrap"><button className="btn" onClick={backup}>🔒 Zuerst Voll-Backup laden</button><button className="btn primary" onClick={installStd}>Neues Standardpaket installieren</button></div>
+          <h3>🆕 Neues Showpaket &amp; erweiterter Fragenpool verfügbar</h3>
+          <p className="small">Es fehlen in diesem Bestand noch: {[!std.classicInstalled && `„${std.name}“`, std.show && !std.show.installed && `„${std.show.name}“ (fester Showablauf)`, std.poolMissing > 0 && `${std.poolMissing} Pool-Fragen`].filter(Boolean).join(', ')}. Beim Installieren wird nichts überschrieben oder gelöscht – ein älteres Standardpaket wird nur archiviert.</p>
+          <div className="row wrap"><button className="btn" onClick={backup}>🔒 Zuerst Voll-Backup laden</button><button className="btn primary" onClick={installStd}>Showpaket &amp; Fragenpool installieren</button></div>
           {stdMsg && <div className="status ok">{stdMsg}</div>}
         </div>)}
       {std?.installed && stdMsg && <div className="status ok">{stdMsg}</div>}

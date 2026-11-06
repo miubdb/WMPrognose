@@ -142,7 +142,7 @@ check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Dat
 const host = await (await browser.newContext()).newPage();
 await host.goto(BASE + '/host'); await host.waitForSelector('select'); const opts = await host.locator('select option').allInnerTexts();
 check(opts.length >= 2 && opts.some(o => o.includes('Kopie')), `Host sieht veröffentlichte Pakete: ${opts.join(' | ')}`);
-await host.locator('select').selectOption({ index: 1 }); await host.getByText('Spielraum erstellen').click(); await host.waitForSelector('.roomtag b'); check(true, 'Raum mit gewähltem Paket erstellt');
+await host.getByRole('button', { name: /Klassisch/ }).click(); await host.locator('select').selectOption({ index: 1 }); await host.getByText('Spielraum erstellen').click(); await host.waitForSelector('.roomtag b'); check(true, 'Raum mit gewähltem Paket erstellt');
 
 // ---- Mobile Ansicht
 const m = await (await browser.newContext({ ...devices['Pixel 7'] })).newPage(); await m.goto(BASE + '/admin');

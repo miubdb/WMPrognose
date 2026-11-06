@@ -45,6 +45,7 @@ export interface AppOptions {
   /** MBTiles-Datei der Offline-Karte (Standard: <Datenordner>/maps/outplay-karte.mbtiles) */
   mapFile?: string;
   seedPack?: { id: string; name: string; description: string };
+  seedShow?: import('./content').SeedShow;
 }
 
 const MIME: Record<string, string> = {
@@ -87,7 +88,7 @@ export class App {
     this.tiles = new LocalTiles(opts.mapFile ?? join(dirname(opts.dbFile), 'maps', 'outplay-karte.mbtiles'));
     this.clock = opts.clock ?? Date.now;
     this.store = new Store(opts.dbFile);
-    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack }, this.clock);
+    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack, show: opts.seedShow }, this.clock);
     this.auth = new AdminAuth(this.store, opts.adminPassword, this.clock);
     this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer() };
     this.engine = new Engine((id: string) => this.content.resolveBook(id));
@@ -257,11 +258,14 @@ export class App {
       const published = this.content.listPublished();
       const pick = b.pack ? published.find(p => p.id === b.pack || p.ref === b.pack) : published.find(p => p.ref === this.content.defaultRef());
       if (!pick) return this.json(res, 400, { err: 'unknown_pack' });
+      const flows = this.content.flowsOf(pick.ref);
+      const flow: 'show' | 'classic' = b.flow === 'classic' || b.flow === 'show' ? b.flow : flows.show ? 'show' : 'classic';        // Standard: fester Showablauf, sofern das Paket ihn enthält
+      if (!flows[flow]) return this.json(res, 400, { err: 'flow_unsupported', message: flow === 'show' ? 'Dieses Paket hat keinen festen Showablauf.' : 'Dieses Paket unterstützt den klassischen Modus nicht.' });
       const code = Engine.newCode(c => this.rooms.has(c));
-      const { room, hostKey } = this.engine.newRoom(code, now, pick.ref);
+      const { room, hostKey } = this.engine.newRoom(code, now, pick.ref, flow);
       this.rooms.set(code, room);
       this.persist(room);
-      return this.json(res, 200, { code, hostKey, hostPin: room.hostPin, pack: pick.name, version: pick.version });
+      return this.json(res, 200, { code, hostKey, hostPin: room.hostPin, pack: pick.name, version: pick.version, flow: room.flow });
     }
     const code = String(parts[2] ?? '').toUpperCase();
     const room = this.rooms.get(code);

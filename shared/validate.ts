@@ -120,7 +120,7 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
 export const CATEGORY_KINDS = ['tile', 'surprise', 'final'] as const;
 export type CategoryKind = typeof CATEGORY_KINDS[number];
 export interface CategoryData { title: string; topic: string; icon: string; color: string; kind: CategoryKind; football: boolean; blurb: string; taskIds: string[]; disabled?: boolean }
-export const BUDGET: Record<CategoryKind, number> = { tile: 1000, surprise: 1000, final: 2000 };
+export const BUDGET: Record<CategoryKind, number> = { tile: 1200, surprise: 1500, final: 2000 };
 
 export function normalizeCategory(raw: any): CategoryData {
   const r = raw ?? {};

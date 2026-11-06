@@ -68,7 +68,7 @@ check(await pb.getByText('Meine Speisekarte').count() > 0, 'Eigene Glitch-Szene 
 
 // ---- Raum auf B mit dem Paket, TV über localhost (QR darf nicht localhost enthalten)
 const hostPage = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); hostPage.on('pageerror', e => { failures++; console.log('pageerror HOST', e.message); });
-await hostPage.goto(B + '/host'); await hostPage.waitForSelector('select'); await hostPage.locator('select').selectOption({ label: 'Samstag-Abend (v1)' }); await hostPage.getByText('Spielraum erstellen').click(); await hostPage.waitForSelector('.roomtag b');
+await hostPage.goto(B + '/host'); await hostPage.waitForSelector('select'); await hostPage.getByRole('button', { name: /Klassisch/ }).click(); await hostPage.locator('select').selectOption({ label: 'Samstag-Abend (v1)' }); await hostPage.getByText('Spielraum erstellen').click(); await hostPage.waitForSelector('.roomtag b');
 const code = (await hostPage.locator('.roomtag b').first().innerText()).trim();
 const key = await hostPage.evaluate(() => JSON.parse(localStorage.getItem('outplay.host')).key);
 const tv = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage(); await tv.goto(`${B}/tv/${code}`); await tv.getByText('Bildschirm starten').click(); await tv.waitForSelector('.roomcode'); await sleep(800);

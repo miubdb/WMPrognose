@@ -27,10 +27,11 @@ export function taskSeconds(t: TaskDef, m: TimeMode = 'expected'): { play: numbe
   }
 }
 
-export function tileSeconds(tile: TileDef, m: TimeMode = 'expected'): number {
+export function tileSeconds(tile: TileDef, m: TimeMode = 'expected', fixed = false): number {
   const special = tile.kind !== 'tile';
   const k = m === 'max' ? SLOW : 1;
-  let s = (special ? OVERHEAD.rulesSpecial : OVERHEAD.pick + OVERHEAD.rules) * k;
+  // fixed = feste Show: keine Auswahlzeit an der Wand, die Regelkarte kommt nur einmal je Runde
+  let s = (special ? OVERHEAD.rulesSpecial : (fixed ? 0 : OVERHEAD.pick) + OVERHEAD.rules) * k;
   for (const t of tile.tasks) {
     const x = taskSeconds(t, m);
     // Finale/Überraschung: längere Spannungsbögen (Moderation, Auflösung langsam zelebrieren)
@@ -44,4 +45,10 @@ export function tileSeconds(tile: TileDef, m: TimeMode = 'expected'): number {
 export function showSeconds(chosen: TileDef[], surprise: TileDef, final: TileDef, m: TimeMode = 'expected'): number {
   const k = m === 'max' ? SLOW : 1;
   return OVERHEAD.lobby + (OVERHEAD.intro + 3 * OVERHEAD.scoreboard + OVERHEAD.ceremony) * k + chosen.reduce((a, t) => a + tileSeconds(t, m), 0) + tileSeconds(surprise, m) + tileSeconds(final, m);
+}
+
+/** Gesamtdauer der FESTEN Show: Lobby + Eröffnung + alle Runden in Reihenfolge + Zwischenstände + Siegerehrung. */
+export function fixedShowSeconds(tiles: TileDef[], boards: number, m: TimeMode = 'expected'): number {
+  const k = m === 'max' ? SLOW : 1;
+  return OVERHEAD.lobby + (OVERHEAD.intro + boards * OVERHEAD.scoreboard + OVERHEAD.ceremony) * k + tiles.reduce((a, t) => a + tileSeconds(t, m, true), 0);
 }

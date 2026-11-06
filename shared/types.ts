@@ -121,9 +121,17 @@ export type TaskDef = GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask 
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
 export interface PackRules { startCredit?: number; maxFootball?: number; maxPerMode?: number }
+/** Ablaufmodell eines Raums: fester Showablauf (Standard) oder klassische Kategorienwand. */
+export type Flow = 'show' | 'classic';
+/** Schritt der festen Show: eine Runde (Kategorie/Kachel), die Überraschungsrunde, das Finale oder ein Zwischenstand. */
+export type ShowStep = { k: 'round' | 'surprise' | 'final'; cat: string } | { k: 'board' };
 /** Fester Inhaltsstand, mit dem ein Raum läuft (unveränderlich nach Veröffentlichung). */
 export interface Book {
   tiles: TileDef[];
+  /** fester Showablauf (cat = Kachel-ID in tiles); fehlt bei rein klassischen Paketen */
+  show?: ShowStep[];
+  /** true, wenn das Paket zusätzlich den klassischen Wand-Modus unterstützt (bei Paketen mit festem Showablauf optional) */
+  classic?: boolean;
   scenes?: Record<string, import('./scenes').Scene>;
   rules?: PackRules;
   /** Paket-ID@Version, nur Information */
@@ -213,7 +221,10 @@ export interface View {
     sound: boolean;
     reduced: boolean;
     hideScores: boolean;
-    act: string; // Anzeige: "Akt 1 – Kategorienwand"
+    act: string; // Anzeige: "Akt 1 – Kategorienwand" bzw. "Runde 2 von 6"
+    flow: Flow;
+    /** Programmübersicht der festen Show (nur Flow 'show') */
+    agenda?: { k: 'round' | 'surprise' | 'final' | 'board'; title: string; icon?: string; mode?: Mode; tasks?: number; state: 'done' | 'now' | 'todo' }[];
     progress: { tilesPlayed: number; tilesTotal: number };
   };
   players: PlayerPublic[];

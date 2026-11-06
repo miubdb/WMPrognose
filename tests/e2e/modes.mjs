@@ -14,7 +14,7 @@ const check = (c, m) => { if (c) console.log('• ✓', m); else { failures++; c
 const AV = i => ({ face: i % 8, skin: i % 6, hair: (i * 2) % 9, hairColor: i % 8, hat: i % 6, shirt: i % 5, shirtColor: (i * 3) % 10, acc: i % 7, bg: i % 8 });
 const post = async (path, body) => (await fetch(BASE + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) })).json();
 
-const room = await post('/api/rooms');
+const room = await post('/api/rooms', { pack: 'standard-2' });
 const code = room.code;
 const names = ['Anna', 'Ben', 'Cem', 'Dana', 'Eli', 'Fiete'];
 const ids = [], tokens = [];

@@ -130,10 +130,10 @@ test('Rangfolge mit Gleichstand (1,1,3)', () => {
 // ---------------- Inhalte ----------------
 const maxOf = (t: any) => t.mode === 'estimate' ? t.points + Math.max(...t.bets) : t.mode === 'unique' ? t.pointsUnique : t.points;
 
-test('Inhalte: Budget je Kachel = 1000, Überraschung = 1000, Finale = 2000', () => {
+test('Inhalte: Budget je Kachel = 1000 (Rank 750, Match/Link 900), Überraschung = 1000, Finale = 2000', () => {
   for (const t of TILES) {
     const sum = t.tasks.reduce((a, x) => a + maxOf(x), 0);
-    const expected = t.kind === 'final' ? 2000 : (t.mode === 'match' || t.mode === 'link') ? 900 : 1000;
+    const expected = t.kind === 'final' ? 2000 : (t.mode === 'match' || t.mode === 'link') ? 900 : t.mode === 'rank' ? 750 : 1000;
     assert.equal(sum, expected, `${t.id}: ${sum}`);
   }
   assert.ok(TILES.filter(t => t.kind === 'tile').length >= 8);

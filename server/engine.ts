@@ -1,7 +1,7 @@
 // Autoritative Spiel-Engine: State-Machine, Aktionen, Wertung, Sichten.
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import type {
-  Book, Action, Avatar, PlayerPublic, Phase, RoundView, ScoreEntry, TaskDef, TileDef, TileView, View,
+  Book, Action, Avatar, PlayerPublic, Phase, RoundView, ScoreEntry, TaskDef, TileDef, TileView, View, Flow,
 } from '../shared/types';
 import { AVATAR_LIMITS } from '../shared/types';
 import { applyClamped } from '../shared/scoring';
@@ -30,14 +30,19 @@ export class Engine {
   bk(room: Room): Book { return typeof this.src === 'function' ? this.src(room.bookId ?? 'legacy') : this.src; }
 
   // ---------------------------------------------------------------- Räume
-  newRoom(code: string, now: number, bookId = 'legacy'): { room: Room; hostKey: string } {
+  /** Ablaufplan der festen Show aus dem Paket (Runden → 'tile:<id>', Zwischenstände → 'board'). */
+  static showPlan(book: Book): PlanStep[] {
+    return (book.show ?? []).map(s => (s.k === 'board' ? 'board' : (`tile:${s.cat}` as PlanStep)));
+  }
+  newRoom(code: string, now: number, bookId = 'legacy', flowReq: Flow = 'classic'): { room: Room; hostKey: string } {
     const book = typeof this.src === 'function' ? this.src(bookId) : this.src;
+    const flow: Flow = flowReq === 'show' && book.show?.length ? 'show' : 'classic';
     const hostKey = randomBytes(24).toString('base64url');
     const pin = String(randomInt(100000, 999999));
     const room: Room = {
       code, createdAt: now, hostKeyHash: sha(hostKey), hostPin: pin, hostPinHash: sha(pin),
       phase: 'lobby', joinOpen: true, showPaused: false, frozen: false, sound: true, reduced: false, hideScores: false,
-      players: [], nextPlayerNo: 1, seq: 1, plan: DEFAULT_PLAN.slice(), planIdx: 0,
+      players: [], nextPlayerNo: 1, seq: 1, flow, plan: flow === 'show' ? Engine.showPlan(book) : DEFAULT_PLAN.slice(), planIdx: 0,
       bookId, tileStatus: Object.fromEntries(book.tiles.filter(t => t.kind === 'tile').map(t => [t.id, 'open' as const])),
       pickOrder: [], pickNo: 0, pickerId: null, round: null, scoreLog: [], scoreSeq: 1, scoreboard: null, lastBoard: {},
       ceremonyStep: 0, tilesPlayed: 0, log: [], processed: {}, processedOrder: [], seed: hashSeed(code + now),
@@ -307,6 +312,13 @@ export class Engine {
     room.round = null;
     const step = room.plan[room.planIdx];
     if (!step) { room.phase = 'ceremony'; room.ceremonyStep = 0; room.hideScores = false; return; }
+    if (step.startsWith('tile:')) {                       // feste Show: Runde direkt starten (Regelkarte, Host gibt die Aufgabe frei)
+      const t = this.tile(room, step.slice(5));
+      if (!t) { this.log(room, now, `Runde „${step.slice(5)}“ fehlt im Paket – übersprungen`); this.nextPlan(room, now); return; }
+      if (t.kind === 'final') room.hideScores = true;
+      this.startRound(room, t, now);
+      return;
+    }
     switch (step) {
       case 'wall': {
         room.phase = 'wall';
@@ -333,17 +345,25 @@ export class Engine {
         const prev = { ...room.lastBoard };
         room.phase = 'scoreboard';
         const nPlayed = room.tilesPlayed;
-        const finalNext = room.plan[room.planIdx + 1] === 'final';
-        const afterSurprise = room.plan[room.planIdx - 1] === 'surprise';
+        const finalNext = this.stepKind(room, room.planIdx + 1) === 'final';
+        const afterSurprise = this.stepKind(room, room.planIdx - 1) === 'surprise';
         room.scoreboard = {
           title: finalNext ? 'Letzter sichtbarer Stand' : afterSurprise ? 'Zwischenstand nach der Überraschung' : 'Zwischenstand',
-          reason: finalNext ? 'Im Finale wird die Rangliste verborgen – alles ist noch möglich!' : `Nach ${nPlayed} gespielten Kategorien${afterSurprise ? ' und der Überraschungsrunde' : ''}`,
+          reason: finalNext ? 'Im Finale wird die Rangliste verborgen – alles ist noch möglich!' : `Nach ${nPlayed} gespielten ${room.flow === 'show' ? 'Runden' : 'Kategorien'}${afterSurprise ? ' und der Überraschungsrunde' : ''}`,
           prev,
         };
         room.lastBoard = Object.fromEntries(this.active(room).map(p => [p.id, p.score]));
         break;
       }
     }
+  }
+  /** Art eines Planschritts: 'round' | 'surprise' | 'final' | 'board' | 'wall' | undefined */
+  stepKind(room: Room, idx: number): 'round' | 'surprise' | 'final' | 'board' | 'wall' | undefined {
+    const s = room.plan[idx];
+    if (!s) return undefined;
+    if (s === 'board' || s === 'wall' || s === 'surprise' || s === 'final') return s === 'wall' ? 'wall' : s;
+    const t = this.tile(room, s.slice(5));
+    return t?.kind === 'surprise' ? 'surprise' : t?.kind === 'final' ? 'final' : 'round';
   }
   private nextPlan(room: Room, now: number) {
     room.planIdx++;
@@ -475,6 +495,7 @@ export class Engine {
       }
       case 'h.startFinal': return bad('use_begin');
       case 'h.backToWall': {
+        if (room.flow === 'show') return bad('not_allowed');        // feste Show kennt keine Wand
         if (room.phase !== 'round' || !room.round) return bad('wrong_phase');
         const t = this.curTile(room)!;
         if (t.kind !== 'tile') return bad('not_allowed');
@@ -571,7 +592,9 @@ export class Engine {
         code: room.code, phase: room.phase, joinOpen: room.joinOpen, showPaused: room.showPaused, sound: room.sound,
         reduced: room.reduced, hideScores: hide,
         act: this.actLabel(room),
-        progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.plan.filter(s => s === 'wall').length + 2 },
+        progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === 'show' ? room.plan.filter(x => x.startsWith('tile:')).length : room.plan.filter(s => s === 'wall').length + 2 },
+        flow: room.flow ?? 'classic',
+        ...(room.flow === 'show' ? { agenda: this.agenda(room) } : {}),
       },
       players, wall: null, round: null, scoreboard: null, ceremony: null,
     };
@@ -625,7 +648,37 @@ export class Engine {
 
   liveSet = new Set<string>(); // "ROOM:pid" – von der Verbindungsschicht gepflegt
 
+  /** Programm der festen Show (für TV und Showmaster). */
+  agenda(room: Room) {
+    const list: NonNullable<View['room']['agenda']> = [];
+    room.plan.forEach((s, i) => {
+      const state: 'done' | 'now' | 'todo' = room.phase === 'ceremony' || room.phase === 'ended' || i < room.planIdx ? 'done' : i === room.planIdx && room.phase !== 'lobby' && room.phase !== 'intro' ? 'now' : 'todo';
+      if (s === 'board') { list.push({ k: 'board', title: 'Zwischenstand', state }); return; }
+      const t = s.startsWith('tile:') ? this.tile(room, s.slice(5)) : undefined;
+      if (t) list.push({ k: t.kind === 'tile' ? 'round' : t.kind, title: t.title, icon: t.icon, mode: t.tasks[0]?.mode, tasks: t.tasks.length, state });
+    });
+    return list;
+  }
+  private roundNumber(room: Room, idx: number): { n: number; of: number } {
+    let n = 0, of = 0;
+    room.plan.forEach((_, i) => { if (this.stepKind(room, i) === 'round') { of++; if (i <= idx) n++; } });
+    return { n, of };
+  }
   private actLabel(room: Room): string {
+    if (room.flow === 'show') {
+      switch (room.phase) {
+        case 'lobby': return 'Lobby';
+        case 'intro': return 'Eröffnung';
+        case 'ceremony': case 'ended': return 'Siegerehrung';
+        default: {
+          const k = this.stepKind(room, Math.max(0, room.planIdx));
+          if (k === 'board') return 'Zwischenstand';
+          if (k === 'final') return 'FINAL LOCK';
+          if (k === 'surprise') return 'Überraschungsrunde';
+          const r = this.roundNumber(room, room.planIdx); return `Runde ${r.n} von ${r.of}`;
+        }
+      }
+    }
     switch (room.phase) {
       case 'lobby': return 'Lobby';
       case 'intro': return 'Eröffnung';
@@ -644,6 +697,7 @@ export class Engine {
   }
   private planNextLabel(room: Room): string {
     const nxt = room.plan[room.planIdx + 1];
+    if (nxt && nxt.startsWith('tile:')) { const t = this.tile(room, nxt.slice(5)); return t ? (t.kind === 'final' ? 'FINAL LOCK' : t.kind === 'surprise' ? 'Überraschungsrunde' : `Runde: ${t.title}`) : 'nächste Runde'; }
     return nxt === 'wall' ? 'Kategorienwand' : nxt === 'board' ? 'Zwischenstand' : nxt === 'surprise' ? 'Überraschungsrunde' : nxt === 'final' ? 'FINAL LOCK' : 'Siegerehrung';
   }
 

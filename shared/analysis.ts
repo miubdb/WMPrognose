@@ -1,6 +1,6 @@
 // Analyse eines Spielepakets: Spielzeit (erwartet/maximal), Verteilung der Modi und des Fußballanteils bei freier Kategorienwahl.
 import type { Book, TileDef } from './types';
-import { showSeconds, tileSeconds } from './timing';
+import { fixedShowSeconds, showSeconds, tileSeconds } from './timing';
 import { taskMax } from './validate';
 
 export interface PackAnalysis {
@@ -62,4 +62,35 @@ export function analyzeBook(book: Book, wallSlots = 6): PackAnalysis {
   res.combos = { count: combos.length, minutesExpected: { min: r1(eMin), max: r1(eMax) }, minutesMax: { min: r1(xMin), max: r1(xMax) },
     footballShare: { min: +fMin.toFixed(2), mean: +(fSum / combos.length).toFixed(2), max: +fMax.toFixed(2) }, maxSameModeTiles: sameMax, minDistinctModes: distinctMin };
   return res;
+}
+
+export interface ShowAnalysis {
+  rounds: { k: string; title: string; icon?: string; mode: string; modes: string[]; tasks: number; points: number; expectedMin: number; maxMin: number }[];
+  boards: number;
+  tasksTotal: number;
+  minutesExpected: number;
+  minutesMax: number;
+  /** theoretische Maximalpunkte ohne Startguthaben und ohne Wettgewinne */
+  pointsMax: number;
+  modesMissing: string[];
+  finalShare: number;
+}
+/** Analyse des festen Showablaufs (Reihenfolge, Punkte je Runde, erwartete/maximale Dauer). */
+export function analyzeShow(book: Book): ShowAnalysis | null {
+  if (!book.show?.length) return null;
+  const byId = new Map(book.tiles.map(t => [t.id, t]));
+  const rounds: ShowAnalysis['rounds'] = []; const order: TileDef[] = []; let boards = 0;
+  for (const st of book.show) {
+    if (st.k === 'board') { boards++; continue; }
+    const t = byId.get(st.cat); if (!t) continue;
+    order.push(t);
+    const pts = t.tasks.reduce((a, x) => a + taskMax(x), 0);
+    rounds.push({ k: st.k, title: t.title, icon: t.icon, mode: t.mode, modes: [...new Set(t.tasks.map(x => x.mode))], tasks: t.tasks.length, points: pts, expectedMin: +(tileSeconds(t, 'expected', true) / 60).toFixed(1), maxMin: +(tileSeconds(t, 'max', true) / 60).toFixed(1) });
+  }
+  const modes = new Set(rounds.flatMap(r => r.modes));
+  const all = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link'];
+  const pointsMax = rounds.reduce((a, r) => a + r.points, 0);
+  const fin = rounds.filter(r => r.k === 'final').reduce((a, r) => a + r.points, 0);
+  return { rounds, boards, tasksTotal: rounds.reduce((a, r) => a + r.tasks, 0), minutesExpected: +(fixedShowSeconds(order, boards, 'expected') / 60).toFixed(1), minutesMax: +(fixedShowSeconds(order, boards, 'max') / 60).toFixed(1),
+    pointsMax, modesMissing: all.filter(m => !modes.has(m)), finalShare: pointsMax ? +(fin / pointsMax).toFixed(2) : 0 };
 }

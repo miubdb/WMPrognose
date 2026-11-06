@@ -58,7 +58,7 @@ test('Transfer Online -> Lokal: vollständiger Spieleabend inkl. eigener Glitch-
   const dry = (await b.post('/import', { data: file, dryRun: true, publish: true })).data;
   assert.equal(dry.dryRun, true); assert.equal(dry.questions.created, 10); assert.equal(dry.scenes.created, 1);
   assert.equal((await b.get('/questions')).data.length, baseQ); assert.equal((await b.get('/scenes')).data.length, baseS);
-  assert.equal((await b.get('/packs')).data.length, 1, 'Trockenlauf legt kein Paket an');
+  assert.equal((await b.get('/packs')).data.length, 2, 'Trockenlauf legt kein Paket an');
   // 7) echter Import mit Prüfung + Veröffentlichung
   const imp = (await b.post('/import', { data: file, publish: true })).data;
   assert.deepEqual(imp.errors, []); assert.deepEqual(imp.warnings, []);

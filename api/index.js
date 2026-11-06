@@ -1703,11 +1703,11 @@ var require_shebang_command = __commonJS({
     "use strict";
     var shebangRegex = require_shebang_regex();
     module.exports = (string = "") => {
-      const match2 = string.match(shebangRegex);
-      if (!match2) {
+      const match3 = string.match(shebangRegex);
+      if (!match3) {
         return null;
       }
-      const [path, argument] = match2[0].replace(/#! ?/, "").split(" ");
+      const [path, argument] = match3[0].replace(/#! ?/, "").split(" ");
       const binary = path.split("/").pop();
       if (binary === "env") {
         return argument;
@@ -4558,8 +4558,8 @@ var require_dist2 = __commonJS({
     function floatSafeRemainder(val, step) {
       let valDecCount = (val.toString().split(".")[1] || "").length, stepString = step.toString(), stepDecCount = (stepString.split(".")[1] || "").length;
       if (stepDecCount === 0 && /\d?e-\d?/.test(stepString)) {
-        let match2 = stepString.match(/\d?e-(\d?)/);
-        match2?.[1] && (stepDecCount = Number.parseInt(match2[1]));
+        let match3 = stepString.match(/\d?e-(\d?)/);
+        match3?.[1] && (stepDecCount = Number.parseInt(match3[1]));
       }
       let decCount = valDecCount > stepDecCount ? valDecCount : stepDecCount, valInt = Number.parseInt(val.toFixed(decCount).replace(".", "")), stepInt = Number.parseInt(step.toFixed(decCount).replace(".", ""));
       return valInt % stepInt / 10 ** decCount;
@@ -22209,15 +22209,15 @@ var require_mock_utils = __commonJS({
         isPromise
       }
     } = __require("node:util");
-    function matchValue(match2, value) {
-      if (typeof match2 === "string") {
-        return match2 === value;
+    function matchValue(match3, value) {
+      if (typeof match3 === "string") {
+        return match3 === value;
       }
-      if (match2 instanceof RegExp) {
-        return match2.test(value);
+      if (match3 instanceof RegExp) {
+        return match3.test(value);
       }
-      if (typeof match2 === "function") {
-        return match2(value) === true;
+      if (typeof match3 === "function") {
+        return match3(value) === true;
       }
       return false;
     }
@@ -33788,7 +33788,7 @@ function validateTask(t, sceneExists = () => true) {
   return e;
 }
 var CATEGORY_KINDS = ["tile", "surprise", "final"];
-var BUDGET = { tile: 1e3, surprise: 1e3, final: 2e3 };
+var BUDGET = { tile: 1200, surprise: 1500, final: 2e3 };
 function normalizeCategory(raw) {
   const r = raw ?? {};
   return {
@@ -33961,10 +33961,10 @@ function taskSeconds(t, m = "expected") {
       return { play: t.seconds * a + (m === "max" ? 60 : 30), reveal: rv(50) };
   }
 }
-function tileSeconds(tile, m = "expected") {
+function tileSeconds(tile, m = "expected", fixed = false) {
   const special = tile.kind !== "tile";
   const k2 = m === "max" ? SLOW : 1;
-  let s = (special ? OVERHEAD.rulesSpecial : OVERHEAD.pick + OVERHEAD.rules) * k2;
+  let s = (special ? OVERHEAD.rulesSpecial : (fixed ? 0 : OVERHEAD.pick) + OVERHEAD.rules) * k2;
   for (const t of tile.tasks) {
     const x3 = taskSeconds(t, m);
     const extra = tile.kind === "final" ? { begin: 15, reveal: 35 } : tile.kind === "surprise" ? { begin: 5, reveal: 25 } : { begin: 0, reveal: 0 };
@@ -33975,6 +33975,10 @@ function tileSeconds(tile, m = "expected") {
 function showSeconds(chosen, surprise, final, m = "expected") {
   const k2 = m === "max" ? SLOW : 1;
   return OVERHEAD.lobby + (OVERHEAD.intro + 3 * OVERHEAD.scoreboard + OVERHEAD.ceremony) * k2 + chosen.reduce((a, t) => a + tileSeconds(t, m), 0) + tileSeconds(surprise, m) + tileSeconds(final, m);
+}
+function fixedShowSeconds(tiles, boards, m = "expected") {
+  const k2 = m === "max" ? SLOW : 1;
+  return OVERHEAD.lobby + (OVERHEAD.intro + boards * OVERHEAD.scoreboard + OVERHEAD.ceremony) * k2 + tiles.reduce((a, t) => a + tileSeconds(t, m, true), 0);
 }
 
 // shared/analysis.ts
@@ -34043,6 +34047,38 @@ function analyzeBook(book, wallSlots = 6) {
   };
   return res;
 }
+function analyzeShow(book) {
+  if (!book.show?.length) return null;
+  const byId = new Map(book.tiles.map((t) => [t.id, t]));
+  const rounds = [];
+  const order = [];
+  let boards = 0;
+  for (const st of book.show) {
+    if (st.k === "board") {
+      boards++;
+      continue;
+    }
+    const t = byId.get(st.cat);
+    if (!t) continue;
+    order.push(t);
+    const pts = t.tasks.reduce((a, x3) => a + taskMax(x3), 0);
+    rounds.push({ k: st.k, title: t.title, icon: t.icon, mode: t.mode, modes: [...new Set(t.tasks.map((x3) => x3.mode))], tasks: t.tasks.length, points: pts, expectedMin: +(tileSeconds(t, "expected", true) / 60).toFixed(1), maxMin: +(tileSeconds(t, "max", true) / 60).toFixed(1) });
+  }
+  const modes = new Set(rounds.flatMap((r) => r.modes));
+  const all = ["geo", "rank", "estimate", "glitch", "unique", "match", "link"];
+  const pointsMax = rounds.reduce((a, r) => a + r.points, 0);
+  const fin = rounds.filter((r) => r.k === "final").reduce((a, r) => a + r.points, 0);
+  return {
+    rounds,
+    boards,
+    tasksTotal: rounds.reduce((a, r) => a + r.tasks, 0),
+    minutesExpected: +(fixedShowSeconds(order, boards, "expected") / 60).toFixed(1),
+    minutesMax: +(fixedShowSeconds(order, boards, "max") / 60).toFixed(1),
+    pointsMax,
+    modesMissing: all.filter((m) => !modes.has(m)),
+    finalShare: pointsMax ? +(fin / pointsMax).toFixed(2) : 0
+  };
+}
 
 // server/content.ts
 var ApiError = class extends Error {
@@ -34084,6 +34120,7 @@ function normalizePack(raw) {
     categoryIds: Array.isArray(r.categoryIds) ? [...new Set(r.categoryIds.map((x3) => s(x3, 80)).filter(Boolean))].slice(0, 20) : [],
     surprise: s(r.surprise, 80),
     final: s(r.final, 80),
+    ...Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x3) => x3?.k === "board" ? { k: "board" } : (x3?.k === "round" || x3?.k === "surprise" || x3?.k === "final") && s(x3.cat, 80) ? { k: x3.k, cat: s(x3.cat, 80) } : null).filter((x3) => !!x3) } : {},
     rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10) }
   };
 }
@@ -34148,7 +34185,7 @@ var ContentService = class {
    */
   installSeed(opts = {}) {
     const t = this.now();
-    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [], ref: "" };
+    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [], ref: "", showRef: "", showCreated: false };
     this.tx(() => {
       const pk = this.seedPack;
       const had = !!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get(pk.id);
@@ -34169,7 +34206,7 @@ var ContentService = class {
         else if (tile.kind === "surprise") surprise = tile.id;
         else final = tile.id;
       }
-      if (!had) {
+      if (!had && this.seed.tiles.length) {
         const pack = { name: pk.name, description: pk.description, categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
         this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pk.id, JSON.stringify(pack), t, t);
         const pub = this.publish(pk.id, "Mitgeliefertes Standardpaket (aus content/tiles.ts)");
@@ -34181,10 +34218,31 @@ var ContentService = class {
             report.archived.push(old.id);
           }
         }
-      } else {
+      } else if (had) {
         report.alreadyInstalled = true;
         const row = this.listPacks().find((p) => p.id === pk.id);
         report.ref = row?.currentVersion ? `${pk.id}@${row.currentVersion}` : "";
+      }
+      const sh = this.seed.show;
+      if (sh) {
+        for (const q2 of sh.pool) report.created.questions += run("INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)", q2.id, q2.task.mode, q2.topic, JSON.stringify(q2.task), t, t);
+        for (const r of sh.rounds) {
+          const cat = { title: r.title, topic: r.topic, icon: r.icon, color: r.color, kind: r.kind, football: r.football, blurb: r.blurb, taskIds: r.taskIds };
+          report.created.categories += run("INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)", r.id, JSON.stringify(cat), t, t);
+        }
+        const exists = !!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get(sh.pack.id);
+        if (!exists) {
+          const pack = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: "", final: "", rules: { ...DEFAULT_RULES }, show: sh.steps };
+          this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(sh.pack.id, JSON.stringify(pack), t, t);
+          report.showRef = this.publish(sh.pack.id, "Mitgeliefertes Showpaket (fester Ablauf)").ref;
+          report.created.packs++;
+          report.showCreated = true;
+        } else {
+          const row = this.listPacks().find((p) => p.id === sh.pack.id);
+          report.showRef = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : "";
+          report.alreadyInstalled = report.alreadyInstalled && true;
+        }
+        if (report.showCreated) report.alreadyInstalled = false;
       }
     });
     return report;
@@ -34193,7 +34251,9 @@ var ContentService = class {
   seedStatus() {
     const pk = this.seedPack;
     const row = this.listPacks().find((p) => p.id === pk.id);
-    return { id: pk.id, name: pk.name, installed: !!row, status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
+    const sh = this.seed.show;
+    const shRow = sh ? this.listPacks().find((p) => p.id === sh.pack.id) : void 0;
+    return { id: pk.id, name: pk.name, installed: !!row && (!sh || !!shRow && !sh.pool.some((q2) => !this.db.prepare("SELECT 1 FROM questions WHERE id=?").get(q2.id))), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: sh ? sh.pool.filter((q2) => !this.db.prepare("SELECT 1 FROM questions WHERE id=?").get(q2.id)).length : 0, status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
   }
   // ------------------------------------------------------------- Szenen
   sceneRow(r) {
@@ -34302,7 +34362,8 @@ var ContentService = class {
     const modes = [...new Set(tasks.map((q2) => q2.mode))];
     if (c.data.kind !== "final" && modes.length > 1) problems.push("Eine Kategorie darf nur Fragen eines Spielmodus enthalten");
     const points = tasks.reduce((a, q2) => a + taskMax(q2.task), 0);
-    const budget = BUDGET[c.data.kind];
+    const betPart = tasks.reduce((a, q2) => a + (q2.task.mode === "estimate" ? Math.max(0, ...q2.task.bets) : 0), 0);
+    const budget = BUDGET[c.data.kind] + betPart;
     if (points > budget) problems.push(`Punkte (${points}) \xFCberschreiten das Budget von ${budget}`);
     if (!tasks.length) problems.push("Keine Fragen zugeordnet");
     if (modes.includes("codebreak")) problems.push("Enth\xE4lt CODEBREAK-Fragen \u2013 dieser Modus wird nicht mehr verwendet. Bitte durch Fragen eines aktiven Modus ersetzen.");
@@ -34419,30 +34480,61 @@ var ContentService = class {
         for (const p of q2.problems) errors.push(`${label} \xB7 \u201E${q2.task.prompt.slice(0, 40)}\u201C: ${p}`);
         tasks.push(q2.task);
       }
-      if (c.points < c.budget && !c.problems.length) warnings.push(`${label}: nur ${c.points} von ${c.budget} Punkten verteilt`);
+      if (c.points < c.budget * 0.8 && !c.problems.length && c.mode !== "estimate") warnings.push(`${label}: nur ${c.points} von ${c.budget} Punkten verteilt`);
       tiles.push({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, mode: tasks[0]?.mode ?? "geo", kind, football: c.football, blurb: c.blurb, tasks: JSON.parse(JSON.stringify(tasks)) });
     };
-    pack.categoryIds.forEach((id) => add(id, "tile"));
-    if (pack.categoryIds.length < 6) errors.push(`Mindestens 6 Kategorien n\xF6tig (aktuell ${pack.categoryIds.length}); empfohlen sind 8\u20139`);
-    else if (pack.categoryIds.length < 8) warnings.push("Empfohlen: 8\u20139 Kategorien, damit die Spieler wirklich w\xE4hlen k\xF6nnen");
-    add(pack.surprise, "surprise");
-    add(pack.final, "final");
+    const hasShow = !!pack.show?.length;
+    const classic = !hasShow || pack.categoryIds.length > 0 || !!pack.surprise || !!pack.final;
+    if (classic) {
+      pack.categoryIds.forEach((id) => add(id, "tile"));
+      if (pack.categoryIds.length < 6) errors.push(`Klassischer Modus: Mindestens 6 Kategorien n\xF6tig (aktuell ${pack.categoryIds.length}); empfohlen sind 8\u20139`);
+      else if (pack.categoryIds.length < 8) warnings.push("Empfohlen: 8\u20139 Kategorien, damit die Spieler wirklich w\xE4hlen k\xF6nnen");
+      add(pack.surprise, "surprise");
+      add(pack.final, "final");
+    }
+    let showSteps;
+    if (hasShow) {
+      const seenCat = /* @__PURE__ */ new Set();
+      let finals = 0, rounds = 0;
+      for (const [i2, st] of pack.show.entries()) {
+        if (st.k === "board") continue;
+        if (seenCat.has(st.cat)) {
+          errors.push(`Showablauf, Schritt ${i2 + 1}: Kategorie \u201E${cats.get(st.cat)?.title ?? st.cat}\u201C kommt doppelt vor`);
+          continue;
+        }
+        seenCat.add(st.cat);
+        if (st.k === "final") finals++;
+        else if (st.k === "round") rounds++;
+        if (!tiles.some((t) => t.id === st.cat)) add(st.cat, st.k === "round" ? "tile" : st.k);
+        else if (cats.get(st.cat)?.kind !== (st.k === "round" ? "tile" : st.k)) errors.push(`Showablauf, Schritt ${i2 + 1}: falscher Kategorietyp`);
+      }
+      if (rounds < 1) errors.push("Showablauf: mindestens eine Runde n\xF6tig");
+      if (finals !== 1) errors.push("Showablauf: genau ein Finale n\xF6tig");
+      else if (pack.show[pack.show.length - 1]?.k !== "final") errors.push("Showablauf: das Finale muss der letzte Schritt sein");
+      showSteps = pack.show.map((x3) => ({ ...x3 }));
+    }
     const used = {};
     for (const t of tiles) for (const k2 of t.tasks) if (k2.mode === "glitch" && scenes[k2.scene]) used[k2.scene] = scenes[k2.scene];
-    const book = { tiles, scenes: used, rules: { ...pack.rules } };
-    if (!errors.length) {
+    const book = { tiles, scenes: used, rules: { ...pack.rules }, ...showSteps ? { show: showSteps, classic } : {} };
+    if (!errors.length && classic) {
       const a = analyzeBook(book);
       if (a.combos) {
         if (a.combos.minutesExpected.min < 55 || a.combos.minutesExpected.max > 80) warnings.push(`Erwartete Spieldauer ${a.combos.minutesExpected.min}\u2013${a.combos.minutesExpected.max} min liegt au\xDFerhalb des Ziels 60\u201375 min`);
         if (a.combos.footballShare.max > 0.45) warnings.push(`Fu\xDFballanteil kann bis ${(a.combos.footballShare.max * 100).toFixed(0)} % steigen`);
       }
     }
+    if (!errors.length && showSteps) {
+      const sa = analyzeShow(book);
+      if (sa.modesMissing.length) warnings.push(`Nicht jeder Spielmodus kommt im Showablauf vor (fehlt: ${sa.modesMissing.join(", ")})`);
+      if (sa.minutesExpected < 70 || sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min liegt au\xDFerhalb des Ziels 75\u201390 min`);
+      if (showSteps[showSteps.length - 2]?.k !== "board") warnings.push("Empfohlen: vor dem Finale einen \u201EZwischenstand\u201C-Schritt");
+    }
     return { book: errors.length ? null : book, errors, warnings };
   }
   analysis(packId) {
     const b2 = this.buildBook(packId);
-    if (b2.book) return { ok: true, errors: b2.errors, warnings: b2.warnings, analysis: analyzeBook(b2.book) };
-    return { ok: false, errors: b2.errors, warnings: b2.warnings, analysis: null };
+    if (b2.book) return { ok: true, errors: b2.errors, warnings: b2.warnings, analysis: b2.book.show && !(b2.book.tiles.filter((t) => t.kind === "tile").length >= 6 && b2.book.tiles.some((t) => t.kind === "surprise")) ? null : analyzeBook(b2.book), show: analyzeShow(b2.book) };
+    return { ok: false, errors: b2.errors, warnings: b2.warnings, analysis: null, show: null };
   }
   publish(packId, note = "") {
     const { book, errors, warnings } = this.buildBook(packId);
@@ -34471,7 +34563,16 @@ var ContentService = class {
   }
   /** Veröffentlichte, für neue Räume wählbare Pakete (öffentlich, ohne Lösungen). */
   listPublished() {
-    return this.listPacks().filter((p) => p.status === "published" && p.currentVersion !== null).map((p) => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion, ref: `${p.id}@${p.currentVersion}` }));
+    return this.listPacks().filter((p) => p.status === "published" && p.currentVersion !== null).map((p) => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
+  }
+  /** Welche Ablaufmodelle ein veröffentlichter Stand unterstützt. */
+  flowsOf(ref) {
+    try {
+      const b2 = this.resolveBook(ref);
+      return { show: !!b2.show?.length, classic: b2.show?.length ? !!b2.classic : true };
+    } catch {
+      return { show: false, classic: true };
+    }
   }
   defaultRef() {
     return this.listPublished()[0]?.ref ?? this.legacyRef();
@@ -34518,6 +34619,7 @@ var ContentService = class {
         surprise: p.surprise,
         final: p.final,
         rules: p.rules,
+        ...p.show ? { show: p.show } : {},
         status: p.status,
         currentVersion: p.currentVersion,
         ...p.currentVersion ? (() => {
@@ -34528,7 +34630,7 @@ var ContentService = class {
       });
       if (typeof scope === "object") {
         const p = this.getPack(scope.pack);
-        catIds = /* @__PURE__ */ new Set([...p.categoryIds, p.surprise, p.final]);
+        catIds = new Set([...p.categoryIds, p.surprise, p.final, ...(p.show ?? []).flatMap((x3) => x3.k === "board" ? [] : [x3.cat])].filter(Boolean));
         out.packs = [packRow(p, false)];
       } else out.packs = this.listPacksView().map((p) => packRow(p, true));
       const cats = this.listCategories().filter((c) => !catIds || catIds.has(c.id));
@@ -34648,7 +34750,13 @@ var ContentService = class {
       }
       for (const p of Array.isArray(data.packs) ? data.packs : []) {
         if (!p?.id) continue;
-        const d2 = normalizePack({ ...p, categoryIds: (p.categoryIds ?? []).map((x3) => maps.c.get(x3) ?? x3), surprise: maps.c.get(p.surprise) ?? p.surprise, final: maps.c.get(p.final) ?? p.final });
+        const d2 = normalizePack({
+          ...p,
+          categoryIds: (p.categoryIds ?? []).map((x3) => maps.c.get(x3) ?? x3),
+          surprise: maps.c.get(p.surprise) ?? p.surprise,
+          final: maps.c.get(p.final) ?? p.final,
+          show: Array.isArray(p.show) ? p.show.map((x3) => x3?.k === "board" ? x3 : { ...x3, cat: maps.c.get(x3?.cat) ?? x3?.cat }) : void 0
+        });
         if (!d2.name) {
           res.errors.push(`Paket ${p.id}: Name fehlt`);
           continue;
@@ -35568,7 +35676,7 @@ var MAX_PLAYERS = 8;
 var MAX_LOG = 150;
 var MAX_PROCESSED = 600;
 var DEFAULT_PLAN = ["wall", "wall", "wall", "board", "surprise", "board", "wall", "wall", "wall", "board", "final"];
-var Engine = class {
+var Engine = class _Engine {
   constructor(src) {
     this.src = src;
   }
@@ -35578,8 +35686,13 @@ var Engine = class {
     return typeof this.src === "function" ? this.src(room.bookId ?? "legacy") : this.src;
   }
   // ---------------------------------------------------------------- Räume
-  newRoom(code2, now, bookId = "legacy") {
+  /** Ablaufplan der festen Show aus dem Paket (Runden → 'tile:<id>', Zwischenstände → 'board'). */
+  static showPlan(book) {
+    return (book.show ?? []).map((s) => s.k === "board" ? "board" : `tile:${s.cat}`);
+  }
+  newRoom(code2, now, bookId = "legacy", flowReq = "classic") {
     const book = typeof this.src === "function" ? this.src(bookId) : this.src;
+    const flow = flowReq === "show" && book.show?.length ? "show" : "classic";
     const hostKey = randomBytes2(24).toString("base64url");
     const pin = String(randomInt(1e5, 999999));
     const room = {
@@ -35598,7 +35711,8 @@ var Engine = class {
       players: [],
       nextPlayerNo: 1,
       seq: 1,
-      plan: DEFAULT_PLAN.slice(),
+      flow,
+      plan: flow === "show" ? _Engine.showPlan(book) : DEFAULT_PLAN.slice(),
       planIdx: 0,
       bookId,
       tileStatus: Object.fromEntries(book.tiles.filter((t) => t.kind === "tile").map((t) => [t.id, "open"])),
@@ -35926,6 +36040,17 @@ var Engine = class {
       room.hideScores = false;
       return;
     }
+    if (step.startsWith("tile:")) {
+      const t = this.tile(room, step.slice(5));
+      if (!t) {
+        this.log(room, now, `Runde \u201E${step.slice(5)}\u201C fehlt im Paket \u2013 \xFCbersprungen`);
+        this.nextPlan(room, now);
+        return;
+      }
+      if (t.kind === "final") room.hideScores = true;
+      this.startRound(room, t, now);
+      return;
+    }
     switch (step) {
       case "wall": {
         room.phase = "wall";
@@ -35954,17 +36079,25 @@ var Engine = class {
         const prev = { ...room.lastBoard };
         room.phase = "scoreboard";
         const nPlayed = room.tilesPlayed;
-        const finalNext = room.plan[room.planIdx + 1] === "final";
-        const afterSurprise = room.plan[room.planIdx - 1] === "surprise";
+        const finalNext = this.stepKind(room, room.planIdx + 1) === "final";
+        const afterSurprise = this.stepKind(room, room.planIdx - 1) === "surprise";
         room.scoreboard = {
           title: finalNext ? "Letzter sichtbarer Stand" : afterSurprise ? "Zwischenstand nach der \xDCberraschung" : "Zwischenstand",
-          reason: finalNext ? "Im Finale wird die Rangliste verborgen \u2013 alles ist noch m\xF6glich!" : `Nach ${nPlayed} gespielten Kategorien${afterSurprise ? " und der \xDCberraschungsrunde" : ""}`,
+          reason: finalNext ? "Im Finale wird die Rangliste verborgen \u2013 alles ist noch m\xF6glich!" : `Nach ${nPlayed} gespielten ${room.flow === "show" ? "Runden" : "Kategorien"}${afterSurprise ? " und der \xDCberraschungsrunde" : ""}`,
           prev
         };
         room.lastBoard = Object.fromEntries(this.active(room).map((p) => [p.id, p.score]));
         break;
       }
     }
+  }
+  /** Art eines Planschritts: 'round' | 'surprise' | 'final' | 'board' | 'wall' | undefined */
+  stepKind(room, idx) {
+    const s = room.plan[idx];
+    if (!s) return void 0;
+    if (s === "board" || s === "wall" || s === "surprise" || s === "final") return s === "wall" ? "wall" : s;
+    const t = this.tile(room, s.slice(5));
+    return t?.kind === "surprise" ? "surprise" : t?.kind === "final" ? "final" : "round";
   }
   nextPlan(room, now) {
     room.planIdx++;
@@ -36124,6 +36257,7 @@ var Engine = class {
       case "h.startFinal":
         return bad("use_begin");
       case "h.backToWall": {
+        if (room.flow === "show") return bad("not_allowed");
         if (room.phase !== "round" || !room.round) return bad("wrong_phase");
         const t = this.curTile(room);
         if (t.kind !== "tile") return bad("not_allowed");
@@ -36243,7 +36377,9 @@ var Engine = class {
         reduced: room.reduced,
         hideScores: hide,
         act: this.actLabel(room),
-        progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.plan.filter((s) => s === "wall").length + 2 }
+        progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === "show" ? room.plan.filter((x3) => x3.startsWith("tile:")).length : room.plan.filter((s) => s === "wall").length + 2 },
+        flow: room.flow ?? "classic",
+        ...room.flow === "show" ? { agenda: this.agenda(room) } : {}
       },
       players,
       wall: null,
@@ -36315,7 +36451,50 @@ var Engine = class {
   }
   liveSet = /* @__PURE__ */ new Set();
   // "ROOM:pid" – von der Verbindungsschicht gepflegt
+  /** Programm der festen Show (für TV und Showmaster). */
+  agenda(room) {
+    const list2 = [];
+    room.plan.forEach((s, i2) => {
+      const state = room.phase === "ceremony" || room.phase === "ended" || i2 < room.planIdx ? "done" : i2 === room.planIdx && room.phase !== "lobby" && room.phase !== "intro" ? "now" : "todo";
+      if (s === "board") {
+        list2.push({ k: "board", title: "Zwischenstand", state });
+        return;
+      }
+      const t = s.startsWith("tile:") ? this.tile(room, s.slice(5)) : void 0;
+      if (t) list2.push({ k: t.kind === "tile" ? "round" : t.kind, title: t.title, icon: t.icon, mode: t.tasks[0]?.mode, tasks: t.tasks.length, state });
+    });
+    return list2;
+  }
+  roundNumber(room, idx) {
+    let n = 0, of = 0;
+    room.plan.forEach((_2, i2) => {
+      if (this.stepKind(room, i2) === "round") {
+        of++;
+        if (i2 <= idx) n++;
+      }
+    });
+    return { n, of };
+  }
   actLabel(room) {
+    if (room.flow === "show") {
+      switch (room.phase) {
+        case "lobby":
+          return "Lobby";
+        case "intro":
+          return "Er\xF6ffnung";
+        case "ceremony":
+        case "ended":
+          return "Siegerehrung";
+        default: {
+          const k2 = this.stepKind(room, Math.max(0, room.planIdx));
+          if (k2 === "board") return "Zwischenstand";
+          if (k2 === "final") return "FINAL LOCK";
+          if (k2 === "surprise") return "\xDCberraschungsrunde";
+          const r = this.roundNumber(room, room.planIdx);
+          return `Runde ${r.n} von ${r.of}`;
+        }
+      }
+    }
     switch (room.phase) {
       case "lobby":
         return "Lobby";
@@ -36338,6 +36517,10 @@ var Engine = class {
   }
   planNextLabel(room) {
     const nxt = room.plan[room.planIdx + 1];
+    if (nxt && nxt.startsWith("tile:")) {
+      const t = this.tile(room, nxt.slice(5));
+      return t ? t.kind === "final" ? "FINAL LOCK" : t.kind === "surprise" ? "\xDCberraschungsrunde" : `Runde: ${t.title}` : "n\xE4chste Runde";
+    }
     return nxt === "wall" ? "Kategorienwand" : nxt === "board" ? "Zwischenstand" : nxt === "surprise" ? "\xDCberraschungsrunde" : nxt === "final" ? "FINAL LOCK" : "Siegerehrung";
   }
   roundView(room, c, aud) {
@@ -36923,7 +37106,7 @@ var TILES = [
       {
         mode: "rank",
         secondsPerItem: 12,
-        points: 340,
+        points: 250,
         prompt: "Was gibt es schon am l\xE4ngsten? \u2013 die \xE4lteste Marke zuerst",
         topLabel: "am \xE4ltesten",
         bottomLabel: "am j\xFCngsten",
@@ -36940,7 +37123,7 @@ var TILES = [
       {
         mode: "rank",
         secondsPerItem: 12,
-        points: 330,
+        points: 250,
         prompt: "Was geschah zuerst? \u2013 das \xE4lteste Ereignis zuerst",
         topLabel: "am l\xE4ngsten her",
         bottomLabel: "am j\xFCngsten",
@@ -36957,7 +37140,7 @@ var TILES = [
       {
         mode: "rank",
         secondsPerItem: 12,
-        points: 330,
+        points: 250,
         prompt: "Wie hoch ist es? \u2013 das h\xF6chste Bauwerk zuerst",
         topLabel: "am h\xF6chsten",
         bottomLabel: "am niedrigsten",
@@ -37190,7 +37373,7 @@ var TILES = [
       {
         mode: "rank",
         secondsPerItem: 12,
-        points: 340,
+        points: 250,
         prompt: "Gr\xFCndungsjahr des Klubs \u2013 der \xE4lteste zuerst",
         topLabel: "\xE4ltester Klub",
         bottomLabel: "j\xFCngster Klub",
@@ -37207,7 +37390,7 @@ var TILES = [
       {
         mode: "rank",
         secondsPerItem: 12,
-        points: 330,
+        points: 250,
         prompt: "Was geschah zuerst? \u2013 Fu\xDFball-Geschichte, das \xE4lteste Ereignis zuerst",
         topLabel: "am l\xE4ngsten her",
         bottomLabel: "am j\xFCngsten",
@@ -37224,7 +37407,7 @@ var TILES = [
       {
         mode: "rank",
         secondsPerItem: 12,
-        points: 330,
+        points: 250,
         prompt: "L\xE4nderspiele f\xFCr Deutschland \u2013 die meisten zuerst",
         topLabel: "meiste L\xE4nderspiele",
         bottomLabel: "wenigste L\xE4nderspiele",
@@ -37468,6 +37651,375 @@ var TILES = [
   }
 ];
 
+// content/show.ts
+var PU2 = "#8b5cf6";
+var BL2 = "#3b82f6";
+var TE2 = "#14d9c0";
+var GO2 = "#f5b82e";
+var PK2 = "#ec4899";
+var GR2 = "#22c55e";
+var CY2 = "#38bdf8";
+var SHOW_PACK = {
+  id: "show-1",
+  name: "Showpaket \u2013 Spieleabend (fester Ablauf)",
+  description: "31 Aufgaben in fester Reihenfolge: 6 Runden, \xDCberraschungsrunde EINZIGARTIG und Finale \u2013 alle sieben Spielmodi. Etwa 80 Minuten."
+};
+var geo2 = (id, topic, map2, seconds, points, prompt, lat, lon, label, explain) => ({ id, topic, task: { mode: "geo", map: map2, seconds, points, prompt, answer: { lat, lon, label }, explain } });
+var est = (id, topic, prompt, unit, answer, explain, bets = [0, 100, 200], points = 300) => ({ id, topic, task: { mode: "estimate", seconds: 45, betSeconds: 35, points, bets, prompt, unit, answer, explain } });
+var glitch2 = (id, scene, viewPrompt, prompt, explain, viewSeconds = 12) => ({ id, topic: "Beobachtung", task: { mode: "glitch", scene, viewSeconds, seconds: 25, points: 250, viewPrompt, prompt, explain } });
+var link2 = (id, topic, prompt, clues, answer, accept, explain) => ({ id, topic, task: { mode: "link", prompt, clueSeconds: 12, points: 300, clues, answer, accept, explain } });
+var match2 = (id, topic, prompt, pairs, order, explain) => ({ id, topic, task: { mode: "match", seconds: 60, points: 300, prompt, pairs: pairs.map(([left, right]) => ({ left, right })), order, explain } });
+var rank2 = (id, topic, prompt, topLabel, bottomLabel, items, order, explain, points = 250, secondsPerItem = 12) => ({ id, topic, task: { mode: "rank", secondsPerItem, points, prompt, topLabel, bottomLabel, items: items.map(([text, value]) => ({ text, value })), order, explain } });
+var unique2 = (id, topic, placeholder, prompt, valid, explain) => ({ id, topic, task: { mode: "unique", seconds: 45, pointsUnique: 500, pointsShared: 150, placeholder, prompt, valid: valid.map(([name, variants]) => ({ name, variants })), explain } });
+var POOL = [
+  // ---------------------------------------------------------------- im Showpaket verwendet (neu)
+  match2(
+    "s3-match-spitznamen",
+    "Bundesliga-Spitznamen",
+    "Welcher Verein tr\xE4gt welchen Spitznamen?",
+    [
+      ["Borussia M\xF6nchengladbach", "Die Fohlen"],
+      ["FC Schalke 04", "Die Knappen"],
+      ["1. FC K\xF6ln", "Die Gei\xDFb\xF6cke"],
+      ["Eintracht Frankfurt", "Die Adler"],
+      ["Hertha BSC", "Die Alte Dame"],
+      ["FC St. Pauli", "Die Kiezkicker"]
+    ],
+    [4, 0, 5, 2, 1, 3],
+    "Gladbach = Fohlen (junge, wilde Mannschaft), Schalke = Knappen (Bergbau), K\xF6ln = Gei\xDFb\xF6cke (Maskottchen Hennes), Frankfurt = Adler (Wappen), Hertha = Alte Dame (Name Hertha), St. Pauli = Kiezkicker (Stadtteil)."
+  ),
+  unique2("s3-unique-orchester", "Musik", "Ein Orchesterinstrument \u2026", "Nenne ein Instrument, das in einem klassischen Sinfonieorchester gespielt wird.", [
+    ["Geige", ["Violine", "Violinen"]],
+    ["Bratsche", ["Viola"]],
+    ["Cello", ["Violoncello"]],
+    ["Kontrabass", ["Bass"]],
+    ["Fl\xF6te", ["Querfl\xF6te"]],
+    ["Piccolo", ["Piccolofl\xF6te"]],
+    ["Oboe", []],
+    ["Klarinette", []],
+    ["Fagott", []],
+    ["Horn", ["Waldhorn"]],
+    ["Trompete", []],
+    ["Posaune", []],
+    ["Tuba", []],
+    ["Pauke", ["Pauken"]],
+    ["Harfe", []],
+    ["Triangel", []],
+    ["Becken", []],
+    ["Xylophon", []],
+    ["Celesta", []],
+    ["Englischhorn", []]
+  ], "G\xFCltig sind u. a. Geige, Bratsche, Cello, Kontrabass, Fl\xF6te, Oboe, Klarinette, Fagott, Horn, Trompete, Posaune, Tuba, Pauke und Harfe. Die meisten nennen Geige, Fl\xF6te oder Trompete \u2013 wer wagt etwas anderes?"),
+  link2(
+    "s3-link-pele",
+    "Fu\xDFball",
+    "Welche Person wird gesucht?",
+    [
+      "Sein b\xFCrgerlicher Name lautet Edson Arantes do Nascimento.",
+      "Er ist der einzige Spieler, der dreimal Weltmeister wurde.",
+      "Mit 17 Jahren schoss er im WM-Finale 1958 zwei Tore.",
+      "Der Brasilianer wurde als \u201EO Rei\u201C \u2013 der K\xF6nig des Fu\xDFballs \u2013 gefeiert."
+    ],
+    "Pel\xE9",
+    ["Pele", "Edson Arantes do Nascimento"],
+    "Pel\xE9 gewann die WM 1958, 1962 und 1970. Im Finale 1958 (5:2 gegen Schweden) war er mit 17 Jahren und 249 Tagen der j\xFCngste Torsch\xFCtze eines WM-Finales."
+  ),
+  rank2("s3-rank-tech", "Technik & Internet", "Technik-Zeitreise \u2013 das fr\xFCheste Ereignis zuerst", "am l\xE4ngsten her", "am j\xFCngsten", [
+    ["Die erste Webseite geht online", "1991"],
+    ["Google wird gegr\xFCndet", "1998"],
+    ["Facebook wird gegr\xFCndet", "2004"],
+    ["YouTube wird gegr\xFCndet", "2005"],
+    ["Das erste iPhone kommt auf den Markt", "2007"]
+  ], [3, 0, 4, 2, 1], "Web (1991), Google (1998), Facebook (2004), YouTube (2005) und iPhone (2007) \u2013 drei der vier j\xFCngeren Meilensteine liegen nur drei Jahre auseinander.", 500, 14),
+  // ---------------------------------------------------------------- Alternativen: WO ZUR HÖLLE?
+  geo2("s3-geo-helgoland", "Geografie", "germany", 30, 250, "Deutschlands einzige Hochseeinsel: Wo liegt Helgoland?", 54.1792, 7.8917, "Helgoland, Nordsee", "Helgoland liegt rund 45 km vor der K\xFCste in der Nordsee \u2013 man erreicht die rote Felsinsel nur per Schiff oder Flugzeug."),
+  geo2("s3-geo-zugspitze", "Geografie", "germany", 30, 200, "Wo ragt Deutschlands h\xF6chster Berg auf, die Zugspitze?", 47.4211, 10.9853, "Zugspitze, Wetterstein", "Die Zugspitze (2.962 m) steht an der Grenze zu \xD6sterreich im Wettersteingebirge s\xFCdwestlich von Garmisch-Partenkirchen."),
+  geo2("s3-geo-montsaintmichel", "Orte mit Geschichte", "europe", 35, 250, "Bei Flut wird dieses Kloster zur Insel: Wo liegt der Mont-Saint-Michel?", 48.6361, -1.5115, "Mont-Saint-Michel, Normandie", "Der Mont-Saint-Michel liegt in der Bucht zwischen Normandie und Bretagne; der Tidenhub ist dort einer der gr\xF6\xDFten Europas (bis etwa 14 m)."),
+  geo2("s3-geo-anfield", "Fu\xDFball-Orte", "europe", 35, 250, "Wo steht das Stadion Anfield, die Heimat des FC Liverpool?", 53.4308, -2.9608, "Anfield, Liverpool", "Anfield liegt in Liverpool in Nordwestengland. Vor Heimspielen singen die Fans \u201EYou\u2019ll Never Walk Alone\u201C."),
+  geo2("s3-geo-maracana", "Fu\xDFball-Orte", "world", 40, 300, "Wo liegt das legend\xE4re Maracan\xE3-Stadion?", -22.9121, -43.2302, "Maracan\xE3, Rio de Janeiro", "Das Maracan\xE3 steht in Rio de Janeiro. Hier endete die WM 1950 mit der \xDCberraschung gegen Brasilien (\u201EMaracana\xE7o\u201C) \u2013 und 2014 wurde hier Deutschland Weltmeister."),
+  geo2("s3-geo-ushuaia", "Geografie", "world", 40, 300, "Sie nennt sich die s\xFCdlichste Stadt der Welt: Wo liegt Ushuaia?", -54.8019, -68.303, "Ushuaia, Feuerland", "Ushuaia liegt auf Feuerland im S\xFCden Argentiniens am Beagle-Kanal \u2013 f\xFCr viele das \u201EEnde der Welt\u201C und Start der Antarktis-Fahrten."),
+  // ---------------------------------------------------------------- Alternativen: BLIND RANK
+  rank2("s3-rank-berge", "Geografie", "Wie hoch ist der Berg? \u2013 der h\xF6chste zuerst", "am h\xF6chsten", "am niedrigsten", [
+    ["Mount Everest", "8.849 m"],
+    ["K2", "8.611 m"],
+    ["Mont Blanc", "4.806 m"],
+    ["Zugspitze", "2.962 m"],
+    ["Brocken", "1.141 m"]
+  ], [3, 0, 4, 1, 2], "Everest (8.849 m), K2 (8.611 m), Mont Blanc (4.806 m), Zugspitze (2.962 m) und Brocken (1.141 m). Zwischen Everest und K2 liegen nur 238 m."),
+  rank2("s3-rank-olympia", "Sport", "Olympische Sommerspiele \u2013 das fr\xFCheste Jahr zuerst", "am l\xE4ngsten her", "am j\xFCngsten", [
+    ["Berlin", "1936"],
+    ["Tokio", "1964"],
+    ["M\xFCnchen", "1972"],
+    ["Los Angeles", "1984"],
+    ["Sydney", "2000"]
+  ], [2, 4, 0, 3, 1], "Berlin (1936), Tokio (1964), M\xFCnchen (1972), Los Angeles (1984) und Sydney (2000)."),
+  // ---------------------------------------------------------------- Alternativen: SETZ AUF MICH
+  est(
+    "s3-est-dombau",
+    "Geschichte",
+    "Wie viele Jahre liegen zwischen der Grundsteinlegung des K\xF6lner Doms (1248) und seiner Fertigstellung (1880)?",
+    "Jahre",
+    632,
+    "632 Jahre \u2013 mit einer Pause von mehreren Jahrhunderten: Der Bau ruhte ab 1473 und wurde erst im 19. Jahrhundert vollendet."
+  ),
+  est(
+    "s3-est-isner",
+    "Sport",
+    "Wie viele Minuten dauerte das l\xE4ngste Tennismatch der Geschichte (Isner gegen Mahut, Wimbledon 2010)?",
+    "Minuten",
+    665,
+    "665 Minuten, also 11 Stunden und 5 Minuten, verteilt auf drei Tage. Der f\xFCnfte Satz endete 70:68."
+  ),
+  est(
+    "s3-est-saarland",
+    "Fu\xDFball & Zahlen",
+    "Wie viele Fu\xDFballfelder (105 \xD7 68 m) passen auf die Fl\xE4che des Saarlands (rund 2.570 km\xB2)?",
+    "Fu\xDFballfelder",
+    36e4,
+    "Ein Feld hat 7.140 m\xB2. Das Saarland hat rund 2.570.000.000 m\xB2 \u2013 das sind etwa 360.000 Fu\xDFballfelder."
+  ),
+  // ---------------------------------------------------------------- Alternativen: GLITCH (vorhandene Szenen)
+  glitch2("s3-glitch-abfahrt", "timetable1", "Merk dir die Abfahrtstafel!", "Was hat sich ge\xE4ndert? Tippe darauf.", "Das Gleis des IC 2012 nach Dresden war vorher die 7, jetzt steht dort die 12."),
+  glitch2("s3-glitch-kassenzettel", "receipt1", "Merk dir den Kassenzettel!", "Welcher Preis wurde ver\xE4ndert? (Die Summe unten stimmt nur mit dem echten Preis.)", "Die Butter kostete vorher 2,19 \u20AC, jetzt steht dort 2,91 \u20AC \u2013 nur mit 2,19 \u20AC ergibt sich die Summe von 13,40 \u20AC."),
+  glitch2("s3-glitch-marktwerte", "market1", "Merk dir die Marktwerte! (alle Daten fiktiv)", "Welcher Wert wurde gef\xE4lscht? Tippe darauf.", "Der Marktwert von A. Kowalczyk wurde von 18,0 auf 28,0 Mio. \u20AC ge\xE4ndert."),
+  glitch2("s3-glitch-tabelle", "table1", "Die Tabelle stimmt \u2013 noch. Pr\xE4ge sie dir ein!", "Eine Punktzahl wurde gef\xE4lscht! Tipp: In jeder Zeile gilt Punkte = 3 \xD7 Siege + Unentschieden.", "Dynamo S\xFCd hat 7 Siege und 3 Unentschieden \u2013 das sind 24 Punkte, nicht 26.", 20),
+  // ---------------------------------------------------------------- Alternativen: MATCHMAKER
+  match2("s3-match-spiele", "Gaming", "Welche Spielfigur geh\xF6rt zu welchem Videospiel?", [
+    ["Master Chief", "Halo"],
+    ["Kratos", "God of War"],
+    ["Geralt von Riva", "The Witcher"],
+    ["Link", "The Legend of Zelda"],
+    ["Samus Aran", "Metroid"],
+    ["Lara Croft", "Tomb Raider"]
+  ], [3, 5, 0, 4, 1, 2], "Master Chief (Halo), Kratos (God of War), Geralt (The Witcher), Link (Zelda), Samus Aran (Metroid) und Lara Croft (Tomb Raider)."),
+  match2("s3-match-baender", "Musik", "Aus welchem Land kommt die Band?", [
+    ["Queen", "England"],
+    ["ABBA", "Schweden"],
+    ["Rammstein", "Deutschland"],
+    ["U2", "Irland"],
+    ["AC/DC", "Australien"],
+    ["Metallica", "USA"]
+  ], [4, 2, 5, 0, 3, 1], "Queen (London, England), ABBA (Stockholm, Schweden), Rammstein (Berlin), U2 (Dublin, Irland), AC/DC (Sydney, Australien) und Metallica (Kalifornien, USA)."),
+  // ---------------------------------------------------------------- Alternativen: DIE VERBINDUNG
+  link2(
+    "s3-link-mozart",
+    "Musik & Geschichte",
+    "Welche Person wird gesucht?",
+    [
+      "Mit sechs Jahren spielte er in Wien vor Kaiserin Maria Theresia.",
+      "Er starb mit nur 35 Jahren \u2013 sein Requiem blieb unvollendet.",
+      "Er komponierte \u201EDie Zauberfl\xF6te\u201C und \u201EEine kleine Nachtmusik\u201C.",
+      "Eine Praline aus Salzburg tr\xE4gt seinen Namen."
+    ],
+    "Mozart",
+    ["Wolfgang Amadeus Mozart", "Wolfgang Mozart", "W. A. Mozart"],
+    "Wolfgang Amadeus Mozart (1756\u20131791) war ein Wunderkind aus Salzburg. Die \u201EMozartkugeln\u201C gibt es seit 1890."
+  ),
+  link2(
+    "s3-link-everest",
+    "Geografie",
+    "Welcher Ort wird gesucht?",
+    [
+      "Auf Nepali hei\xDFt er Sagarmatha, auf Tibetisch Chomolungma.",
+      "Er w\xE4chst jedes Jahr um einige Millimeter, weil sich die Erdplatten aufeinander zuschieben.",
+      "Edmund Hillary und Tenzing Norgay standen 1953 als Erste oben.",
+      "Mit 8.849 Metern ist er der h\xF6chste Berg der Erde."
+    ],
+    "Mount Everest",
+    ["Everest", "Mt. Everest", "Sagarmatha", "Chomolungma"],
+    "Der Mount Everest liegt an der Grenze zwischen Nepal und Tibet. Er ist knapp 8,85 km hoch und w\xE4chst langsam weiter."
+  ),
+  link2(
+    "s3-link-oktoberfest",
+    "Feste & Traditionen",
+    "Welches Ereignis wird gesucht?",
+    [
+      "Es begann 1810 mit einer k\xF6niglichen Hochzeit und einem Pferderennen.",
+      "Der B\xFCrgermeister er\xF6ffnet es mit dem Ruf \u201EO\u2019zapft is!\u201C.",
+      "Es findet auf der Theresienwiese statt.",
+      "Man trinkt Bier in Ma\xDFkr\xFCgen \u2013 in M\xFCnchen."
+    ],
+    "Oktoberfest",
+    ["Wiesn", "M\xFCnchner Oktoberfest"],
+    "Das Oktoberfest feierte 1810 die Hochzeit von Kronprinz Ludwig und Therese \u2013 die Wiese hei\xDFt deshalb Theresienwiese."
+  ),
+  // ---------------------------------------------------------------- Alternativen: EINZIGARTIG
+  unique2("s3-unique-spanisch", "Sprachen & L\xE4nder", "Ein spanischsprachiges Land \u2026", "Nenne ein Land, in dem Spanisch Amtssprache ist.", [
+    ["Spanien", ["Spain"]],
+    ["Mexiko", ["Mexico"]],
+    ["Argentinien", ["Argentina"]],
+    ["Kolumbien", ["Colombia"]],
+    ["Peru", []],
+    ["Venezuela", []],
+    ["Chile", []],
+    ["Ecuador", []],
+    ["Guatemala", []],
+    ["Kuba", ["Cuba"]],
+    ["Bolivien", ["Bolivia"]],
+    ["Dominikanische Republik", ["Dom Rep"]],
+    ["Honduras", []],
+    ["Paraguay", []],
+    ["El Salvador", []],
+    ["Nicaragua", []],
+    ["Costa Rica", []],
+    ["Panama", []],
+    ["Uruguay", []],
+    ["\xC4quatorialguinea", ["Aequatorialguinea", "Equatorial Guinea"]]
+  ], "Spanisch ist Amtssprache in 20 Staaten \u2013 von Spanien \xFCber Mexiko und Argentinien bis nach \xC4quatorialguinea in Afrika."),
+  unique2("s3-unique-fluesse", "Geografie", "Ein deutscher Fluss \u2026", "Nenne einen Fluss, der durch Deutschland flie\xDFt.", [
+    ["Rhein", []],
+    ["Elbe", []],
+    ["Donau", []],
+    ["Main", []],
+    ["Weser", []],
+    ["Oder", []],
+    ["Neckar", []],
+    ["Mosel", []],
+    ["Spree", []],
+    ["Isar", []],
+    ["Ruhr", []],
+    ["Saale", []],
+    ["Ems", []],
+    ["Lahn", []],
+    ["Inn", []],
+    ["Lech", []],
+    ["Havel", []],
+    ["Fulda", []],
+    ["Werra", []],
+    ["Iller", []],
+    ["Saar", []],
+    ["Nei\xDFe", ["Neisse"]],
+    ["Aller", []],
+    ["Leine", []],
+    ["Lippe", []],
+    ["Nahe", []],
+    ["Regnitz", []],
+    ["Eider", []],
+    ["Trave", []],
+    ["Warnow", []],
+    ["Peene", []],
+    ["Mulde", []],
+    ["Wei\xDFe Elster", ["Weisse Elster"]],
+    ["Tauber", []],
+    ["Kinzig", []],
+    ["Altm\xFChl", ["Altmuehl"]],
+    ["Naab", []]
+  ], "Es gibt Hunderte Fl\xFCsse in Deutschland. Die \u201Egro\xDFen\u201C Rhein, Elbe, Donau und Main nennen fast alle \u2013 wer einen kleineren wie Nahe, Tauber oder Peene wei\xDF, ist einzigartig.")
+];
+var RB = {
+  geo: "Setze deinen Pin auf der Karte \u2013 du kannst zoomen und ihn verschieben. Gewertet wird die Platzierung nach Entfernung.",
+  match: "Links sechs Begriffe, rechts die gemischten Partner. Verbinde sie auf dem Handy: 50 Punkte je richtigem Paar, \xC4ndern geht bis zur Abgabe.",
+  rank: "F\xFCnf Begriffe erscheinen nacheinander. Setze jeden SOFORT auf einen freien Rangplatz \u2013 endg\xFCltig!",
+  glitch: "Schau genau hin: Du siehst ein Bild, dann ver\xE4ndert sich etwas. Tippe auf dem Handy auf die ver\xE4nderte Stelle.",
+  est: "Erst sch\xE4tzt jeder geheim. Dann sehen alle die Tipps \u2013 und du setzt Punkte auf die Sch\xE4tzung, der du am meisten vertraust.",
+  link: "Vier Hinweise erscheinen nacheinander. Je fr\xFCher du die gemeinsame L\xF6sung nennst, desto mehr Punkte (300 / 225 / 150 / 75). Nur ein Versuch!"
+};
+var SHOW_ROUNDS = [
+  {
+    id: "s3-r1",
+    title: "Wo zur H\xF6lle?",
+    topic: "Orte, Stadien & \xDCberraschungen",
+    icon: "\u{1F9ED}",
+    color: TE2,
+    kind: "tile",
+    football: true,
+    blurb: RB.geo,
+    taskIds: ["v2-heimspiel-1", "v2-heimspiel-2", "v2-orte-mit-geschichte-2", "v2-orte-mit-geschichte-4"]
+  },
+  {
+    id: "s3-r2",
+    title: "Passt zusammen",
+    topic: "Fu\xDFball, Firmen, Erfinder & Filme",
+    icon: "\u{1F9F2}",
+    color: PU2,
+    kind: "tile",
+    football: false,
+    blurb: RB.match,
+    taskIds: ["v2-passt-zusammen-3", "s3-match-spitznamen", "v2-passt-zusammen-2", "v2-passt-zusammen-1"]
+  },
+  {
+    id: "s3-r3",
+    title: "Wer war zuerst?",
+    topic: "Reihenfolgen mit Aha-Effekt",
+    icon: "\u23F3",
+    color: PK2,
+    kind: "tile",
+    football: true,
+    blurb: RB.rank,
+    taskIds: ["v2-wer-war-zuerst-1", "v2-fussball-zeitreise-1", "v2-wer-war-zuerst-3", "v2-fussball-zeitreise-3"]
+  },
+  {
+    id: "s3-sur",
+    title: "EINZIGARTIG",
+    topic: "\xDCberraschungsrunde",
+    icon: "\u2728",
+    color: PK2,
+    kind: "surprise",
+    football: false,
+    blurb: "Nenne eine g\xFCltige Antwort \u2013 aber blo\xDF keine, die auch ein anderer nennt! Einzigartige Antworten bringen die meisten Punkte, doppelte nur wenige.",
+    taskIds: ["v2-einzigartig-1", "v2-einzigartig-2", "s3-unique-orchester"]
+  },
+  {
+    id: "s3-r4",
+    title: "Alles im Blick",
+    topic: "Alltag & Beobachtung",
+    icon: "\u{1F441}\uFE0F",
+    color: CY2,
+    kind: "tile",
+    football: false,
+    blurb: RB.glitch,
+    taskIds: ["v2-alles-im-blick-1", "v2-alles-im-blick-2", "v2-alles-im-blick-3", "v2-alles-im-blick-4"]
+  },
+  {
+    id: "s3-r5",
+    title: "Sch\xE4tz mal!",
+    topic: "Zahlen, Tore & T\xF6ne",
+    icon: "\u{1F3AF}",
+    color: GO2,
+    kind: "tile",
+    football: false,
+    blurb: RB.est,
+    taskIds: ["v2-wahnsinnszahlen-1", "v2-sport-und-pop-2", "v2-sport-und-pop-1", "v2-wahnsinnszahlen-2"]
+  },
+  {
+    id: "s3-r6",
+    title: "Wer oder was?",
+    topic: "Die gemeinsame L\xF6sung",
+    icon: "\u{1F517}",
+    color: BL2,
+    kind: "tile",
+    football: false,
+    blurb: RB.link,
+    taskIds: ["v2-wer-oder-was-2", "v2-wer-oder-was-1", "s3-link-pele", "v2-wer-oder-was-3"]
+  },
+  {
+    id: "s3-final",
+    title: "FINAL LOCK",
+    topic: "Das gro\xDFe Finale",
+    icon: "\u{1F512}",
+    color: GR2,
+    kind: "final",
+    football: false,
+    blurb: "Vier Aufgaben, 2.000 Punkte, die Rangliste bleibt verborgen. Erst bei der Siegerehrung zeigt sich, wer wirklich vorne liegt.",
+    taskIds: ["v2-final-1", "v2-final-2", "s3-rank-tech", "v2-final-4"]
+  }
+];
+var SHOW_STEPS = [
+  { k: "round", cat: "s3-r1" },
+  { k: "round", cat: "s3-r2" },
+  { k: "round", cat: "s3-r3" },
+  { k: "board" },
+  { k: "surprise", cat: "s3-sur" },
+  { k: "round", cat: "s3-r4" },
+  { k: "round", cat: "s3-r5" },
+  { k: "round", cat: "s3-r6" },
+  { k: "board" },
+  { k: "final", cat: "s3-final" }
+];
+
+// content/index.ts
+var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
+
 // server/vercel.ts
 var ConflictError = class extends Error {
 };
@@ -37577,7 +38129,7 @@ var OnlineAdmin = class {
       }
     }
     const store = new Store(file, { wal: false });
-    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK }, this.now);
+    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW }, this.now);
     const auth = new AdminAuth(store, this.opts.adminPassword, this.now, { passwordRequiredFromEnv: true });
     this.live = { store, content, auth, etag, checkedAt: this.now(), file };
     if (content.wasSeeded) {

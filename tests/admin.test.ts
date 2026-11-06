@@ -6,6 +6,7 @@ import { buildScene, validateTemplate } from '../shared/sceneTemplates';
 import { diffZones } from '../shared/scenes';
 import { analyzeBook } from '../shared/analysis';
 import { TILES } from '../content/tiles';
+import { SEED_SHOW } from '../content';
 import { SCENES } from '../shared/scenes';
 
 const envs: TestEnv[] = [];
@@ -51,13 +52,13 @@ test('Sicherheit: Login, HttpOnly-Cookie, CSRF-Header, Logout, Rate-Limit', asyn
 
 test('Initiale Vorlagen: alle bisherigen Inhalte sind im Admin sichtbar (Fragen, Kategorien, Standardpaket v1)', async () => {
   const e = await mk(); const a = new Admin(e); await a.login();
-  const total = TILES.reduce((n, t) => n + t.tasks.length, 0);
+  const total = TILES.reduce((n, t) => n + t.tasks.length, 0) + SEED_SHOW.pool.length;
   const qs = (await a.get('/questions')).data; assert.equal(qs.length, total);
   assert.ok(qs.every((q: any) => q.problems.length === 0), 'alle Vorlagen-Fragen sind gültig');
-  const cats = (await a.get('/categories')).data; assert.equal(cats.length, TILES.length);
+  const cats = (await a.get('/categories')).data; assert.equal(cats.length, TILES.length + SEED_SHOW.rounds.length);
   assert.ok(cats.every((c: any) => c.problems.length === 0), JSON.stringify(cats.filter((c: any) => c.problems.length)));
-  const packs = (await a.get('/packs')).data; assert.equal(packs[0].id, 'standard-2'); assert.equal(packs[0].currentVersion, 1); assert.equal(packs[0].status, 'published');
-  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[])[0].ref, 'standard-2@1');
+  const packs = (await a.get('/packs')).data; const std = packs.find((p: any) => p.id === 'standard-2'); assert.ok(std); assert.equal(std.currentVersion, 1); assert.equal(std.status, 'published'); assert.ok(packs.some((p: any) => p.id === 'show-1' && p.status === 'published'));
+  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[]).map((p: any) => p.ref).sort().join(), 'show-1@1,standard-2@1');
   // Filter & Suche
   assert.ok((await a.get('/questions?mode=geo')).data.every((q: any) => q.mode === 'geo'));
   assert.ok((await a.get('/questions?q=timbuktu')).data.length === 1);
@@ -86,12 +87,12 @@ test('Fragen: erstellen, bearbeiten, duplizieren, filtern, löschen (und Löschs
 
 test('Kategorien: anlegen, bearbeiten, duplizieren, deaktivieren, löschen; Budget-/Modus-Prüfung', async () => {
   const e = await mk(); const a = new Admin(e); await a.login();
-  const q1 = (await a.post('/questions', q2({ points: 600 }))).data.id, q3 = (await a.post('/questions', q2({ points: 600 }))).data.id;
+  const q1 = (await a.post('/questions', q2({ points: 1100 }))).data.id, q3 = (await a.post('/questions', q2({ points: 1100 }))).data.id;
   const est = (await a.post('/questions', { task: { mode: 'estimate', prompt: 'Wie viele?', unit: 'x', answer: 5, seconds: 30, betSeconds: 20, points: 100, bets: [0, 100], explain: 'e' } })).data.id;
   const c = (await a.post('/categories', cat({ taskIds: [q1, q3] }))).data;
-  assert.equal(c.mode, 'geo'); assert.equal(c.points, 1200);
-  assert.ok(c.problems.some((p: string) => p.includes('Budget')), 'mehr als 1000 Punkte wird gemeldet');
-  const fixed = (await a.put('/categories/' + c.id, { ...c, taskIds: [q1] })).data; assert.equal(fixed.points, 600); assert.deepEqual(fixed.problems, []);
+  assert.equal(c.mode, 'geo'); assert.equal(c.points, 2200);
+  assert.ok(c.problems.some((p: string) => p.includes('Budget')), 'mehr als das Kategorienbudget wird gemeldet');
+  const fixed = (await a.put('/categories/' + c.id, { ...c, taskIds: [q1] })).data; assert.equal(fixed.points, 1100); assert.deepEqual(fixed.problems, []);
   const mixed = (await a.put('/categories/' + c.id, { ...c, taskIds: [q1, est] })).data; assert.ok(mixed.problems.some((p: string) => p.includes('Spielmodus')));
   const d = (await a.post(`/categories/${c.id}/duplicate`, { copyQuestions: true })).data; assert.equal(d.disabled, true); assert.notEqual(d.id, c.id);
   assert.notDeepEqual(d.taskIds, c.taskIds);

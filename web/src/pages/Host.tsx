@@ -17,14 +17,17 @@ export function Host({ code }: { code?: string }) {
 function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSession) => void }) {
   const [pw, setPw] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [rc, setRc] = useState(code ?? ''); const [pin, setPin] = useState('');
-  const [packs, setPacks] = useState<{ id: string; name: string; version: number; description: string }[]>([]);
+  const [packs, setPacks] = useState<{ id: string; name: string; version: number; description: string; show?: boolean; classic?: boolean }[]>([]);
   const [pack, setPack] = useState('');
-  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { setPacks(r.data as any); setPack((r.data as any)[0]?.id ?? ''); } }); }, []);
+  const [flow, setFlow] = useState<'show' | 'classic'>('show');
+  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { const l = r.data as any[]; setPacks(l); const f = l.some(p => p.show) ? 'show' : 'classic'; setFlow(f); setPack((l.find(p => p[f]) ?? l[0])?.id ?? ''); } }); }, []);
+  const usable = packs.filter(p => (p as any)[flow] !== false);
+  const pickFlow = (f: 'show' | 'classic') => { setFlow(f); const l = packs.filter(p => (p as any)[f] !== false); if (!l.some(p => p.id === pack)) setPack(l[0]?.id ?? ''); };
   const create = async () => {
     setBusy(true); setErr('');
-    const r = await api('/api/rooms', { password: pw, pack });
+    const r = await api('/api/rooms', { password: pw, pack, flow });
     setBusy(false);
-    if (!r.ok) { setErr(r.status === 403 ? 'Falsches Passwort.' : r.status === 501 ? ((r.data as any).message ?? 'Die Gameshow läuft nur lokal auf dem Laptop.') : 'Server nicht erreichbar.'); return; }
+    if (!r.ok) { setErr(r.status === 400 && (r.data as any).message ? (r.data as any).message : r.status === 403 ? 'Falsches Passwort.' : r.status === 501 ? ((r.data as any).message ?? 'Die Gameshow läuft nur lokal auf dem Laptop.') : 'Server nicht erreichbar.'); return; }
     onSession({ code: (r.data as any).code, key: (r.data as any).hostKey, pin: (r.data as any).hostPin });
   };
   const login = async () => {
@@ -40,11 +43,16 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
       <h2>Showmaster</h2>
       <div className="card">
         <h3>Neue Show erstellen</h3>
+        <div className="seg" role="tablist">
+          <button type="button" className={flow === 'show' ? 'on' : ''} onClick={() => pickFlow('show')}>🎬 Showmodus – fester Ablauf</button>
+          <button type="button" className={flow === 'classic' ? 'on' : ''} onClick={() => pickFlow('classic')}>🧱 Klassisch – Kategorienwand</button>
+        </div>
+        <p className="muted small">{flow === 'show' ? 'Alle Runden in bewusst festgelegter Reihenfolge, jeder Spielmodus kommt vor. Empfohlen.' : 'Die Spieler wählen abwechselnd sechs von neun Kategorien (Fallback).'}</p>
         <label className="field"><span>Spielepaket</span>
-          <select value={pack} onChange={e => setPack(e.target.value)}>{packs.map(p => <option key={p.id} value={p.id}>{p.name} (v{p.version})</option>)}</select></label>
+          <select value={pack} onChange={e => setPack(e.target.value)}>{usable.map(p => <option key={p.id} value={p.id}>{p.name} (v{p.version})</option>)}{!usable.length && <option value="">kein passendes Paket veröffentlicht</option>}</select></label>
         {packs.find(p => p.id === pack)?.description && <p className="muted small">{packs.find(p => p.id === pack)!.description}</p>}
         <label className="field"><span>Passwort (nur falls der Server eines verlangt)</span><input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="optional" /></label>
-        <button className="btn primary wide" disabled={busy} onClick={create}>🎬 Spielraum erstellen</button>
+        <button className="btn primary wide" disabled={busy || !pack} onClick={create}>🎬 Spielraum erstellen</button>
       </div>
       <div className="card">
         <h3>Bestehende Show übernehmen</h3>
@@ -94,6 +102,7 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
           <Main view={view} run={run} busy={busy} serverNow={serverNow} tvUrl={tvUrl} joinUrl={joinUrl} code={sess.code} />
         </div>
         <aside className="hostside">
+          {view.room.agenda && <Agenda view={view} />}
           <Players view={view} run={run} />
           <div className="card">
             <h3>Zugang</h3>
@@ -109,7 +118,7 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
   );
 }
 
-type Run = (a: Action) => void;
+type Run = (a: Action) => void | Promise<void>;
 
 function Main({ view, run, busy, serverNow, tvUrl, joinUrl, code }: { view: View; run: Run; busy: boolean; serverNow: () => number; tvUrl: string; joinUrl: string; code: string }) {
   const ph = view.room.phase;
@@ -128,7 +137,7 @@ function Main({ view, run, busy, serverNow, tvUrl, joinUrl, code }: { view: View
       <button className="btn primary huge" disabled={busy || view.players.length < 1} onClick={() => run({ k: 'h.startShow' })}>🎬 Lobby schließen &amp; Show starten</button>
     </div>
   );
-  if (ph === 'intro') return <div className="card"><h2>Eröffnung läuft</h2><p>Die Kandidaten werden auf dem TV vorgestellt.</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.introDone' })}>▶ Weiter zur Kategorienwand</button></div>;
+  if (ph === 'intro') return <div className="card"><h2>Eröffnung läuft</h2><p>Die Kandidaten werden auf dem TV vorgestellt.</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.introDone' })}>{view.room.flow === 'show' ? '▶ Weiter zur ersten Runde' : '▶ Weiter zur Kategorienwand'}</button></div>;
   if (ph === 'wall') return <WallHost view={view} run={run} busy={busy} />;
   if (ph === 'scoreboard') return <div className="card"><h2>Zwischenstand wird gezeigt</h2><p>{view.scoreboard?.reason}</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.continue' })}>▶ Weiter ({view.host?.planNext})</button></div>;
   if (ph === 'ceremony') return (
@@ -139,6 +148,17 @@ function Main({ view, run, busy, serverNow, tvUrl, joinUrl, code }: { view: View
   if (ph === 'ended') return <div className="card center"><h2>🏁 Show beendet</h2><p className="muted">Danke fürs Moderieren! Räume bleiben 14 Tage gespeichert.</p></div>;
   if (ph === 'round' && view.round) return <RoundHost view={view} round={view.round} run={run} busy={busy} serverNow={serverNow} />;
   return null;
+}
+
+function Agenda({ view }: { view: View }) {
+  const ag = view.room.agenda!;
+  return (
+    <details className="card" open>
+      <summary><b>Showablauf</b> <small className="muted">{view.room.act}</small></summary>
+      <div className="agendahost">{ag.map((a, i) => (
+        <div key={i} className={`ah ${a.state}`}>{a.state === 'done' ? '✓' : a.state === 'now' ? '▶' : '○'} <span>{a.icon ?? '📊'} {a.k === 'board' ? 'Zwischenstand' : a.title}</span>{a.tasks ? <small>{a.tasks} Aufg.</small> : null}</div>))}</div>
+    </details>
+  );
 }
 
 function WallHost({ view, run, busy }: { view: View; run: Run; busy: boolean }) {
@@ -197,14 +217,18 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
           </div>
         </>
       )}
-      {st === 'reveal' && <button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.next' })}>{lastTask ? '▶ Kachel abschließen' : `▶ Weiter zu Aufgabe ${round.taskIndex + 2}`}</button>}
+      {st === 'reveal' && (
+        <div className="row wrap">
+          <button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.next' })}>{lastTask ? (view.room.flow === 'show' ? '▶ Runde abschließen' : '▶ Kachel abschließen') : `▶ Weiter zu Aufgabe ${round.taskIndex + 2}`}</button>
+          {!lastTask && <button className="btn ghost" disabled={busy} title="Gibt die nächste Aufgabe sofort frei (zwei Aktionen in einem Klick)" onClick={async () => { await run({ k: 'h.next' }); await run({ k: 'h.begin' }); }}>⏩ Weiter &amp; Aufgabe {round.taskIndex + 2} sofort starten</button>}
+        </div>)}
 
       <details className="danger"><summary>Korrektur &amp; Notfall</summary>
         <div className="row wrap">
           <button className="btn warn" disabled={busy} onClick={() => confirm('Aufgabe für ALLE neu starten? Bisherige Antworten und Punkte dieser Aufgabe werden verworfen.') && run({ k: 'h.restartTask' })}>↺ Aufgabe für alle neu starten</button>
           <button className="btn warn" disabled={busy} onClick={() => confirm('Aufgabe überspringen (ohne Punkte)?') && run({ k: 'h.skipTask' })}>⏭ Aufgabe überspringen</button>
           <button className="btn warn" disabled={busy} onClick={() => confirm('Ganze Kachel überspringen?') && run({ k: 'h.skipTile' })}>⏭⏭ Kachel überspringen</button>
-          {round.kind === 'tile' && <button className="btn warn" disabled={busy} onClick={() => confirm('Zurück zur Wand? Kachel wird wieder freigegeben, ihre Punkte werden verworfen.') && run({ k: 'h.backToWall' })}>↩ Zurück zur Wand</button>}
+          {round.kind === 'tile' && view.room.flow !== 'show' && <button className="btn warn" disabled={busy} onClick={() => confirm('Zurück zur Wand? Kachel wird wieder freigegeben, ihre Punkte werden verworfen.') && run({ k: 'h.backToWall' })}>↩ Zurück zur Wand</button>}
         </div>
       </details>
     </div>
