@@ -11,6 +11,8 @@ import { scoreGlitch, groupUnique, scoreRankExact } from '../shared/scoring';
 import { analyzeShow } from '../shared/analysis';
 import { TILES, SEED_PACK, SEED_SHOW, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, EXTRA_SHOWS } from '../content';
 import { BESTOF_PLAN, BESTOF_NEW, BESTOF_KK } from '../content/bestof';
+import { BESTOF2_NEW, BESTOF2_PLAN } from '../content/bestof2';
+import { shuffledPool } from '../server/modes';
 import { AV, startEnv } from './helpers';
 import type { Action, Book, TaskDef, View } from '../shared/types';
 
@@ -191,7 +193,7 @@ test('Installation auf bestehender DB: alte Inhalte/Pakete/Versionen byte-identi
   assert.equal(JSON.stringify(after.v.filter((x: any) => before.v.some((y: any) => y[0] === x[0]))), hashOld, 'bestehende Paketversionen unverändert');
   for (const [id, task] of before.q) assert.deepEqual(after.q.find((x: any) => x[0] === id)[1], task, 'Frage ' + id);
   for (const [id, ids, title] of before.c) assert.deepEqual(after.c.find((x: any) => x[0] === id).slice(1), [ids, title], 'Kategorie ' + id);
-  assert.deepEqual(after.v.map((x: any) => x[0]).sort(), ['show-1@1', 'show-2@1', 'show-2k@1', 'show-3@1', 'show-3z@1', 'show-4@1', 'standard-2@1']);
+  assert.deepEqual(after.v.map((x: any) => x[0]).sort(), ['show-1@1', 'show-2@1', 'show-2k@1', 'show-3@1', 'show-3z@1', 'show-4@1', 'show-4z@1', 'show-5@1', 'standard-2@1']);
   const rep2 = cur.installSeed({ archiveOlder: true }); assert.deepEqual(rep2.created, { scenes: 0, questions: 0, categories: 0, packs: 0 }, 'Wiederholung legt nichts doppelt an');
   assert.equal(cur.seedStatus().installed, true);
 });
@@ -240,4 +242,59 @@ test('C09 / T03 / T05 / C19: redaktionelle Fassung (Transfermarkt-Maßstab, Haal
   assert.match(t('b42-match-t03').pairs[0].left, /Salzburg → Dortmund/); assert.equal(t('b42-match-t03').pairs[0].right, 'Molde FK');
   assert.deepEqual(t('b42-rank-t05').items.map((i: any) => i.value), ['16 Jahre, 1 Tag', '16 Jahre, 3 Tage', '16 Jahre, 15 Tage', '16 Jahre, 214 Tage', '16 Jahre, 263 Tage']);
   assert.match(t('b42-est-c19').prompt, /vorläufigen Wiesn-Bilanz 2025/); assert.equal(t('b42-est-c19').answer, 6.5);
+});
+
+
+// ---------------------------------------------------------------- Praxistest 3: Best of 42, Version 2 (show-5 / show-4z)
+const V2: Book = CS.resolveBook('show-5@1'), V2K: Book = CS.resolveBook('show-4z@1');
+
+test('Best of 42 v2 (show-5): 42 + 7, 21/21, genau die vier Änderungen; show-4 bleibt unverändert', () => {
+  assert.equal(regular(V2).length, 42); assert.equal(V2.tiles.reduce((n, t) => n + t.tasks.filter(x => x.practice).length, 0), 7);
+  const flat = MODES.flatMap(m => BESTOF2_PLAN[m]); assert.equal(flat.length, 42); assert.equal(flat.filter(x => x.fb).length, 21); assert.equal(new Set(flat.map(x => x.id)).size, 42);
+  for (const m of MODES) assert.equal(BESTOF2_PLAN[m].filter(x => x.fb).length, 3, m + ' bleibt 3 Fußball / 3 andere');
+  const oldIds = MODES.flatMap(m => BESTOF_PLAN[m].map(x => x.id)); const changed = flat.map((x, i) => [oldIds[i], x.id]).filter(([a, b]) => a !== b);
+  assert.deepEqual(changed, [['v2-heimspiel-2', 'b43-geo-2028'], ['b42-geo-c04', 'b43-geo-c04'], ['b42-match-c08', 's3-match-spiele'], ['b42-rank-t05', 'b43-rank-t05']]);
+  const r = (b: Book, id: string) => b.tiles.find(t => t.id === id)!;
+  assert.match((r(B42, 'b42-r1').tasks[1] as any).prompt, /Champions-League-Finale 2025/, 'show-4 unverändert (alte Version bleibt als Fallback)');
+  assert.equal((r(B42, 'b42-r1').tasks[4] as any).map, 'europe');
+  assert.equal(r(V2, 'b43-r3').title, 'SORTIER’S!'); assert.equal(V2.rules!.rankVariant, 'sort'); assert.deepEqual(V2.show!.filter(x => x.k !== 'board').map((x: any) => x.cat), ['b43-r1', 'b43-r2', 'b43-r3', 'b42-sur', 'b42-r4', 'b42-r5', 'b42-r6', 's3-final']);
+  assert.equal(V2K.show!.at(-1)!.k, 'final'); assert.equal((V2K.show!.at(-1) as any).cat, 'b42-final-kk');
+});
+
+test('Neue Geo-Frage 2028: Wortlaut, Lösung Allianz Arena, Koordinaten = Geo-Probe, UEFA-Rückbezug im Reveal; Käserennen auf Weltkarte mit unverändertem Ziel', () => {
+  const geo = V2.tiles.find(t => t.id === 'b43-r1')!.tasks as any[];
+  assert.equal(geo[0].practice, true); assert.match(geo[0].prompt, /Allianz Arena/);
+  assert.equal(geo[1].prompt, 'In welchem Stadion wird das Champions-League-Finale 2028 stattfinden?'); assert.equal(geo[1].answer.label, 'Allianz Arena, München');
+  assert.equal(geo[1].answer.lat, geo[0].answer.lat); assert.equal(geo[1].answer.lon, geo[0].answer.lon, 'Koordinaten der Allianz Arena unverändert');
+  assert.match(geo[1].explain, /2012 und 2025/); assert.match(geo[1].explain, /2028/); assert.ok(!geo.slice(1).some(t => /2025 zwischen/.test(t.prompt)));
+  const cheese = geo.find(t => /Käselaib/.test(t.prompt)); assert.equal(cheese.map, 'world'); assert.equal(cheese.answer.lat, 51.8299); assert.equal(cheese.answer.lon, -2.1581);
+  assert.equal((BESTOF_NEW.find(q => q.id === 'b42-geo-c04')!.task as any).map, 'europe', 'alte Frage unverändert');
+  // Wertung: Europa-Kurve auf der neuen Frage
+  assert.equal(geoPointsOf(geo[1], 9), 245); assert.ok(Math.abs(geoPointsOf(geo[1], 113) - 137) <= 3);
+});
+import { geoPoints } from '../shared/scoring';
+const geoPointsOf = (t: any, km: number) => geoPoints(km, t.points, t.map);
+
+test('MATCHMAKER v2: s3-match-spiele statt Produktursprünge – sechs eindeutige Paare, weiter 6 Wertungsfragen (3 Fußball / 3 andere)', () => {
+  const m = V2.tiles.find(t => t.id === 'b43-r2')!.tasks.filter(t => !t.practice) as any[]; assert.equal(m.length, 6);
+  const sp = m.find(t => /Spielfigur/.test(t.prompt)); assert.ok(sp); assert.equal(sp.pairs.length, 6); assert.equal(new Set(sp.pairs.map((p: any) => p.left)).size, 6); assert.equal(new Set(sp.pairs.map((p: any) => p.right)).size, 6);
+  assert.ok(!m.some(t => /ursprünglich entwickelt/.test(t.prompt)), 'Produktursprünge nicht mehr enthalten');
+  assert.ok(sp.order.some((v: number, i: number) => v !== i), 'rechte Spalte gemischt');
+});
+
+test('SORTIER’S! mit Moukoko: fünf eindeutige Positionen nach Bundesliga.com, Reveal nennt Iličević; Anfangskarten nie in richtiger Reihenfolge (alle Rank-Aufgaben aller Pakete)', () => {
+  const t = BESTOF2_NEW.find(q => q.id === 'b43-rank-t05')!.task as any;
+  assert.deepEqual(t.items.map((i: any) => i.text), ['Youssoufa Moukoko', 'Linus Güther', 'Paul Wanner', 'Louis Lemke', 'Tom Bischof']);
+  assert.deepEqual(t.items.map((i: any) => i.value), ['16 Jahre, 1 Tag', '16 Jahre, 3 Tage', '16 Jahre, 15 Tage', '16 Jahre, 214 Tage', '16 Jahre, 264 Tage']);
+  assert.match(t.explain, /Iličević/); assert.match(t.explain, /2026/);
+  const days = t.items.map((i: any) => { const m = /(\d+) Jahre?, (\d+) Tage?/.exec(i.value)!; return Number(m[1]) * 365 + Number(m[2]); }); assert.deepEqual(days, [...days].sort((a, b) => a - b)); assert.equal(new Set(days).size, 5, 'eindeutige Reihenfolge');
+  assert.equal(new Set(t.items.map((i: any) => i.text)).size, 5);
+  for (const b of [B42, V2, CS.resolveBook('show-3@1')]) for (const tile of b.tiles) for (const k of tile.tasks) if (k.mode === 'rank') { const sh = shuffledPool(k as any); assert.ok(sh.some((v, i) => v !== i), 'Karten gemischt: ' + (k as any).prompt.slice(0, 30)); assert.deepEqual([...sh].sort(), [0, 1, 2, 3, 4]); }
+  assert.deepEqual(shuffledPool({ items: [1, 2, 3, 4, 5].map(i => ({ text: String(i) })), order: [0, 1, 2, 3, 4] } as any), [1, 2, 3, 4, 0], 'Identität wird verschoben');
+});
+
+test('Best of 42 v2: komplett durchspielbar (Probe + 6), auch KONSENS-Variante; 4/5/6 je Modus als neue Version', () => {
+  const g = playAll(V2, 'show-5@1'); assert.equal(g.room.phase, 'ceremony'); assert.equal(g.log.scored, 46); assert.equal(g.log.practice, 7); assert.equal(g.log.boards, 3); assert.equal(g.log.leaks, 0);
+  const k = playAll(V2K, 'show-4z@1'); assert.equal(k.room.phase, 'ceremony'); assert.equal(k.log.scored, 45);
+  const c = fresh(); for (const n of [4, 5, 6]) { const p = c.getPack('show-5'); c.updatePack('show-5', { ...p, rules: { ...p.rules, tasksPerMode: n } }); const pub = c.publish('show-5', `${n}`); const b = c.resolveBook(pub.ref); assert.equal(regular(b).length, 7 * n); }
 });

@@ -7,8 +7,10 @@ import { SceneView } from '../ui/SceneView';
 import { initAudio, play, setMusic, setSoundEnabled } from '../ui/audio';
 import type { PlayerPublic, RoundView, View } from '../../../shared/types';
 
+/** Sichtbarer Modusname: SORTIER’S! (Karten sortieren); nur die klassische Nacheinander-Variante heißt weiter BLIND RANK. */
+export const modeName = (r: { mode: string; data?: any }) => (r.mode === 'rank' && r.data?.variant === 'sequence' ? 'BLIND RANK' : MODE_NAME[r.mode]);
 export const MODE_NAME: Record<string, string> = {
-  geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS',
+  geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S!', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS',
 };
 const MODE_RULES: Record<string, string[]> = {
   geo: ['Setze auf deinem Handy einen Pin auf die Karte.', 'Du kannst ihn bis zum Absenden verschieben.', 'Je näher dein Pin, desto mehr Punkte – egal, wie die anderen tippen.'],
@@ -171,7 +173,7 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
       {showLive && <LiveRank view={view} />}
       <Header view={view} right={timer ? <Countdown round={round} serverNow={serverNow} size={140} onTick={s => { if (s > 0 && s <= 5 && round.pausedLeft === null) play('tick'); }} /> : undefined} />
       {round.stage !== 'intro' && (
-        <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.kind === 'final' && round.mode !== 'vote' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</b><small>{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</small></div></div>
+        <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.kind === 'final' && round.mode !== 'vote' ? 'FINAL LOCK' : modeName(round)}</b><small>{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</small></div></div>
       )}
       {round.stage === 'reveal' && round.mode !== 'match' && <MissingNote view={view} rev={round.reveal} />}
       {round.practice && round.stage === 'reveal' && <div className="probebanner">🎓 Proberunde – so wäre es gewertet worden. Es werden <b>keine Punkte</b> vergeben.</div>}
@@ -194,16 +196,16 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
 /** Kleine Zusatzzeile: Aufgabe X von Y und Maximalpunkte – bei Proberunden der Hinweis „keine Punkte“. */
 function taskLine(round: RoundView, cat?: string): string {
   const parts: string[] = [];
-  if (cat && cat !== MODE_NAME[round.mode]) parts.push(cat);
+  if (cat && cat !== modeName(round)) parts.push(cat);
   if (round.practice) parts.push('Proberunde', 'keine Punkte');
   else { if (round.scoredCount > 1) parts.push(`Aufgabe ${round.scoredIndex} von ${round.scoredCount}`); parts.push(`bis zu ${round.points} Punkte`); }
   return parts.join(' · ');
 }
 
-/** Regeltexte je Modus – variantenabhängig (BLIND RANK: nacheinander/sortieren; SETZ AUF MICH: Einsätze und Bonus aus dem Paket). */
+/** Regeltexte je Modus – variantenabhängig (SORTIER’S!/BLIND RANK; SETZ AUF MICH: Einsätze und Bonus aus dem Paket). */
 function rulesFor(round: RoundView): string[] {
   const d = round.data ?? {};
-  if (round.mode === 'rank' && d.variant === 'sort') return ['Alle fünf Begriffe sind sichtbar.', 'Bringe sie auf deinem Handy in die richtige Reihenfolge.', `Je Begriff auf der exakt richtigen Position: ${d.points ? Math.round(d.points / 5) : 50} Punkte.`];
+  if (round.mode === 'rank' && d.variant === 'sort') return ['Fünf gemischte Karten liegen auf deinem Handy.', 'Ziehe sie auf die Plätze 1 bis 5 – oder erst Karte, dann Platz antippen.', `Je Karte auf der exakt richtigen Position: ${d.points ? Math.round(d.points / 5) : 50} Punkte.`];
   if (round.mode === 'estimate' && d.bets) return ['Schätze geheim eine Zahl.', `Dann siehst du alle Tipps und setzt ${d.bets.filter((b: number) => b > 0).join(' oder ')} Punkte auf eine Schätzung – oder gar nichts.`, d.bonus ? `Die beste Schätzung bringt zusätzlich +${d.bonus} Punkte.` : 'Gewonnener Einsatz: plus. Verlorener: minus.'];
   return MODE_RULES[round.mode];
 }
@@ -213,7 +215,7 @@ function RuleCard({ round, view }: { round: RoundView; view: View }) {
     return (
       <div className="rulecard compact">
         <div className="flip"><div className="bigic">{round.icon}</div></div>
-        <h1>{round.kind === 'final' && round.mode !== 'vote' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</h1>
+        <h1>{round.kind === 'final' && round.mode !== 'vote' ? 'FINAL LOCK' : modeName(round)}</h1>
         <p className="muted">{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</p>
       </div>
     );
@@ -228,7 +230,7 @@ function RuleCard({ round, view }: { round: RoundView; view: View }) {
         <h1>FINAL LOCK</h1>
         <ol><li style={{ animationDelay: '.4s' }}>① Ein Ort auf der Karte – 400 Punkte</li><li style={{ animationDelay: '.8s' }}>② Eine gemeinsame Lösung – bis 300 Punkte</li><li style={{ animationDelay: '1.2s' }}>③ Eine Sortieraufgabe – 500 Punkte</li><li style={{ animationDelay: '1.6s' }}>④ Schätzen mit Einsatz – bis zu 800 Punkte</li></ol>
       </> : <>
-        <h1>{MODE_NAME[round.mode]}</h1>
+        <h1>{modeName(round)}</h1>
         <ol>{rulesFor(round).map((r, i) => <li key={i} style={{ animationDelay: `${0.4 + i * 0.5}s` }}>{r}</li>)}</ol>
       </>}
       <p className="muted">{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</p>
@@ -298,7 +300,7 @@ function RankTv({ view, round }: { view: View; round: RoundView }) {
     <div className="ranktv">
       <div className="bigq small">{d.prompt}</div>
       <div className="rankstage">
-        {d.variant === 'sort' && d.pool && <div className="curitem"><small>Bringe alle fünf Begriffe in die richtige Reihenfolge – auf deinem Handy</small><div className="seen">{d.pool.map((x: any) => <span key={x.idx}>{x.text}</span>)}</div><small>▲ {d.topLabel} · ▼ {d.bottomLabel}</small></div>}
+        {d.variant === 'sort' && d.pool && <div className="curitem"><small>Sortiere die fünf Karten auf deinem Handy auf die Plätze 1–5</small><div className="seen">{d.pool.map((x: any) => <span key={x.idx}>{x.text}</span>)}</div><small>▲ {d.topLabel} · ▼ {d.bottomLabel}</small></div>}
         {round.stage === 'open' && d.item && <div className="curitem" key={d.step}><small>Begriff {d.step + 1} von {d.steps}</small><b>{d.item}</b></div>}
         {round.stage !== 'open' && <div className="curitem"><small>Alle Begriffe vergeben</small><b>Gleich die Auflösung …</b></div>}
         <div className="seen">{d.seen.map((t: string, i: number) => <span key={i}>{t}</span>)}</div>

@@ -9,7 +9,7 @@ export const MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'ma
 export const FINAL_ONLY_MODES: Mode[] = ['vote'];
 export const ACTIVE_MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link'];
 export const isLegacyMode = (m: string) => m === 'codebreak';
-export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS', codebreak: 'CODEBREAK (veraltet)' };
+export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S! (BLIND RANK)', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS', codebreak: 'CODEBREAK (veraltet)' };
 
 export function taskMax(t: TaskDef): number {
   if (t.practice) return 0;                          // Proberunden zählen nie zu den Punkten

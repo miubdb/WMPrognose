@@ -127,32 +127,68 @@ function GeoPhone({ round, act, room, d }: Props & { d: any }) {
 }
 
 // ---------------------------------------------------------------- RANK
-function RankSortPhone({ round, act, d }: Props & { d: any }) {
+/** SORTIER’S!: fünf gemischte Karten auf die Plätze 1–5 ziehen (Drag & Drop) oder erst Karte, dann Platz antippen; Abgabe erst nach Bestätigung. */
+function RankSortPhone({ round, act, room, d }: Props & { d: any }) {
   const snd = useSender(act);
   const pool: { idx: number; text: string }[] = d.pool ?? [];
-  const [order, setOrder] = useState<number[]>(() => pool.map(p => p.idx));
+  const n = d.slots ?? 5;
+  const [slots, setSlots, clearSlots] = useDraft<(number | null)[]>(`${room}.${round.rid}.sort`, new Array(n).fill(null));
+  const [sel, setSel] = useState<number | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [drag, setDrag] = useState<{ idx: number; x: number; y: number } | null>(null);
   const sent = !!(d.mine && d.mine.some((x: string | null) => x));
-  useEffect(() => { if (!sent && pool.length && order.length !== pool.length) setOrder(pool.map(p => p.idx)); /* eslint-disable-next-line */ }, [pool.length]);
   const text = (i: number) => pool.find(p => p.idx === i)?.text ?? '';
-  const move = (pos: number, dir: -1 | 1) => setOrder(o => { const n = o.slice(); const q = pos + dir; if (q < 0 || q >= n.length) return o; [n[pos], n[q]] = [n[q], n[pos]]; return n; });
+  const cur = slots.length === n ? slots : new Array(n).fill(null);
+  const placed = new Set(cur.filter((x): x is number => x !== null));
+  const free = pool.filter(p => !placed.has(p.idx));
+  const slotOf = (idx: number) => cur.findIndex(x => x === idx);
+  const placeAt = (idx: number, pos: number) => { const next = cur.slice(); const from = slotOf(idx); const occ = next[pos]; if (from >= 0) next[from] = occ ?? null; next[pos] = idx; setSlots(next); setSel(null); setConfirm(false); };
+  const toPool = (idx: number) => { const next = cur.slice(); const from = slotOf(idx); if (from >= 0) next[from] = null; setSlots(next); setSel(null); setConfirm(false); };
+  const tapCard = (idx: number) => { if (sel === idx) { setSel(null); return; } const at = slotOf(idx); if (sel !== null && at >= 0) { placeAt(sel, at); return; } setSel(idx); };
+  const tapSlot = (pos: number) => { if (sel !== null) { placeAt(sel, pos); return; } const occ = cur[pos]; if (occ !== null) setSel(occ); };
+  // Drag & Drop per Pointer-Events (Finger und Maus); kurzes Tippen = Auswahl
+  const startDrag = (e: React.PointerEvent, idx: number) => {
+    if (sent || round.stage !== 'open') return;
+    const sx = e.clientX, sy = e.clientY; let moved = false;
+    const move = (ev: PointerEvent) => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 8) moved = true; if (moved) { ev.preventDefault(); setDrag({ idx, x: ev.clientX, y: ev.clientY }); } };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      if (!moved) { setDrag(null); tapCard(idx); return; }
+      const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+      const slotEl = el?.closest('[data-slot]') as HTMLElement | null; setDrag(null);
+      if (slotEl) placeAt(idx, Number(slotEl.dataset.slot)); else if (el?.closest('[data-pool]')) toPool(idx);
+    };
+    window.addEventListener('pointermove', move, { passive: false }); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  };
+  const card = (idx: number, where: 'pool' | 'slot') => (
+    <div role="button" tabIndex={0} key={idx} data-card={idx} className={`scard ${sel === idx ? 'sel' : ''} ${drag?.idx === idx ? 'dragging' : ''} ${where}`} onPointerDown={e => startDrag(e, idx)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') tapCard(idx); }}>{text(idx)}</div>
+  );
   if (round.stage !== 'open' || sent) return (
     <div className="rank"><div className="question">{d.prompt}</div>
       <div className="slots"><small className="edge">▲ {d.topLabel}</small>{(d.mine ?? []).map((t: string | null, i: number) => <div key={i} className="slot filled"><b>{i + 1}</b><span>{t ?? '—'}</span></div>)}<small className="edge">▼ {d.bottomLabel}</small></div>
       {sent ? <div className="status ok">✓ Abgegeben – endgültig</div> : <Waiting text="Zeit abgelaufen" sub="Gleich kommt die Auflösung." />}</div>
   );
+  const all = placed.size === n;
   return (
-    <div className="rank">
-      <div className="question">{d.prompt}</div>
-      <p className="muted center small">Bringe alle fünf Begriffe in die richtige Reihenfolge – mit ▲ ▼ verschieben, dann abgeben (endgültig).</p>
-      <div className="slots"><small className="edge">▲ {d.topLabel}</small>
-        {order.map((idx, pos) => (
-          <div key={idx} className="slot filled sortrow"><b>{pos + 1}</b><span>{text(idx)}</span>
-            <button type="button" className="mv" aria-label="nach oben" disabled={pos === 0} onClick={() => move(pos, -1)}>▲</button>
-            <button type="button" className="mv" aria-label="nach unten" disabled={pos === order.length - 1} onClick={() => move(pos, 1)}>▼</button></div>
-        ))}
+    <div className="rank sorter">
+      <div className="question small">{d.prompt}</div>
+      <p className="muted center small">{sel !== null ? 'Jetzt einen Platz antippen' : 'Karte auf einen Platz ziehen – oder antippen, dann Platz antippen.'}</p>
+      <div className="slotsboard"><small className="edge">▲ {d.topLabel}</small>
+        {cur.map((idx, pos) => (
+          <div key={pos} data-slot={pos} className={`sslot ${idx !== null ? 'filled' : ''} ${sel !== null ? 'target' : ''}`} onClick={() => tapSlot(pos)}>
+            <b className="no">{pos + 1}</b>{idx !== null ? card(idx, 'slot') : <span className="ph">Platz {pos + 1}</span>}
+          </div>))}
         <small className="edge">▼ {d.bottomLabel}</small></div>
+      <div className="cardpool" data-pool onClick={() => { if (sel !== null && slotOf(sel) >= 0) toPool(sel); }}>
+        {free.length ? free.map(p => card(p.idx, 'pool')) : <span className="muted small">Alle Karten liegen auf Plätzen – tippe eine Karte an, um sie zu tauschen.</span>}
+      </div>
+      {drag && <div className="scard ghost" style={{ left: drag.x, top: drag.y }}>{text(drag.idx)}</div>}
       <Status sent={false} draft={false} sending={snd.state === 'sending'} msg={snd.msg} />
-      <button className="btn primary wide" disabled={snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { order } })}>Reihenfolge abgeben – endgültig</button>
+      {!confirm
+        ? <button className="btn primary wide" disabled={!all || snd.state === 'sending'} onClick={() => setConfirm(true)}>{all ? 'Reihenfolge prüfen & abgeben' : `Noch ${n - placed.size} Karte${n - placed.size > 1 ? 'n' : ''} platzieren`}</button>
+        : <div className="confirmbox"><b>Endgültig abgeben?</b><span className="muted small">Danach kannst du nichts mehr ändern.</span>
+            <div className="row"><button className="btn ghost" onClick={() => setConfirm(false)}>Zurück</button><button className="btn primary" disabled={snd.state === 'sending'} onClick={async () => { const a = await snd.send({ k: 'submit', payload: { order: cur } }); if (a.ok) clearSlots(); }}>Ja, endgültig abgeben</button></div></div>}
     </div>
   );
 }
@@ -484,7 +520,7 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
   if (!rev) return none;
   switch (mode) {
     case 'geo': { const g = rev.guesses.find((x: any) => x.pid === pid); return g ? { points: g.points, title: `${g.km.toLocaleString('de-DE')} km entfernt`, text: `${g.points} Punkte` } : none; }
-    case 'rank': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.placed ? { points: r.points, title: 'Blind Rank', text: rev.scoring === 'exact' ? `${r.correct} von 5 Begriffen richtig platziert` : `${r.correct} von ${r.total} Paaren richtig` } : none; }
+    case 'rank': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.placed ? { points: r.points, title: rev.scoring === 'exact' ? 'SORTIER’S!' : 'Blind Rank', text: rev.scoring === 'exact' ? `${r.correct} von 5 Begriffen richtig platziert` : `${r.correct} von ${r.total} Paaren richtig` } : none; }
     case 'estimate': {
       const g = rev.guesses.find((x: any) => x.pid === pid); const b = rev.bets.find((x: any) => x.pid === pid);
       const pts = (g?.points ?? 0) + (g?.bonus ?? 0) + (b?.delta ?? 0);

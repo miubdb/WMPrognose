@@ -4852,7 +4852,7 @@ var require_dist2 = __commonJS({
     var $ZodRealError = $constructor("$ZodError", initializer, { Parent: Error });
     function flattenError(error, mapper = (issue2) => issue2.message) {
       let fieldErrors = {}, formErrors = [];
-      for (let sub of error.issues) sub.path.length > 0 ? (fieldErrors[sub.path[0]] = fieldErrors[sub.path[0]] || [], fieldErrors[sub.path[0]].push(mapper(sub))) : formErrors.push(mapper(sub));
+      for (let sub2 of error.issues) sub2.path.length > 0 ? (fieldErrors[sub2.path[0]] = fieldErrors[sub2.path[0]] || [], fieldErrors[sub2.path[0]].push(mapper(sub2))) : formErrors.push(mapper(sub2));
       return { formErrors, fieldErrors };
     }
     function formatError(error, _mapper) {
@@ -33435,9 +33435,12 @@ function rankAscending(items, eps = 0) {
   return out;
 }
 var GEO_SCALE = {
-  germany: { scaleKm: 200, freeKm: 2 },
-  europe: { scaleKm: 700, freeKm: 5 },
-  world: { scaleKm: 2e3, freeKm: 15 }
+  germany: { scaleKm: 50, freeKm: 2 },
+  // Karte ≈ 850 km breit
+  europe: { scaleKm: 180, freeKm: 5 },
+  // Karte ≈ 4.000 km breit
+  world: { scaleKm: 600, freeKm: 15 }
+  // Weltkarte
 };
 function geoFraction(km, map2 = "germany") {
   const { scaleKm, freeKm } = GEO_SCALE[map2] ?? GEO_SCALE.germany;
@@ -34634,14 +34637,14 @@ var ContentService = class {
     if (b2.book) return { ok: true, errors: b2.errors, warnings: b2.warnings, analysis: b2.book.show && !(b2.book.tiles.filter((t) => t.kind === "tile").length >= 6 && b2.book.tiles.some((t) => t.kind === "surprise")) ? null : analyzeBook(b2.book), show: analyzeShow(b2.book) };
     return { ok: false, errors: b2.errors, warnings: b2.warnings, analysis: null, show: null };
   }
-  publish(packId, note = "") {
+  publish(packId, note2 = "") {
     const { book, errors, warnings } = this.buildBook(packId);
     if (!book) throw new ApiError(422, "Paket kann nicht ver\xF6ffentlicht werden", errors);
     const last = this.db.prepare("SELECT MAX(version) v FROM pack_versions WHERE pack_id=?").get(packId).v;
     const version = (last ?? 0) + 1, ref = `${packId}@${version}`;
     book.ref = ref;
     this.tx(() => {
-      this.db.prepare("INSERT INTO pack_versions(id,pack_id,version,note,book,created) VALUES(?,?,?,?,?,?)").run(ref, packId, version, String(note).slice(0, 200), JSON.stringify(book), this.now());
+      this.db.prepare("INSERT INTO pack_versions(id,pack_id,version,note,book,created) VALUES(?,?,?,?,?,?)").run(ref, packId, version, String(note2).slice(0, 200), JSON.stringify(book), this.now());
       this.db.prepare("UPDATE packs SET status='published', current_version=?, updated=? WHERE id=?").run(version, this.now(), packId);
     });
     return { ref, version, warnings };
@@ -35372,6 +35375,11 @@ var geo = {
     return base;
   }
 };
+function shuffledPool(t) {
+  const o = t.order.length === t.items.length ? t.order.slice() : t.items.map((_2, i2) => i2);
+  if (o.every((v2, i2) => v2 === i2)) o.push(o.shift());
+  return o;
+}
 var rank = {
   maxPoints: (t) => t.points,
   begin(c) {
@@ -35462,7 +35470,7 @@ var rank = {
       step,
       steps: t.order.length,
       // Sortier-Variante: alle Begriffe in gemischter (nicht der richtigen) Reihenfolge, gleich für alle
-      pool: c.round.m?.sort && (c.round.stage === "open" || c.round.stage === "locked") ? t.order.map((i2) => ({ idx: i2, text: t.items[i2].text })) : null,
+      pool: c.round.m?.sort && (c.round.stage === "open" || c.round.stage === "locked") ? shuffledPool(t).map((i2) => ({ idx: i2, text: t.items[i2].text })) : null,
       item: c.round.stage === "open" && !c.round.m?.sort ? t.items[t.order[step]].text : null,
       seen: showItem && !c.round.m?.sort ? t.order.slice(0, c.round.stage === "open" ? step : t.order.length).map((i2) => t.items[i2].text) : []
     };
@@ -36507,6 +36515,7 @@ var Engine = class _Engine {
         return ok;
       }
       case "h.pause": {
+        if (!a.paused && room.showPaused) return bad("paused");
         if (a.paused) this.freeze(room, now);
         else this.unfreeze(room, now);
         return ok;
@@ -36877,7 +36886,7 @@ var Engine = class _Engine {
 var av = (i2) => ({ face: i2 % 8, skin: i2 * 2 % 6, hair: i2 * 3 % 9, hairColor: i2 * 5 % 8, hat: i2 === 1 ? 4 : 0, shirt: i2 % 5, shirtColor: i2 * 3 % 10, acc: i2 === 2 ? 2 : 0, bg: i2 * 2 % 8 });
 var SAMPLE_NAMES = ["Anna", "Ben", "Cem", "Dana"];
 var FORMULAS = {
-  geo: "Punkte nach tats\xE4chlicher Entfernung (Gro\xDFkreis, km): Maximalpunkte \xD7 e^(\u2212(km \u2212 Treffertoleranz)/Skala); Skala Deutschland 200 km, Europa 700 km, Welt 2000 km. Gleiche Entfernung = gleiche Punkte, unabh\xE4ngig von den Mitspielern. Keine Abgabe = 0.",
+  geo: "Punkte nach tats\xE4chlicher Entfernung (Gro\xDFkreis, km): Maximalpunkte \xD7 e^(\u2212(km \u2212 Treffertoleranz)/Skala); Skala Deutschland 50 km, Europa 180 km, Welt 600 km (z. B. Europa 250 Punkte: 9 km \u2248 245, 113 km \u2248 137). Gleiche Entfernung = gleiche Punkte, unabh\xE4ngig von den Mitspielern. Keine Abgabe = 0.",
   rank: "Nacheinander-Variante: Budget \xD7 richtig angeordnete Paare \xF7 10 (10 Paarvergleiche bei 5 Begriffen). Sortier-Variante (alle f\xFCnf sichtbar): Budget \xF7 5 f\xFCr jeden Begriff auf der exakt richtigen Position (bei 250 Punkten: 50 je Begriff).",
   estimate: "Beste Sch\xE4tzung = volles Budget, danach nach Platz abgestuft (100/75/55/40/28/18/10 %); Rangfolge nach |ln(Tipp/L\xF6sung)|. Einsatz: +Einsatz bei Treffer auf den besten Tipp, sonst \u2212Einsatz (h\xF6chstens so viel, wie man besitzt).",
   glitch: "Nur zwei Ergebnisse: Treffer (innerhalb der Objektbox plus Fingertoleranz) = volle Punkte, sonst oder keine Abgabe = 0. Keine Trostpunkte.",
@@ -38571,7 +38580,7 @@ var SEED_SHOW4 = {
 };
 
 // content/bestof.ts
-var rv = (q2, note) => note ? { ...q2, task: { ...q2.task, review: note } } : q2;
+var rv = (q2, note2) => note2 ? { ...q2, task: { ...q2.task, review: note2 } } : q2;
 var closed = (q2) => ({ ...q2, task: { ...q2.task, closed: true } });
 var BESTOF_NEW = [
   // ===== WO ZUR HÖLLE? (60 s, Punkte nach Entfernung)
@@ -38893,9 +38902,67 @@ var SEED_SHOW_B42K = {
   steps: BESTOF_STEPS.map((s) => s.k === "final" ? { k: "final", cat: "b42-final-kk" } : s)
 };
 
+// content/bestof2.ts
+var note = (q2, review) => review ? { ...q2, task: { ...q2.task, review } } : q2;
+var BESTOF2_NEW = [
+  note(
+    geo2(
+      "b43-geo-2028",
+      "Fu\xDFball",
+      "europe",
+      60,
+      250,
+      "In welchem Stadion wird das Champions-League-Finale 2028 stattfinden?",
+      48.2188,
+      11.6247,
+      "Allianz Arena, M\xFCnchen",
+      "Wieder die Allianz Arena! Bei UEFA-Spielen hei\xDFt sie \u201EFu\xDFball Arena M\xFCnchen\u201C. M\xFCnchen war schon 2012 und 2025 Finalort \u2013 2028 kommt das Endspiel erneut dorthin (UEFA-Entscheidung vom 15. September 2026)."
+    ),
+    ""
+  ),
+  // Quelle (UEFA-Meldung vom 15.09.2026, gelesen und bestätigt): docs/BESTOF42-REDAKTION.md
+  (() => {
+    const q2 = BESTOF_NEW.find((x3) => x3.id === "b42-geo-c04");
+    return { id: "b43-geo-c04", topic: q2.topic, task: { ...q2.task, map: "world" } };
+  })(),
+  rank2("b43-rank-t05", "Fu\xDFball", "Sortiere nach Alter beim ersten Bundesligaspiel, j\xFCngster zuerst.", "j\xFCngster Deb\xFCtant", "\xE4ltester Deb\xFCtant", [
+    ["Youssoufa Moukoko", "16 Jahre, 1 Tag"],
+    ["Linus G\xFCther", "16 Jahre, 3 Tage"],
+    ["Paul Wanner", "16 Jahre, 15 Tage"],
+    ["Louis Lemke", "16 Jahre, 214 Tage"],
+    ["Tom Bischof", "16 Jahre, 264 Tage"]
+  ], [4, 1, 3, 0, 2], "Moukoko h\xE4lt den Rekord seit 2020 \u2013 Niko Ili\u010Devi\u0107 stellte ihn am 1. November 2026 mit ebenfalls 16 Jahren und 1 Tag ein.")
+];
+var SWAP = { "v2-heimspiel-2": "b43-geo-2028", "b42-geo-c04": "b43-geo-c04", "b42-match-c08": "s3-match-spiele", "b42-rank-t05": "b43-rank-t05" };
+var mapId = (id) => SWAP[id] ?? id;
+var BESTOF2_PLAN = Object.fromEntries(Object.entries(BESTOF_PLAN).map(([m, l]) => [m, l.map((x3) => ({ id: mapId(x3.id), fb: x3.fb }))]));
+var CHANGED = { "b42-r1": "b43-r1", "b42-r2": "b43-r2", "b42-r3": "b43-r3" };
+var BESTOF2_ROUNDS = BESTOF_ROUNDS.filter((r) => CHANGED[r.id]).map((r) => ({
+  ...r,
+  id: CHANGED[r.id],
+  title: r.id === "b42-r3" ? "SORTIER\u2019S!" : r.title,
+  taskIds: r.taskIds.map(mapId),
+  blurb: r.id === "b42-r3" ? "F\xFCnf gemischte Karten liegen bereit. Ziehe sie auf dem Handy auf die Pl\xE4tze 1 bis 5 (oder erst Karte, dann Platz antippen) \u2013 je Karte auf der exakt richtigen Position gibt es 50 Punkte." : r.blurb
+}));
+var sub = (id) => CHANGED[id] ?? id;
+var BESTOF2_STEPS = SEED_SHOW_B42.steps.map((s) => s.k === "board" || s.k === "final" ? s : { ...s, cat: sub(s.cat) });
+var RULES2 = SEED_SHOW_B42.pack.rules;
+var SEED_SHOW_B43 = {
+  pack: { id: "show-5", name: "Reus 65 Mio \u2013 Best of 42", description: "Version 2 (Praxistest 3): 42 Wertungsfragen + 7 Proben, SORTIER\u2019S! mit Karten-Bedienung, Geo-Kurve 180 km, CL-Finale 2028. FINAL LOCK. Sieger: Reus65Mio-Champion.", rules: RULES2 },
+  pool: BESTOF2_NEW,
+  rounds: BESTOF2_ROUNDS,
+  steps: BESTOF2_STEPS
+};
+var SEED_SHOW_B43K = {
+  pack: { id: "show-4z", name: "Reus 65 Mio \u2013 Best of 42 \xB7 Finale KICKBASE-KONSENS", description: "Wie \u201EBest of 42\u201C (Version 2), aber mit KICKBASE-KONSENS als Finale (optional; FINAL LOCK bleibt Standard).", rules: RULES2 },
+  pool: [],
+  rounds: [],
+  steps: BESTOF2_STEPS.map((s) => s.k === "final" ? { k: "final", cat: "b42-final-kk" } : s)
+};
+
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K];
+var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B43, SEED_SHOW_B43K];
 
 // server/vercel.ts
 var ConflictError = class extends Error {

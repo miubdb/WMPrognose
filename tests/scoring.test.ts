@@ -39,19 +39,24 @@ test('Geo: Punkte hängen nur von der Entfernung ab (nicht von Mitspielern/Rang)
   const t = scoreGeo({ x: { lat: 50, lon: 11 }, y: { lat: 50, lon: 11 } }, ans, 250, 4); assert.equal(t.x.points, t.y.points);
 });
 
-test('Geo-Kalibrierung: Skalen für Deutschland / Europa / Welt (Prozent der Maximalpunkte)', () => {
-  const pct = (km: number, m: 'germany' | 'europe' | 'world') => Math.round(geoFraction(km, m) * 100);
-  // Deutschland (S = 200 km)
-  assert.deepEqual([0, 2, 10, 50, 100, 300, 600].map(k => pct(k, 'germany')), [100, 100, 96, 79, 61, 23, 5]);
-  // Europa (S = 700 km)
-  assert.deepEqual([0, 5, 100, 500, 1500, 3000].map(k => pct(k, 'europe')), [100, 100, 87, 49, 12, 1]);
-  // Welt (S = 2000 km)
-  assert.deepEqual([0, 15, 500, 1000, 5000, 10000].map(k => pct(k, 'world')), [100, 100, 78, 61, 8, 1]);
-  // dieselbe Entfernung zählt auf größeren Karten großzügiger
+test('Geo-Kalibrierung (Praxistest 3): Europa 180 km – 9 km ≈ 245, 113 km ≈ 135 von 250; Deutschland 50 km; Welt 600 km; stetig, nie negativ', () => {
+  const pts = (km: number, m: 'germany' | 'europe' | 'world', max = 250) => geoPoints(km, max, m);
+  // Europa, 250 Punkte (Beispiele aus dem Praxistest)
+  assert.equal(pts(0, 'europe'), 250); assert.equal(pts(5, 'europe'), 250, '0–5 km = volle Punkte');
+  assert.ok(pts(9, 'europe') >= 243 && pts(9, 'europe') <= 247, String(pts(9, 'europe')));
+  assert.ok(pts(113, 'europe') >= 132 && pts(113, 'europe') <= 140, String(pts(113, 'europe')));
+  assert.ok(pts(9, 'europe') - pts(113, 'europe') > 100, 'deutlicher Unterschied (vorher nur 35 Punkte)');
+  assert.deepEqual([300, 600, 1500, 3000].map(k => pts(k, 'europe')), [49, 9, 0, 0]);
+  // Deutschland (50 km): Prozent der Maximalpunkte
+  const pg = (km: number) => Math.round(geoFraction(km, 'germany') * 100);
+  assert.deepEqual([0, 2, 9, 25, 50, 100, 300].map(pg), [100, 100, 87, 63, 38, 14, 0]);
+  // Welt (600 km)
+  const pw = (km: number) => Math.round(geoFraction(km, 'world') * 100);
+  assert.deepEqual([0, 15, 100, 500, 1000, 3000, 10000].map(pw), [100, 100, 87, 45, 19, 1, 0]);
+  // gleiche Entfernung → gleiche Punkte, auch bei unterschiedlichem Maximum; Punkte proportional zum Maximum
+  assert.equal(geoPoints(113, 300, 'europe') / 300 > 0.54, true); assert.equal(geoPoints(113, 200, 'europe'), Math.round(200 * geoFraction(113, 'europe')));
+  for (const m of ['germany', 'europe', 'world'] as const) { let prev = 2; for (let k = 0; k <= 20000; k += 25) { const f = geoFraction(k, m); assert.ok(f >= 0 && f <= prev + 1e-12); prev = f; } }
   assert.ok(geoFraction(300, 'world') > geoFraction(300, 'europe') && geoFraction(300, 'europe') > geoFraction(300, 'germany'));
-  // monoton fallend
-  for (const m of ['germany', 'europe', 'world'] as const) { let prev = 2; for (let k = 0; k <= 20000; k += 50) { const f = geoFraction(k, m); assert.ok(f <= prev + 1e-12); prev = f; } }
-  assert.equal(geoPoints(1234, 300, 'europe'), Math.round(300 * geoFraction(1234, 'europe')));
 });
 
 test('Blind Rank: 10 Paare, Punkte anteilig', () => {

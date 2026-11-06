@@ -33,12 +33,12 @@ export function rankAscending(items: { pid: string; value: number }[], eps = 0):
 /**
  * Entfernungswertung (Prinzip GeoGuessr): points = budget · exp(−(d − frei)/S).
  * - d ≤ frei (Treffer-Toleranz): volle Punkte; danach stetig fallend, unabhängig von den Mitspielern.
- * - Skala S je Karte (Entfernung, bei der noch ≈ 37 % übrig sind): Deutschland 200 km, Europa 700 km, Welt 2000 km.
+ * - Skala S je Karte (Entfernung, bei der noch ≈ 37 % übrig sind): Deutschland 50 km, Europa 180 km, Welt 600 km.
  */
 export const GEO_SCALE: Record<'germany' | 'europe' | 'world', { scaleKm: number; freeKm: number }> = {
-  germany: { scaleKm: 200, freeKm: 2 },
-  europe: { scaleKm: 700, freeKm: 5 },
-  world: { scaleKm: 2000, freeKm: 15 },
+  germany: { scaleKm: 50, freeKm: 2 },       // Karte ≈ 850 km breit
+  europe: { scaleKm: 180, freeKm: 5 },       // Karte ≈ 4.000 km breit
+  world: { scaleKm: 600, freeKm: 15 },       // Weltkarte
 };
 export function geoFraction(km: number, map: 'germany' | 'europe' | 'world' = 'germany'): number {
   const { scaleKm, freeKm } = GEO_SCALE[map] ?? GEO_SCALE.germany;

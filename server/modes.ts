@@ -95,6 +95,12 @@ const geo: ModeImpl = {
 // =====================================================================
 // RANK
 // =====================================================================
+/** Anfangsreihenfolge der Karten: nie in der richtigen Reihenfolge (die gespeicherte Mischung wird bei Bedarf verschoben). */
+export function shuffledPool(t: RankTask): number[] {
+  const o = t.order.length === t.items.length ? t.order.slice() : t.items.map((_, i) => i);
+  if (o.every((v, i) => v === i)) o.push(o.shift()!);
+  return o;
+}
 const rank: ModeImpl = {
   maxPoints: t => (t as RankTask).points,
   begin(c) {
@@ -175,7 +181,7 @@ const rank: ModeImpl = {
       variant: rankVariantOf(t, c.rules), points: t.points,
       step, steps: t.order.length,
       // Sortier-Variante: alle Begriffe in gemischter (nicht der richtigen) Reihenfolge, gleich für alle
-      pool: c.round.m?.sort && (c.round.stage === 'open' || c.round.stage === 'locked') ? t.order.map(i => ({ idx: i, text: t.items[i].text })) : null,
+      pool: c.round.m?.sort && (c.round.stage === 'open' || c.round.stage === 'locked') ? shuffledPool(t).map(i => ({ idx: i, text: t.items[i].text })) : null,
       item: c.round.stage === 'open' && !c.round.m?.sort ? t.items[t.order[step]].text : null,
       seen: showItem && !c.round.m?.sort ? t.order.slice(0, c.round.stage === 'open' ? step : t.order.length).map(i => t.items[i].text) : [],
     };

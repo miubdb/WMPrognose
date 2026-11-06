@@ -452,6 +452,7 @@ export class Engine {
         return ok;
       }
       case 'h.pause': {
+        if (!a.paused && room.showPaused) return bad('paused');          // Während der Show-Pause läuft kein Timer weiter
         if (a.paused) this.freeze(room, now); else this.unfreeze(room, now);
         return ok;
       }

@@ -421,7 +421,7 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
             <label className="field"><span>Max. Kacheln je Modus</span><input inputMode="numeric" value={p.rules.maxPerMode} onChange={e => setRule('maxPerMode', e.target.value)} /></label>
           </div>
           <div className="form2">
-            <label className="field"><span>BLIND RANK – Bedienung</span><select value={p.rules.rankVariant ?? 'task'} onChange={e => set('rules', { ...p.rules, rankVariant: e.target.value })}><option value="task">je Frage festgelegt (Standard: nacheinander)</option><option value="sequence">immer nacheinander (klassisch)</option><option value="sort">immer: alle fünf sichtbar & sortieren</option></select></label>
+            <label className="field"><span>SORTIER’S! / BLIND RANK – Bedienung</span><select value={p.rules.rankVariant ?? 'task'} onChange={e => set('rules', { ...p.rules, rankVariant: e.target.value })}><option value="task">je Frage festgelegt (Standard: nacheinander)</option><option value="sequence">immer nacheinander (klassisch)</option><option value="sort">immer: SORTIER’S! (fünf Karten auf Plätze ziehen)</option></select></label>
           </div>
           <div className="form2">
             <label className="field"><span>Länge der Show (gewertete Aufgaben je Spielmodus)</span><select value={p.rules.tasksPerMode ?? 4} onChange={e => set('rules', { ...p.rules, tasksPerMode: Number(e.target.value) })}><option value={4}>Kompakte Show – 4 Aufgaben je Spielmodus</option><option value={5}>Längere Show – 5 Aufgaben je Spielmodus</option><option value={6}>Best-of-Show – 6 Aufgaben je Spielmodus (sehr lang, ca. 2,5 Std.)</option></select></label>

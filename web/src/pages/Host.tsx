@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { api, store, useGame } from '../net';
 import { Avatar } from '../ui/Avatar';
 import { ConnBadge, Countdown, QR, useBaseUrl } from '../ui/widgets';
-import { MODE_NAME } from './Tv';
+import { modeName } from './Tv';
 import type { Action, PlayerPublic, RoundView, View } from '../../../shared/types';
 
 interface HostSession { code: string; key: string; pin?: string }
@@ -194,7 +194,7 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
   return (
     <div className="card">
       <div className="row between">
-        <div><h2>{round.icon} {round.title}</h2><p className="muted">{MODE_NAME[round.mode]} · Aufgabe {round.taskIndex + 1}/{round.taskCount} · Stage: <b>{STAGE[st]}</b></p></div>
+        <div><h2>{round.icon} {round.title}</h2><p className="muted">{modeName(round)} · Aufgabe {round.taskIndex + 1}/{round.taskCount} · Stage: <b>{STAGE[st]}</b></p></div>
         {timed && <Countdown round={round} serverNow={serverNow} size={96} />}
       </div>
 

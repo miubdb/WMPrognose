@@ -10,7 +10,7 @@ const av = (i: number): Avatar => ({ face: i % 8, skin: (i * 2) % 6, hair: (i * 
 export const SAMPLE_NAMES = ['Anna', 'Ben', 'Cem', 'Dana'];
 
 export const FORMULAS: Record<string, string> = {
-  geo: 'Punkte nach tatsächlicher Entfernung (Großkreis, km): Maximalpunkte × e^(−(km − Treffertoleranz)/Skala); Skala Deutschland 200 km, Europa 700 km, Welt 2000 km. Gleiche Entfernung = gleiche Punkte, unabhängig von den Mitspielern. Keine Abgabe = 0.',
+  geo: 'Punkte nach tatsächlicher Entfernung (Großkreis, km): Maximalpunkte × e^(−(km − Treffertoleranz)/Skala); Skala Deutschland 50 km, Europa 180 km, Welt 600 km (z. B. Europa 250 Punkte: 9 km ≈ 245, 113 km ≈ 137). Gleiche Entfernung = gleiche Punkte, unabhängig von den Mitspielern. Keine Abgabe = 0.',
   rank: 'Nacheinander-Variante: Budget × richtig angeordnete Paare ÷ 10 (10 Paarvergleiche bei 5 Begriffen). Sortier-Variante (alle fünf sichtbar): Budget ÷ 5 für jeden Begriff auf der exakt richtigen Position (bei 250 Punkten: 50 je Begriff).',
   estimate: 'Beste Schätzung = volles Budget, danach nach Platz abgestuft (100/75/55/40/28/18/10 %); Rangfolge nach |ln(Tipp/Lösung)|. Einsatz: +Einsatz bei Treffer auf den besten Tipp, sonst −Einsatz (höchstens so viel, wie man besitzt).',
   glitch: 'Nur zwei Ergebnisse: Treffer (innerhalb der Objektbox plus Fingertoleranz) = volle Punkte, sonst oder keine Abgabe = 0. Keine Trostpunkte.',
