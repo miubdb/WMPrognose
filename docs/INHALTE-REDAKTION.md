@@ -110,3 +110,41 @@ Je Runde sind erreichbare Punkte: R1 1000 · R2 1200 · R3 1000 · Überraschung
 
 ## Spieldauer (neu berechnet)
 Erwartet **82,5 min** (max. 105 min bei voll ausgeschöpften Zeitlimits) – Ziel 75–90 min. Annahmen: Regelkarte nur bei der ersten Aufgabe einer Runde ausführlich (Aufgaben 2–4 kompakt), 10 s Pause bis zur Freigabe durch den Showmaster, Auflösung ~12–20 s je Aufgabe, 2 Zwischenstände à ~1 min, Eröffnung ~3 min, Siegerehrung ~4 min. Antwortzeiten wurden **nicht** gekürzt; Übergänge wurden optimiert (kompakte Regelkarte, „Weiter & sofort starten“). Reale Dauer hängt vom Tempo des Showmasters ab – Richtwert, keine Garantie.
+
+---
+
+# Paket „Reus 65 Mio“ (`show-2`) – Aufbau, Proberunden, Änderungen nach dem Praxistest
+
+**Ablauf:** Eröffnung → **R1 WO ZUR HÖLLE?** → *Stand* → **R2 MATCHMAKER** → **R3 BLIND RANK** → *Stand* → **Überraschung EINZIGARTIG** → **R4 GLITCH** → **R5 SETZ AUF MICH** → **R6 DIE VERBINDUNG** → *letzter sichtbarer Stand* → **FINAL LOCK** → Siegerehrung („Reus65Mio-Champion“).
+Jede Runde beginnt mit einer **ungewerteten Proberunde** (Modus erklärt sich selbst, alle spielen mit dem eigenen Handy, Auflösung wie immer, aber keine Punkte; der Showmaster kann sie überspringen). Danach folgen **4 (kompakt) bzw. 5 (länger) gewertete Aufgaben** – Paketregel „Länge der Show“. Überraschungsrunde: 3 gewertete Aufgaben, Finale: 4.
+
+## Proberunden (neue Aufgaben `s4-probe-*`)
+| Modus | Probe | Warum |
+|---|---|---|
+| WO ZUR HÖLLE? | Allianz Arena (Deutschlandkarte) | wie gewünscht; die erste **gewertete** Frage („CL-Finale 2025 PSG–Inter“) hat dieselbe Lösung → einmaliger Überraschungseffekt („Wieder die Allianz Arena!“) |
+| MATCHMAKER | Tier ↔ Geräusch | sofort verständlich |
+| BLIND RANK | Planeten nach Sonnenabstand | allgemein bekannte, eindeutige Reihenfolge (Werte: mittlere Abstände) |
+| SETZ AUF MICH | Bundesländer Deutschlands (16) | jeder hat eine Meinung → Wetten sichtbar |
+| GLITCH | Aufstellungstafel `pitch2` (Spieler fehlt, Ball verschoben) | zeigt Ablauf TV→Handy |
+| EINZIGARTIG | Farben der deutschen Flagge (nur 3 gültige) | erzeugt garantiert Doppelte → Prinzip „einzigartig“ wird sichtbar |
+| DIE VERBINDUNG | Mond (4 Hinweise) | klar, zeigt das Sinken der Punkte je Hinweis |
+Alle Probe-Aufgaben haben ein Erklär-Feld „So funktioniert’s: …“, das bei der Auflösung erscheint.
+
+## Inhaltliche Änderungen
+- **Timbuktu** (Geo): im neuen Paket nicht mehr enthalten (bleibt in älteren Paketen). R1 enthält stattdessen **Wacken** (gefällt), Rovaniemi, Helgoland, Maracanã (Skalen Deutschland/Europa/Welt gemischt).
+- **Filme & Regisseure** (MATCHMAKER): im neuen Paket ersetzt durch **„Welches Tier hält welchen Rekord?“** (`s4-match-tierrekorde`: Gepard schnellstes Landtier, Blauwal größtes Tier, Strauß größter Vogel, Giraffe höchstes Landtier, Kolibri/Bienenelfe kleinster Vogel, Grönlandhai über 250 Jahre – Aha-Moment ohne künstlichen Witz). MATCHMAKER als Spielprinzip unverändert.
+- **Fakten:** Die Rekordangaben (u. a. Gepard > 100 km/h, Blauwal bis ca. 30 m, Giraffe bis ca. 5,5 m, Grönlandhai 250–400 Jahre geschätztes Höchstalter, Planetenabstände) stammen aus gängigem Standardwissen und wurden in dieser Runde **nicht erneut per Websuche belegt**. Bitte stichprobenartig prüfen.
+- Alle anderen Aufgaben sind unveränderte bestehende Fragen (gleiche IDs).
+
+## Wertung nach dem Praxistest
+- **Geo:** Punkte = Maximalpunkte × e^(−(Entfernung − Treffertoleranz)/Skala). Skala/Toleranz: Deutschland 200 km / 2 km, Europa 700 km / 5 km, Welt 2000 km / 15 km. Beispiele (Prozent der Maximalpunkte): Deutschland 10 km → 96 %, 50 km → 79 %, 100 km → 61 %, 300 km → 23 %, 600 km → 5 %; Europa 100 km → 87 %, 500 km → 49 %, 1500 km → 12 %; Welt 500 km → 78 %, 1000 km → 61 %, 5000 km → 8 %. Zeitlimit **60 s** für alle regulären Geo-Fragen (auch ältere gespeicherte; Proberunde 40 s).
+- **Glitch:** Trefferfläche = enge Box um das veränderte Objekt (bei langen Textzeilen nur das geänderte Wort), dazu 35 Einheiten (≈ 3,5 % der Bildbreite) Fingertoleranz; innen volle Punkte, im Toleranzrand 85–100 %, bis 2× Toleranz kleiner Trostpreis (nie „Treffer“). Das Koordinatensystem ist 1000×600 für alle Geräte (Handy und TV rechnen identisch).
+- **Blind Rank:** Punktelogik unverändert (10 Paarvergleiche × Punkte/10); neu: Darstellung der Paare und optional die Sortier-Variante (alle fünf sichtbar, gesamt ca. 42 s).
+- **DIE VERBINDUNG:** 20 s je Hinweis (Admin-Feld „Sekunden je Hinweis“); gespeicherte Altfragen mit dem früheren Standardwert 12 s laufen ebenfalls mit 20 s.
+
+## Dauer (ehrlich berechnet, Modell: Richtwert, keine Messung)
+| Variante | gewertete Aufgaben | Proben | erwartet | maximal |
+|---|---|---|---|---|
+| Kompakt (4) | 31 | 7 | ≈ 100 min | ≈ 127 min |
+| Länger (5) | 37 | 7 | ≈ 111 min | ≈ 142 min |
+Proben kosten zusammen etwa 16 min und sind überspringbar (ohne Proben ca. 84 bzw. 95 min). Wenn der Abend kürzer werden soll: Proben für schon bekannte Modi überspringen oder die kompakte Variante wählen.

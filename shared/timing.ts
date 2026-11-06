@@ -17,7 +17,7 @@ export function taskSeconds(t: TaskDef, m: TimeMode = 'expected'): { play: numbe
   const a = m === 'max' ? 1 : AVG;
   const rv = (x: number) => (m === 'max' ? x * SLOW : x);
   switch (t.mode) {
-    case 'geo': return { play: Math.max(60, t.seconds) * a, reveal: rv(38) };
+    case 'geo': return { play: (t.practice ? t.seconds : Math.max(60, t.seconds)) * a, reveal: rv(38) };
     case 'rank': return { play: t.items.length * (t.secondsPerItem * (m === 'max' ? 1 : 0.75) + 1.5), reveal: rv(55) };
     case 'estimate': return { play: t.seconds * a + t.betSeconds * a, reveal: rv(55) };
     case 'glitch': return { play: t.viewSeconds + t.seconds * a, reveal: rv(32) };

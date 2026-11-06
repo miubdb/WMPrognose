@@ -3,6 +3,7 @@
 // Redaktion, Quellen und Begründung: docs/INHALTE-REDAKTION.md.
 import type { ShowStep, TaskDef } from '../shared/types';
 
+export const COLORS = { PU: '#8b5cf6', BL: '#3b82f6', TE: '#14d9c0', GO: '#f5b82e', PK: '#ec4899', GR: '#22c55e', CY: '#38bdf8' };
 const PU = '#8b5cf6', BL = '#3b82f6', TE = '#14d9c0', GO = '#f5b82e', PK = '#ec4899', GR = '#22c55e', CY = '#38bdf8';
 
 export const SHOW_PACK = {
@@ -13,19 +14,19 @@ export const SHOW_PACK = {
 
 export interface PoolQuestion { id: string; topic: string; task: TaskDef }
 
-const geo = (id: string, topic: string, map: 'world' | 'europe' | 'germany', seconds: number, points: number, prompt: string, lat: number, lon: number, label: string, explain: string): PoolQuestion =>
+export const geo = (id: string, topic: string, map: 'world' | 'europe' | 'germany', seconds: number, points: number, prompt: string, lat: number, lon: number, label: string, explain: string): PoolQuestion =>
   ({ id, topic, task: { mode: 'geo', map, seconds: 60, points, prompt, answer: { lat, lon, label }, explain } });
-const est = (id: string, topic: string, prompt: string, unit: string, answer: number, explain: string, bets = [0, 100, 200], points = 300): PoolQuestion =>
+export const est = (id: string, topic: string, prompt: string, unit: string, answer: number, explain: string, bets = [0, 100, 200], points = 300): PoolQuestion =>
   ({ id, topic, task: { mode: 'estimate', seconds: 45, betSeconds: 35, points, bets, prompt, unit, answer, explain } });
-const glitch = (id: string, scene: string, viewPrompt: string, prompt: string, explain: string, viewSeconds = 12): PoolQuestion =>
+export const glitch = (id: string, scene: string, viewPrompt: string, prompt: string, explain: string, viewSeconds = 12): PoolQuestion =>
   ({ id, topic: 'Beobachtung', task: { mode: 'glitch', scene, viewSeconds, seconds: 25, points: 250, viewPrompt, prompt, explain } });
-const link = (id: string, topic: string, prompt: string, clues: string[], answer: string, accept: string[], explain: string): PoolQuestion =>
+export const link = (id: string, topic: string, prompt: string, clues: string[], answer: string, accept: string[], explain: string): PoolQuestion =>
   ({ id, topic, task: { mode: 'link', prompt, clueSeconds: 20, points: 300, clues, answer, accept, explain } });
-const match = (id: string, topic: string, prompt: string, pairs: [string, string][], order: number[], explain: string): PoolQuestion =>
+export const match = (id: string, topic: string, prompt: string, pairs: [string, string][], order: number[], explain: string): PoolQuestion =>
   ({ id, topic, task: { mode: 'match', seconds: 60, points: 300, prompt, pairs: pairs.map(([left, right]) => ({ left, right })), order, explain } });
-const rank = (id: string, topic: string, prompt: string, topLabel: string, bottomLabel: string, items: [string, string][], order: number[], explain: string, points = 250, secondsPerItem = 12): PoolQuestion =>
+export const rank = (id: string, topic: string, prompt: string, topLabel: string, bottomLabel: string, items: [string, string][], order: number[], explain: string, points = 250, secondsPerItem = 12): PoolQuestion =>
   ({ id, topic, task: { mode: 'rank', secondsPerItem, points, prompt, topLabel, bottomLabel, items: items.map(([text, value]) => ({ text, value })), order, explain } });
-const unique = (id: string, topic: string, placeholder: string, prompt: string, valid: [string, string[]][], explain: string): PoolQuestion =>
+export const unique = (id: string, topic: string, placeholder: string, prompt: string, valid: [string, string[]][], explain: string): PoolQuestion =>
   ({ id, topic, task: { mode: 'unique', seconds: 45, pointsUnique: 500, pointsShared: 150, placeholder, prompt, valid: valid.map(([name, variants]) => ({ name, variants })), explain } });
 
 /** Neue Aufgaben (im Showpaket verwendet oder als Alternative im Pool). Die 34 Aufgaben aus tiles.ts gehören ebenfalls zum Pool. */
@@ -128,8 +129,8 @@ export const POOL: PoolQuestion[] = [
 
 // ---------------------------------------------------------------- Runden des Showpakets (Kategorien mit Aufgaben in fester Reihenfolge)
 export interface ShowRound { id: string; title: string; topic: string; icon: string; color: string; kind: 'tile' | 'surprise' | 'final'; football: boolean; blurb: string; taskIds: string[] }
-const RB = {
-  geo: 'Setze deinen Pin auf der Karte – du kannst zoomen und ihn verschieben. Gewertet wird die Platzierung nach Entfernung.',
+export const RB = {
+  geo: 'Setze deinen Pin auf der Karte – du kannst zoomen und ihn verschieben. Je näher dein Pin, desto mehr Punkte.',
   match: 'Links sechs Begriffe, rechts die gemischten Partner. Verbinde sie auf dem Handy: 50 Punkte je richtigem Paar, Ändern geht bis zur Abgabe.',
   rank: 'Fünf Begriffe erscheinen nacheinander. Setze jeden SOFORT auf einen freien Rangplatz – endgültig!',
   glitch: 'Schau genau hin: Du siehst ein Bild, dann verändert sich etwas. Tippe auf dem Handy auf die veränderte Stelle.',

@@ -6,12 +6,13 @@ import { Engine } from '../server/engine';
 import { ContentService } from '../server/content';
 import { Store } from '../server/store';
 import { SCENES } from '../shared/scenes';
-import { TILES, SEED_PACK, SEED_SHOW } from '../content';
+import { TILES, SEED_PACK, SEED_SHOW, EXTRA_SHOWS } from '../content';
 import { AV } from './helpers';
+import { analyzeShow } from '../shared/analysis';
 import { geoPoints, rankPairs } from '../shared/scoring';
 import type { Action, Book, View } from '../shared/types';
 
-const CS = new ContentService(new Store(join(mkdtempSync(join(tmpdir(), 'outplay-r2-')), 'c.db')), { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW });
+const CS = new ContentService(new Store(join(mkdtempSync(join(tmpdir(), 'outplay-r2-')), 'c.db')), { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: EXTRA_SHOWS });
 const BASE: Book = CS.resolveBook('show-1@1');
 
 function game(rules: Book['rules'] = {}, n = 7) {
@@ -136,3 +137,88 @@ test('EINZIGARTIG: unbekannte Antworten sperren die Auflösung bis zur Prüfung;
   assert.ok(g.room.players.every(p => p.score >= 0));
 });
 void G;
+
+// ---------------------------------------------------------------- Reus 65 Mio: Proberunden, 4/5 Aufgaben, Zwischenstände
+const CS2 = CS;
+const REUS_COMPACT: Book = CS2.resolveBook('show-2@1');
+function reusGame(book: Book = REUS_COMPACT, n = 7) {
+  const eng = new Engine(() => book);
+  let now = 1_800_000_000_000;
+  const { room } = eng.newRoom('RE', now, 'show-2@1', 'show');
+  const ids: string[] = [];
+  for (let i = 0; i < n; i++) { const r = eng.join(room, `Bot${i + 1}`, AV, now); if (r.ok) ids.push(r.player.id); }
+  let rq = 0;
+  const host = (a: Action): any => eng.act(room, { role: 'host' }, `h${++rq}`, a, now);
+  const pl = (i: number, a: Action): any => eng.act(room, { role: 'player', pid: ids[i] }, `p${i}-${++rq}`, a, now);
+  const view = (who: number | 'host' | 'tv'): View => eng.buildView(room, who === 'host' ? { role: 'host' } : who === 'tv' ? { role: 'tv' } : { role: 'player', pid: ids[who] }, now);
+  const advance = (ms: number) => { now += ms; eng.tick(room, now); };
+  host({ k: 'h.startShow' }); host({ k: 'h.introDone' });
+  return { eng, room, ids, host, pl, view, advance };
+}
+
+test('Reus 65 Mio: Paketname, Branding, Ablauf mit Zwischenständen nach R1, R3 und vor dem Finale', () => {
+  assert.equal(CS2.listPublished().find((p: any) => p.id === 'show-2')!.name, 'Reus 65 Mio');
+  assert.equal(REUS_COMPACT.rules!.winnerTitle, 'Reus65Mio-Champion'); assert.equal(REUS_COMPACT.rules!.showTitle, 'Reus 65 Mio');
+  assert.deepEqual(REUS_COMPACT.show!.map(s => (s.k === 'board' ? 'board' : s.cat)), ['s4-r1', 'board', 's4-r2', 's4-r3', 'board', 's4-sur', 's4-r4', 's4-r5', 's4-r6', 'board', 's3-final']);
+  const g = reusGame(); const v = g.view('tv'); assert.equal(v.room.brand!.winner, 'Reus65Mio-Champion'); assert.equal(v.room.brand!.title, 'Reus 65 Mio');
+  // Wertung: je Modus 4 gewertete Aufgaben + 1 Probe, Überraschung 3 + 1 Probe, Finale 4
+  for (const t of REUS_COMPACT.tiles) { const reg = t.tasks.filter(x => !x.practice).length; assert.equal(reg, t.kind === 'surprise' ? 3 : 4, t.id); assert.equal(t.tasks.filter(x => x.practice).length, t.kind === 'final' ? 0 : 1, t.id); if (t.kind !== 'final') assert.ok(t.tasks[0].practice, 'Probe steht zuerst'); }
+});
+
+test('Längere Show: Paketregel tasksPerMode = 5 ergibt 5 gewertete Aufgaben je Spielmodus (neue Paketversion), Proben bleiben, kompakte Version unverändert', () => {
+  const p = CS2.getPack('show-2'); CS2.updatePack('show-2', { ...p, rules: { ...p.rules, tasksPerMode: 5 } });
+  const pub = CS2.publish('show-2', 'Längere Show'); assert.equal(pub.ref, 'show-2@2');
+  const long: Book = CS2.resolveBook('show-2@2');
+  for (const t of long.tiles) assert.equal(t.tasks.filter(x => !x.practice).length, t.kind === 'tile' ? 5 : t.kind === 'surprise' ? 3 : 4, t.id);
+  assert.equal(CS2.resolveBook('show-2@1').tiles.find(t => t.id === 's4-r1')!.tasks.filter(x => !x.practice).length, 4, 'veröffentlichte Version bleibt unverändert');
+  const a = analyzeShow(long)!, c = analyzeShow(REUS_COMPACT)!;
+  assert.equal(c.tasksTotal, 31); assert.equal(a.tasksTotal, 37); assert.ok(a.minutesExpected > c.minutesExpected + 8, `${c.minutesExpected} → ${a.minutesExpected}`);
+  CS2.updatePack('show-2', { ...p, rules: { ...p.rules, tasksPerMode: 4 } });   // Entwurf zurück (Testisolation)
+});
+
+test('Proberunden: erste Aufgabe jedes Modus, mitspielen möglich, KEINE Punkte, überspringbar, zählen nicht als gewertete Aufgabe; CL-Finale 2025 ist die erste Wertung', () => {
+  const g = reusGame(); const before = g.room.players.map(p => p.score);
+  assert.equal(g.room.round!.tileId, 's4-r1'); const v0 = g.view('tv').round!; assert.equal(v0.practice, true); assert.equal(v0.scoredIndex, 0); assert.equal(v0.scoredCount, 4);
+  assert.ok(g.host({ k: 'h.begin' }).ok); const t = g.eng.curTask(g.room) as any; assert.match(t.prompt, /Allianz Arena/);
+  assert.equal(Math.round((g.room.round!.deadline! - Date.now() * 0) > 0 ? 1 : 0), 1);
+  g.ids.forEach((_, i) => g.pl(i, { k: 'submit', payload: { lat: t.answer.lat + i * 0.2, lon: t.answer.lon } }));
+  g.host({ k: 'h.lock' }); assert.ok(g.host({ k: 'h.reveal' }).ok);
+  const rev = g.view('tv').round!.reveal; assert.equal(rev.practice, true); assert.ok(rev.guesses[0].points > 0, 'Anzeige zeigt, wie gewertet worden wäre');
+  assert.deepEqual(g.room.players.map(p => p.score), before, 'keine Punkte gebucht');
+  g.host({ k: 'h.next' });
+  const v1 = g.view('tv').round!; assert.equal(v1.practice, false); assert.equal(v1.scoredIndex, 1); assert.equal(v1.taskIndex, 1);
+  assert.match((g.eng.curTask(g.room) as any).prompt, /Champions-League-Finale 2025/);
+  // Probe überspringen: neue Runde (R2) → Probe skippen → erste gewertete Aufgabe
+  const h = reusGame(); h.host({ k: 'h.skipTask' }); assert.equal(h.room.round!.taskIndex, 1); assert.equal(h.room.round!.tileId, 's4-r1');
+});
+
+test('Alle sieben Probe-Aufgaben: spielbar bis zur Auflösung ohne Punktebuchung (Match, Rank, Setz auf mich inkl. Wetten, Glitch, Einzigartig inkl. Prüfung, Verbindung)', () => {
+  const g = reusGame(); const total0 = () => g.room.players.reduce((a, p) => a + p.score, 0); const start = total0();
+  const playProbe = () => {
+    assert.ok(g.host({ k: 'h.begin' }).ok); const t = g.eng.curTask(g.room) as any;
+    for (let s = 0; s < 30 && ['view', 'open', 'bet'].includes(g.room.round!.stage); s++) {
+      const stage = g.room.round!.stage as string; if (stage === 'view') { g.advance(g.room.round!.deadline! - Date.now() * 0 > 0 ? 20_000 : 1); continue; }
+      g.ids.forEach((_, i) => {
+        if (t.mode === 'geo') g.pl(i, { k: 'submit', payload: { lat: t.answer.lat, lon: t.answer.lon } });
+        if (t.mode === 'match') g.pl(i, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5].map(k => t.order.indexOf(k)), final: true } });
+        if (t.mode === 'rank') { const st = g.room.round!.m.step as number; g.pl(i, { k: 'submit', payload: { step: st, slot: t.order[st] } }); }
+        if (t.mode === 'estimate') { if (stage === 'open') g.pl(i, { k: 'submit', payload: { value: 16 + i } }); else g.pl(i, { k: 'submit', payload: { amount: 100, target: g.ids[0] } }); }
+        if (t.mode === 'glitch') { const z = g.view('host').round!.data.zones[0]; g.pl(i, { k: 'submit', payload: { x: z.x, y: z.y } }); }
+        if (t.mode === 'unique') g.pl(i, { k: 'submit', payload: { answer: i % 2 ? 'Rot' : 'Fantasie' } });
+        if (t.mode === 'link') g.pl(i, { k: 'submit', payload: { answer: 'Mond' } });
+      });
+      if (['open', 'bet'].includes(g.room.round!.stage) && !['rank'].includes(t.mode)) g.host({ k: 'h.lock' });
+    }
+    g.host({ k: 'h.reveal' });
+    for (const gr of (g.view('host').round!.data.groups ?? [])) if (gr.state === 'unknown') g.host({ k: 'h.review', groupKey: gr.key, decision: 'invalid' });
+    if (g.room.round!.stage !== 'reveal') assert.ok(g.host({ k: 'h.reveal' }).ok);
+    assert.equal(g.view('tv').round!.reveal.practice, true);
+    return t.mode;
+  };
+  const modes = new Set<string>();
+  for (const tile of ['s4-r1', 's4-r2', 's4-r3', 's4-sur', 's4-r4', 's4-r5', 's4-r6']) {
+    for (let i = 0; i < 40 && g.room.round?.tileId !== tile; i++) g.host({ k: (g.room.phase as string) === 'scoreboard' ? 'h.continue' : 'h.skipTile' });
+    assert.equal(g.room.round?.tileId, tile, `phase=${g.room.phase} round=${g.room.round?.tileId}`); modes.add(playProbe());
+  }
+  assert.equal(modes.size, 7); assert.equal(total0(), start, 'Proberunden buchen niemals Punkte');
+});

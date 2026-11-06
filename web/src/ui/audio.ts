@@ -50,3 +50,31 @@ export function play(name: Name) {
     case 'win': [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.14, 0.4, 'triangle', 0.55)); tone(262, 0, 1.6, 'sawtooth', 0.2); break;
   }
 }
+
+// ---------------------------------------------------------------- Hintergrundmusik
+// Eigenständig erzeugt (WebAudio, keine Dateien, keine fremde Musik): ein ruhiger, langsamer Klangteppich aus weichen Sinus-/Dreieckstönen
+// über einer wiederkehrenden Akkordfolge (Am – F – C – G, je 8 s). Läuft komplett offline. Nur eine Instanz; setMusic ist idempotent.
+let mus: { gain: GainNode; oscs: OscillatorNode[]; timer: number } | null = null;
+const CHORDS = [[110, 220, 261.63, 329.63], [87.31, 174.61, 220, 261.63], [130.81, 196, 261.63, 329.63], [98, 196, 246.94, 293.66]];
+export function setMusic(on: boolean, vol: number) {
+  try {
+    const target = on && enabled && ctx && ctx.state === 'running' ? Math.max(0, Math.min(100, vol)) / 100 * 0.07 : 0;   // sehr leise: max. ≈ −23 dB
+    if (target > 0 && !mus && ctx) {
+      const gain = ctx.createGain(); gain.gain.value = 0.0001; gain.connect(ctx.destination);
+      const lfo = ctx.createOscillator(), lfoG = ctx.createGain(); lfo.frequency.value = 0.08; lfoG.gain.value = 0.25; lfo.connect(lfoG); lfoG.connect(gain.gain); lfo.start();
+      const oscs: OscillatorNode[] = [lfo];
+      CHORDS[0].forEach((f, i) => { const o = ctx!.createOscillator(); o.type = i % 2 ? 'triangle' : 'sine'; o.frequency.value = f; const g = ctx!.createGain(); g.gain.value = 0.22; o.connect(g); g.connect(gain); o.start(); oscs.push(o); });
+      let n = 0;
+      const timer = window.setInterval(() => { if (!ctx) return; n = (n + 1) % CHORDS.length; oscs.slice(1).forEach((o, i) => o.frequency.setTargetAtTime(CHORDS[n][i], ctx!.currentTime, 1.6)); }, 8000);
+      mus = { gain, oscs, timer };
+    }
+    if (mus && ctx) {
+      mus.gain.gain.cancelScheduledValues(ctx.currentTime);
+      mus.gain.gain.setTargetAtTime(Math.max(0.0001, target), ctx.currentTime, 0.6);
+      if (target === 0) {   // sauber beenden, damit nichts weiterläuft oder später doppelt startet
+        const m = mus; mus = null; window.clearInterval(m.timer);
+        window.setTimeout(() => { m.oscs.forEach(o => { try { o.stop(); } catch { /* */ } }); try { m.gain.disconnect(); } catch { /* */ } }, 2500);
+      }
+    }
+  } catch { /* Audio darf die Show nie gefährden */ }
+}

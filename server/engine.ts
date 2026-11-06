@@ -397,11 +397,16 @@ export class Engine {
     this.forceLock(c);
     if (MODES[c.task.mode].blockReveal?.(c)) return { ok: false, err: 'review_needed' };
     const res = MODES[c.task.mode].score(c);
-    r.result = res;
-    const key = this.scoreKey(room);
-    this.dropEntries(room, key);
-    for (const e of res.entries) this.addEntry(room, key, e.pid, e.delta, e.label, now);
-    this.recompute(room);
+    if (c.task.practice) {
+      // Proberunde: Auflösung wie gewohnt, aber niemals Punkte buchen (gezeigte Punkte = „so wäre es gewertet worden“)
+      r.result = { entries: [], reveal: { ...res.reveal, practice: true } };
+    } else {
+      r.result = res;
+      const key = this.scoreKey(room);
+      this.dropEntries(room, key);
+      for (const e of res.entries) this.addEntry(room, key, e.pid, e.delta, e.label, now);
+      this.recompute(room);
+    }
     c.setStage('reveal', null);
     this.log(room, now, `Auflösung: ${this.curTile(room)!.title} · Aufgabe ${r.taskIndex + 1}`);
     return { ok: true };
@@ -437,6 +442,8 @@ export class Engine {
         room.pickerId = a.pid; return ok;
       }
       case 'h.sound': room.sound = !!a.on; return ok;
+      case 'h.liveRank': room.liveRank = !!a.on; return ok;
+      case 'h.music': { const cur = room.music ?? { on: false, vol: 25 }; room.music = { on: a.on ?? cur.on, vol: Math.max(0, Math.min(100, Math.round(a.vol ?? cur.vol))) }; return ok; }
       case 'h.reduced': room.reduced = !!a.on; return ok;
       case 'h.showPause': {
         room.showPaused = !!a.paused;
@@ -594,6 +601,8 @@ export class Engine {
         act: this.actLabel(room),
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === 'show' ? room.plan.filter(x => x.startsWith('tile:')).length : room.plan.filter(s => s === 'wall').length + 2 },
         flow: room.flow ?? 'classic',
+        brand: { title: this.bk(room).rules?.showTitle || 'OUTPLAY', winner: this.bk(room).rules?.winnerTitle || 'OUTPLAY-Champion' },
+        liveRank: room.liveRank ?? true, music: room.music ?? { on: false, vol: 25 },
         ...(room.flow === 'show' ? { agenda: this.agenda(room) } : {}),
       },
       players, wall: null, round: null, scoreboard: null, ceremony: null,
@@ -655,7 +664,7 @@ export class Engine {
       const state: 'done' | 'now' | 'todo' = room.phase === 'ceremony' || room.phase === 'ended' || i < room.planIdx ? 'done' : i === room.planIdx && room.phase !== 'lobby' && room.phase !== 'intro' ? 'now' : 'todo';
       if (s === 'board') { list.push({ k: 'board', title: 'Zwischenstand', state }); return; }
       const t = s.startsWith('tile:') ? this.tile(room, s.slice(5)) : undefined;
-      if (t) list.push({ k: t.kind === 'tile' ? 'round' : t.kind, title: t.title, icon: t.icon, mode: t.tasks[0]?.mode, tasks: t.tasks.length, state });
+      if (t) list.push({ k: t.kind === 'tile' ? 'round' : t.kind, title: t.title, icon: t.icon, mode: t.tasks[0]?.mode, tasks: t.tasks.filter(x => !x.practice).length, state });
     });
     return list;
   }
@@ -710,7 +719,8 @@ export class Engine {
     const reveal = r.stage === 'reveal' ? this.revealView(r.result?.reveal, aud) : null;
     return {
       rid: `${tile.id}#${r.taskIndex}#${r.attempt}`, tileId: tile.id, title: tile.title, topic: tile.topic, icon: tile.icon, color: tile.color, mode: c.task.mode, kind: tile.kind,
-      blurb: tile.blurb, taskIndex: r.taskIndex, taskCount: tile.tasks.length, stage: r.stage,
+      blurb: tile.blurb, taskIndex: r.taskIndex, taskCount: tile.tasks.length, practice: !!c.task.practice,
+      scoredIndex: c.task.practice ? 0 : tile.tasks.slice(0, r.taskIndex + 1).filter(x => !x.practice).length, scoredCount: tile.tasks.filter(x => !x.practice).length, stage: r.stage,
       deadline: r.deadline, pausedLeft: r.pausedLeft, stageSeconds: r.stageSeconds,
       points: mode.maxPoints(c.task), data, reveal,
     };

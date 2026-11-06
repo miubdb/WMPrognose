@@ -13,6 +13,8 @@ export interface AdminCtx {
   mode: 'local' | 'online';
   /** konsistenter Voll-Snapshot der SQLite-Datenbank (VACUUM INTO) */
   backup(): Buffer;
+  /** optional: Voll-Sicherung unmittelbar vor einer Installation (lokal: Datei im Backup-Ordner) */
+  preInstallBackup?(): string | null;
   /** Meldet nach einer Admin-Anfrage, ob geschrieben wurde (Online: dann wird nach Blob gespeichert) */
   setupProblem?(): { err: string; setup: string } | null;
 }
@@ -112,7 +114,7 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
       }
       case 'standard': {   // mitgeliefertes Standardpaket: Status / sicher installieren (nicht-destruktiv, mit Archivierung des Vorgängers)
         if (method === 'GET') return json(200, C.seedStatus());
-        if (method === 'POST') return json(200, C.installSeed({ archiveOlder: true }));
+        if (method === 'POST') { const backupFile = app.preInstallBackup?.() ?? null; return json(200, { ...C.installSeed({ archiveOlder: true }), backupFile }); }
         break;
       }
       case 'backup': {

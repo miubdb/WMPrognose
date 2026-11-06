@@ -4,7 +4,7 @@ import { Avatar } from '../ui/Avatar';
 import { AnswerRow, Countdown, Leaderboard, QR, useBaseUrl } from '../ui/widgets';
 import { MapView } from '../ui/MapView';
 import { SceneView } from '../ui/SceneView';
-import { initAudio, play, setSoundEnabled } from '../ui/audio';
+import { initAudio, play, setMusic, setSoundEnabled } from '../ui/audio';
 import type { PlayerPublic, RoundView, View } from '../../../shared/types';
 
 export const MODE_NAME: Record<string, string> = {
@@ -30,6 +30,7 @@ export function Tv({ code }: { code: string }) {
     try { void rootRef.current?.requestFullscreen?.(); } catch { /* */ }
   };
   useEffect(() => { if (view) setSoundEnabled(view.room.sound); }, [view?.room.sound]);
+  useEffect(() => { setMusic(!!view?.room.music?.on && started && !view?.room.showPaused, view?.room.music?.vol ?? 25); }, [view?.room.music?.on, view?.room.music?.vol, view?.room.sound, view?.room.showPaused, started]);
   useSounds(view, started);
   return (
     <div className={`tv ${view?.room.reduced ? 'reduced' : ''}`} ref={rootRef}>
@@ -111,8 +112,8 @@ function LobbyTv({ view, code }: { view: View; code: string }) {
 // ---------------------------------------------------------------- Vorstellung
 function IntroTv({ view }: { view: View }) {
   return (
-    <div className="introtv">
-      <Header view={view} />
+    <div className="introtv calm">
+      <div className="showtitle">{view.room.brand?.title ?? 'OUTPLAY'}</div>
       <h1 className="introtitle">Heute im Studio</h1>
       <div className="introgrid">
         {view.players.map((p, i) => (
@@ -121,11 +122,6 @@ function IntroTv({ view }: { view: View }) {
           </div>
         ))}
       </div>
-      {view.room.agenda && (
-        <div className="agenda" aria-label="Programm">
-          {view.room.agenda.map((a, i) => <div key={i} className={`ag ${a.k}`}><span>{a.icon ?? '📊'}</span><b>{a.k === 'board' ? 'Stand' : a.title}</b></div>)}
-        </div>
-      )}
     </div>
   );
 }
@@ -154,14 +150,30 @@ function WallTv({ view }: { view: View }) {
 }
 
 // ---------------------------------------------------------------- Runde
+function LiveRank({ view }: { view: View }) {
+  const rows = view.players.filter(p => p.score !== undefined && p.score !== null).slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  if (!rows.length) return null;
+  return (
+    <aside className="liverank" aria-label="Zwischenstand">
+      <small>Ranking</small>
+      {rows.map((p, i) => <div key={p.id} className="lr"><b>{i + 1}</b><Avatar a={p.avatar} size={28} /><span>{p.name}</span><em>{(p.score ?? 0).toLocaleString('de-DE')}</em></div>)}
+    </aside>
+  );
+}
+
 export function RoundTv({ view, round, serverNow }: { view: View; round: RoundView; serverNow: () => number }) {
+  const showLive = !!view.room.liveRank && !view.room.hideScores && round.kind !== 'final' && round.stage !== 'intro';
   const timer = round.stage !== 'intro' && round.stage !== 'reveal' && round.deadline !== null || round.pausedLeft !== null;
   return (
-    <div className={`roundtv k-${round.kind}`} style={{ ['--accent' as any]: round.color }}>
+    <div className={`roundtv k-${round.kind} ${showLive ? 'withlive' : ''}`} style={{ ['--accent' as any]: round.color }}>
+      {showLive && <LiveRank view={view} />}
       <Header view={view} right={timer ? <Countdown round={round} serverNow={serverNow} size={140} onTick={s => { if (s > 0 && s <= 5 && round.pausedLeft === null) play('tick'); }} /> : undefined} />
-      <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.title}</b><small>{MODE_NAME[round.mode]}{round.taskCount > 1 ? ` · Aufgabe ${round.taskIndex + 1} von ${round.taskCount}` : ''} · bis zu {round.points} Punkte</small></div></div>
+      {round.stage !== 'intro' && (
+        <div className="roundtitle"><span className="ic">{round.icon}</span><div><b>{round.kind === 'final' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</b><small>{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</small></div></div>
+      )}
+      {round.practice && round.stage === 'reveal' && <div className="probebanner">🎓 Proberunde – so wäre es gewertet worden. Es werden <b>keine Punkte</b> vergeben.</div>}
       <div className="roundbody">
-        {round.stage === 'intro' ? <RuleCard round={round} /> :
+        {round.stage === 'intro' ? <RuleCard round={round} view={view} /> :
           round.mode === 'geo' ? <GeoTv view={view} round={round} /> :
           round.mode === 'rank' ? <RankTv view={view} round={round} /> :
           round.mode === 'estimate' ? <EstimateTv view={view} round={round} /> :
@@ -175,19 +187,29 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
   );
 }
 
-function RuleCard({ round }: { round: RoundView }) {
+/** Kleine Zusatzzeile: Aufgabe X von Y und Maximalpunkte – bei Proberunden der Hinweis „keine Punkte“. */
+function taskLine(round: RoundView, cat?: string): string {
+  const parts: string[] = [];
+  if (cat && cat !== MODE_NAME[round.mode]) parts.push(cat);
+  if (round.practice) parts.push('Proberunde', 'keine Punkte');
+  else { if (round.scoredCount > 1) parts.push(`Aufgabe ${round.scoredIndex} von ${round.scoredCount}`); parts.push(`bis zu ${round.points} Punkte`); }
+  return parts.join(' · ');
+}
+
+function RuleCard({ round, view }: { round: RoundView; view: View }) {
   if (round.taskIndex > 0) {                     // ab der 2. Aufgabe einer Runde: kompakte Karte statt voller Regelkarte (spart Zeit)
     return (
       <div className="rulecard compact">
         <div className="flip"><div className="bigic">{round.icon}</div></div>
-        <h1>Aufgabe {round.taskIndex + 1} von {round.taskCount}</h1>
-        <p className="muted">{MODE_NAME[round.mode]} · bis zu {round.points} Punkte</p>
+        <h1>{round.kind === 'final' ? 'FINAL LOCK' : MODE_NAME[round.mode]}</h1>
+        <p className="muted">{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</p>
       </div>
     );
   }
   return (
     <div className="rulecard">
-      {round.kind === 'surprise' && <div className="kicker surprise">⚡ ÜBERRASCHUNG ⚡</div>}
+      {round.practice && <div className="kicker probe">🎓 PROBERUNDE – alle spielen mit, keine Punkte</div>}
+      {round.kind === 'surprise' && !round.practice && <div className="kicker surprise">⚡ ÜBERRASCHUNG ⚡</div>}
       {round.kind === 'final' && <div className="kicker final">🔒 Rangliste ab jetzt verborgen</div>}
       <div className="flip"><div className="bigic">{round.icon}</div></div>
       {round.kind === 'final' && round.taskIndex === 0 ? <>
@@ -197,7 +219,7 @@ function RuleCard({ round }: { round: RoundView }) {
         <h1>{MODE_NAME[round.mode]}</h1>
         <ol>{MODE_RULES[round.mode].map((r, i) => <li key={i} style={{ animationDelay: `${0.4 + i * 0.5}s` }}>{r}</li>)}</ol>
       </>}
-      <p className="muted">{round.taskCount > 1 ? `${round.taskCount} Aufgaben · ` : ''}insgesamt bis zu {round.kind === 'final' ? '2.000' : '1.000'} Punkte</p>
+      <p className="muted">{taskLine(round, view.room.flow === 'classic' ? round.title : undefined)}</p>
     </div>
   );
 }
@@ -476,7 +498,7 @@ function CeremonyTv({ view }: { view: View }) {
           </div>); })}
       </div>
       {winner && <div className="confetti">{Array.from({ length: 60 }, (_, i) => <i key={i} style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 12) * 0.25}s`, background: ['#f5b82e', '#8b5cf6', '#14d9c0', '#3b82f6', '#ec4899'][i % 5] }} />)}</div>}
-      {winner && <div className="winnerbanner"><small>Der OUTPLAY-Champion</small><b>{winner.name}</b></div>}
+      {winner && <div className="winnerbanner"><small>Der {view.room.brand?.winner ?? 'OUTPLAY-Champion'}</small><b>{winner.name}</b><span className="trophy">🏆</span></div>}
     </div>
   );
 }

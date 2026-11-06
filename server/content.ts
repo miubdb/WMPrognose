@@ -26,7 +26,7 @@ export function bookHash(book: Book): string {
 const J = <T>(s: string) => JSON.parse(s) as T;
 
 export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules>; /** fester Showablauf (optional) */ show?: ShowStep[] }
-export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'Champion' };
+export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4 };
 
 export function normalizePack(raw: any): PackData {
   const r = raw ?? {};
@@ -36,12 +36,12 @@ export function normalizePack(raw: any): PackData {
     name: s(r.name, 60), description: s(r.description, 300), categoryIds: Array.isArray(r.categoryIds) ? [...new Set<string>(r.categoryIds.map((x: unknown) => s(x, 80)).filter(Boolean))].slice(0, 20) : [],
     surprise: s(r.surprise, 80), final: s(r.final, 80),
     ...(Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x: any): ShowStep | null => (x?.k === 'board' ? { k: 'board' } : (x?.k === 'round' || x?.k === 'surprise' || x?.k === 'final') && s(x.cat, 80) ? { k: x.k, cat: s(x.cat, 80) } : null)).filter((x: ShowStep | null): x is ShowStep => !!x) } : {}),
-    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ['task', 'sequence', 'sort'].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle },
+    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ['task', 'sequence', 'sort'].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle, tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6) },
   };
 }
 
 export interface SeedShow {
-  pack: { id: string; name: string; description: string };
+  pack: { id: string; name: string; description: string; rules?: Partial<PackRules> };
   pool: { id: string; topic: string; task: TaskDef }[];
   rounds: { id: string; title: string; topic: string; icon: string; color: string; kind: 'tile' | 'surprise' | 'final'; football: boolean; blurb: string; taskIds: string[] }[];
   steps: ShowStep[];
@@ -49,7 +49,7 @@ export interface SeedShow {
 
 export class ContentService {
   private cache = new Map<string, Book>();
-  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene>; pack?: { id: string; name: string; description: string }; show?: SeedShow }, private now: () => number = Date.now) {
+  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene>; pack?: { id: string; name: string; description: string }; show?: SeedShow; /** weitere mitgelieferte Showpakete (z. B. „Reus 65 Mio“) */ extraShows?: SeedShow[] }, private now: () => number = Date.now) {
     if (!this.setting('seeded')) { this.installSeed(); this.setSetting('seeded', '1'); this.wasSeeded = true; }
   }
   private get db() { return this.store.db; }
@@ -75,7 +75,7 @@ export class ContentService {
    */
   installSeed(opts: { archiveOlder?: boolean } = {}) {
     const t = this.now();
-    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [] as string[], ref: '', showRef: '', showCreated: false };
+    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [] as string[], ref: '', showRef: '', showCreated: false, extraRefs: [] as string[] };
     this.tx(() => {
       const pk = this.seedPack;
       const had = !!this.db.prepare('SELECT 1 FROM packs WHERE id=?').get(pk.id);
@@ -102,9 +102,9 @@ export class ContentService {
           for (const old of this.listPacks()) if (old.id !== pk.id && /^standard-\d+$/.test(old.id) && old.status !== 'archived') { this.setPackStatus(old.id, 'archived'); report.archived.push(old.id); }
         }
       } else if (had) { report.alreadyInstalled = true; const row = this.listPacks().find(p => p.id === pk.id); report.ref = row?.currentVersion ? `${pk.id}@${row.currentVersion}` : ''; }
-      // ---- Showpaket (fester Ablauf) + erweiterter Fragenpool: ebenfalls nur ergänzend (INSERT OR IGNORE)
-      const sh = this.seed.show;
-      if (sh) {
+      // ---- Showpakete (fester Ablauf) + erweiterter Fragenpool: ebenfalls nur ergänzend (INSERT OR IGNORE)
+      for (const sh of [this.seed.show, ...(this.seed.extraShows ?? [])]) {
+        if (!sh) continue;
         for (const q of sh.pool) report.created.questions += run('INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)', q.id, q.task.mode, q.topic, JSON.stringify(q.task), t, t);
         for (const r of sh.rounds) {
           const cat: CategoryData = { title: r.title, topic: r.topic, icon: r.icon, color: r.color, kind: r.kind, football: r.football, blurb: r.blurb, taskIds: r.taskIds };
@@ -112,12 +112,13 @@ export class ContentService {
         }
         const exists = !!this.db.prepare('SELECT 1 FROM packs WHERE id=?').get(sh.pack.id);
         if (!exists) {
-          const pack: PackData = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: '', final: '', rules: { ...DEFAULT_RULES }, show: sh.steps };
+          const pack: PackData = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: '', final: '', rules: { ...DEFAULT_RULES, ...(sh.pack.rules ?? {}) } as Required<PackRules>, show: sh.steps };
           this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(sh.pack.id, JSON.stringify(pack), t, t);
-          report.showRef = this.publish(sh.pack.id, 'Mitgeliefertes Showpaket (fester Ablauf)').ref; report.created.packs++; report.showCreated = true;
-        } else { const row = this.listPacks().find(p => p.id === sh.pack.id); report.showRef = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : ''; report.alreadyInstalled = report.alreadyInstalled && true; }
-        if (report.showCreated) report.alreadyInstalled = false;
+          const ref = this.publish(sh.pack.id, 'Mitgeliefertes Showpaket (fester Ablauf)').ref; report.created.packs++; report.showCreated = true;
+          if (sh === this.seed.show) report.showRef = ref; else report.extraRefs.push(ref);
+        } else { const row = this.listPacks().find(p => p.id === sh.pack.id); const ref = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : ''; if (sh === this.seed.show) report.showRef = ref; }
       }
+      if (report.showCreated) report.alreadyInstalled = false;
     });
     return report;
   }
@@ -126,7 +127,9 @@ export class ContentService {
     const pk = this.seedPack;
     const row = this.listPacks().find(p => p.id === pk.id);
     const sh = this.seed.show; const shRow = sh ? this.listPacks().find(p => p.id === sh.pack.id) : undefined;
-    return { id: pk.id, name: pk.name, installed: !!row && (!sh || (!!shRow && !sh.pool.some(q => !this.db.prepare('SELECT 1 FROM questions WHERE id=?').get(q.id)))), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: sh ? sh.pool.filter(q => !this.db.prepare('SELECT 1 FROM questions WHERE id=?').get(q.id)).length : 0, status: row?.status ?? null, olderPacks: this.listPacks().filter(p => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== 'archived').map(p => ({ id: p.id, name: p.data.name })) };
+    const qMissing = (x: SeedShow) => x.pool.filter(q => !this.db.prepare('SELECT 1 FROM questions WHERE id=?').get(q.id)).length;
+    const extras = (this.seed.extraShows ?? []).map(x => ({ id: x.pack.id, name: x.pack.name, installed: !!this.listPacks().find(p => p.id === x.pack.id) && qMissing(x) === 0 }));
+    return { extras, id: pk.id, name: pk.name, installed: !!row && (!sh || (!!shRow && !qMissing(sh))) && extras.every(e => e.installed), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: (sh ? qMissing(sh) : 0) + (this.seed.extraShows ?? []).reduce((a, x) => a + qMissing(x), 0), status: row?.status ?? null, olderPacks: this.listPacks().filter(p => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== 'archived').map(p => ({ id: p.id, name: p.data.name })) };
   }
 
   // ------------------------------------------------------------- Szenen
@@ -313,6 +316,12 @@ export class ContentService {
         for (const p of q.problems) errors.push(`${label} · „${q.task.prompt.slice(0, 40)}“: ${p}`);
         tasks.push(q.task);
       }
+      // Kompakte (4) bzw. längere (5) Show: je regulärem Spielmodus nur die ersten N gewerteten Aufgaben (Proberunden bleiben immer erhalten)
+      if (kind === 'tile' && pack.show?.length) {
+        let reg = 0; const keep: TaskDef[] = [];
+        for (const t of tasks) { if (t.practice) keep.push(t); else if (reg < pack.rules.tasksPerMode) { keep.push(t); reg++; } }
+        tasks.length = 0; tasks.push(...keep);
+      }
       if (c.points < c.budget * 0.8 && !c.problems.length && c.mode !== 'estimate') warnings.push(`${label}: nur ${c.points} von ${c.budget} Punkten verteilt`);
       tiles.push({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, mode: (tasks[0]?.mode ?? 'geo'), kind, football: c.football, blurb: c.blurb, tasks: JSON.parse(JSON.stringify(tasks)) });
     };
@@ -353,7 +362,9 @@ export class ContentService {
     if (!errors.length && showSteps) {
       const sa = analyzeShow(book)!;
       if (sa.modesMissing.length) warnings.push(`Nicht jeder Spielmodus kommt im Showablauf vor (fehlt: ${sa.modesMissing.join(', ')})`);
-      if (sa.minutesExpected < 70 || sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min liegt außerhalb des Ziels 75–90 min`);
+      const probes = book.tiles.reduce((a, t) => a + t.tasks.filter(x => x.practice).length, 0);
+        if (sa.minutesExpected < 60 || sa.minutesExpected > 120) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min (höchstens ${sa.minutesMax} min) – für einen Spieleabend ungewöhnlich lang/kurz`);
+        else if (sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min, davon ca. ${Math.round(probes * 2.3)} min für ${probes} Proberunden (überspringbar). Ohne Proben ca. ${Math.round(sa.minutesExpected - probes * 2.3)} min.`);
       if (showSteps[showSteps.length - 2]?.k !== 'board') warnings.push('Empfohlen: vor dem Finale einen „Zwischenstand“-Schritt');
     }
     return { book: errors.length ? null : book, errors, warnings };

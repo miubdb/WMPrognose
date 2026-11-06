@@ -41,6 +41,9 @@ export interface Room {
   bookId?: string;
   /** Ablaufmodell; fehlt bei älteren Räumen → klassisch (Kategorienwand) */
   flow?: Flow;
+  /** Live-Ranking am TV-Rand (Standard an) und Hintergrundmusik (Standard aus) */
+  liveRank?: boolean;
+  music?: { on: boolean; vol: number };
   createdAt: number;
   hostKeyHash: string;
   hostPin: string;

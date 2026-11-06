@@ -423,8 +423,11 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
             <label className="field"><span>BLIND RANK – Bedienung</span><select value={p.rules.rankVariant ?? 'task'} onChange={e => set('rules', { ...p.rules, rankVariant: e.target.value })}><option value="task">je Frage festgelegt (Standard: nacheinander)</option><option value="sequence">immer nacheinander (klassisch)</option><option value="sort">immer: alle fünf sichtbar & sortieren</option></select></label>
           </div>
           <div className="form2">
+            <label className="field"><span>Länge der Show (gewertete Aufgaben je Spielmodus)</span><select value={p.rules.tasksPerMode ?? 4} onChange={e => set('rules', { ...p.rules, tasksPerMode: Number(e.target.value) })}><option value={4}>Kompakte Show – 4 Aufgaben je Spielmodus</option><option value={5}>Längere Show – 5 Aufgaben je Spielmodus</option></select></label>
+          </div>
+          <div className="form2">
             <label className="field"><span>Showtitel (TV-Eröffnung)</span><input value={p.rules.showTitle ?? ''} maxLength={40} placeholder="OUTPLAY" onChange={e => set('rules', { ...p.rules, showTitle: e.target.value })} /></label>
-            <label className="field"><span>Gewinnerbezeichnung (Siegerehrung)</span><input value={p.rules.winnerTitle ?? ''} maxLength={40} placeholder="Champion" onChange={e => set('rules', { ...p.rules, winnerTitle: e.target.value })} /></label>
+            <label className="field"><span>Gewinnerbezeichnung (Siegerehrung)</span><input value={p.rules.winnerTitle ?? ''} maxLength={40} placeholder="OUTPLAY-Champion" onChange={e => set('rules', { ...p.rules, winnerTitle: e.target.value })} /></label>
           </div>
           <p className="muted small">Paketname oben ändern. Änderungen gelten für neue Räume, sobald du das Paket neu veröffentlichst (neue Version); laufende Räume bleiben unverändert.</p>
         </details>
@@ -510,9 +513,9 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
   const loadStd = useCallback(() => { adm('GET', '/standard').then(r => r.ok && setStd(r.data)); }, []);
   useEffect(loadStd, [loadStd]);
   const installStd = async () => {
-    if (!confirm('Neues Standardpaket jetzt installieren?\n\nBestehende Fragen, Kategorien und Pakete bleiben unverändert. Das bisherige Standardpaket wird nur archiviert (nicht gelöscht) und lässt sich jederzeit wieder aktivieren.')) return;
+    if (!confirm('Fehlende mitgelieferte Inhalte jetzt installieren?\n\nVorher wird automatisch eine Voll-Sicherung angelegt (lokal: Ordner data\\backups). Bestehende Fragen, Kategorien, Szenen und Pakete bleiben unverändert – es wird nur Fehlendes ergänzt.')) return;
     const r = await adm('POST', '/standard', {});
-    if (r.ok) { setStdMsg(r.data.alreadyInstalled ? 'Bereits installiert – nichts geändert.' : `Installiert: ${r.data.created.questions} Fragen, ${r.data.created.categories} Kategorien, Paket ${r.data.ref}${r.data.archived.length ? ' · archiviert: ' + r.data.archived.join(', ') : ''}`); bump(); loadStd(); } else setStdMsg(errText(r));
+    if (r.ok) { setStdMsg(r.data.alreadyInstalled ? 'Bereits installiert – nichts geändert.' : `Installiert: ${r.data.created.questions} Fragen, ${r.data.created.categories} Kategorien, ${r.data.created.packs} Paket(e) ${[r.data.ref, r.data.showRef, ...(r.data.extraRefs ?? [])].filter(Boolean).join(', ')}${r.data.archived.length ? ' · archiviert: ' + r.data.archived.join(', ') : ''}${r.data.backupFile ? ' · Sicherung vor der Installation: ' + r.data.backupFile : ''}`); bump(); loadStd(); } else setStdMsg(errText(r));
   };
   return (
     <div>
@@ -520,7 +523,7 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
       {std && !std.installed && (
         <div className="card warnbox">
           <h3>🆕 Neues Showpaket &amp; erweiterter Fragenpool verfügbar</h3>
-          <p className="small">Es fehlen in diesem Bestand noch: {[!std.classicInstalled && `„${std.name}“`, std.show && !std.show.installed && `„${std.show.name}“ (fester Showablauf)`, std.poolMissing > 0 && `${std.poolMissing} Pool-Fragen`].filter(Boolean).join(', ')}. Beim Installieren wird nichts überschrieben oder gelöscht – ein älteres Standardpaket wird nur archiviert.</p>
+          <p className="small">Es fehlen in diesem Bestand noch: {[!std.classicInstalled && `„${std.name}“`, std.show && !std.show.installed && `„${std.show.name}“ (fester Showablauf)`, ...(std.extras ?? []).filter((e: any) => !e.installed).map((e: any) => `„${e.name}“ (neues Showpaket)`), std.poolMissing > 0 && `${std.poolMissing} Pool-Fragen`].filter(Boolean).join(', ')}. Beim Installieren wird nichts überschrieben oder gelöscht – ein älteres Standardpaket wird nur archiviert.</p>
           <div className="row wrap"><button className="btn" onClick={backup}>🔒 Zuerst Voll-Backup laden</button><button className="btn primary" onClick={installStd}>Showpaket &amp; Fragenpool installieren</button></div>
           {stdMsg && <div className="status ok">{stdMsg}</div>}
         </div>)}

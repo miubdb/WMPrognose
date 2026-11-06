@@ -51,7 +51,7 @@ const balanceOf = (c: Ctx, pid: string) => c.room.players.find(p => p.id === pid
 // =====================================================================
 /** Alle regulären Geo-Fragen: 60 Sekunden (Finale behält die hinterlegte Zeit, mindestens 60). */
 export const GEO_SECONDS = 60;
-const geoSeconds = (c: Ctx) => Math.max(GEO_SECONDS, (c.task as GeoTask).seconds);
+const geoSeconds = (c: Ctx) => c.task.practice ? (c.task as GeoTask).seconds : Math.max(GEO_SECONDS, (c.task as GeoTask).seconds);
 const geo: ModeImpl = {
   maxPoints: t => (t as GeoTask).points,
   begin(c) { c.setStage('open', geoSeconds(c)); },

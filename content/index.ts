@@ -4,4 +4,6 @@ import type { Book } from '../server/engine';
 export const BOOK: Book = { tiles: TILES };
 /** Showpaket mit festem Ablauf + erweiterter Fragenpool (wird zusammen mit dem klassischen Standardpaket installiert). */
 export const SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-export { TILES, SEED_PACK };
+import { SEED_SHOW2 } from './show2';
+export const EXTRA_SHOWS = [SEED_SHOW2];
+export { TILES, SEED_PACK, SEED_SHOW2 };

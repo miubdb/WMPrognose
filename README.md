@@ -66,6 +66,8 @@ Vektorkarte auf OpenStreetMap-Basis, offline-fähig: siehe [docs/KARTE.md](docs/
 ## Spielmodi (aktiv) und Altbestand
 Aktiv sind sieben Modi: WO ZUR HÖLLE?, BLIND RANK, SETZ AUF MICH, GLITCH, EINZIGARTIG, MATCHMAKER, DIE VERBINDUNG. **CODEBREAK wird nicht mehr angeboten.** Bereits gespeicherte CODEBREAK-Fragen, ältere Pakete und Backups bleiben erhalten (lesbar, in alten Paketversionen spielbar), lassen sich aber nicht neu anlegen oder in neu veröffentlichte Pakete übernehmen.
 
+> **Update nach dem Praxistest:** Neue Regeln, Proberunden, Paket „Reus 65 Mio“ und die Update-Anleitung für den Windows-Laptop (ohne Datenverlust): [docs/PRAXISTEST-UPDATE.md](docs/PRAXISTEST-UPDATE.md).
+
 ## Showmodus (fester Ablauf) und Klassischer Modus
 Beim Erstellen eines Raums wählt der Showmaster: **🎬 Showmodus – fester Ablauf (Standard)** oder **🧱 Klassisch – Kategorienwand**. Der Showmodus spielt das Paket `show-1` (31 Aufgaben, 6 Runden + Überraschung + Finale, alle sieben Modi, ca. 80 min) in fester Reihenfolge ohne Wand; nach jeder Auflösung führt „Weiter“ automatisch zur nächsten Station, jede Aufgabe gibt der Showmaster aber selbst frei. Der Klassische Modus (`standard-2`, Kategorienwand) bleibt als Fallback. Bereits laufende Räume und alte Pakete funktionieren unverändert (Räume ohne Ablaufangabe sind „klassisch“). Der Ablauf liegt im Paket (`show`-Schritte) und wird beim Export/Import mit Reihenfolge übertragen.
 

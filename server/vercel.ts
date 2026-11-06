@@ -12,7 +12,7 @@ import { AdminAuth } from './auth';
 import { ContentService } from './content';
 import { Store } from './store';
 import { TILES, SEED_PACK } from '../content/tiles';
-import { SEED_SHOW } from '../content';
+import { EXTRA_SHOWS, SEED_SHOW } from '../content';
 import { SCENES } from '../shared/scenes';
 
 export interface BlobBackend {
@@ -111,7 +111,7 @@ export class OnlineAdmin {
     let etag: string | null = null;
     if (head) { const got = await b.get(); if (got) { writeFileSync(file, got.bytes); etag = got.etag; } }
     const store = new Store(file, { wal: false });
-    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW }, this.now);
+    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: EXTRA_SHOWS }, this.now);
     const auth = new AdminAuth(store, this.opts.adminPassword, this.now, { passwordRequiredFromEnv: true });
     this.live = { store, content, auth, etag, checkedAt: this.now(), file };
     if (content.wasSeeded) {                               // erste Initialisierung (Vorlagen) sofort sichern; scheitert, falls eine andere Instanz schneller war

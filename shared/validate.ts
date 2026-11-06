@@ -10,6 +10,7 @@ export const isLegacyMode = (m: string) => m === 'codebreak';
 export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'BLIND RANK', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', codebreak: 'CODEBREAK (veraltet)' };
 
 export function taskMax(t: TaskDef): number {
+  if (t.practice) return 0;                          // Proberunden zählen nie zu den Punkten
   switch (t.mode) {
     case 'estimate': return t.points + Math.max(0, ...t.bets);
     case 'unique': return t.pointsUnique;
@@ -25,6 +26,11 @@ const strList = (v: unknown, max: number, len = 80) => (Array.isArray(v) ? v.map
 
 /** Wandelt beliebige (ggf. aus der Oberfläche/Import stammende) Daten in ein sauberes TaskDef-Objekt um. */
 export function normalizeTask(raw: any): TaskDef {
+  const t = normalizeTaskCore(raw);
+  if (raw?.practice === true) (t as any).practice = true;
+  return t;
+}
+function normalizeTaskCore(raw: any): TaskDef {
   const r = raw ?? {};
   switch (r.mode as Mode) {
     case 'geo': return { mode: 'geo', prompt: str(r.prompt, 300), map: r.map, answer: { lat: num(r.answer?.lat), lon: num(r.answer?.lon), label: str(r.answer?.label, 80) }, seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 500) } as GeoTask;
@@ -120,7 +126,7 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
 export const CATEGORY_KINDS = ['tile', 'surprise', 'final'] as const;
 export type CategoryKind = typeof CATEGORY_KINDS[number];
 export interface CategoryData { title: string; topic: string; icon: string; color: string; kind: CategoryKind; football: boolean; blurb: string; taskIds: string[]; disabled?: boolean }
-export const BUDGET: Record<CategoryKind, number> = { tile: 1200, surprise: 1500, final: 2000 };
+export const BUDGET: Record<CategoryKind, number> = { tile: 1500, surprise: 1500, final: 2000 };
 
 export function normalizeCategory(raw: any): CategoryData {
   const r = raw ?? {};

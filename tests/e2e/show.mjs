@@ -1,5 +1,5 @@
 // E2E Showmodus mit echten Browsern: Host-Oberfläche (Klicks), TV, 7 Handys (Beitritt über die echte Oberfläche inkl. Avatar/QR),
-// komplette feste Show (31 Aufgaben) in Reihenfolge, Serverneustart mitten in einer Runde, Handy-Reload, Siegerehrung.
+// komplette feste Show „Reus 65 Mio“ (31 gewertete Aufgaben + 7 Proberunden) in Reihenfolge, Serverneustart mitten in einer Runde, Handy-Reload, Siegerehrung.
 // Antworten der Handys: erste Geo-Aufgabe per echtem Karten-Tipp im Browser; alle übrigen Aufgaben über das Handy-Protokoll
 // (WebSocket mit dem Spieler-Schlüssel – exakt die Nachrichten, die die Handy-Oberfläche sendet).
 // Start: node --import tsx tests/e2e/show.mjs   (startet den Server selbst, frische Datenbank, Port 8092)
@@ -9,7 +9,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const { chromium, devices } = require('playwright');
 const { WebSocket } = require('ws');
-const { TILES, SEED_SHOW } = await import('../../content/index.ts');
+const { TILES, SEED_SHOW, SEED_SHOW2 } = await import('../../content/index.ts');
 
 const PORT = 8092, BASE = `http://localhost:${PORT}`, DATA = '/tmp/outplay-show-e2e';
 const SHOTS = process.env.SHOTS ?? '/tmp/claude-0/shots-show';
@@ -22,8 +22,8 @@ const check = (c, m) => { if (c) console.log('• ✓', m); else { failures++; c
 // ---------- Aufgaben-Lookup (für sinnvolle Bot-Antworten) ----------
 const Q = new Map();
 for (const t of TILES) t.tasks.forEach((task, i) => Q.set(`${t.id}-${i + 1}`, task));
-for (const q of SEED_SHOW.pool) Q.set(q.id, q.task);
-const ROUND = new Map(SEED_SHOW.rounds.map(r => [r.id, r]));
+for (const q of [...SEED_SHOW.pool, ...SEED_SHOW2.pool]) Q.set(q.id, q.task);
+const ROUND = new Map([...SEED_SHOW.rounds, ...SEED_SHOW2.rounds].map(r => [r.id, r]));
 const taskOf = (tileId, idx) => Q.get(ROUND.get(tileId).taskIds[idx]);
 
 // ---------- Server ----------
@@ -84,6 +84,7 @@ const click = async (re, ms = 6000) => { const b = hostPage.getByRole('button', 
 await hostPage.waitForFunction(n => document.querySelectorAll('.plist li').length === n, 7);
 await click(/Lobby schließen/);
 await tv.waitForSelector('.introgrid'); check(true, 'TV zeigt Eröffnung (Kandidatenvorstellung)');
+await sleep(1500); check(await tv.locator('.agenda').count() === 0 && (await tv.locator('.showtitle').innerText()).includes('Reus 65 Mio'), 'Eröffnung: ruhig, ohne Modus-Liste, mit Showtitel „Reus 65 Mio“');
 await sleep(5200);
 await click(/Weiter zur ersten Runde/);
 await sleep(800);
@@ -107,8 +108,9 @@ const waitHost = async (pred, ms = 8000) => { const t0 = Date.now(); while (!pre
 
 // 6. Fahrplan
 const played = [], modesSeen = new Set(), tilesOrder = [], boards = [], shotModes = new Set();
-let restarted = false, firstGeoUi = false, leaks = 0, safety = 0;
-const TILEIDS = ['s3-r1', 's3-r2', 's3-r3', 's3-sur', 's3-r4', 's3-r5', 's3-r6', 's3-final'];
+let liveSeen = 0, liveInFinal = 0, brandOk = false; let restarted = false, firstGeoUi = false, leaks = 0, safety = 0;
+const TILEIDS = ['s4-r1', 's4-r2', 's4-r3', 's4-sur', 's4-r4', 's4-r5', 's4-r6', 's3-final'];
+const practiceSeen = [];
 while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
   const v = hostView, ph = v.room.phase;
   if (ph === 'scoreboard') { boards.push(v.scoreboard.title + ' | nächster Schritt: ' + v.host?.planNext); await shot(tv, `${SHOTS}/tv-board-${boards.length}.png`); await sleep(1500); await click(/Weiter \(/); await sleep(300); continue; }
@@ -119,11 +121,12 @@ while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
   if (r.stage === 'intro') {
     // Die Aufgabe startet NIE von selbst: nach 1,5 s muss sie noch im Intro stehen
     await sleep(1500); check(hostView.round.stage === 'intro' && hostView.round.deadline == null, `${key}: wartet auf Freigabe durch den Showmaster`);
-    await click(/Aufgabe \d+ starten/); await waitHost(x => x.round.stage !== 'intro'); continue;
+    await click(/Aufgabe \d+ starten|Proberunde starten/); await waitHost(x => x.round.stage !== 'intro'); continue;
   }
   if (r.stage === 'view') { await sleep(600); await click(/Betrachtung beenden/); await waitHost(x => x.round.stage !== 'view'); continue; }
   if (r.stage === 'open' || r.stage === 'bet') {
     const mode = task.mode; modesSeen.add(mode);
+    { const n = await tv.locator('.liverank').count(); if (r.kind === 'final') liveInFinal += n; else liveSeen += n; }
     if (!shotModes.has(mode)) { shotModes.add(mode); await sleep(900); await shot(tv, `${SHOTS}/tv-open-${mode}.png`); await shot(phones[0].p, `${SHOTS}/phone-open-${mode}.png`); }
     // keine Lösung vorzeitig sichtbar (TV + Handy)
     const bodyTv = await tv.locator('body').innerText(), bodyPh = await phones[1].p.locator('body').innerText();
@@ -135,7 +138,7 @@ while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
       for (let i = 1; i < 6; i++) await send(phones[i], { lat: task.answer.lat + i, lon: task.answer.lon - i });
     } else await answer(mode, task, r.stage);
     // Serverneustart mitten in der Runde (einmalig, in Runde 2 / Aufgabe 2 nach abgegebenen Antworten)
-    if (!restarted && r.tileId === 's3-r2' && r.taskIndex === 1) {
+    if (!restarted && r.tileId === 's4-r2' && r.taskIndex === 2) {
       restarted = true; const before = JSON.stringify({ t: hostView.round.tileId, i: hostView.round.taskIndex, sc: hostView.players.map(p => p.score) });
       hws.terminate(); phones.forEach(ph => ph.ws.terminate()); await stopServer(); await startServer(); await connectHost(); for (const ph of phones) await connectPhone(ph);
       const after = JSON.stringify({ t: hostView.round.tileId, i: hostView.round.taskIndex, sc: hostView.players.map(p => p.score) });
@@ -151,17 +154,18 @@ while (hostView.room.phase !== 'ceremony' && safety++ < 900) {
     await click(/Auflösung auf dem TV zeigen/); await waitHost(x => x.round.stage === 'reveal'); continue;
   }
   if (r.stage === 'reveal') {
-    if (!played.includes(key)) { played.push(key); await sleep(1800); if (played.length % 6 === 1) await shot(tv, `${SHOTS}/tv-reveal-${played.length}.png`); }
+    if (!played.includes(key)) { played.push(key); if (v.round.practice) practiceSeen.push(key); if (!v.round.practice && v.room.liveRank && v.room.hideScores === false) { /* Live-Ranking sichtbar */ } await sleep(1800); if (played.length % 6 === 1) await shot(tv, `${SHOTS}/tv-reveal-${played.length}.png`); }
     const last = v.round.taskIndex + 1 >= v.round.taskCount;
     await click(last ? /Runde abschließen/ : /^▶ Weiter zu Aufgabe/); await sleep(500); continue;
   }
   await sleep(250);
 }
 check(hostView.room.phase === 'ceremony', 'Siegerehrung erreicht');
-check(played.length === 31, `31 Aufgaben gespielt (${played.length})`);
+check(played.length === 38 && practiceSeen.length === 7, `31 gewertete Aufgaben + 7 Proberunden gespielt (${played.length}, davon Proben ${practiceSeen.length})`);
 check(JSON.stringify(tilesOrder) === JSON.stringify(TILEIDS), 'Rundenreihenfolge fest: ' + tilesOrder.join(' → '));
 check(modesSeen.size === 7, 'alle sieben Spielmodi gespielt: ' + [...modesSeen].join(', '));
-check(boards.length === 2, `genau 2 Zwischenstände vor dem Finale (${boards.length}): ` + boards.join(' // '));
+check(boards.length === 3, `genau 3 Zwischenstände vor dem Finale (${boards.length}): ` + boards.join(' // '));
+check(liveSeen > 0 && liveInFinal === 0, `Live-Ranking in normalen Runden sichtbar (${liveSeen}×), im FINAL LOCK nie (${liveInFinal}×)`);
 check(leaks === 0, 'keine Lösung vorzeitig auf TV/Handy sichtbar');
 check(hostView.players.every(p => p.score >= 0), 'keine negativen Punktestände');
 console.log('  Endstand:', hostView.players.map(p => `${p.name} ${p.score}`).join(', '));
@@ -170,5 +174,7 @@ console.log('  Endstand:', hostView.players.map(p => `${p.name} ${p.score}`).joi
 for (let i = 0; i < 12 && (hostView.ceremony?.step ?? 0) < hostView.ceremony.steps - 1; i++) { await click(/Nächster Schritt/); await sleep(700); if (i === 0) await shot(tv, `${SHOTS}/tv-ceremony-1.png`); }
 await sleep(800); await shot(tv, `${SHOTS}/tv-ceremony-end.png`);
 check(hostView.ceremony.step === hostView.ceremony.steps - 1, 'Siegerehrung bis zum Schluss durchgeklickt');
+brandOk = (await tv.locator('.winnerbanner').innerText().catch(() => '')).includes('Reus65Mio-Champion');
+check(brandOk, 'Siegerehrung zeigt „Reus65Mio-Champion“');
 await browser.close(); await phoneBrowser.close(); srv.kill('SIGKILL');
 console.log(failures ? `\n${failures} FEHLER` : '\nALLES OK'); process.exit(failures ? 1 : 0);

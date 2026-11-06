@@ -1,5 +1,8 @@
 // Erzeugt die OFFLINE-Vektorkarte (OpenStreetMap-Daten) als MBTiles-Datei für die Show.
 //   node scripts/build-maps.mjs [--maxzoom 12] [--out data/maps/outplay-karte.mbtiles] [--source <pmtiles-URL>]
+//        [--europe-maxzoom 7]  Europa-Detailstufe (Standard 7; 8 = deutlich mehr Details beim Hineinzoomen, ca. +50–60 MB, geschätzt)
+//        [--world-maxzoom 5]   Welt-Detailstufe (Standard 5; 6 = mehr Details, ca. +40 MB, geschätzt)
+// Zusätzliche Stufen ERGÄNZEN eine vorhandene Datei (bereits geladene Kacheln werden übersprungen) – die alte Datei bleibt voll nutzbar.
 // Quelle: Protomaps-Basiskarte (OpenStreetMap-Daten, © OpenStreetMap-Mitwirkende, ODbL). Es werden nur die benötigten Kacheln
 // (Welt grob, Europa mittel, Deutschland detailliert) per HTTP-Range geladen, überflüssige Ebenen (Gebäude, POIs, Ackerflächen …)
 // entfernt und alles in eine SQLite-Datei geschrieben. Abbrechen und erneut starten setzt fort. Einmalig mit Internet nötig.
@@ -20,6 +23,8 @@ const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ?
 const MAXZ = Number(arg('maxzoom', 12));
 const OUT = arg('out', 'data/maps/outplay-karte.mbtiles');
 const conc = Number(arg('concurrency', 12));
+const EUZ = Math.max(7, Number(arg('europe-maxzoom', 7)));   // höchste Zoomstufe für ganz Europa
+const WZ = Math.max(5, Number(arg('world-maxzoom', 5)));      // höchste Zoomstufe für die ganze Welt
 
 async function findSource() {
   const given = arg('source', '');
@@ -50,8 +55,8 @@ const polys = (deu.type === 'Polygon' ? [deu.coordinates] : deu.coordinates).map
 const inDE = pt => polys.some(({ p, bb }) => pt[0] >= bb[0] && pt[0] <= bb[2] && pt[1] >= bb[1] && pt[1] <= bb[3] && inRing(pt, p[0]) && !p.slice(1).some(h => inRing(pt, h)));
 
 function tilesFor(z) {
-  if (z <= 5) { const n = 2 ** z, a = []; for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) a.push([x, y]); return a; }
-  if (z <= 7) { const a = []; for (let x = lon2x(-26, z); x <= lon2x(48, z); x++) for (let y = lat2y(72, z); y <= lat2y(33, z); y++) a.push([x, y]); return a; }
+  if (z <= WZ) { const n = 2 ** z, a = []; for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) a.push([x, y]); return a; }
+  if (z <= EUZ) { const a = []; for (let x = lon2x(-26, z); x <= lon2x(48, z); x++) for (let y = lat2y(72, z); y <= lat2y(33, z); y++) a.push([x, y]); return a; }
   const set = new Map(); const add = (x, y) => set.set(x + '/' + y, [x, y]);
   const x0 = lon2x(5.3, z), x1 = lon2x(15.9, z), y0 = lat2y(55.5, z), y1 = lat2y(46.9, z);
   for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {

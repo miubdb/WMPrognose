@@ -10,7 +10,7 @@ import { Store } from './store';
 import { ContentService, ApiError } from './content';
 import { AdminAuth } from './auth';
 import { handleAdmin, type AdminCtx } from './admin';
-import { mkdtempSync, readFileSync as rf, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync as rf, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as pjoin } from 'node:path';
 import { SCENES } from '../shared/scenes';
@@ -46,6 +46,7 @@ export interface AppOptions {
   mapFile?: string;
   seedPack?: { id: string; name: string; description: string };
   seedShow?: import('./content').SeedShow;
+  extraShows?: import('./content').SeedShow[];
 }
 
 const MIME: Record<string, string> = {
@@ -73,6 +74,11 @@ export class App {
     const dir = mkdtempSync(pjoin(tmpdir(), 'outplay-bk-'));
     try { const f = pjoin(dir, 'backup.db'); this.store.backupTo(f); return rf(f); } finally { rmSync(dir, { recursive: true, force: true }); }
   }
+  /** Vor jeder Installation mitgelieferter Inhalte: eigene Voll-Sicherung (wird nie rotiert/gelöscht). */
+  preInstallBackup(): string | null {
+    const dir = this.opts?.backupDir; if (!dir) return null;
+    try { mkdirSync(dir, { recursive: true }); const f = pjoin(dir, `outplay-vor-installation-${new Date(this.clock()).toISOString().replace(/[:T]/g, '-').slice(0, 19)}.db`); this.store.backupTo(f); return f; } catch { return null; }
+  }
   /** Automatische Sicherung nach <backupDir> (konsistent per VACUUM INTO), die letzten 30 bleiben erhalten. */
   autoBackup(dir: string, keep = 30): string {
     const stamp = new Date(this.clock()).toISOString().replace(/[:T]/g, '-').slice(0, 19);
@@ -88,9 +94,9 @@ export class App {
     this.tiles = new LocalTiles(opts.mapFile ?? join(dirname(opts.dbFile), 'maps', 'outplay-karte.mbtiles'));
     this.clock = opts.clock ?? Date.now;
     this.store = new Store(opts.dbFile);
-    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack, show: opts.seedShow }, this.clock);
+    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack, show: opts.seedShow, extraShows: opts.extraShows }, this.clock);
     this.auth = new AdminAuth(this.store, opts.adminPassword, this.clock);
-    this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer() };
+    this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer(), preInstallBackup: () => this.preInstallBackup() };
     this.engine = new Engine((id: string) => this.content.resolveBook(id));
     for (const r of this.store.loadAll()) this.rooms.set(r.code, r);
     this.store.deleteOlderThan(this.clock() - 14 * 24 * 3600 * 1000);

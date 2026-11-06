@@ -6,7 +6,7 @@ import { buildScene, validateTemplate } from '../shared/sceneTemplates';
 import { diffZones } from '../shared/scenes';
 import { analyzeBook } from '../shared/analysis';
 import { TILES } from '../content/tiles';
-import { SEED_SHOW } from '../content';
+import { SEED_SHOW, EXTRA_SHOWS } from '../content';
 import { SCENES } from '../shared/scenes';
 
 const envs: TestEnv[] = [];
@@ -52,13 +52,13 @@ test('Sicherheit: Login, HttpOnly-Cookie, CSRF-Header, Logout, Rate-Limit', asyn
 
 test('Initiale Vorlagen: alle bisherigen Inhalte sind im Admin sichtbar (Fragen, Kategorien, Standardpaket v1)', async () => {
   const e = await mk(); const a = new Admin(e); await a.login();
-  const total = TILES.reduce((n, t) => n + t.tasks.length, 0) + SEED_SHOW.pool.length;
+  const total = TILES.reduce((n, t) => n + t.tasks.length, 0) + SEED_SHOW.pool.length + EXTRA_SHOWS.reduce((n, x) => n + x.pool.length, 0);
   const qs = (await a.get('/questions')).data; assert.equal(qs.length, total);
   assert.ok(qs.every((q: any) => q.problems.length === 0), 'alle Vorlagen-Fragen sind gültig');
-  const cats = (await a.get('/categories')).data; assert.equal(cats.length, TILES.length + SEED_SHOW.rounds.length);
+  const cats = (await a.get('/categories')).data; assert.equal(cats.length, TILES.length + SEED_SHOW.rounds.length + EXTRA_SHOWS.reduce((n, x) => n + x.rounds.length, 0));
   assert.ok(cats.every((c: any) => c.problems.length === 0), JSON.stringify(cats.filter((c: any) => c.problems.length)));
   const packs = (await a.get('/packs')).data; const std = packs.find((p: any) => p.id === 'standard-2'); assert.ok(std); assert.equal(std.currentVersion, 1); assert.equal(std.status, 'published'); assert.ok(packs.some((p: any) => p.id === 'show-1' && p.status === 'published'));
-  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[]).map((p: any) => p.ref).sort().join(), 'show-1@1,standard-2@1');
+  assert.equal((await (await fetch(e.url + '/api/packs')).json() as any[]).map((p: any) => p.ref).sort().join(), 'show-1@1,show-2@1,standard-2@1');
   // Filter & Suche
   assert.ok((await a.get('/questions?mode=geo')).data.every((q: any) => q.mode === 'geo'));
   assert.ok((await a.get('/questions?q=timbuktu')).data.length === 1);

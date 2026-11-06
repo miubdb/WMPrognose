@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { App } from '../server/app';
-import { BOOK, SEED_PACK, SEED_SHOW } from '../content';
+import { BOOK, SEED_PACK, SEED_SHOW, EXTRA_SHOWS } from '../content';
 import type { Action, Avatar, ServerMsg, View } from '../shared/types';
 
 export const AV: Avatar = { face: 0, skin: 0, hair: 0, hairColor: 0, hat: 0, shirt: 0, shirtColor: 0, acc: 0, bg: 0 };
@@ -13,7 +13,7 @@ export interface TestEnv { app: App; port: number; url: string; clock: { now: nu
 export async function startEnv(opts: { dbFile?: string; book?: any; adminPassword?: string } = {}): Promise<TestEnv> {
   const dbFile = opts.dbFile ?? join(mkdtempSync(join(tmpdir(), 'outplay-')), 'test.db');
   const clock = { now: 1_800_000_000_000 };
-  const app = new App({ book: opts.book ?? BOOK, seedPack: SEED_PACK, seedShow: SEED_SHOW, dbFile, clock: () => clock.now, tickMs: 40, adminPassword: opts.adminPassword });
+  const app = new App({ book: opts.book ?? BOOK, seedPack: SEED_PACK, seedShow: SEED_SHOW, extraShows: EXTRA_SHOWS, dbFile, clock: () => clock.now, tickMs: 40, adminPassword: opts.adminPassword });
   const port = await app.listen(0, '127.0.0.1');
   return { app, port, url: `http://127.0.0.1:${port}`, clock, dbFile, close: () => app.close() };
 }

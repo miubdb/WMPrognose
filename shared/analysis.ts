@@ -32,7 +32,7 @@ export function analyzeBook(book: Book, wallSlots = 6): PackAnalysis {
   const surprise = book.tiles.find(t => t.kind === 'surprise');
   const final = book.tiles.find(t => t.kind === 'final');
   const pts = (t: TileDef) => t.tasks.reduce((a, x) => a + taskMax(x), 0);
-  const row = (t: TileDef) => ({ tasks: t.tasks.length, points: pts(t), expectedMin: +(tileSeconds(t, 'expected') / 60).toFixed(1), maxMin: +(tileSeconds(t, 'max') / 60).toFixed(1) });
+  const row = (t: TileDef) => ({ tasks: t.tasks.filter(x => !x.practice).length, practice: t.tasks.filter(x => x.practice).length, points: pts(t), expectedMin: +(tileSeconds(t, 'expected') / 60).toFixed(1), maxMin: +(tileSeconds(t, 'max') / 60).toFixed(1) });
   const res: PackAnalysis = {
     tiles: regular.map(t => ({ id: t.id, title: t.title, mode: t.mode, football: t.football, ...row(t) })),
     specials: book.tiles.filter(t => t.kind !== 'tile').map(t => ({ id: t.id, title: t.title, kind: t.kind, ...row(t) })),
@@ -51,8 +51,9 @@ export function analyzeBook(book: Book, wallSlots = 6): PackAnalysis {
   for (const c of combos) {
     const e = showSeconds(c, surprise, final, 'expected') / 60, x = showSeconds(c, surprise, final, 'max') / 60;
     eMin = Math.min(eMin, e); eMax = Math.max(eMax, e); xMin = Math.min(xMin, x); xMax = Math.max(xMax, x);
-    const tasks = c.reduce((a, t) => a + t.tasks.length, 0);
-    const f = c.filter(t => t.football).reduce((a, t) => a + t.tasks.length, 0) / tasks;
+    const nreg = (t: TileDef) => t.tasks.filter(x => !x.practice).length;
+    const tasks = c.reduce((a, t) => a + nreg(t), 0);
+    const f = c.filter(t => t.football).reduce((a, t) => a + nreg(t), 0) / tasks;
     fMin = Math.min(fMin, f); fMax = Math.max(fMax, f); fSum += f;
     const m: Record<string, number> = {};
     for (const t of c) m[t.mode] = (m[t.mode] ?? 0) + 1;
@@ -65,7 +66,7 @@ export function analyzeBook(book: Book, wallSlots = 6): PackAnalysis {
 }
 
 export interface ShowAnalysis {
-  rounds: { k: string; title: string; icon?: string; mode: string; modes: string[]; tasks: number; points: number; expectedMin: number; maxMin: number }[];
+  rounds: { k: string; title: string; icon?: string; mode: string; modes: string[]; tasks: number; practice?: number; points: number; expectedMin: number; maxMin: number }[];
   boards: number;
   tasksTotal: number;
   minutesExpected: number;
@@ -85,7 +86,7 @@ export function analyzeShow(book: Book): ShowAnalysis | null {
     const t = byId.get(st.cat); if (!t) continue;
     order.push(t);
     const pts = t.tasks.reduce((a, x) => a + taskMax(x), 0);
-    rounds.push({ k: st.k, title: t.title, icon: t.icon, mode: t.mode, modes: [...new Set(t.tasks.map(x => x.mode))], tasks: t.tasks.length, points: pts, expectedMin: +(tileSeconds(t, 'expected', true) / 60).toFixed(1), maxMin: +(tileSeconds(t, 'max', true) / 60).toFixed(1) });
+    rounds.push({ k: st.k, title: t.title, icon: t.icon, mode: t.mode, modes: [...new Set(t.tasks.map(x => x.mode))], tasks: t.tasks.filter(x => !x.practice).length, practice: t.tasks.filter(x => x.practice).length, points: pts, expectedMin: +(tileSeconds(t, 'expected', true) / 60).toFixed(1), maxMin: +(tileSeconds(t, 'max', true) / 60).toFixed(1) });
   }
   const modes = new Set(rounds.flatMap(r => r.modes));
   const all = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link'];

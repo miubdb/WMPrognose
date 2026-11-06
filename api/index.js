@@ -33658,6 +33658,7 @@ var clueSecs = (t) => t.clueSeconds === 12 ? CLUE_SECONDS_DEFAULT : t.clueSecond
 var MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "codebreak"];
 var ACTIVE_MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link"];
 function taskMax(t) {
+  if (t.practice) return 0;
   switch (t.mode) {
     case "estimate":
       return t.points + Math.max(0, ...t.bets);
@@ -33678,6 +33679,11 @@ var num = (v2, d2 = NaN) => {
 var str = (v2, max2 = 600) => typeof v2 === "string" ? v2.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max2) : "";
 var strList = (v2, max2, len = 80) => Array.isArray(v2) ? v2.map((x3) => str(x3, len)).filter(Boolean).slice(0, max2) : [];
 function normalizeTask(raw) {
+  const t = normalizeTaskCore(raw);
+  if (raw?.practice === true) t.practice = true;
+  return t;
+}
+function normalizeTaskCore(raw) {
   const r = raw ?? {};
   switch (r.mode) {
     case "geo":
@@ -33827,7 +33833,7 @@ function validateTask(t, sceneExists = () => true) {
   return e;
 }
 var CATEGORY_KINDS = ["tile", "surprise", "final"];
-var BUDGET = { tile: 1200, surprise: 1500, final: 2e3 };
+var BUDGET = { tile: 1500, surprise: 1500, final: 2e3 };
 function normalizeCategory(raw) {
   const r = raw ?? {};
   return {
@@ -33983,7 +33989,7 @@ function taskSeconds(t, m = "expected") {
   const rv = (x3) => m === "max" ? x3 * SLOW : x3;
   switch (t.mode) {
     case "geo":
-      return { play: Math.max(60, t.seconds) * a, reveal: rv(38) };
+      return { play: (t.practice ? t.seconds : Math.max(60, t.seconds)) * a, reveal: rv(38) };
     case "rank":
       return { play: t.items.length * (t.secondsPerItem * (m === "max" ? 1 : 0.75) + 1.5), reveal: rv(55) };
     case "estimate":
@@ -34043,7 +34049,7 @@ function analyzeBook(book, wallSlots = 6) {
   const surprise = book.tiles.find((t) => t.kind === "surprise");
   const final = book.tiles.find((t) => t.kind === "final");
   const pts = (t) => t.tasks.reduce((a, x3) => a + taskMax(x3), 0);
-  const row = (t) => ({ tasks: t.tasks.length, points: pts(t), expectedMin: +(tileSeconds(t, "expected") / 60).toFixed(1), maxMin: +(tileSeconds(t, "max") / 60).toFixed(1) });
+  const row = (t) => ({ tasks: t.tasks.filter((x3) => !x3.practice).length, practice: t.tasks.filter((x3) => x3.practice).length, points: pts(t), expectedMin: +(tileSeconds(t, "expected") / 60).toFixed(1), maxMin: +(tileSeconds(t, "max") / 60).toFixed(1) });
   const res = {
     tiles: regular.map((t) => ({ id: t.id, title: t.title, mode: t.mode, football: t.football, ...row(t) })),
     specials: book.tiles.filter((t) => t.kind !== "tile").map((t) => ({ id: t.id, title: t.title, kind: t.kind, ...row(t) })),
@@ -34065,8 +34071,9 @@ function analyzeBook(book, wallSlots = 6) {
     eMax = Math.max(eMax, e);
     xMin = Math.min(xMin, x3);
     xMax = Math.max(xMax, x3);
-    const tasks = c.reduce((a, t) => a + t.tasks.length, 0);
-    const f = c.filter((t) => t.football).reduce((a, t) => a + t.tasks.length, 0) / tasks;
+    const nreg = (t) => t.tasks.filter((x4) => !x4.practice).length;
+    const tasks = c.reduce((a, t) => a + nreg(t), 0);
+    const f = c.filter((t) => t.football).reduce((a, t) => a + nreg(t), 0) / tasks;
     fMin = Math.min(fMin, f);
     fMax = Math.max(fMax, f);
     fSum += f;
@@ -34101,7 +34108,7 @@ function analyzeShow(book) {
     if (!t) continue;
     order.push(t);
     const pts = t.tasks.reduce((a, x3) => a + taskMax(x3), 0);
-    rounds.push({ k: st.k, title: t.title, icon: t.icon, mode: t.mode, modes: [...new Set(t.tasks.map((x3) => x3.mode))], tasks: t.tasks.length, points: pts, expectedMin: +(tileSeconds(t, "expected", true) / 60).toFixed(1), maxMin: +(tileSeconds(t, "max", true) / 60).toFixed(1) });
+    rounds.push({ k: st.k, title: t.title, icon: t.icon, mode: t.mode, modes: [...new Set(t.tasks.map((x3) => x3.mode))], tasks: t.tasks.filter((x3) => !x3.practice).length, practice: t.tasks.filter((x3) => x3.practice).length, points: pts, expectedMin: +(tileSeconds(t, "expected", true) / 60).toFixed(1), maxMin: +(tileSeconds(t, "max", true) / 60).toFixed(1) });
   }
   const modes = new Set(rounds.flatMap((r) => r.modes));
   const all = ["geo", "rank", "estimate", "glitch", "unique", "match", "link"];
@@ -34145,7 +34152,7 @@ function bookHash(book) {
   return sha(canonical({ tiles, rules: book.rules ?? {} }));
 }
 var J2 = (s) => JSON.parse(s);
-var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "Champion" };
+var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4 };
 function normalizePack(raw) {
   const r = raw ?? {};
   const s = (v2, m) => typeof v2 === "string" ? v2.trim().slice(0, m) : "";
@@ -34160,7 +34167,7 @@ function normalizePack(raw) {
     surprise: s(r.surprise, 80),
     final: s(r.final, 80),
     ...Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x3) => x3?.k === "board" ? { k: "board" } : (x3?.k === "round" || x3?.k === "surprise" || x3?.k === "final") && s(x3.cat, 80) ? { k: x3.k, cat: s(x3.cat, 80) } : null).filter((x3) => !!x3) } : {},
-    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ["task", "sequence", "sort"].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle }
+    rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ["task", "sequence", "sort"].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle, tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6) }
   };
 }
 var ContentService = class {
@@ -34224,7 +34231,7 @@ var ContentService = class {
    */
   installSeed(opts = {}) {
     const t = this.now();
-    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [], ref: "", showRef: "", showCreated: false };
+    const report = { alreadyInstalled: false, created: { scenes: 0, questions: 0, categories: 0, packs: 0 }, archived: [], ref: "", showRef: "", showCreated: false, extraRefs: [] };
     this.tx(() => {
       const pk = this.seedPack;
       const had = !!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get(pk.id);
@@ -34262,8 +34269,8 @@ var ContentService = class {
         const row = this.listPacks().find((p) => p.id === pk.id);
         report.ref = row?.currentVersion ? `${pk.id}@${row.currentVersion}` : "";
       }
-      const sh = this.seed.show;
-      if (sh) {
+      for (const sh of [this.seed.show, ...this.seed.extraShows ?? []]) {
+        if (!sh) continue;
         for (const q2 of sh.pool) report.created.questions += run("INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)", q2.id, q2.task.mode, q2.topic, JSON.stringify(q2.task), t, t);
         for (const r of sh.rounds) {
           const cat = { title: r.title, topic: r.topic, icon: r.icon, color: r.color, kind: r.kind, football: r.football, blurb: r.blurb, taskIds: r.taskIds };
@@ -34271,18 +34278,20 @@ var ContentService = class {
         }
         const exists = !!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get(sh.pack.id);
         if (!exists) {
-          const pack = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: "", final: "", rules: { ...DEFAULT_RULES }, show: sh.steps };
+          const pack = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: "", final: "", rules: { ...DEFAULT_RULES, ...sh.pack.rules ?? {} }, show: sh.steps };
           this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(sh.pack.id, JSON.stringify(pack), t, t);
-          report.showRef = this.publish(sh.pack.id, "Mitgeliefertes Showpaket (fester Ablauf)").ref;
+          const ref = this.publish(sh.pack.id, "Mitgeliefertes Showpaket (fester Ablauf)").ref;
           report.created.packs++;
           report.showCreated = true;
+          if (sh === this.seed.show) report.showRef = ref;
+          else report.extraRefs.push(ref);
         } else {
           const row = this.listPacks().find((p) => p.id === sh.pack.id);
-          report.showRef = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : "";
-          report.alreadyInstalled = report.alreadyInstalled && true;
+          const ref = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : "";
+          if (sh === this.seed.show) report.showRef = ref;
         }
-        if (report.showCreated) report.alreadyInstalled = false;
       }
+      if (report.showCreated) report.alreadyInstalled = false;
     });
     return report;
   }
@@ -34292,7 +34301,9 @@ var ContentService = class {
     const row = this.listPacks().find((p) => p.id === pk.id);
     const sh = this.seed.show;
     const shRow = sh ? this.listPacks().find((p) => p.id === sh.pack.id) : void 0;
-    return { id: pk.id, name: pk.name, installed: !!row && (!sh || !!shRow && !sh.pool.some((q2) => !this.db.prepare("SELECT 1 FROM questions WHERE id=?").get(q2.id))), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: sh ? sh.pool.filter((q2) => !this.db.prepare("SELECT 1 FROM questions WHERE id=?").get(q2.id)).length : 0, status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
+    const qMissing = (x3) => x3.pool.filter((q2) => !this.db.prepare("SELECT 1 FROM questions WHERE id=?").get(q2.id)).length;
+    const extras = (this.seed.extraShows ?? []).map((x3) => ({ id: x3.pack.id, name: x3.pack.name, installed: !!this.listPacks().find((p) => p.id === x3.pack.id) && qMissing(x3) === 0 }));
+    return { extras, id: pk.id, name: pk.name, installed: !!row && (!sh || !!shRow && !qMissing(sh)) && extras.every((e) => e.installed), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: (sh ? qMissing(sh) : 0) + (this.seed.extraShows ?? []).reduce((a, x3) => a + qMissing(x3), 0), status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
   }
   // ------------------------------------------------------------- Szenen
   sceneRow(r) {
@@ -34519,6 +34530,19 @@ var ContentService = class {
         for (const p of q2.problems) errors.push(`${label} \xB7 \u201E${q2.task.prompt.slice(0, 40)}\u201C: ${p}`);
         tasks.push(q2.task);
       }
+      if (kind === "tile" && pack.show?.length) {
+        let reg2 = 0;
+        const keep = [];
+        for (const t of tasks) {
+          if (t.practice) keep.push(t);
+          else if (reg2 < pack.rules.tasksPerMode) {
+            keep.push(t);
+            reg2++;
+          }
+        }
+        tasks.length = 0;
+        tasks.push(...keep);
+      }
       if (c.points < c.budget * 0.8 && !c.problems.length && c.mode !== "estimate") warnings.push(`${label}: nur ${c.points} von ${c.budget} Punkten verteilt`);
       tiles.push({ id: c.id, title: c.title, topic: c.topic, icon: c.icon, color: c.color, mode: tasks[0]?.mode ?? "geo", kind, football: c.football, blurb: c.blurb, tasks: JSON.parse(JSON.stringify(tasks)) });
     };
@@ -34565,7 +34589,9 @@ var ContentService = class {
     if (!errors.length && showSteps) {
       const sa = analyzeShow(book);
       if (sa.modesMissing.length) warnings.push(`Nicht jeder Spielmodus kommt im Showablauf vor (fehlt: ${sa.modesMissing.join(", ")})`);
-      if (sa.minutesExpected < 70 || sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min liegt au\xDFerhalb des Ziels 75\u201390 min`);
+      const probes = book.tiles.reduce((a, t) => a + t.tasks.filter((x3) => x3.practice).length, 0);
+      if (sa.minutesExpected < 60 || sa.minutesExpected > 120) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min (h\xF6chstens ${sa.minutesMax} min) \u2013 f\xFCr einen Spieleabend ungew\xF6hnlich lang/kurz`);
+      else if (sa.minutesExpected > 95) warnings.push(`Erwartete Spieldauer ${sa.minutesExpected} min, davon ca. ${Math.round(probes * 2.3)} min f\xFCr ${probes} Proberunden (\xFCberspringbar). Ohne Proben ca. ${Math.round(sa.minutesExpected - probes * 2.3)} min.`);
       if (showSteps[showSteps.length - 2]?.k !== "board") warnings.push("Empfohlen: vor dem Finale einen \u201EZwischenstand\u201C-Schritt");
     }
     return { book: errors.length ? null : book, errors, warnings };
@@ -34690,8 +34716,8 @@ var ContentService = class {
    */
   import(data, onConflict = "rename", opts = {}) {
     if (!data || data.format !== "outplay-content" || ![1, 2].includes(data.version)) throw new ApiError(422, "Keine g\xFCltige OUTPLAY-Exportdatei (format/version)");
-    const mk = () => ({ created: 0, identical: 0, renamed: 0, overwritten: 0, skipped: 0 });
-    const res = { dryRun: !!opts.dryRun, onConflict, scenes: mk(), questions: mk(), categories: mk(), packs: mk(), errors: [], warnings: [], packResults: [], idMap: {} };
+    const mk2 = () => ({ created: 0, identical: 0, renamed: 0, overwritten: 0, skipped: 0 });
+    const res = { dryRun: !!opts.dryRun, onConflict, scenes: mk2(), questions: mk2(), categories: mk2(), packs: mk2(), errors: [], warnings: [], packResults: [], idMap: {} };
     const finish = () => {
       res.questionsCount = res.questions.created + res.questions.renamed + res.questions.overwritten;
     };
@@ -34907,6 +34933,19 @@ function diffZones(scene) {
     const ia = a.find((i2) => i2.id === id);
     const ib = b2.find((i2) => i2.id === id);
     const boxes = [ib ?? ia].filter(Boolean).map((i2) => bbox(i2));
+    if (ia && ib && ia.t === "text" && ib.t === "text" && ia.text !== ib.text) {
+      const A3 = ia.text, B2 = ib.text;
+      let pre = 0;
+      while (pre < A3.length && pre < B2.length && A3[pre] === B2[pre]) pre++;
+      let suf = 0;
+      while (suf < A3.length - pre && suf < B2.length - pre && A3[A3.length - 1 - suf] === B2[B2.length - 1 - suf]) suf++;
+      let w0 = pre;
+      while (w0 > 0 && B2[w0 - 1] !== " ") w0--;
+      let w1 = B2.length - suf;
+      while (w1 < B2.length && B2[w1] !== " ") w1++;
+      const bb = boxes[0], cw = (bb.x1 - bb.x0) / Math.max(1, B2.length);
+      if (B2.length > 12) boxes[0] = { x0: bb.x0 + w0 * cw - 6, x1: bb.x0 + w1 * cw + 6, y0: bb.y0, y1: bb.y1 };
+    }
     if (!boxes.length) continue;
     const x0 = Math.min(...boxes.map((x3) => x3.x0)), y0 = Math.min(...boxes.map((x3) => x3.y0));
     const x1 = Math.max(...boxes.map((x3) => x3.x1)), y1 = Math.max(...boxes.map((x3) => x3.y1));
@@ -35172,7 +35211,7 @@ var sameJson = (a, b2) => JSON.stringify(a) === JSON.stringify(b2);
 var nm = (c, pid) => c.players.find((p) => p.id === pid)?.name ?? "?";
 var balanceOf = (c, pid) => c.room.players.find((p) => p.id === pid)?.score ?? 0;
 var GEO_SECONDS = 60;
-var geoSeconds = (c) => Math.max(GEO_SECONDS, c.task.seconds);
+var geoSeconds = (c) => c.task.practice ? c.task.seconds : Math.max(GEO_SECONDS, c.task.seconds);
 var geo = {
   maxPoints: (t) => t.points,
   begin(c) {
@@ -36221,11 +36260,15 @@ var Engine = class _Engine {
     this.forceLock(c);
     if (MODES2[c.task.mode].blockReveal?.(c)) return { ok: false, err: "review_needed" };
     const res = MODES2[c.task.mode].score(c);
-    r.result = res;
-    const key = this.scoreKey(room);
-    this.dropEntries(room, key);
-    for (const e of res.entries) this.addEntry(room, key, e.pid, e.delta, e.label, now);
-    this.recompute(room);
+    if (c.task.practice) {
+      r.result = { entries: [], reveal: { ...res.reveal, practice: true } };
+    } else {
+      r.result = res;
+      const key = this.scoreKey(room);
+      this.dropEntries(room, key);
+      for (const e of res.entries) this.addEntry(room, key, e.pid, e.delta, e.label, now);
+      this.recompute(room);
+    }
     c.setStage("reveal", null);
     this.log(room, now, `Aufl\xF6sung: ${this.curTile(room).title} \xB7 Aufgabe ${r.taskIndex + 1}`);
     return { ok: true };
@@ -36269,6 +36312,14 @@ var Engine = class _Engine {
       case "h.sound":
         room.sound = !!a.on;
         return ok;
+      case "h.liveRank":
+        room.liveRank = !!a.on;
+        return ok;
+      case "h.music": {
+        const cur = room.music ?? { on: false, vol: 25 };
+        room.music = { on: a.on ?? cur.on, vol: Math.max(0, Math.min(100, Math.round(a.vol ?? cur.vol))) };
+        return ok;
+      }
       case "h.reduced":
         room.reduced = !!a.on;
         return ok;
@@ -36463,6 +36514,9 @@ var Engine = class _Engine {
         act: this.actLabel(room),
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === "show" ? room.plan.filter((x3) => x3.startsWith("tile:")).length : room.plan.filter((s) => s === "wall").length + 2 },
         flow: room.flow ?? "classic",
+        brand: { title: this.bk(room).rules?.showTitle || "OUTPLAY", winner: this.bk(room).rules?.winnerTitle || "OUTPLAY-Champion" },
+        liveRank: room.liveRank ?? true,
+        music: room.music ?? { on: false, vol: 25 },
         ...room.flow === "show" ? { agenda: this.agenda(room) } : {}
       },
       players,
@@ -36545,7 +36599,7 @@ var Engine = class _Engine {
         return;
       }
       const t = s.startsWith("tile:") ? this.tile(room, s.slice(5)) : void 0;
-      if (t) list2.push({ k: t.kind === "tile" ? "round" : t.kind, title: t.title, icon: t.icon, mode: t.tasks[0]?.mode, tasks: t.tasks.length, state });
+      if (t) list2.push({ k: t.kind === "tile" ? "round" : t.kind, title: t.title, icon: t.icon, mode: t.tasks[0]?.mode, tasks: t.tasks.filter((x3) => !x3.practice).length, state });
     });
     return list2;
   }
@@ -36625,6 +36679,9 @@ var Engine = class _Engine {
       blurb: tile.blurb,
       taskIndex: r.taskIndex,
       taskCount: tile.tasks.length,
+      practice: !!c.task.practice,
+      scoredIndex: c.task.practice ? 0 : tile.tasks.slice(0, r.taskIndex + 1).filter((x3) => !x3.practice).length,
+      scoredCount: tile.tasks.filter((x3) => !x3.practice).length,
       stage: r.stage,
       deadline: r.deadline,
       pausedLeft: r.pausedLeft,
@@ -36678,14 +36735,14 @@ function buildPreview(rawTask, scenes, meta = {}) {
     if (r.ok) ids.push(r.player.id);
   });
   const H3 = (a) => eng.act(room, { role: "host" }, "", a, now);
-  const P2 = (i2, a) => eng.act(room, { role: "player", pid: ids[i2] }, "", a, now);
+  const P3 = (i2, a) => eng.act(room, { role: "player", pid: ids[i2] }, "", a, now);
   H3({ k: "h.startShow" });
   H3({ k: "h.introDone" });
   H3({ k: "h.pick", tileId: "preview" });
   const frames = [];
   const snap = (label) => {
-    const mk = (role) => JSON.parse(JSON.stringify(eng.buildView(room, { role, pid: ids[0] }, now)));
-    const f = { label, tv: mk("tv"), player: mk("player"), host: mk("host") };
+    const mk2 = (role) => JSON.parse(JSON.stringify(eng.buildView(room, { role, pid: ids[0] }, now)));
+    const f = { label, tv: mk2("tv"), player: mk2("player"), host: mk2("host") };
     for (const v2 of [f.tv, f.player, f.host]) {
       if (v2.round) v2.round.kind = kind;
       v2.room.act = kind === "final" ? "Akt 4 \u2013 FINAL LOCK" : kind === "surprise" ? "Akt 2 \u2013 \xDCberraschungsrunde" : "Vorschau";
@@ -36700,7 +36757,7 @@ function buildPreview(rawTask, scenes, meta = {}) {
       snap("Aufgabe l\xE4uft");
       const a = t.answer;
       const off = [[0.4, -0.5], [6, 5], [-25, 30]];
-      off.forEach(([dla, dlo], i2) => P2(i2, { k: "submit", payload: { lat: Math.max(-80, Math.min(80, a.lat + dla)), lon: Math.max(-175, Math.min(175, a.lon + dlo)) } }));
+      off.forEach(([dla, dlo], i2) => P3(i2, { k: "submit", payload: { lat: Math.max(-80, Math.min(80, a.lat + dla)), lon: Math.max(-175, Math.min(175, a.lon + dlo)) } }));
       snap("Antworten abgegeben");
       H3({ k: "h.lock" });
       snap("Alle Tipps auf der Karte");
@@ -36717,7 +36774,7 @@ function buildPreview(rawTask, scenes, meta = {}) {
               const pm = room.round.pm[ids[i2]];
               const free = pm ? pm.slots.map((s, idx) => s === -1 ? idx : -1).filter((x3) => x3 >= 0) : [0, 1, 2, 3, 4];
               const use = free.includes(slot) ? slot : free[0];
-              P2(i2, { k: "submit", payload: { step: k2, slot: use } });
+              P3(i2, { k: "submit", payload: { step: k2, slot: use } });
             }
           }
           if (k2 === 2) snap("Dritter Begriff");
@@ -36729,13 +36786,13 @@ function buildPreview(rawTask, scenes, meta = {}) {
     }
     case "estimate": {
       snap("Sch\xE4tzen");
-      [1.02, 0.6, 3].forEach((f, i2) => P2(i2, { k: "submit", payload: { value: Math.max(1, Math.round(t.answer * f * 100) / 100) } }));
+      [1.02, 0.6, 3].forEach((f, i2) => P3(i2, { k: "submit", payload: { value: Math.max(1, Math.round(t.answer * f * 100) / 100) } }));
       H3({ k: "h.lock" });
       snap("Alle Tipps sichtbar \u2013 Eins\xE4tze");
       const bet = t.bets[1] ?? 0;
-      P2(0, { k: "submit", payload: { amount: 0, target: null } });
-      P2(1, { k: "submit", payload: bet ? { amount: bet, target: ids[0] } : { amount: 0, target: null } });
-      P2(2, { k: "submit", payload: bet ? { amount: bet, target: ids[2] } : { amount: 0, target: null } });
+      P3(0, { k: "submit", payload: { amount: 0, target: null } });
+      P3(1, { k: "submit", payload: bet ? { amount: bet, target: ids[0] } : { amount: 0, target: null } });
+      P3(2, { k: "submit", payload: bet ? { amount: bet, target: ids[2] } : { amount: 0, target: null } });
       H3({ k: "h.lock" });
       snap("Eins\xE4tze gesperrt");
       break;
@@ -36745,21 +36802,21 @@ function buildPreview(rawTask, scenes, meta = {}) {
       H3({ k: "h.lock" });
       snap("Suchphase (Bild B)");
       const z2 = glitchZones(t, scenes)[0];
-      P2(0, { k: "submit", payload: { x: z2.x, y: z2.y } });
-      P2(1, { k: "submit", payload: { x: Math.min(990, z2.x + Math.round(z2.r * 1.5)), y: z2.y } });
-      P2(2, { k: "submit", payload: { x: Math.max(10, 1e3 - z2.x), y: Math.max(10, 600 - z2.y) } });
+      P3(0, { k: "submit", payload: { x: z2.x, y: z2.y } });
+      P3(1, { k: "submit", payload: { x: Math.min(990, z2.x + Math.round(z2.r * 1.5)), y: z2.y } });
+      P3(2, { k: "submit", payload: { x: Math.max(10, 1e3 - z2.x), y: Math.max(10, 600 - z2.y) } });
       H3({ k: "h.lock" });
       snap("Markierungen auf dem TV");
       break;
     }
     case "codebreak": {
       snap("Aufgabe l\xE4uft");
-      P2(0, { k: "submit", payload: { answer: t.answers[0] } });
+      P3(0, { k: "submit", payload: { answer: t.answers[0] } });
       if (t.hints.length) {
-        P2(1, { k: "hint" });
-        P2(1, { k: "submit", payload: { answer: t.answers[0] } });
+        P3(1, { k: "hint" });
+        P3(1, { k: "submit", payload: { answer: t.answers[0] } });
       }
-      for (let i2 = 0; i2 < 3; i2++) P2(2, { k: "submit", payload: { answer: "x" + i2 } });
+      for (let i2 = 0; i2 < 3; i2++) P3(2, { k: "submit", payload: { answer: "x" + i2 } });
       H3({ k: "h.lock" });
       snap("Gesperrt");
       break;
@@ -36767,9 +36824,9 @@ function buildPreview(rawTask, scenes, meta = {}) {
     case "match": {
       snap("Aufgabe l\xE4uft");
       const posOf = (i2) => t.order.indexOf(i2);
-      P2(0, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map(posOf), final: true } });
-      P2(1, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map((i2, k2) => k2 < 3 ? posOf(i2) : posOf((i2 + 1) % 6)), final: true } });
-      P2(2, { k: "submit", payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
+      P3(0, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map(posOf), final: true } });
+      P3(1, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map((i2, k2) => k2 < 3 ? posOf(i2) : posOf((i2 + 1) % 6)), final: true } });
+      P3(2, { k: "submit", payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
       snap("Antworten abgegeben");
       H3({ k: "h.lock" });
       snap("Gesperrt");
@@ -36777,15 +36834,15 @@ function buildPreview(rawTask, scenes, meta = {}) {
     }
     case "link": {
       snap("Hinweis 1");
-      P2(0, { k: "submit", payload: { answer: t.answer } });
+      P3(0, { k: "submit", payload: { answer: t.answer } });
       now += (clueSecs(t) + 1) * 1e3;
       eng.tick(room, now);
       snap("Hinweis 2");
       now += (clueSecs(t) + 1) * 1e3;
       eng.tick(room, now);
       snap("Hinweis 3");
-      P2(1, { k: "submit", payload: { answer: t.accept[0] ?? t.answer } });
-      P2(2, { k: "submit", payload: { answer: "Phantasiewort" } });
+      P3(1, { k: "submit", payload: { answer: t.accept[0] ?? t.answer } });
+      P3(2, { k: "submit", payload: { answer: "Phantasiewort" } });
       now += (clueSecs(t) + 1) * 1e3;
       eng.tick(room, now);
       snap("Hinweis 4");
@@ -36796,10 +36853,10 @@ function buildPreview(rawTask, scenes, meta = {}) {
     case "unique": {
       snap("Aufgabe l\xE4uft");
       const n = t.valid.map((v2) => v2.name);
-      P2(0, { k: "submit", payload: { answer: n[0] } });
-      P2(1, { k: "submit", payload: { answer: n[0] } });
-      P2(2, { k: "submit", payload: { answer: n[1] ?? n[0] } });
-      P2(3, { k: "submit", payload: { answer: "Phantasiewort" } });
+      P3(0, { k: "submit", payload: { answer: n[0] } });
+      P3(1, { k: "submit", payload: { answer: n[0] } });
+      P3(2, { k: "submit", payload: { answer: n[1] ?? n[0] } });
+      P3(3, { k: "submit", payload: { answer: "Phantasiewort" } });
       H3({ k: "h.lock" });
       snap("Antworten pr\xFCfen (Host)");
       for (const gr of eng.buildView(room, { role: "host" }, now).round?.data.groups ?? []) if (gr.state === "unknown") H3({ k: "h.review", groupKey: gr.key, decision: "invalid" });
@@ -36928,7 +36985,10 @@ async function handleAdmin(app, req, res, parts, url, readBody) {
       }
       case "standard": {
         if (method === "GET") return json(200, C2.seedStatus());
-        if (method === "POST") return json(200, C2.installSeed({ archiveOlder: true }));
+        if (method === "POST") {
+          const backupFile = app.preInstallBackup?.() ?? null;
+          return json(200, { ...C2.installSeed({ archiveOlder: true }), backupFile });
+        }
         break;
       }
       case "backup": {
@@ -37737,6 +37797,7 @@ var TILES = [
 ];
 
 // content/show.ts
+var COLORS = { PU: "#8b5cf6", BL: "#3b82f6", TE: "#14d9c0", GO: "#f5b82e", PK: "#ec4899", GR: "#22c55e", CY: "#38bdf8" };
 var PU2 = "#8b5cf6";
 var BL2 = "#3b82f6";
 var TE2 = "#14d9c0";
@@ -37992,7 +38053,7 @@ var POOL = [
   ], "Es gibt Hunderte Fl\xFCsse in Deutschland. Die \u201Egro\xDFen\u201C Rhein, Elbe, Donau und Main nennen fast alle \u2013 wer einen kleineren wie Nahe, Tauber oder Peene wei\xDF, ist einzigartig.")
 ];
 var RB = {
-  geo: "Setze deinen Pin auf der Karte \u2013 du kannst zoomen und ihn verschieben. Gewertet wird die Platzierung nach Entfernung.",
+  geo: "Setze deinen Pin auf der Karte \u2013 du kannst zoomen und ihn verschieben. Je n\xE4her dein Pin, desto mehr Punkte.",
   match: "Links sechs Begriffe, rechts die gemischten Partner. Verbinde sie auf dem Handy: 50 Punkte je richtigem Paar, \xC4ndern geht bis zur Abgabe.",
   rank: "F\xFCnf Begriffe erscheinen nacheinander. Setze jeden SOFORT auf einen freien Rangplatz \u2013 endg\xFCltig!",
   glitch: "Schau genau hin: Du siehst ein Bild, dann ver\xE4ndert sich etwas. Tippe auf dem Handy auf die ver\xE4nderte Stelle.",
@@ -38102,8 +38163,142 @@ var SHOW_STEPS = [
   { k: "final", cat: "s3-final" }
 ];
 
+// content/show2.ts
+var SHOW2_PACK = {
+  id: "show-2",
+  name: "Reus 65 Mio",
+  description: "Der feste Showablauf mit Proberunden: 6 Spielmodi je 4 oder 5 gewertete Aufgaben, \xDCberraschungsrunde EINZIGARTIG und FINAL LOCK. Sieger: Reus65Mio-Champion.",
+  rules: { showTitle: "Reus 65 Mio", winnerTitle: "Reus65Mio-Champion", tasksPerMode: 4 }
+};
+var P2 = (task) => ({ ...task, practice: true });
+var PROBES = [
+  { id: "s4-probe-geo", topic: "Probe", task: P2({
+    mode: "geo",
+    map: "germany",
+    seconds: 40,
+    points: 200,
+    prompt: "Probe: Wo steht die Allianz Arena?",
+    answer: { lat: 48.2188, lon: 11.6247, label: "Allianz Arena, M\xFCnchen" },
+    explain: "So funktioniert\u2019s: Je n\xE4her dein Pin am Ziel liegt, desto mehr Punkte gibt es \u2013 gewertet wird die echte Entfernung in Kilometern, nicht der Rang. Die Allianz Arena steht im M\xFCnchner Norden (Fr\xF6ttmaning)."
+  }) },
+  { id: "s4-probe-match", topic: "Probe", task: P2({
+    mode: "match",
+    seconds: 40,
+    points: 300,
+    prompt: "Probe: Welches Tier macht welches Ger\xE4usch?",
+    pairs: [["Hund", "bellt"], ["Katze", "miaut"], ["Kuh", "muht"], ["Schaf", "m\xE4ht"], ["Frosch", "quakt"], ["Hahn", "kr\xE4ht"]].map(([left, right]) => ({ left, right })),
+    order: [3, 5, 0, 2, 4, 1],
+    explain: "So funktioniert\u2019s: Links stehen sechs Begriffe, rechts die gemischten Partner. Verbinde auf dem Handy, was zusammengeh\xF6rt \u2013 jedes richtige Paar gibt Punkte, bis zur Abgabe darfst du \xE4ndern."
+  }) },
+  { id: "s4-probe-rank", topic: "Probe", task: P2({
+    mode: "rank",
+    secondsPerItem: 10,
+    points: 250,
+    prompt: "Probe: Wie weit ist der Planet von der Sonne entfernt? \u2013 der n\xE4chste zuerst",
+    topLabel: "am n\xE4chsten",
+    bottomLabel: "am weitesten",
+    items: [["Merkur", "ca. 58 Mio. km"], ["Venus", "ca. 108 Mio. km"], ["Erde", "ca. 150 Mio. km"], ["Mars", "ca. 228 Mio. km"], ["Jupiter", "ca. 778 Mio. km"]].map(([text, value]) => ({ text, value })),
+    order: [3, 0, 4, 1, 2],
+    explain: "So funktioniert\u2019s: Du siehst die Begriffe und ordnest sie ohne Wissen \xFCber die anderen ein. Gewertet wird jeder Paarvergleich (\u201Esteht der richtige weiter oben?\u201C) \u2013 10 Vergleiche bei 5 Begriffen."
+  }) },
+  { id: "s4-probe-estimate", topic: "Probe", task: P2({
+    mode: "estimate",
+    seconds: 30,
+    betSeconds: 25,
+    points: 300,
+    bets: [0, 100, 200],
+    prompt: "Probe: Wie viele Bundesl\xE4nder hat Deutschland?",
+    unit: "Bundesl\xE4nder",
+    answer: 16,
+    explain: "So funktioniert\u2019s: Erst sch\xE4tzt jeder geheim. Dann siehst du alle Tipps und setzt Punkte auf die Sch\xE4tzung, der du vertraust \u2013 auch auf die eigene. Liegt dein Tipp richtig, gewinnst du den Einsatz, sonst verlierst du ihn (nie unter 0). Es sind 16 L\xE4nder."
+  }) },
+  { id: "s4-probe-glitch", topic: "Probe", task: P2({
+    mode: "glitch",
+    scene: "pitch2",
+    viewSeconds: 10,
+    seconds: 25,
+    points: 250,
+    viewPrompt: "Probe: Merk dir die Aufstellung!",
+    prompt: "Probe: Was hat sich ver\xE4ndert? Tippe auf deinem Handy darauf.",
+    explain: "So funktioniert\u2019s: Erst zeigt der Fernseher ein Bild, dann verschwindet es. Auf dem Handy erscheint die ver\xE4nderte Version \u2013 tippe auf die Ver\xE4nderung. Hier fehlte ein Spieler und der Ball lag woanders."
+  }) },
+  { id: "s4-probe-unique", topic: "Probe", task: P2({
+    mode: "unique",
+    seconds: 30,
+    pointsUnique: 500,
+    pointsShared: 150,
+    placeholder: "Eine Farbe \u2026",
+    prompt: "Probe: Nenne eine Farbe der deutschen Flagge.",
+    valid: [{ name: "Schwarz", variants: [] }, { name: "Rot", variants: [] }, { name: "Gold", variants: ["Gelb"] }],
+    explain: "So funktioniert\u2019s: Nur eine g\xFCltige Antwort, die kein anderer nennt, bringt volle Punkte. Bei drei Farben und vielen Spielern gibt es fast immer Doppelte \u2013 die z\xE4hlen deutlich weniger. Unbekannte Antworten pr\xFCft der Showmaster."
+  }) },
+  { id: "s4-probe-link", topic: "Probe", task: P2({
+    mode: "link",
+    clueSeconds: 15,
+    points: 300,
+    prompt: "Probe: Was ist gesucht?",
+    clues: ["Er ist rund 384.000 Kilometer von uns entfernt.", "Von Neumond bis Vollmond ver\xE4ndert er sich im Lauf eines Monats.", "Er sorgt f\xFCr Ebbe und Flut.", "1969 betrat Neil Armstrong ihn als erster Mensch."],
+    answer: "Mond",
+    accept: ["Der Mond", "Erdmond"],
+    explain: "So funktioniert\u2019s: Vier Hinweise erscheinen nacheinander. Je fr\xFCher du die gemeinsame L\xF6sung nennst, desto mehr Punkte (300 / 225 / 150 / 75) \u2013 aber du hast nur einen Versuch. Gesucht war der Mond."
+  }) }
+];
+var NEW = [
+  match2(
+    "s4-match-tierrekorde",
+    "Tierrekorde",
+    "Welches Tier h\xE4lt welchen Rekord?",
+    [
+      ["Gepard", "schnellstes Landtier"],
+      ["Blauwal", "gr\xF6\xDFtes Tier der Erde"],
+      ["Strau\xDF", "gr\xF6\xDFter Vogel"],
+      ["Giraffe", "h\xF6chstes Landtier"],
+      ["Kolibri", "kleinster Vogel (Bienenelfe)"],
+      ["Gr\xF6nlandhai", "wird \xFCber 250 Jahre alt"]
+    ],
+    [3, 5, 1, 0, 4, 2],
+    "Gepard (bis \xFCber 100 km/h), Blauwal (bis ca. 30 m), Strau\xDF (bis ca. 2,7 m), Giraffe (bis ca. 5,5 m), die Bienenelfe \u2013 ein Kolibri \u2013 wiegt knapp 2 g, der Gr\xF6nlandhai ist das \xE4lteste bekannte Wirbeltier (Sch\xE4tzungen: 250 bis ca. 400 Jahre)."
+  )
+];
+var POOL2 = [...PROBES, ...NEW];
+var mk = (id, title, icon, color, football, blurb, taskIds) => ({ id, title, topic: "Spielmodus", icon, color, kind: "tile", football, blurb, taskIds });
+var SHOW2_ROUNDS = [
+  mk("s4-r1", "WO ZUR H\xD6LLE?", "\u{1F9ED}", COLORS.TE, true, RB.geo, ["s4-probe-geo", "v2-heimspiel-2", "v2-orte-mit-geschichte-2", "v2-orte-mit-geschichte-3", "s3-geo-helgoland", "s3-geo-maracana"]),
+  mk("s4-r2", "MATCHMAKER", "\u{1F9F2}", COLORS.PU, true, RB.match, ["s4-probe-match", "s3-match-spitznamen", "v2-passt-zusammen-2", "v2-passt-zusammen-1", "s4-match-tierrekorde", "s3-match-spiele"]),
+  mk("s4-r3", "BLIND RANK", "\u23F3", COLORS.PK, true, RB.rank, ["s4-probe-rank", "v2-wer-war-zuerst-1", "v2-fussball-zeitreise-1", "v2-wer-war-zuerst-3", "s3-rank-berge", "s3-rank-olympia"]),
+  mk("s4-r4", "GLITCH", "\u{1F441}\uFE0F", COLORS.CY, false, RB.glitch, ["s4-probe-glitch", "v2-alles-im-blick-1", "v2-alles-im-blick-2", "v2-alles-im-blick-3", "v2-alles-im-blick-4", "s3-glitch-kassenzettel"]),
+  mk("s4-r5", "SETZ AUF MICH", "\u{1F3AF}", COLORS.GO, false, RB.est, ["s4-probe-estimate", "v2-wahnsinnszahlen-1", "v2-sport-und-pop-2", "v2-sport-und-pop-1", "v2-wahnsinnszahlen-2", "s3-est-isner"]),
+  mk("s4-r6", "DIE VERBINDUNG", "\u{1F517}", COLORS.BL, true, RB.link, ["s4-probe-link", "v2-wer-oder-was-2", "v2-wer-oder-was-1", "s3-link-pele", "v2-wer-oder-was-3", "s3-link-oktoberfest"]),
+  {
+    id: "s4-sur",
+    title: "EINZIGARTIG",
+    topic: "\xDCberraschungsrunde",
+    icon: "\u2728",
+    color: COLORS.PK,
+    kind: "surprise",
+    football: false,
+    blurb: "Nenne eine g\xFCltige Antwort \u2013 aber blo\xDF keine, die auch ein anderer nennt! Einzigartige Antworten bringen die meisten Punkte, doppelte nur wenige.",
+    taskIds: ["s4-probe-unique", "v2-einzigartig-1", "v2-einzigartig-2", "s3-unique-orchester"]
+  }
+];
+var SHOW2_STEPS = [
+  { k: "round", cat: "s4-r1" },
+  { k: "board" },
+  { k: "round", cat: "s4-r2" },
+  { k: "round", cat: "s4-r3" },
+  { k: "board" },
+  { k: "surprise", cat: "s4-sur" },
+  { k: "round", cat: "s4-r4" },
+  { k: "round", cat: "s4-r5" },
+  { k: "round", cat: "s4-r6" },
+  { k: "board" },
+  { k: "final", cat: "s3-final" }
+];
+var SEED_SHOW2 = { pack: SHOW2_PACK, pool: POOL2, rounds: SHOW2_ROUNDS, steps: SHOW2_STEPS };
+
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
+var EXTRA_SHOWS = [SEED_SHOW2];
 
 // server/vercel.ts
 var ConflictError = class extends Error {
@@ -38214,7 +38409,7 @@ var OnlineAdmin = class {
       }
     }
     const store = new Store(file, { wal: false });
-    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW }, this.now);
+    const content = new ContentService(store, { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: EXTRA_SHOWS }, this.now);
     const auth = new AdminAuth(store, this.opts.adminPassword, this.now, { passwordRequiredFromEnv: true });
     this.live = { store, content, auth, etag, checkedAt: this.now(), file };
     if (content.wasSeeded) {

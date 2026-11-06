@@ -442,6 +442,7 @@ function PhoneReveal({ round, view, pid }: Props) {
   const info = useMemo(() => ownResult(round.mode, rev, pid, view), [round.mode, rev, pid, view]);
   return (
     <div className="card center big reveal">
+      {rev?.practice && <div className="probebanner">🎓 Proberunde – keine Punkte</div>}
       <small>{info.title}</small>
       <div className={`pts ${info.points > 0 ? 'pos' : info.points < 0 ? 'neg' : ''}`}>{info.points > 0 ? '+' : ''}{info.points}</div>
       <p>{info.text}</p>

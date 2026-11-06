@@ -120,7 +120,9 @@ export interface LinkTask {
   points: number;
   explain: string;
 }
-export type TaskDef = GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask;
+/** Proberunde: interaktive Beispielaufgabe ohne Wertung (Punkte werden nie vergeben). */
+export interface TaskBase { practice?: boolean }
+export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask) & TaskBase;
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
 export interface PackRules {
@@ -129,6 +131,8 @@ export interface PackRules {
   rankVariant?: 'task' | 'sequence' | 'sort';
   /** Branding: Titel der Show (TV-Eröffnung) und Gewinnerbezeichnung der Siegerehrung */
   showTitle?: string; winnerTitle?: string;
+  /** Gewertete Aufgaben je regulärem Spielmodus im festen Showablauf: 4 = kompakte, 5 = längere Show (Proberunden zählen nicht). */
+  tasksPerMode?: number;
 }
 /** Ablaufmodell eines Raums: fester Showablauf (Standard) oder klassische Kategorienwand. */
 export type Flow = 'show' | 'classic';
@@ -201,6 +205,11 @@ export interface RoundView {
   blurb: string;
   taskIndex: number;
   taskCount: number;
+  /** Proberunde (ungewertet) */
+  practice: boolean;
+  /** Zähler nur über gewertete Aufgaben: Nr. der aktuellen gewerteten Aufgabe (0 bei Probe) und Anzahl gewerteter Aufgaben der Runde */
+  scoredIndex: number;
+  scoredCount: number;
   stage: Stage;
   deadline: number | null;
   pausedLeft: number | null;
@@ -233,6 +242,12 @@ export interface View {
     act: string; // Anzeige: "Akt 1 – Kategorienwand" bzw. "Runde 2 von 6"
     flow: Flow;
     /** Programmübersicht der festen Show (nur Flow 'show') */
+    /** Branding aus den Paketregeln */
+    brand?: { title: string; winner: string };
+    /** kleines Live-Ranking am TV-Rand (Showmaster schaltet) */
+    liveRank?: boolean;
+    /** Hintergrundmusik (Showmaster): an/aus und Lautstärke 0–100 */
+    music?: { on: boolean; vol: number };
     agenda?: { k: 'round' | 'surprise' | 'final' | 'board'; title: string; icon?: string; mode?: Mode; tasks?: number; state: 'done' | 'now' | 'todo' }[];
     progress: { tilesPlayed: number; tilesTotal: number };
   };
@@ -274,6 +289,8 @@ export type Action =
   | { k: 'h.startShow' }
   | { k: 'h.introDone' }
   | { k: 'h.pick'; tileId: string }
+  | { k: 'h.liveRank'; on: boolean }
+  | { k: 'h.music'; on?: boolean; vol?: number }
   | { k: 'h.setPicker'; pid: string }
   | { k: 'h.begin' }            // Aufgabe starten (intro -> view/open)
   | { k: 'h.lock' }

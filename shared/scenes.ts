@@ -46,6 +46,15 @@ export function diffZones(scene: Scene): GlitchZone[] {
     const ib = b.find(i => i.id === id);
     // Getippt wird auf das, was die Spieler sehen: das veränderte Objekt in Bild B. Nur wenn es entfernt wurde, zählt die Stelle in Bild A.
     const boxes = [ib ?? ia].filter(Boolean).map(i => bbox(i as Item));
+    // Lange Textzeilen: nur das tatsächlich geänderte Wort (nicht die ganze Zeile) ist die Trefferfläche
+    if (ia && ib && ia.t === 'text' && ib.t === 'text' && ia.text !== ib.text) {
+      const A = ia.text, B = ib.text; let pre = 0; while (pre < A.length && pre < B.length && A[pre] === B[pre]) pre++;
+      let suf = 0; while (suf < A.length - pre && suf < B.length - pre && A[A.length - 1 - suf] === B[B.length - 1 - suf]) suf++;
+      let w0 = pre; while (w0 > 0 && B[w0 - 1] !== ' ') w0--;                       // bis zum Wortanfang
+      let w1 = B.length - suf; while (w1 < B.length && B[w1] !== ' ') w1++;           // bis zum Wortende
+      const bb = boxes[0], cw = (bb.x1 - bb.x0) / Math.max(1, B.length);
+      if (B.length > 12) boxes[0] = { x0: bb.x0 + w0 * cw - 6, x1: bb.x0 + w1 * cw + 6, y0: bb.y0, y1: bb.y1 };
+    }
     if (!boxes.length) continue;
     const x0 = Math.min(...boxes.map(x => x.x0)), y0 = Math.min(...boxes.map(x => x.y0));
     const x1 = Math.max(...boxes.map(x => x.x1)), y1 = Math.max(...boxes.map(x => x.y1));

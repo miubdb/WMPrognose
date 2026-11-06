@@ -21,9 +21,9 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
   const [packs, setPacks] = useState<{ id: string; name: string; version: number; description: string; show?: boolean; classic?: boolean }[]>([]);
   const [pack, setPack] = useState('');
   const [flow, setFlow] = useState<'show' | 'classic'>('show');
-  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { const l = r.data as any[]; setPacks(l); const f = l.some(p => p.show) ? 'show' : 'classic'; setFlow(f); setPack((l.find(p => p[f]) ?? l[0])?.id ?? ''); } }); }, []);
-  const usable = packs.filter(p => (p as any)[flow] !== false);
-  const pickFlow = (f: 'show' | 'classic') => { setFlow(f); const l = packs.filter(p => (p as any)[f] !== false); if (!l.some(p => p.id === pack)) setPack(l[0]?.id ?? ''); };
+  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { const l = r.data as any[]; setPacks(l); const f = l.some(p => p.show) ? 'show' : 'classic'; setFlow(f); setPack(([...l].filter(p => p[f]).sort((a, b) => b.id.localeCompare(a.id))[0] ?? l[0])?.id ?? '');   } }); }, []);
+  const usable = packs.filter(p => (p as any)[flow] !== false).sort((a, b) => b.id.localeCompare(a.id));
+  const pickFlow = (f: 'show' | 'classic') => { setFlow(f); const l = packs.filter(p => (p as any)[f] !== false).sort((a, b) => b.id.localeCompare(a.id)); if (!l.some(p => p.id === pack)) setPack(l[0]?.id ?? ''); };
   const create = async () => {
     setBusy(true); setErr('');
     const r = await api('/api/rooms', { password: pw, pack, flow });
@@ -93,6 +93,9 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
         <span className="act">{view.room.act}</span>
         <div className="spacer" />
         <button className={`btn small ${view.room.sound ? '' : 'ghost'}`} onClick={() => run({ k: 'h.sound', on: !view.room.sound })}>{view.room.sound ? '🔊 Ton an' : '🔇 Ton aus'}</button>
+        <button className={`btn small ${view.room.liveRank ? '' : 'ghost'}`} title="Kleines Ranking am TV-Rand (im FINAL LOCK immer verborgen)" onClick={() => run({ k: 'h.liveRank', on: !view.room.liveRank })}>{view.room.liveRank ? '📊 Live-Ranking an' : '📊 Live-Ranking aus'}</button>
+        <button className={`btn small ${view.room.music?.on ? '' : 'ghost'}`} title="Leise Hintergrundmusik (selbst erzeugt, offline) – nur auf dem TV" onClick={() => run({ k: 'h.music', on: !view.room.music?.on })}>{view.room.music?.on ? '🎵 Musik an' : '🎵 Musik aus'}</button>
+        <input type="range" aria-label="Musiklautstärke" title="Musiklautstärke" min={0} max={100} step={5} value={view.room.music?.vol ?? 25} style={{ width: 90 }} onChange={e => run({ k: 'h.music', vol: Number(e.target.value) })} />
         <button className={`btn small ${view.room.reduced ? '' : 'ghost'}`} onClick={() => run({ k: 'h.reduced', on: !view.room.reduced })}>{view.room.reduced ? '✨ Animationen reduziert' : '✨ Animationen voll'}</button>
         <button className={`btn small ${view.room.showPaused ? 'warn' : 'ghost'}`} onClick={() => run({ k: 'h.showPause', paused: !view.room.showPaused })}>{view.room.showPaused ? '▶ Show fortsetzen' : '⏸ Show pausieren'}</button>
       </div>
@@ -195,7 +198,7 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
         {timed && <Countdown round={round} serverNow={serverNow} size={96} />}
       </div>
 
-      {st === 'intro' && <div><p>Regelkarte läuft auf dem TV. Wenn alle bereit sind:</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.begin' })}>▶ Aufgabe {round.taskIndex + 1} starten</button></div>}
+      {st === 'intro' && <div><p>Regelkarte läuft auf dem TV. Wenn alle bereit sind:</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.begin' })}>{round.practice ? '▶ Proberunde starten' : `▶ Aufgabe ${round.scoredIndex} starten`}</button>{round.practice && <button className="btn ghost" disabled={busy} title="Probe überspringen – direkt zur ersten gewerteten Aufgabe" onClick={() => run({ k: 'h.skipTask' })}>⏭ Probe überspringen</button>}</div>}
 
       {st !== 'intro' && d?.solution && <div className="solution">🔑 Lösung (nur Host): <b>{Array.isArray(d.solution) ? d.solution.join(' › ') : d.solution}</b></div>}
       {st !== 'intro' && st !== 'reveal' && <div className="muted">Abgegeben: <b>{answered}/{view.players.length}</b></div>}
@@ -220,8 +223,8 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
       )}
       {st === 'reveal' && (
         <div className="row wrap">
-          <button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.next' })}>{lastTask ? (view.room.flow === 'show' ? '▶ Runde abschließen' : '▶ Kachel abschließen') : `▶ Weiter zu Aufgabe ${round.taskIndex + 2}`}</button>
-          {!lastTask && <button className="btn ghost" disabled={busy} title="Gibt die nächste Aufgabe sofort frei (zwei Aktionen in einem Klick)" onClick={async () => { await run({ k: 'h.next' }); await run({ k: 'h.begin' }); }}>⏩ Weiter &amp; Aufgabe {round.taskIndex + 2} sofort starten</button>}
+          <button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.next' })}>{lastTask ? (view.room.flow === 'show' ? '▶ Runde abschließen' : '▶ Kachel abschließen') : `▶ Weiter zu Aufgabe ${round.scoredIndex + 1}`}</button>
+          {!lastTask && <button className="btn ghost" disabled={busy} title="Gibt die nächste Aufgabe sofort frei (zwei Aktionen in einem Klick)" onClick={async () => { await run({ k: 'h.next' }); await run({ k: 'h.begin' }); }}>⏩ Weiter &amp; Aufgabe {round.scoredIndex + 1} sofort starten</button>}
         </div>)}
 
       <details className="danger"><summary>Korrektur &amp; Notfall</summary>
