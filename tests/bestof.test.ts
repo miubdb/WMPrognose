@@ -213,3 +213,27 @@ test('Regression: bestehende Pakete (show-1, show-3, show-2k, standard-2) bleibe
   assert.ok(k.minutesExpected < a.minutesExpected); assert.ok(a.minutesExpected > base.minutesExpected + 25);
   console.log('# Dauer Best of 42:', JSON.stringify({ erwartet: a.minutesExpected, maximal: a.minutesMax, mitKonsens: k.minutesExpected, show3: base.minutesExpected }));
 });
+
+test('Länge der Show 4 / 5 / 6 Aufgaben je Modus (auch EINZIGARTIG): neue Paketversion, Proben bleiben, vollständig durchspielbar; Ausgangsversion unverändert', () => {
+  const c = fresh(); const v1 = JSON.stringify(c.resolveBook('show-4@1'));
+  let ver = 1;
+  for (const n of [4, 5, 6]) {
+    const p = c.getPack('show-4'); c.updatePack('show-4', { ...p, rules: { ...p.rules, tasksPerMode: n } }); ver++;
+    const pub = c.publish('show-4', `${n} je Modus`); assert.equal(pub.ref, `show-4@${ver}`);
+    const book = c.resolveBook(pub.ref);
+    for (const t of book.tiles.filter(x => x.kind !== 'final')) { assert.equal(t.tasks.filter(x => !x.practice).length, n, `${t.id} bei ${n}`); assert.equal(t.tasks.filter(x => x.practice).length, 1); }
+    assert.equal(book.tiles.find(t => t.kind === 'final')!.tasks.length, 4);
+    const g = playAll(book, pub.ref); assert.equal(g.room.phase, 'ceremony'); assert.equal(g.log.scored, 7 * n + 4, `${n}: gewertet`); assert.equal(g.log.practice, 7);
+    const a = analyzeShow(book)!; assert.equal(a.tasksTotal, 7 * n + 4); console.log(`# ${n} je Modus: erwartet ${a.minutesExpected} min, maximal ${a.minutesMax} min`);
+  }
+  assert.equal(JSON.stringify(c.resolveBook('show-4@1')), v1, 'veröffentlichte Version bleibt unverändert');
+});
+
+test('C09 / T03 / T05 / C19: redaktionelle Fassung (Transfermarkt-Maßstab, Haaland-Stationen, belegte Debütalter, Wiesn vorläufig)', () => {
+  const t = (id: string) => BESTOF_NEW.find(q => q.id === id)!.task as any;
+  const c09 = t('b42-rank-c09'); assert.equal(c09.prompt, 'Sortiere diese fünf BVB-Neuzugänge nach ihrer auf Transfermarkt.de angegebenen Ablösesumme – vom günstigsten zum teuersten.');
+  const vals = c09.items.map((i: any) => Number(i.value.replace(',', '.').replace(/[^0-9.]/g, ''))); assert.deepEqual(vals, [...vals].sort((a, b) => a - b), 'Reihenfolge = aufsteigende Ablöse'); assert.equal(vals.length, 5);
+  assert.match(t('b42-match-t03').pairs[0].left, /Salzburg → Dortmund/); assert.equal(t('b42-match-t03').pairs[0].right, 'Molde FK');
+  assert.deepEqual(t('b42-rank-t05').items.map((i: any) => i.value), ['16 Jahre, 1 Tag', '16 Jahre, 3 Tage', '16 Jahre, 15 Tage', '16 Jahre, 214 Tage', '16 Jahre, 263 Tage']);
+  assert.match(t('b42-est-c19').prompt, /vorläufigen Wiesn-Bilanz 2025/); assert.equal(t('b42-est-c19').answer, 6.5);
+});

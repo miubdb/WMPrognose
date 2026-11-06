@@ -8,7 +8,7 @@ import type { SeedShow } from '../server/content';
 import { SHOW3_PACK, SHOW3_ROUNDS } from './show3';
 
 /** Redaktionshinweis an eine Frage hängen (erscheint als Warnung bei „Prüfen & Veröffentlichen“). */
-const rv = (q: PoolQuestion, note: string): PoolQuestion => ({ ...q, task: { ...q.task, review: note } as PoolQuestion['task'] });
+const rv = (q: PoolQuestion, note: string): PoolQuestion => (note ? { ...q, task: { ...q.task, review: note } as PoolQuestion['task'] } : q);   // leerer Hinweis = geklärt, keine Warnung
 const closed = (q: PoolQuestion): PoolQuestion => ({ ...q, task: { ...q.task, closed: true } as PoolQuestion['task'] });
 
 // ---------------------------------------------------------------- neue Fragen aus der Jury (Kürzel = Jury-ID)
@@ -18,17 +18,18 @@ export const BESTOF_NEW: PoolQuestion[] = [
     'MLS-Cup-Finale LA Galaxy – New York Red Bulls 2:1 am 7. Dezember 2024. Zwölf Jahre beim BVB ohne Meisterschale, dann nach vier Monaten in Los Angeles Meister.'),
   rv(geo('b42-geo-c04', 'Andere Themen', 'europe', 60, 250, 'In welchem Ort stürzen sich jedes Jahr Menschen einen extrem steilen Hang hinunter, weil vor ihnen ein Käselaib ins Tal rollt?', 51.8299, -2.1581, 'Cooper’s Hill bei Brockworth, Gloucestershire (England)',
     '2025 gewann ein YouTuber aus München zum zweiten Mal in Folge. Der Käse rollt vorweg – und wird fast nie eingeholt.'),
-    'Koordinate geprüft (Wikipedia 51,8299 N / 2,1581 W). Reveal-Detail „YouTuber aus München 2025“ stammt aus der Jury-Karte (AP-Quelle genannt), von uns nicht erneut belegt.'),
+    'Offen: Reveal-Detail „YouTuber aus München gewann 2025“ nur laut Jury-Karte (AP), nicht erneut belegt. Koordinate geprüft.'),
   geo('b42-geo-t01', 'Fußball', 'europe', 60, 250, 'Für die EM 2004 baute ein europäischer Verein ein Fußballstadion in einen ehemaligen Steinbruch. Hinter einem Tor steht eine riesige Felswand. Wo?', 41.5625, -8.43, 'Estádio Municipal de Braga, Portugal',
     'Nur zwei große Seitentribünen und eine steile Felswand hinter dem Tor – das „Estádio Municipal de Braga“ heißt auch „A Pedreira“, der Steinbruch.'),
   geo('b42-geo-c05', 'Andere Themen', 'world', 60, 250, 'Markiere den Punkt auf der Erde, der weiter von jedem Stück Land entfernt ist als jeder andere Ort!', -48.8767, -123.3933, 'Point Nemo, Südpazifik',
     'Point Nemo liegt rund 2.688 km vom nächsten Land entfernt (NOAA). Befindet sich die ISS genau darüber, sind Astronauten näher als Menschen an Land.'),
 
   // ===== MATCHMAKER (sechs eindeutige Paare)
-  rv(match('b42-match-t03', 'Fußball', 'Ordne jeden Star dem Verein zu, für den er unmittelbar vor seinem großen nächsten Transfersprung spielte.', [
-    ['Erling Haaland', 'Molde FK'], ['Mohamed Salah', 'FC Basel'], ['Jude Bellingham', 'Birmingham City'], ['Kevin De Bruyne', 'KRC Genk'], ['Robert Lewandowski', 'Lech Posen'], ['Heung-min Son', 'Hamburger SV'],
-  ], [3, 5, 1, 4, 0, 2], 'Nicht das teuerste Team, sondern der übersehene letzte Schritt vor dem Durchbruch ist entscheidend.'),
-    'Vorbehalt: „Transfersprung“ muss eindeutig definiert werden. Haaland wechselte von Molde zunächst zu Red Bull Salzburg (nicht zum BVB). Die übrigen fünf Zuordnungen sind unstrittig (Salah → Chelsea, Bellingham → BVB, De Bruyne → Chelsea, Lewandowski → BVB, Son → Leverkusen).'),
+  rv(match('b42-match-t03', 'Fußball', 'Ordne jeden Star dem Verein zu, bei dem er spielte, bevor er zu der jeweils genannten nächsten Station wechselte.', [
+    ['Erling Haaland (danach Salzburg → Dortmund)', 'Molde FK'], ['Mohamed Salah (danach Chelsea)', 'FC Basel'], ['Jude Bellingham (danach Dortmund)', 'Birmingham City'], ['Kevin De Bruyne (danach Chelsea)', 'KRC Genk'],
+    ['Robert Lewandowski (danach Dortmund)', 'Lech Posen'], ['Heung-min Son (danach Leverkusen)', 'Hamburger SV'],
+  ], [3, 5, 1, 4, 0, 2], 'Nicht das teuerste Team, sondern der übersehene letzte Schritt vor dem Durchbruch ist entscheidend: Haaland ging von Molde erst nach Salzburg und dann nach Dortmund.'),
+    'Stationen allgemein bekannt, nicht einzeln per Websuche belegt (Haaland Molde → Salzburg → Dortmund, Salah Basel → Chelsea, Bellingham Birmingham → Dortmund, De Bruyne Genk → Chelsea, Lewandowski Lech → Dortmund, Son HSV → Leverkusen).'),
   rv(match('b42-match-c08', 'Andere Themen', 'Wozu wurde dieses Produkt ursprünglich entwickelt bzw. woraus entstand es?', [
     ['Play-Doh', 'Tapetenreiniger'], ['Luftpolsterfolie', 'dekorative Struktur-Tapete'], ['Slinky', 'Feder zur Stabilisierung von Schiffs-Instrumenten'],
     ['Listerine', 'antiseptisches Mittel'], ['Viagra', 'Behandlung von Angina pectoris'], ['Coca-Cola', 'als Tonikum verkauftes Apothekengetränk'],
@@ -37,25 +38,25 @@ export const BESTOF_NEW: PoolQuestion[] = [
   rv(match('b42-match-c06', 'Fußball', 'Sechs Maskottchen – welcher Bundesliga-Verein gehört dazu?', [
     ['Fritzle', 'VfB Stuttgart'], ['Hoffi', 'TSG Hoffenheim'], ['Emma', 'Borussia Dortmund'], ['Jünter', 'Borussia Mönchengladbach'], ['Bulli', 'RB Leipzig'], ['Berni', 'FC Bayern'],
   ], [5, 2, 0, 4, 3, 1], 'Echte Überraschungen: Ein Krokodil, ein Elch, eine Biene, ein Fohlen, ein Bulle und ein Bär.'),
-    'Zuordnung per Websuche bestätigt (Fritzle = Krokodil, Hoffi = Elch, Emma = Biene, Jünter = Fohlen, Berni = Bär; Bulli = RB-Leipzig-Bulle laut Jury). Optional: Maskottchenfotos bei der Auflösung.'),
+    ''),
   rv(match('b42-match-c07', 'Andere Themen', 'Was bedeutet der Name dieser Marke wirklich?', [
     ['Audi', 'lateinisch für „Horch!“'], ['LEGO', 'dänisch für „spiel gut“'], ['Haribo', 'Hans Riegel, Bonn'], ['IKEA', 'Gründerinitialen, Hof und Dorf'], ['Nivea', 'lateinisch: „schneeweiß“'], ['Häagen-Dazs', 'frei erfundener Kunstname'],
   ], [4, 0, 5, 2, 1, 3], 'Der pseudo-dänische Name Häagen-Dazs ist gerade nicht Dänisch.'),
     'Allgemein bekannte Markenherkunft (Audi = Übersetzung von „Horch“, LEGO = „leg godt“, HARIBO = Hans Riegel Bonn, IKEA = Ingvar Kamprad Elmtaryd Agunnaryd, Nivea = lat. niveus, Häagen-Dazs = erfunden); Primärquellen je Marke noch zu dokumentieren.'),
 
   // ===== WER WAR ZUERST? / SORTIEREN (alle fünf sichtbar, 50 Punkte je richtiger Position)
-  rv(rank('b42-rank-c09', 'Fußball', 'Ordne die gezahlten Sockelablösen des BVB (ohne spätere Boni), günstigster Einkauf zuerst: Kagawa 2010, Sancho 2017, Haaland 2020, Bellingham 2020, Hummels-Rückkehr 2019.', 'günstigster Einkauf', 'teuerster Einkauf', [
-    ['Shinji Kagawa (2010)', 'ca. 0,35 Mio. €'], ['Jadon Sancho (2017)', 'ca. 7,8 Mio. €'], ['Erling Haaland (2020)', 'ca. 20 Mio. €'], ['Jude Bellingham (2020)', 'ca. 23–25 Mio. €'], ['Mats Hummels (2019)', 'ca. 30,5 Mio. €'],
-  ], [3, 0, 4, 2, 1], 'Der teuerste Einkauf war ein Rückkehrer – der günstigste ein Japaner für Kleingeld.'),
-    'NICHT FREIGEGEBEN: Ablösesummen widersprechen sich je nach Quelle (u. a. Sancho 7,8 vs. 20,6 Mio., Haaland 20 vs. 21,4 Mio., Hummels 30,5 vs. 38 Mio. inkl. Boni). Die Reihenfolge Sancho/Haaland ist definitionsabhängig. Vor dem Abend eine einheitliche Quelle (z. B. Transfermarkt, Sockelablöse) festlegen oder die Aufgabe im Admin ersetzen (Vorschlag: v2-fussball-zeitreise-1, Gründungsjahre).'),
+  rv(rank('b42-rank-c09', 'Fußball', 'Sortiere diese fünf BVB-Neuzugänge nach ihrer auf Transfermarkt.de angegebenen Ablösesumme – vom günstigsten zum teuersten.', 'günstigste Ablöse', 'teuerste Ablöse', [
+    ['Shinji Kagawa (2010)', '0,35 Mio. €'], ['Jadon Sancho (2017)', '7,84 Mio. €'], ['Erling Haaland (2020)', '20,00 Mio. €'], ['Jude Bellingham (2020)', '25,00 Mio. €'], ['Mats Hummels (2019)', '30,50 Mio. €'],
+  ], [3, 0, 4, 2, 1], 'Laut Transfermarkt.de war der teuerste Einkauf ein Rückkehrer – der günstigste ein Japaner für Kleingeld.'),
+    'Maßstab ist ausdrücklich Transfermarkt.de (Fragetext). Transfermarkt war in der Redaktionsumgebung nicht abrufbar: Die Werte stützen sich auf Medienberichte (Kagawa 0,35 / Sancho ca. 7,5–7,84 / Haaland 20 / Bellingham ca. 25 / Hummels 30,5 Mio. €). Bitte die fünf Zahlen einmal direkt auf Transfermarkt.de gegenlesen. Die Reihenfolge ist in allen Quellen identisch.'),
   rv(rank('b42-rank-c10', 'Andere Themen', 'Sortiere chronologisch, ältestes Ereignis zuerst.', 'am längsten her', 'am jüngsten', [
     ['Bau der Cheops-Pyramide', 'um 2560 v. Chr.'], ['Die letzten Mammuts auf der Wrangelinsel', 'um 2000 v. Chr.'], ['Beginn der Regentschaft Kleopatras', '51 v. Chr.'], ['Beginn des Lehrbetriebs in Oxford', 'ab ca. 1096'], ['Gründung von Tenochtitlan', '1325'],
   ], [2, 4, 0, 3, 1], 'Mammuts lebten nach dem Pyramidenbau; in Oxford wurde schon vor der Gründung der Aztekenhauptstadt gelehrt.'),
     'Jahreswerte antiker Vorgänge sind Näherungen (Abstände sind groß genug, Reihenfolge ist stabil). Mammut-Datum (Wrangelinsel, ca. 4.000 Jahre) aus der Jury-Karte.'),
   rv(rank('b42-rank-t05', 'Fußball', 'Sortiere nach Alter beim ersten Bundesligaspiel, jüngster zuerst.', 'jüngster Debütant', 'ältester Debütant', [
-    ['Niko Iličević', '16 Jahre, 1 Tag'], ['Linus Güther', '16 Jahre, 3 Tage'], ['Paul Wanner', '16 Jahre, 15 Tage'], ['Louis Lemke', '16 Jahre, 214 Tage'], ['Tom Bischof', '16 Jahre, 264 Tage'],
-  ], [4, 1, 3, 0, 2], 'Iličević stellte am 1. November 2026 Moukokos Rekord ein; Moukoko ist bewusst nicht dabei, weil er den Rekord teilt.'),
-    'VORBEHALT: Belegt sind Iličević (gleichauf mit Moukoko, 16 J. 1 Tag), Güther (16 J. 3 Tage, Bundesliga.com) und Wanner (16 J. 15 Tage). Die Alter von Lemke (214 Tage) und Bischof (264 Tage) wurden nicht gefunden – vor der Show gegen Bundesliga.com prüfen; sonst im Admin ersetzen (Vorschlag: v2-fussball-zeitreise-1).'),
+    ['Niko Iličević', '16 Jahre, 1 Tag'], ['Linus Güther', '16 Jahre, 3 Tage'], ['Paul Wanner', '16 Jahre, 15 Tage'], ['Louis Lemke', '16 Jahre, 214 Tage'], ['Tom Bischof', '16 Jahre, 263 Tage'],
+  ], [4, 1, 3, 0, 2], 'Iličević stellte 2026 Moukokos Rekord ein; Moukoko ist bewusst nicht dabei, weil er den Rekord teilt.'),
+    'Belegt: Güther 16 J. 3 T. (Bundesliga.com), Wanner 16 J. 15 T., Lemke 16 J. 214 T. (HSV, Debüt 10.5.2026), Bischof 16 J. 263 T. (Hoffenheim, 19.3.2022; die Jury-Karte nannte 264). Offen: Iličević „gleichauf mit Moukoko“ nur über eine Bundesliga.com-Meldung, Debüt-Datum nicht erneut geprüft.'),
 
   // ===== GLITCH (Original auf TV, Veränderung nur auf den Handys)
   glitch('b42-glitch-t07', 'transfer1', 'Merk dir die Transferübersicht! (alle Daten fiktiv)', 'Was hat sich verändert? Tippe darauf.', 'Der Reus-Kaufpreis wurde von 6,5 auf 65,0 Mio. € verzehnfacht – der Name der Show taucht plötzlich als Transferkatastrophe auf.'),
@@ -66,8 +67,8 @@ export const BESTOF_NEW: PoolQuestion[] = [
   // ===== SETZ AUF MICH (Einsätze/Bonus aus der Paketregel)
   est('b42-est-t09', 'Fußball', 'Wie viele Tore erzielte Youssoufa Moukoko laut BVB-Angabe in seinen insgesamt 88 Einsätzen für die U17 und U19 von Borussia Dortmund?', 'Tore', 141, 'In der Jugend erzielte er etwa 1,6 Treffer pro Spiel.'),
   est('b42-est-c18', 'Fußball', 'Wie viel wiegt der Original-WM-Pokal der Männer laut FIFA, in Gramm?', 'Gramm', 6175, 'Das Original verlässt die FIFA nur zu besonderen Anlässen; die Sieger erhalten nach der Feier eine andere Ausführung.'),
-  rv(est('b42-est-c19', 'Andere Themen', 'Wie viele Millionen Maß Bier wurden laut vorläufiger Oktoberfest-Bilanz 2025 ausgeschenkt? Auf 0,1 Millionen Maß gerundet!', 'Mio. Maß', 6.5, 'Auch die Besucherzahl lag bei rund 6,5 Millionen.'),
-    'VORBEHALT: „vorläufige Bilanz“ (Festwirte-Schätzung) = rund 6,5 Mio. Maß; der städtische Bericht nennt 6.712.700 verkaufte Maß (≈ 6,7 Mio.). Die Frage gilt nur mit dem Zusatz „vorläufig“ – nicht als exakten Wert darstellen.'),
+  rv(est('b42-est-c19', 'Andere Themen', 'Wie viele Millionen Maß Bier wurden laut der vorläufigen Wiesn-Bilanz 2025 (Schätzung der Festwirte) ausgeschenkt? Auf 0,1 Millionen Maß gerundet!', 'Mio. Maß', 6.5, 'Auch die Besucherzahl lag bei rund 6,5 Millionen. (Die spätere städtische Auswertung nennt rund 6,7 Millionen verkaufte Maß.)'),
+    ''),
   est('b42-est-t10', 'Andere Themen', 'Wie viele Kilometer lang ist der reguläre Linienflug zwischen Westray und Papa Westray in Schottland, laut Guinness World Records? Gib die Entfernung auf zwei Nachkommastellen an.', 'km', 2.74, 'Einmal wurde die Strecke in nur 53 Sekunden geflogen.'),
 
   // ===== DIE VERBINDUNG (Hinweise schwer → leicht)
@@ -83,21 +84,21 @@ export const BESTOF_NEW: PoolQuestion[] = [
     'Berlin, Hamburg und Duisburg beanspruchen meine Erfindungsgeschichte.',
     'Ich bin eine Wurst mit Ketchup und Currypulver.',
   ], 'Currywurst', ['Curry Wurst', 'Curry-Wurst', 'Currywürste'], 'Bitte „Marke“ statt „Patent“ sagen: Das Deutsche Patent- und Markenamt widerspricht dem Patentmythos ausdrücklich.'),
-    'Quelle laut Jury: DPMA (Chillup als Marke, 1959). VW-Teilenummer 199 398 500 A nicht per Websuche belegt.'),
+    'Offen: VW-Teilenummer 199 398 500 A nicht per Websuche belegt; Chillup-Marke (1959) laut Jury/DPMA.'),
   rv(link('b42-link-c24', 'Fußball', 'Was wird gesucht?', [
     'Das aserbaidschanische Tofiq-Bahramov-Stadion trägt den Namen eines Mannes, der über mich mitentschied.',
     'Vier Monate zuvor spielte ein Hund beim verschwundenen WM-Pokal eine Hauptrolle.',
     '2010 gab es im WM-Spiel Deutschland–England eine berühmte fast spiegelbildliche Szene.',
     'Geoff Hurst, Lattenunterkante, Torlinie – Wembley 1966.',
   ], 'Das Wembley-Tor', ['Wembley-Tor', 'Wembleytor', 'Wembley Tor', 'Das Wembleytor', 'Wembley 1966', 'Wembley'], 'Der Linienrichter war aus Aserbaidschan, nicht aus Russland.'),
-    'Bahramov/Stadion Baku per Websuche bestätigt. „Hund Pickles / verschwundener WM-Pokal (März 1966)“ nicht per Suche belegt (allgemein bekannt).'),
+    'Offen: Hinweis 2 („Hund und verschwundener WM-Pokal, März 1966“) nicht per Websuche belegt (allgemein bekannt). Bahramov/Stadion Baku bestätigt.'),
   rv(link('b42-link-c23', 'Andere Themen', 'Was wird gesucht?', [
     'Ein Exemplar von mir überstand 1991 eine Explosion während des Golfkriegs und konnte danach weiterlaufen.',
     'Mein ursprünglicher Bildschirm zeigte vier Graustufen auf grünlichem Grund.',
     'Mein Verkauf wurde durch ein sowjetisches Puzzlespiel enorm angeschoben.',
     'Pokémon Rot und Blau erschienen für mich.',
   ], 'Nintendo Game Boy', ['Game Boy', 'Gameboy', 'Nintendo Gameboy', 'GameBoy', 'Game Boy Classic', 'Der Game Boy'], 'Das verkohlte Exemplar wurde jahrelang in einem Nintendo-Store gezeigt.'),
-    'Story bestätigt (Golfkrieg 1990/91, Exemplar des US-Soldaten Stephan Scoggins, Display im Nintendo-Store New York bis 2023). Die genaue Ursache variiert in den Berichten (Kasernenbombardement vs. nahe Explosion) – „Explosion“ ist die sichere Formulierung.'),
+    ''),
 
   // ===== EINZIGARTIG (eine gültige, nur einmal genannte Antwort = Punkte)
   closed(unique('b42-unique-t13', 'Fußball', 'Eine Nation …', 'Nenne eine Nation, die von 1930 bis einschließlich 2026 mindestens einmal Gastgeber der Männer-Fußball-WM war. Co-Gastgeber zählen.', [

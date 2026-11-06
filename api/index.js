@@ -38571,7 +38571,7 @@ var SEED_SHOW4 = {
 };
 
 // content/bestof.ts
-var rv = (q2, note) => ({ ...q2, task: { ...q2.task, review: note } });
+var rv = (q2, note) => note ? { ...q2, task: { ...q2.task, review: note } } : q2;
 var closed = (q2) => ({ ...q2, task: { ...q2.task, closed: true } });
 var BESTOF_NEW = [
   // ===== WO ZUR HÖLLE? (60 s, Punkte nach Entfernung)
@@ -38600,7 +38600,7 @@ var BESTOF_NEW = [
       "Cooper\u2019s Hill bei Brockworth, Gloucestershire (England)",
       "2025 gewann ein YouTuber aus M\xFCnchen zum zweiten Mal in Folge. Der K\xE4se rollt vorweg \u2013 und wird fast nie eingeholt."
     ),
-    "Koordinate gepr\xFCft (Wikipedia 51,8299 N / 2,1581 W). Reveal-Detail \u201EYouTuber aus M\xFCnchen 2025\u201C stammt aus der Jury-Karte (AP-Quelle genannt), von uns nicht erneut belegt."
+    "Offen: Reveal-Detail \u201EYouTuber aus M\xFCnchen gewann 2025\u201C nur laut Jury-Karte (AP), nicht erneut belegt. Koordinate gepr\xFCft."
   ),
   geo2(
     "b42-geo-t01",
@@ -38628,15 +38628,15 @@ var BESTOF_NEW = [
   ),
   // ===== MATCHMAKER (sechs eindeutige Paare)
   rv(
-    match2("b42-match-t03", "Fu\xDFball", "Ordne jeden Star dem Verein zu, f\xFCr den er unmittelbar vor seinem gro\xDFen n\xE4chsten Transfersprung spielte.", [
-      ["Erling Haaland", "Molde FK"],
-      ["Mohamed Salah", "FC Basel"],
-      ["Jude Bellingham", "Birmingham City"],
-      ["Kevin De Bruyne", "KRC Genk"],
-      ["Robert Lewandowski", "Lech Posen"],
-      ["Heung-min Son", "Hamburger SV"]
-    ], [3, 5, 1, 4, 0, 2], "Nicht das teuerste Team, sondern der \xFCbersehene letzte Schritt vor dem Durchbruch ist entscheidend."),
-    "Vorbehalt: \u201ETransfersprung\u201C muss eindeutig definiert werden. Haaland wechselte von Molde zun\xE4chst zu Red Bull Salzburg (nicht zum BVB). Die \xFCbrigen f\xFCnf Zuordnungen sind unstrittig (Salah \u2192 Chelsea, Bellingham \u2192 BVB, De Bruyne \u2192 Chelsea, Lewandowski \u2192 BVB, Son \u2192 Leverkusen)."
+    match2("b42-match-t03", "Fu\xDFball", "Ordne jeden Star dem Verein zu, bei dem er spielte, bevor er zu der jeweils genannten n\xE4chsten Station wechselte.", [
+      ["Erling Haaland (danach Salzburg \u2192 Dortmund)", "Molde FK"],
+      ["Mohamed Salah (danach Chelsea)", "FC Basel"],
+      ["Jude Bellingham (danach Dortmund)", "Birmingham City"],
+      ["Kevin De Bruyne (danach Chelsea)", "KRC Genk"],
+      ["Robert Lewandowski (danach Dortmund)", "Lech Posen"],
+      ["Heung-min Son (danach Leverkusen)", "Hamburger SV"]
+    ], [3, 5, 1, 4, 0, 2], "Nicht das teuerste Team, sondern der \xFCbersehene letzte Schritt vor dem Durchbruch ist entscheidend: Haaland ging von Molde erst nach Salzburg und dann nach Dortmund."),
+    "Stationen allgemein bekannt, nicht einzeln per Websuche belegt (Haaland Molde \u2192 Salzburg \u2192 Dortmund, Salah Basel \u2192 Chelsea, Bellingham Birmingham \u2192 Dortmund, De Bruyne Genk \u2192 Chelsea, Lewandowski Lech \u2192 Dortmund, Son HSV \u2192 Leverkusen)."
   ),
   rv(
     match2("b42-match-c08", "Andere Themen", "Wozu wurde dieses Produkt urspr\xFCnglich entwickelt bzw. woraus entstand es?", [
@@ -38658,7 +38658,7 @@ var BESTOF_NEW = [
       ["Bulli", "RB Leipzig"],
       ["Berni", "FC Bayern"]
     ], [5, 2, 0, 4, 3, 1], "Echte \xDCberraschungen: Ein Krokodil, ein Elch, eine Biene, ein Fohlen, ein Bulle und ein B\xE4r."),
-    "Zuordnung per Websuche best\xE4tigt (Fritzle = Krokodil, Hoffi = Elch, Emma = Biene, J\xFCnter = Fohlen, Berni = B\xE4r; Bulli = RB-Leipzig-Bulle laut Jury). Optional: Maskottchenfotos bei der Aufl\xF6sung."
+    ""
   ),
   rv(
     match2("b42-match-c07", "Andere Themen", "Was bedeutet der Name dieser Marke wirklich?", [
@@ -38673,14 +38673,14 @@ var BESTOF_NEW = [
   ),
   // ===== WER WAR ZUERST? / SORTIEREN (alle fünf sichtbar, 50 Punkte je richtiger Position)
   rv(
-    rank2("b42-rank-c09", "Fu\xDFball", "Ordne die gezahlten Sockelabl\xF6sen des BVB (ohne sp\xE4tere Boni), g\xFCnstigster Einkauf zuerst: Kagawa 2010, Sancho 2017, Haaland 2020, Bellingham 2020, Hummels-R\xFCckkehr 2019.", "g\xFCnstigster Einkauf", "teuerster Einkauf", [
-      ["Shinji Kagawa (2010)", "ca. 0,35 Mio. \u20AC"],
-      ["Jadon Sancho (2017)", "ca. 7,8 Mio. \u20AC"],
-      ["Erling Haaland (2020)", "ca. 20 Mio. \u20AC"],
-      ["Jude Bellingham (2020)", "ca. 23\u201325 Mio. \u20AC"],
-      ["Mats Hummels (2019)", "ca. 30,5 Mio. \u20AC"]
-    ], [3, 0, 4, 2, 1], "Der teuerste Einkauf war ein R\xFCckkehrer \u2013 der g\xFCnstigste ein Japaner f\xFCr Kleingeld."),
-    "NICHT FREIGEGEBEN: Abl\xF6sesummen widersprechen sich je nach Quelle (u. a. Sancho 7,8 vs. 20,6 Mio., Haaland 20 vs. 21,4 Mio., Hummels 30,5 vs. 38 Mio. inkl. Boni). Die Reihenfolge Sancho/Haaland ist definitionsabh\xE4ngig. Vor dem Abend eine einheitliche Quelle (z. B. Transfermarkt, Sockelabl\xF6se) festlegen oder die Aufgabe im Admin ersetzen (Vorschlag: v2-fussball-zeitreise-1, Gr\xFCndungsjahre)."
+    rank2("b42-rank-c09", "Fu\xDFball", "Sortiere diese f\xFCnf BVB-Neuzug\xE4nge nach ihrer auf Transfermarkt.de angegebenen Abl\xF6sesumme \u2013 vom g\xFCnstigsten zum teuersten.", "g\xFCnstigste Abl\xF6se", "teuerste Abl\xF6se", [
+      ["Shinji Kagawa (2010)", "0,35 Mio. \u20AC"],
+      ["Jadon Sancho (2017)", "7,84 Mio. \u20AC"],
+      ["Erling Haaland (2020)", "20,00 Mio. \u20AC"],
+      ["Jude Bellingham (2020)", "25,00 Mio. \u20AC"],
+      ["Mats Hummels (2019)", "30,50 Mio. \u20AC"]
+    ], [3, 0, 4, 2, 1], "Laut Transfermarkt.de war der teuerste Einkauf ein R\xFCckkehrer \u2013 der g\xFCnstigste ein Japaner f\xFCr Kleingeld."),
+    "Ma\xDFstab ist ausdr\xFCcklich Transfermarkt.de (Fragetext). Transfermarkt war in der Redaktionsumgebung nicht abrufbar: Die Werte st\xFCtzen sich auf Medienberichte (Kagawa 0,35 / Sancho ca. 7,5\u20137,84 / Haaland 20 / Bellingham ca. 25 / Hummels 30,5 Mio. \u20AC). Bitte die f\xFCnf Zahlen einmal direkt auf Transfermarkt.de gegenlesen. Die Reihenfolge ist in allen Quellen identisch."
   ),
   rv(
     rank2("b42-rank-c10", "Andere Themen", "Sortiere chronologisch, \xE4ltestes Ereignis zuerst.", "am l\xE4ngsten her", "am j\xFCngsten", [
@@ -38698,9 +38698,9 @@ var BESTOF_NEW = [
       ["Linus G\xFCther", "16 Jahre, 3 Tage"],
       ["Paul Wanner", "16 Jahre, 15 Tage"],
       ["Louis Lemke", "16 Jahre, 214 Tage"],
-      ["Tom Bischof", "16 Jahre, 264 Tage"]
-    ], [4, 1, 3, 0, 2], "Ili\u010Devi\u0107 stellte am 1. November 2026 Moukokos Rekord ein; Moukoko ist bewusst nicht dabei, weil er den Rekord teilt."),
-    "VORBEHALT: Belegt sind Ili\u010Devi\u0107 (gleichauf mit Moukoko, 16 J. 1 Tag), G\xFCther (16 J. 3 Tage, Bundesliga.com) und Wanner (16 J. 15 Tage). Die Alter von Lemke (214 Tage) und Bischof (264 Tage) wurden nicht gefunden \u2013 vor der Show gegen Bundesliga.com pr\xFCfen; sonst im Admin ersetzen (Vorschlag: v2-fussball-zeitreise-1)."
+      ["Tom Bischof", "16 Jahre, 263 Tage"]
+    ], [4, 1, 3, 0, 2], "Ili\u010Devi\u0107 stellte 2026 Moukokos Rekord ein; Moukoko ist bewusst nicht dabei, weil er den Rekord teilt."),
+    "Belegt: G\xFCther 16 J. 3 T. (Bundesliga.com), Wanner 16 J. 15 T., Lemke 16 J. 214 T. (HSV, Deb\xFCt 10.5.2026), Bischof 16 J. 263 T. (Hoffenheim, 19.3.2022; die Jury-Karte nannte 264). Offen: Ili\u010Devi\u0107 \u201Egleichauf mit Moukoko\u201C nur \xFCber eine Bundesliga.com-Meldung, Deb\xFCt-Datum nicht erneut gepr\xFCft."
   ),
   // ===== GLITCH (Original auf TV, Veränderung nur auf den Handys)
   glitch2("b42-glitch-t07", "transfer1", "Merk dir die Transfer\xFCbersicht! (alle Daten fiktiv)", "Was hat sich ver\xE4ndert? Tippe darauf.", "Der Reus-Kaufpreis wurde von 6,5 auf 65,0 Mio. \u20AC verzehnfacht \u2013 der Name der Show taucht pl\xF6tzlich als Transferkatastrophe auf."),
@@ -38711,8 +38711,8 @@ var BESTOF_NEW = [
   est("b42-est-t09", "Fu\xDFball", "Wie viele Tore erzielte Youssoufa Moukoko laut BVB-Angabe in seinen insgesamt 88 Eins\xE4tzen f\xFCr die U17 und U19 von Borussia Dortmund?", "Tore", 141, "In der Jugend erzielte er etwa 1,6 Treffer pro Spiel."),
   est("b42-est-c18", "Fu\xDFball", "Wie viel wiegt der Original-WM-Pokal der M\xE4nner laut FIFA, in Gramm?", "Gramm", 6175, "Das Original verl\xE4sst die FIFA nur zu besonderen Anl\xE4ssen; die Sieger erhalten nach der Feier eine andere Ausf\xFChrung."),
   rv(
-    est("b42-est-c19", "Andere Themen", "Wie viele Millionen Ma\xDF Bier wurden laut vorl\xE4ufiger Oktoberfest-Bilanz 2025 ausgeschenkt? Auf 0,1 Millionen Ma\xDF gerundet!", "Mio. Ma\xDF", 6.5, "Auch die Besucherzahl lag bei rund 6,5 Millionen."),
-    "VORBEHALT: \u201Evorl\xE4ufige Bilanz\u201C (Festwirte-Sch\xE4tzung) = rund 6,5 Mio. Ma\xDF; der st\xE4dtische Bericht nennt 6.712.700 verkaufte Ma\xDF (\u2248 6,7 Mio.). Die Frage gilt nur mit dem Zusatz \u201Evorl\xE4ufig\u201C \u2013 nicht als exakten Wert darstellen."
+    est("b42-est-c19", "Andere Themen", "Wie viele Millionen Ma\xDF Bier wurden laut der vorl\xE4ufigen Wiesn-Bilanz 2025 (Sch\xE4tzung der Festwirte) ausgeschenkt? Auf 0,1 Millionen Ma\xDF gerundet!", "Mio. Ma\xDF", 6.5, "Auch die Besucherzahl lag bei rund 6,5 Millionen. (Die sp\xE4tere st\xE4dtische Auswertung nennt rund 6,7 Millionen verkaufte Ma\xDF.)"),
+    ""
   ),
   est("b42-est-t10", "Andere Themen", "Wie viele Kilometer lang ist der regul\xE4re Linienflug zwischen Westray und Papa Westray in Schottland, laut Guinness World Records? Gib die Entfernung auf zwei Nachkommastellen an.", "km", 2.74, "Einmal wurde die Strecke in nur 53 Sekunden geflogen."),
   // ===== DIE VERBINDUNG (Hinweise schwer → leicht)
@@ -38729,7 +38729,7 @@ var BESTOF_NEW = [
       "Berlin, Hamburg und Duisburg beanspruchen meine Erfindungsgeschichte.",
       "Ich bin eine Wurst mit Ketchup und Currypulver."
     ], "Currywurst", ["Curry Wurst", "Curry-Wurst", "Curryw\xFCrste"], "Bitte \u201EMarke\u201C statt \u201EPatent\u201C sagen: Das Deutsche Patent- und Markenamt widerspricht dem Patentmythos ausdr\xFCcklich."),
-    "Quelle laut Jury: DPMA (Chillup als Marke, 1959). VW-Teilenummer 199 398 500 A nicht per Websuche belegt."
+    "Offen: VW-Teilenummer 199 398 500 A nicht per Websuche belegt; Chillup-Marke (1959) laut Jury/DPMA."
   ),
   rv(
     link2("b42-link-c24", "Fu\xDFball", "Was wird gesucht?", [
@@ -38738,7 +38738,7 @@ var BESTOF_NEW = [
       "2010 gab es im WM-Spiel Deutschland\u2013England eine ber\xFChmte fast spiegelbildliche Szene.",
       "Geoff Hurst, Lattenunterkante, Torlinie \u2013 Wembley 1966."
     ], "Das Wembley-Tor", ["Wembley-Tor", "Wembleytor", "Wembley Tor", "Das Wembleytor", "Wembley 1966", "Wembley"], "Der Linienrichter war aus Aserbaidschan, nicht aus Russland."),
-    "Bahramov/Stadion Baku per Websuche best\xE4tigt. \u201EHund Pickles / verschwundener WM-Pokal (M\xE4rz 1966)\u201C nicht per Suche belegt (allgemein bekannt)."
+    "Offen: Hinweis 2 (\u201EHund und verschwundener WM-Pokal, M\xE4rz 1966\u201C) nicht per Websuche belegt (allgemein bekannt). Bahramov/Stadion Baku best\xE4tigt."
   ),
   rv(
     link2("b42-link-c23", "Andere Themen", "Was wird gesucht?", [
@@ -38747,7 +38747,7 @@ var BESTOF_NEW = [
       "Mein Verkauf wurde durch ein sowjetisches Puzzlespiel enorm angeschoben.",
       "Pok\xE9mon Rot und Blau erschienen f\xFCr mich."
     ], "Nintendo Game Boy", ["Game Boy", "Gameboy", "Nintendo Gameboy", "GameBoy", "Game Boy Classic", "Der Game Boy"], "Das verkohlte Exemplar wurde jahrelang in einem Nintendo-Store gezeigt."),
-    "Story best\xE4tigt (Golfkrieg 1990/91, Exemplar des US-Soldaten Stephan Scoggins, Display im Nintendo-Store New York bis 2023). Die genaue Ursache variiert in den Berichten (Kasernenbombardement vs. nahe Explosion) \u2013 \u201EExplosion\u201C ist die sichere Formulierung."
+    ""
   ),
   // ===== EINZIGARTIG (eine gültige, nur einmal genannte Antwort = Punkte)
   closed(unique2("b42-unique-t13", "Fu\xDFball", "Eine Nation \u2026", "Nenne eine Nation, die von 1930 bis einschlie\xDFlich 2026 mindestens einmal Gastgeber der M\xE4nner-Fu\xDFball-WM war. Co-Gastgeber z\xE4hlen.", [

@@ -19,15 +19,15 @@ Legende: ✅ belegt/unstrittig · 🟡 Vorbehalt (im Admin als Warnung sichtbar)
 | | 6 | Point Nemo (48°52,6′ S / 123°23,6′ W) | Jury C05 | ✅ NOAA (2.688 km) |
 | MATCHMAKER | 1 ⚽ | Bundesliga-Spitznamen | Bestand `s3-match-spitznamen` | ✅ |
 | | 2 | Tierrekorde | Bestand `s4-match-tierrekorde` | ✅ (Grönlandhai 250–400 J. = Schätzung) |
-| | 3 ⚽ | Stars und frühere Vereine | Jury T03 | 🟡 „Transfersprung“ mehrdeutig: Haaland wechselte von Molde zuerst zu Salzburg, nicht zum BVB; übrige fünf unstrittig |
+| | 3 ⚽ | Stars und frühere Vereine | Jury T03 | ✅ Fragetext präzisiert („bevor er zur genannten nächsten Station wechselte“; Haaland: danach Salzburg → Dortmund); Stationen allgemein bekannt, nicht einzeln per Suche belegt |
 | | 4 | Produktursprünge | Jury C08 | 🟡 Slinky/Listerine/Viagra nur Sekundärquellen; Primärquellen noch zu ergänzen |
 | | 5 ⚽ | Bundesliga-Maskottchen | Jury C06 | ✅ (Fritzle Krokodil, Hoffi Elch, Emma Biene, Jünter Fohlen, Berni Bär; Bulli laut Jury) |
 | | 6 | Markennamen | Jury C07 | 🟡 allgemein bekannt, Primärquellen je Marke offen |
 | WER WAR ZUERST? | 1 ⚽ | Fußballgeschichte | Bestand `v2-fussball-zeitreise-2` | ✅ |
 | | 2 | Olympische Sommerspiele | Bestand `s3-rank-olympia` | ✅ |
-| | 3 ⚽ | BVB-Sockelablösen | Jury C09 | 🔴 **Ablösen widersprechen sich** (Sancho 7,8 vs. 20,6 Mio., Haaland 20 vs. 21,4, Hummels 30,5 vs. 38 inkl. Boni) → Reihenfolge Sancho/Haaland definitionsabhängig; Alternative: `v2-fussball-zeitreise-1` (Gründungsjahre) |
+| | 3 ⚽ | BVB-Neuzugänge nach Transfermarkt-Ablöse | Jury C09 | 🟡 Maßstab jetzt ausdrücklich Transfermarkt.de (0,35 / 7,84 / 20,00 / 25,00 / 30,50 Mio. €); Transfermarkt war nicht abrufbar → Zahlen aus Medienberichten, **einmal direkt auf Transfermarkt.de gegenlesen**; Reihenfolge in allen Quellen identisch |
 | | 4 | Pyramiden/Mammuts/Oxford/Tenochtitlan | Jury C10 | 🟡 antike Jahre = Näherungen, Reihenfolge stabil |
-| | 5 ⚽ | Jüngste Bundesliga-Debütanten | Jury T05 | 🟡 belegt: Iličević (gleichauf Moukoko), Güther 16 J. 3 T. (Bundesliga.com), Wanner 16 J. 15 T.; **Lemke 214 / Bischof 264 Tage nicht gefunden**; Alternative `v2-fussball-zeitreise-1` |
+| | 5 ⚽ | Jüngste Bundesliga-Debütanten | Jury T05 | ✅ Güther 16 J. 3 T., Wanner 16 J. 15 T., **Lemke 16 J. 214 T. (HSV, 10.5.2026)**, **Bischof 16 J. 263 T. (Hoffenheim, 19.3.2022; Karte nannte 264)**; 🟡 Iličević-Gleichstand nur über Bundesliga.com-Meldung |
 | | 6 | Bauwerke nach Höhe | Bestand `v2-wer-war-zuerst-3` | ✅ |
 | GLITCH | 1 ⚽ | Reus-Transfer 6,5 → 65,0 | Jury T07, Szene `transfer1` | ✅ fiktiv |
 | | 2 | Stadionkiosk Bier 0,5 → 0,4 l | Jury C16, Szene `kiosk1` | ✅ fiktiv |
@@ -38,7 +38,7 @@ Legende: ✅ belegt/unstrittig · 🟡 Vorbehalt (im Admin als Warnung sichtbar)
 | SETZ AUF MICH | 1 ⚽ | Moukoko 141 Tore (88 Spiele) | Jury T09 | ✅ BVB-Angabe bestätigt |
 | | 2 | Längstes Tennismatch (665 min) | Bestand `s3-est-isner` | ✅ |
 | | 3 ⚽ | WM-Pokal 6.175 g | Jury C18 | ✅ (6,175 kg, mehrere Quellen) |
-| | 4 | Wiesn 2025 Mio. Maß | Jury C19 | 🟡 „vorläufig“ ≈ 6,5 Mio. (Festwirte); amtlicher Bericht 6.712.700 Maß |
+| | 4 | Wiesn 2025 Mio. Maß | Jury C19 | ✅ Frage ausdrücklich auf die vorläufige Festwirte-Bilanz (≈ 6,5 Mio.); städtische Auswertung 6,7 Mio. steht im Reveal |
 | | 5 ⚽ | WM-Tore 2014 | Bestand `v2-sport-und-pop-1` | ✅ |
 | | 6 | Kürzester Linienflug 2,74 km | Jury T10 | ✅ Guinness (53-s-Flug als Rekordzeit genannt) |
 | DIE VERBINDUNG | 1 ⚽ | Pelé | Bestand `s3-link-pele` | ✅ |
@@ -56,14 +56,15 @@ Legende: ✅ belegt/unstrittig · 🟡 Vorbehalt (im Admin als Warnung sichtbar)
 
 **Proben (ungewertet, unverändert aus `show-3`):** `s5-probe-geo` (Allianz Arena – **direkt danach** CL-Finale 2025), `-match` (Tierlaute), `-rank` (Planeten), `-glitch` (Aufstellungstafel), `-estimate` (16 Bundesländer), `-link` (Mond), `-unique` (Flagge, vollständige Liste).
 
-## Offene Fakten (nicht ausreichend belegt) – bitte vor dem Abend klären
-1. **C09 BVB-Ablösen (🔴)** – Quellen widersprechen sich; entweder einheitliche Transfermarkt-Sockelablösen festlegen oder durch `v2-fussball-zeitreise-1` ersetzen (Admin → Pakete → Aufgabe ersetzen, neue Paketversion).
-2. **T05 Debütalter (🟡)** – Lemke/Bischof nicht belegt; Iličević-Debüt 1.11.2026 und Rekordgleichstand nur über Bundesliga.com-Meldung belegt.
-3. **T03 Haaland (🟡)** – „unmittelbar vor dem Sprung“: Molde → Salzburg → BVB; Frage ggf. umformulieren.
-4. **C19 Wiesn (🟡)** – 6,5 Mio. (vorläufig) vs. 6,71 Mio. (amtlich).
-5. **C08/C07/C22/C24 (🟡)** – Primärquellen einzeln ergänzen.
-6. **C27 (🟡)** – vollständige Positivliste fehlt (bewusst offen).
-Alle Punkte erscheinen als **Warnungen** bei „Prüfen & Veröffentlichen“ im Admin (Feld `review` an der Aufgabe). Nicht per Websuche geprüft wurden außerdem: T13-Gastgeberliste, P20-Klubliste außer PSG, Details der Moderationskarten-Reveals, Namen/Fakten, die als „allgemein bekannt“ gelten.
+## Offene Fakten – bleiben als Warnung im Admin
+1. **C09:** Transfermarkt.de war in der Redaktionsumgebung nicht abrufbar – die fünf Zahlen bitte einmal direkt gegenlesen (Frage bleibt im Paket).
+2. **C04:** Reveal „YouTuber aus München gewann 2025“ nur laut Jury-Karte (AP).
+3. **C08/C07:** Primärquellen für Slinky/Listerine/Viagra bzw. die Markennamen fehlen (allgemein bekannt, nur Sekundärquellen).
+4. **C22/C24:** VW-Teilenummer bzw. „Hund/verschwundener WM-Pokal 1966“ nicht per Suche belegt.
+5. **C10:** antike Jahreszahlen sind Näherungen (Reihenfolge stabil).
+6. **C27:** vollständige Positivliste fehlt – bewusst offene Liste mit manueller Host-Prüfung.
+7. **T03:** Stationen allgemein bekannt, nicht einzeln belegt; **T05:** Iličević-Gleichstand nur über Bundesliga.com.
+Geklärt in der Schlussrunde: C09-Maßstab (Transfermarkt), T03-Haaland, T05 Lemke/Bischof, C19 (vorläufige Bilanz), C06/C23 (Warnung entfernt). Nicht per Websuche geprüft: T13-/P20-Listen außer PSG, Moderationskarten-Reveals, „allgemein bekannte“ Fakten.
 
 ## Dauer (Modell, keine Messung)
 | Variante | erwartet | maximal |
