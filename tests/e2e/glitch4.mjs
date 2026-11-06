@@ -27,7 +27,7 @@ for (const [scene, text, ti] of SCENES) {
   while (hv.round.taskIndex < ti) { await H({ k: 'h.skipTask' }); }
   check(hv.round.taskIndex === ti, `Szene ${scene}: Aufgabe erreicht`);
   await H({ k: 'h.begin' }); await waitH(v => v.round.stage === 'view' || v.round.stage === 'open'); idx++;
-  check((await tv.locator('svg.scene').count()) >= 1 || hv.round.stage === 'open', `${scene}: TV zeigt in der Betrachtung die Ursprungsszene`);
+  if (hv.round.stage === 'view') { const ok = await tv.waitForSelector('svg.scene', { timeout: 15000 }).then(() => true, () => false); check(ok, `${scene}: TV zeigt in der Betrachtung die Ursprungsszene`); }
   await waitH(v => v.round.stage === 'open', 40000); await sleep(600);
   check(await tv.locator('svg.scene').count() === 0, `${scene}: TV zeigt in der Suchphase KEINE Szene`);
   const zone = hv.round.data.zones[0]; const sc = hv.round.data.sceneData;
