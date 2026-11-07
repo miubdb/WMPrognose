@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PlayerPublic, RoundView, View } from '../../../shared/types';
+import { estimateNetLine } from '../../../shared/util';
 import { Avatar } from '../ui/Avatar';
 import { MapView, type LL } from '../ui/MapView';
 import { SceneView } from '../ui/SceneView';
@@ -134,7 +135,6 @@ function RankSortPhone({ round, act, room, d }: Props & { d: any }) {
   const n = d.slots ?? 5;
   const [slots, setSlots, clearSlots] = useDraft<(number | null)[]>(`${room}.${round.rid}.sort`, new Array(n).fill(null));
   const [sel, setSel] = useState<number | null>(null);
-  const [confirm, setConfirm] = useState(false);
   const [drag, setDrag] = useState<{ idx: number; x: number; y: number } | null>(null);
   const sent = !!(d.mine && d.mine.some((x: string | null) => x));
   const text = (i: number) => pool.find(p => p.idx === i)?.text ?? '';
@@ -142,8 +142,8 @@ function RankSortPhone({ round, act, room, d }: Props & { d: any }) {
   const placed = new Set(cur.filter((x): x is number => x !== null));
   const free = pool.filter(p => !placed.has(p.idx));
   const slotOf = (idx: number) => cur.findIndex(x => x === idx);
-  const placeAt = (idx: number, pos: number) => { const next = cur.slice(); const from = slotOf(idx); const occ = next[pos]; if (from >= 0) next[from] = occ ?? null; next[pos] = idx; setSlots(next); setSel(null); setConfirm(false); };
-  const toPool = (idx: number) => { const next = cur.slice(); const from = slotOf(idx); if (from >= 0) next[from] = null; setSlots(next); setSel(null); setConfirm(false); };
+  const placeAt = (idx: number, pos: number) => { const next = cur.slice(); const from = slotOf(idx); const occ = next[pos]; if (from >= 0) next[from] = occ ?? null; next[pos] = idx; setSlots(next); setSel(null); };
+  const toPool = (idx: number) => { const next = cur.slice(); const from = slotOf(idx); if (from >= 0) next[from] = null; setSlots(next); setSel(null); };
   const tapCard = (idx: number) => { if (sel === idx) { setSel(null); return; } const at = slotOf(idx); if (sel !== null && at >= 0) { placeAt(sel, at); return; } setSel(idx); };
   const tapSlot = (pos: number) => { if (sel !== null) { placeAt(sel, pos); return; } const occ = cur[pos]; if (occ !== null) setSel(occ); };
   // Drag & Drop per Pointer-Events (Finger und Maus); kurzes Tippen = Auswahl
@@ -185,10 +185,7 @@ function RankSortPhone({ round, act, room, d }: Props & { d: any }) {
       </div>
       {drag && <div className="scard ghost" style={{ left: drag.x, top: drag.y }}>{text(drag.idx)}</div>}
       <Status sent={false} draft={false} sending={snd.state === 'sending'} msg={snd.msg} />
-      {!confirm
-        ? <button className="btn primary wide" disabled={!all || snd.state === 'sending'} onClick={() => setConfirm(true)}>{all ? 'Reihenfolge prüfen & abgeben' : `Noch ${n - placed.size} Karte${n - placed.size > 1 ? 'n' : ''} platzieren`}</button>
-        : <div className="confirmbox"><b>Endgültig abgeben?</b><span className="muted small">Danach kannst du nichts mehr ändern.</span>
-            <div className="row"><button className="btn ghost" onClick={() => setConfirm(false)}>Zurück</button><button className="btn primary" disabled={snd.state === 'sending'} onClick={async () => { const a = await snd.send({ k: 'submit', payload: { order: cur } }); if (a.ok) clearSlots(); }}>Ja, endgültig abgeben</button></div></div>}
+      <button className="btn primary wide" disabled={!all || snd.state === 'sending'} onClick={async () => { const a = await snd.send({ k: 'submit', payload: { order: cur } }); if (a.ok) clearSlots(); }}>{all ? 'Reihenfolge endgültig abgeben' : `Noch ${n - placed.size} Karte${n - placed.size > 1 ? 'n' : ''} platzieren`}</button>
     </div>
   );
 }
@@ -452,14 +449,14 @@ function VotePhone({ round, act, view, pid, d }: Props & { d: any }) {
   const mine: string | null = d.mine ?? null;
   const others = view.players.filter(p => p.id !== pid || view.players.length <= 2);
   if (round.stage !== 'open') return <Waiting text={mine ? 'Stimme abgegeben' : 'Zeit abgelaufen'} sub="Gleich werden die Stimmen enthüllt …" />;
-  if (mine) return <div className="vote"><div className="question">{d.prompt}</div><Status sent draft={false} /><p className="center">Du hast gewählt: <b>{view.players.find(p => p.id === mine)?.name}</b></p><p className="muted center">Warte auf die anderen … ({d.answeredCount} von {d.playerCount} haben gewählt)</p></div>;
+  if (mine) return <div className="vote"><div className="question">{d.prompt}</div><Status sent draft={false} /><p className="center">Du hast gewählt: <b>{view.players.find(p => p.id === mine)?.name ?? d.candidate?.name}</b></p><p className="muted center">Warte auf die anderen … ({d.answeredCount} von {d.playerCount} haben gewählt)</p></div>;
   return (
     <div className="vote">
       <div className="question">{d.prompt}</div>
-      <p className="muted center small">Wähle geheim einen Mitspieler. Punkte gibt es, wenn deine Wahl die meisten Stimmen bekommt.</p>
-      <div className="votegrid">{others.map(p => <button type="button" key={p.id} className={`votecard ${sel === p.id ? 'sel' : ''}`} onClick={() => setSel(p.id)}><Avatar a={p.avatar} size={72} /><b>{p.name}</b></button>)}</div>
+      <p className="muted center small">Wähle geheim eine Person. 100 Punkte, wenn deine Wahl die meisten Stimmen bekommt (mind. 2).</p>
+      <div className="votegrid">{others.map(p => <button type="button" key={p.id} className={`votecard ${sel === p.id ? 'sel' : ''}`} onClick={() => setSel(p.id)}><Avatar a={p.avatar} size={72} /><b>{p.name}</b></button>)}{d.candidate && <button type="button" className={`votecard host ${sel === d.candidate.id ? 'sel' : ''}`} onClick={() => setSel(d.candidate.id)}><span className="hostav" aria-hidden>🎙️</span><b>{d.candidate.name}</b></button>}</div>
       <Status sent={false} draft={!!sel} sending={snd.state === 'sending'} msg={snd.msg} />
-      <button className="btn primary wide" disabled={!sel || snd.state === 'sending'} onClick={() => sel && snd.send({ k: 'submit', payload: { target: sel } })}>{sel ? `Stimme für ${view.players.find(p => p.id === sel)?.name} abgeben` : 'Mitspieler antippen'}</button>
+      <button className="btn primary wide" disabled={!sel || snd.state === 'sending'} onClick={() => sel && snd.send({ k: 'submit', payload: { target: sel } })}>{sel ? `Stimme für ${view.players.find(p => p.id === sel)?.name ?? d.candidate?.name} abgeben` : 'Mitspieler antippen'}</button>
     </div>
   );
 }
@@ -524,13 +521,13 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
     case 'estimate': {
       const g = rev.guesses.find((x: any) => x.pid === pid); const b = rev.bets.find((x: any) => x.pid === pid);
       const pts = (g?.points ?? 0) + (g?.bonus ?? 0) + (b?.delta ?? 0);
-      const t = [g ? `Schätzung: Platz ${g.place}${g.best ? ' 🎯' : ''}${g.bonus ? ` · Bonus +${g.bonus}` : ''}` : 'Keine Schätzung', b ? (b.won ? `Einsatz gewonnen (+${b.amount})` : `Einsatz verloren (${b.delta})`) : ''].filter(Boolean).join(' · ');
+      const t = [g ? `Platz ${g.place}${g.best ? ' 🎯' : ''}` : 'Keine Schätzung', estimateNetLine((g?.points ?? 0) + (g?.bonus ?? 0), b ? b.delta : null)].join(' · ');
       return { points: pts, title: `Lösung: ${rev.answer.toLocaleString('de-DE')} ${rev.unit}`, text: t };
     }
     case 'glitch': { const r = rev.rows.find((x: any) => x.pid === pid); return r?.tap ? { points: r.points, title: r.hit ? 'Treffer!' : 'Daneben', text: r.hit ? 'Genau erkannt.' : r.points ? 'Knapp daneben.' : 'Nicht getroffen.' } : none; }
     case 'codebreak': { const r = rev.rows.find((x: any) => x.pid === pid); return r ? { points: r.points, title: `Lösung: ${rev.answer}`, text: r.solved ? (r.hints ? `Gelöst mit ${r.hints} Hinweis(en)` : 'Gelöst ohne Hinweis!') : 'Nicht gelöst.' } : none; }
     case 'match': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.submitted ? { points: r.points, title: 'MATCHMAKER', text: `${r.correct} von 6 Paaren richtig` } : none; }
-    case 'vote': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.target ? { points: r.points, title: r.correct ? 'Konsens getroffen! 🤝' : 'Nicht die Mehrheit', text: `Du hast ${view.players.find(p => p.id === r.target)?.name ?? '?'} gewählt.` } : none; }
+    case 'vote': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.target ? { points: r.points, title: r.correct ? 'Konsens getroffen! 🤝' : 'Kein Konsens', text: `Du hast ${view.players.find(p => p.id === r.target)?.name ?? rev.candidate ?? '?'} gewählt.` } : none; }
     case 'link': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? `Richtig nach Hinweis ${r.level + 1}!` : 'Leider falsch', text: `Deine Antwort: ${r.answer}` } : none; }
     case 'unique': { const r = rev.results[pid]; return r ? { points: r.points, title: r.kind === 'unique' ? 'EINZIGARTIG! ✨' : r.kind === 'shared' ? 'Mehrfach genannt' : 'Ungültig', text: rev.groups.find((g: any) => g.members.includes(pid))?.label ?? '' } : none; }
   }

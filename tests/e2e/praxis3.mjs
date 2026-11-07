@@ -42,7 +42,7 @@ const rd = await tv.evaluate(() => window.__outplayMusicRender(24));
 check(rd.bad === 0 && rd.peak > 0.01 && rd.peak < 0.9 && rd.rms > 0.003 && rd.rms < 0.25 && Math.abs(rd.dc) < 0.01 && rd.audibleShare > 0.35, `Offline-Rendering (24 s @ ${rd.bpm} BPM): Spitze ${rd.peak.toFixed(3)}, Effektivwert ${rd.rms.toFixed(4)}, Gleichanteil ${rd.dc.toExponential(1)}, hörbar ${(rd.audibleShare * 100).toFixed(0)} %, keine NaN`);
 
 // ---------- 3) SORTIER'S!: zur Sortier-Aufgabe, Kartenbedienung auf 5 Formaten
-for (let i = 0; i < 30 && !(hv.round?.tileId === 'b43-r3' && hv.room.phase === 'round'); i++) await H({ k: hv.room.phase === 'scoreboard' ? 'h.continue' : 'h.skipTile' });
+for (let i = 0; i < 30 && !(hv.round?.tileId === 'b44-r3' && hv.room.phase === 'round'); i++) await H({ k: hv.room.phase === 'scoreboard' ? 'h.continue' : 'h.skipTile' });
 await H({ k: 'h.skipTask' }); await H({ k: 'h.begin' }); await waitH(v => v.round.stage === 'open'); const sol = hv.round.data.solution;
 check(hv.round.data.variant === 'sort', 'Sortier-Variante aktiv'); const tvTxt = await tv.locator('body').innerText(); check(/SORTIER/i.test(tvTxt), 'TV zeigt den Namen SORTIER’S!');
 const order = [[0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [0, 1, 2, 3, 4], [2, 0, 1, 4, 3], [0, 1, 2, 3, 4]];   // Zielreihenfolge je Gerät (Indizes in sol)
@@ -53,7 +53,7 @@ for (let i = 0; i < 5; i++) {
   check(await p.locator('.sslot .no').allInnerTexts().then(a => a.join() === '1,2,3,4,5'), `${vw}px: Plätze 1–5 sichtbar`);
   const geo = await p.evaluate(() => { const r = q => document.querySelector(q)?.getBoundingClientRect(); const a = r('.slotsboard'), b = r('.cardpool'), c = r('.topbar'); return { top: Math.round(a.top), slotsBottom: Math.round(a.bottom), poolBottom: Math.round(b.bottom), topbar: Math.round(c?.bottom ?? 0), vh: innerHeight }; });
   console.log(`  Layout ${vw}px: Plätze ${geo.top}–${geo.slotsBottom}, Kartenablage bis ${geo.poolBottom} von ${geo.vh} px Höhe`);
-  const btn = p.getByRole('button', { name: /platzieren|prüfen/ }); check(await btn.isDisabled(), `${vw}px: Abgabe gesperrt, solange nicht alle Karten liegen`);
+  const btn = p.getByRole('button', { name: /platzieren|endgültig abgeben/ }); check(await btn.isDisabled(), `${vw}px: Abgabe gesperrt, solange nicht alle Karten liegen`);
   const place = async (text, pos, how) => {
     const card = p.locator('.scard', { hasText: text }).first(); await card.scrollIntoViewIfNeeded();
     if (how === 'tap') { await card.click(); await p.locator(`[data-slot="${pos}"]`).click(); }
@@ -72,9 +72,7 @@ for (let i = 0; i < 5; i++) {
   const shown = await p.locator('.sslot .scard').allInnerTexts(); const wantShown = target.map(x => sol[x]);
   check(shown.join('|') === wantShown.join('|'), `${vw}px (${moves[i]}): Karten liegen wie gewünscht auf den Plätzen`);
   if (i === 0) await p.screenshot({ path: `${SHOTS}/sorter-${vw}.png` });
-  await p.getByRole('button', { name: /prüfen & abgeben/ }).click(); check(await p.getByText('Endgültig abgeben?').isVisible(), `${vw}px: bewusste Bestätigung vor der Abgabe`);
-  if (i === 1) { await p.getByRole('button', { name: 'Zurück' }).click(); check(await p.getByRole('button', { name: /prüfen & abgeben/ }).isVisible(), 'Zurück bricht die Abgabe ab (noch nichts gesendet)'); await p.getByRole('button', { name: /prüfen & abgeben/ }).click(); }
-  await p.getByRole('button', { name: 'Ja, endgültig abgeben' }).click(); await p.waitForFunction(() => /Abgegeben/.test(document.body.innerText), null, { timeout: 10000 });
+  await p.getByRole('button', { name: 'Reihenfolge endgültig abgeben' }).click(); check(!(await p.getByText('Ja, endgültig abgeben').count()), `${vw}px: ein Klick sendet, kein zweiter Dialog`); await p.waitForFunction(() => /Abgegeben/.test(document.body.innerText), null, { timeout: 10000 });
 }
 await H({ k: 'h.lock' }); await H({ k: 'h.reveal' }); await waitH(v => v.round.stage === 'reveal'); const rows = hv.round.reveal.rows;
 const exp = order.map(o => o.filter((x, k) => x === k).length * 50); const got = pls.map(p => rows.find(r => r.pid === p.playerId)?.points);

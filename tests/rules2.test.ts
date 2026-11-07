@@ -157,7 +157,7 @@ function reusGame(book: Book = REUS_COMPACT, n = 7) {
 }
 
 test('Reus 65 Mio: Paketname, Branding, Ablauf mit Zwischenständen nach R1, R3 und vor dem Finale', () => {
-  assert.equal(CS2.listPublished().find((p: any) => p.id === 'show-3')!.name, 'Reus 65 Mio');
+  assert.equal(CS2.listPublished().find((p: any) => p.id === 'show-3')!.name, 'Reus 65 Mio (Backup, alt)');
   assert.equal(REUS_COMPACT.rules!.winnerTitle, 'Reus65Mio-Champion'); assert.equal(REUS_COMPACT.rules!.showTitle, 'Reus 65 Mio');
   assert.deepEqual(REUS_COMPACT.show!.map(s => (s.k === 'board' ? 'board' : s.cat)), ['s4-r1', 'board', 's4-r2', 's4-r3', 'board', 's4-sur', 's4-r4', 's4-r5', 's4-r6', 'board', 's3-final']);
   const g = reusGame(); const v = g.view('tv'); assert.equal(v.room.brand!.winner, 'Reus65Mio-Champion'); assert.equal(v.room.brand!.title, 'Reus 65 Mio');

@@ -265,8 +265,19 @@ function ReviewList({ view, round, run }: { view: View; round: RoundView; run: R
           <b>{g.label}</b>
           <span className="tag">{g.state === 'valid' ? 'gültig' : g.state === 'invalid' ? (g.autoInvalid ? 'automatisch ungültig – korrigierbar' : 'ungültig') : 'unklar – bitte entscheiden'}</span>
           <ul className="rmembers">{g.members.map((m: string) => {
-            const raw = g.raw?.[m]; const auto = g.auto?.includes(m);
-            return <li key={m}><b>{nameOf(m)}</b> schrieb „{raw ?? g.label}“{auto && <> <span className="tag warn">Tippfehler automatisch als „{g.label}“ gewertet</span> <button className="btn tiny ghost" title="Diese Eingabe ist ein anderer Begriff – selbst entscheiden" onClick={() => run({ k: 'h.review', groupKey: 'u:' + normText(raw), decision: 'invalid' })}>✗ war etwas anderes</button></>}</li>;
+            const raw = g.raw?.[m]; const auto = g.auto?.includes(m); const manual = g.manual?.includes(m);
+            const others = groups.flatMap((x: any) => x.members.filter((o: string) => o !== m).map((o: string) => ({ pid: o, raw: x.raw?.[o] ?? x.label })));
+            return <li key={m}><b>{nameOf(m)}</b> schrieb „{raw ?? g.label}“{auto && <> <span className="tag warn">Tippfehler automatisch als „{g.label}“ gewertet</span></>}{manual && <> <span className="tag">vom Showmaster entschieden</span></>}
+              <span className="decide mini" aria-label={`Entscheidung für ${nameOf(m)}`}>
+                <button className={`btn tiny ${g.state === 'valid' ? '' : 'ghost'}`} title="Diese Antwort ist gültig" onClick={() => run({ k: 'h.review', groupKey: 'a:' + m, decision: 'valid' })}>✓ Gültig</button>
+                <button className={`btn tiny ${g.state === 'invalid' ? '' : 'ghost'}`} title="Diese Antwort ist ungültig" onClick={() => run({ k: 'h.review', groupKey: 'a:' + m, decision: 'invalid' })}>✗ Ungültig</button>
+                <select value="" aria-label="Identisch mit …" onChange={e => { const v = e.target.value; if (!v) return; run({ k: 'h.review', groupKey: 'a:' + m, decision: v.startsWith('n:') ? { mapTo: v.slice(2) } : { sameAs: v.slice(2) } }); }}>
+                  <option value="">= Identisch mit …</option>
+                  {valid.map(v => <option key={'n' + v} value={'n:' + v}>{v}</option>)}
+                  {others.map((o: any) => <option key={'p' + o.pid} value={'p:' + o.pid}>Antwort von {nameOf(o.pid)}: {o.raw}</option>)}
+                </select>
+                <button className="btn tiny ghost" title="Automatische Entscheidung wiederherstellen" disabled={!manual} onClick={() => run({ k: 'h.review', groupKey: 'a:' + m, decision: 'auto' })}>↺ Automatisch</button>
+              </span></li>;
           })}</ul>
           {g.key.startsWith('u:') && <Decide k={g.key} />}
         </div>

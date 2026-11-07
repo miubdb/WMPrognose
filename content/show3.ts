@@ -11,10 +11,10 @@ import { POOL2, SHOW2_ROUNDS } from './show2';
 
 export const SHOW3_PACK = {
   id: 'show-3',
-  name: 'Reus 65 Mio',
-  description: 'Der feste Showablauf mit Proberunden, Sortier-Variante bei BLIND RANK und fairerer SETZ-AUF-MICH-Wertung. Sieger: Reus65Mio-Champion.',
+  name: 'Reus 65 Mio (Backup, alt)',
+  description: 'Altes Backup-Paket: Der feste Showablauf mit Proberunden, Sortier-Variante bei BLIND RANK und fairerer SETZ-AUF-MICH-Wertung. Sieger: Reus65Mio-Champion.',
   rules: {
-    showTitle: 'Reus 65 Mio', winnerTitle: 'Reus65Mio-Champion', tasksPerMode: 4, rankVariant: 'sort' as const, estimateBets: [0, 50, 100], estimateBonus: 150,
+    startCredit: 200, showTitle: 'Reus 65 Mio', winnerTitle: 'Reus65Mio-Champion', tasksPerMode: 4, rankVariant: 'sort' as const, estimateBets: [0, 50, 100], estimateBonus: 150,
     tagline: 'Dein persönlicher Kickbase-Abend', winnerLine: 'Marktwert: unbezahlbar – die 65 Mio. sind verdient', boardTitle: 'Marktwert-Update',
   },
 };

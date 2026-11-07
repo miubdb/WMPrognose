@@ -38,13 +38,13 @@ test('Online: ohne Blob-Speicher oder ohne ADMIN_PASSWORD wird NICHT still "flü
   assert.equal((await b.call('GET', '/api/health')).data.admin.passwordConfigured, false);
 });
 
-test('Online: Login, Secure-Cookie, Erstinitialisierung (111 Fragen), Schreiben, Persistenz über "Kaltstart" (neue Instanz)', async () => {
+test('Online: Login, Secure-Cookie, Erstinitialisierung (121 Fragen), Schreiben, Persistenz über "Kaltstart" (neue Instanz)', async () => {
   const blob = newBlob(); const opts = { adminPassword: PW };
   const a = await boot(new OnlineAdmin(blob, opts));
   assert.equal((await a.call('POST', '/api/admin/login', { password: 'falsch' })).status, 401);
   const l = await a.call('POST', '/api/admin/login', { password: PW }); assert.equal(l.status, 200);
   assert.match(l.setCookie, /HttpOnly/); assert.match(l.setCookie, /Secure/); assert.match(l.setCookie, /SameSite=Strict/);
-  assert.equal((await a.call('GET', '/api/admin/questions')).data.length, 111, 'Vorlagen wurden initial übernommen');
+  assert.equal((await a.call('GET', '/api/admin/questions')).data.length, 121, 'Vorlagen wurden initial übernommen');
   const c = await a.call('POST', '/api/admin/questions', q); assert.equal(c.status, 201);
   assert.ok(existsSync((blob as any).file), 'Daten liegen im Blob-Speicher');
   // neue Instanz (Kaltstart) – gleiche Daten, gleiche Sitzung
@@ -138,7 +138,7 @@ test('Online: Voll-Backup (SQLite) ist eine gültige, vollständige Datenbank', 
   assert.equal(r.status, 200); assert.match(r.headers.get('content-disposition') ?? '', /VERTRAULICH/);
   const bytes = Buffer.from(await r.arrayBuffer()); assert.equal(bytes.subarray(0, 15).toString(), 'SQLite format 3');
   const { DatabaseSync } = await import('node:sqlite'); const f = join(mkdtempSync(join(tmpdir(), 'bk-')), 'b.db'); (await import('node:fs')).writeFileSync(f, bytes);
-  const db = new DatabaseSync(f); assert.equal((db.prepare('SELECT COUNT(*) n FROM questions').get() as any).n, 112); assert.equal((db.prepare('PRAGMA integrity_check').get() as any).integrity_check, 'ok'); db.close(); rmSync(f);
+  const db = new DatabaseSync(f); assert.equal((db.prepare('SELECT COUNT(*) n FROM questions').get() as any).n, 122); assert.equal((db.prepare('PRAGMA integrity_check').get() as any).integrity_check, 'ok'); db.close(); rmSync(f);
 });
 
 test('Die eingecheckte Vercel-Function (api/index.js) entspricht dem aktuellen Quellcode', async () => {

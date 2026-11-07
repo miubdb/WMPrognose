@@ -156,7 +156,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
               <Field label="Hinweis beim Betrachten"><input value={task.viewPrompt} maxLength={120} onChange={e => set('viewPrompt', e.target.value)} /></Field>
               {sec('Betrachtungszeit (Sek.)', 'viewSeconds')}{sec('Suchzeit (Sek.)', 'seconds')}{sec('Punkte', 'points')}</>}
             {m === 'match' && <>{sec('Zeit (Sek.)', 'seconds')}<p className="small muted">Fest: 50 Punkte je richtigem Paar (max. 300), keine Minuspunkte.</p></>}
-            {m === 'vote' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Punkte je richtiger Wahl', 'points')}<p className="small muted">Nur im Finale einsetzbar. Jeder wählt geheim einen Mitspieler; Punkte für alle, die die Wahl mit den meisten Stimmen getroffen haben (bei Gleichstand beide Wahlen).</p></>}
+            {m === 'vote' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Punkte je richtiger Wahl', 'points')}<Field label="Zusätzlicher Kandidat (optional, z. B. Showmaster)"><input value={task.candidate ?? ''} maxLength={40} onChange={e => set('candidate', e.target.value)} /></Field><p className="small muted">Nur im Finale einsetzbar. Jeder wählt geheim eine Person; Punkte für alle, die die Wahl mit den meisten Stimmen getroffen haben (mind. 2 Stimmen; bei Gleichstand zählen alle Spitzenwahlen). Der Zusatzkandidat bekommt keine Punkte.</p></>}
             {m === 'link' && <>{sec('Sekunden je Hinweis', 'clueSeconds')}<p className="small muted">Fest: 300 / 225 / 150 / 75 Punkte, eine endgültige Antwort je Spieler.</p></>}
             {m === 'unique' && <>
               <Field label="Platzhalter im Eingabefeld"><input value={task.placeholder} maxLength={40} onChange={e => set('placeholder', e.target.value)} /></Field>

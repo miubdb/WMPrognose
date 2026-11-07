@@ -5471,11 +5471,11 @@ var require_dist2 = __commonJS({
           return `shape[${k2}]._zod.run({ value: input[${k2}], issues: [] }, ctx)`;
         };
         doc.write("const input = payload.value;");
-        let ids = /* @__PURE__ */ Object.create(null), counter = 0;
-        for (let key of normalized.keys) ids[key] = `key_${counter++}`;
+        let ids2 = /* @__PURE__ */ Object.create(null), counter = 0;
+        for (let key of normalized.keys) ids2[key] = `key_${counter++}`;
         doc.write("const newResult = {};");
         for (let key of normalized.keys) {
-          let id = ids[key], k2 = esc(key);
+          let id = ids2[key], k2 = esc(key);
           doc.write(`const ${id} = ${parseStr(key)};`), doc.write(`
         if (${id}.issues.length) {
           payload.issues = payload.issues.concat(${id}.issues.map(iss => ({
@@ -33617,44 +33617,62 @@ function matchValidDetail(input, valid) {
   return { name: target, kind: "typo" };
 }
 function groupUnique(answers, valid, overrides = {}, closed2 = false) {
-  const groups = /* @__PURE__ */ new Map();
-  for (const [pid, raw] of Object.entries(answers)) {
+  const base = (pid, raw) => {
     const n = normText(raw);
-    if (!n) continue;
-    let key, label, state;
-    let autoTypo = false;
-    let autoInvalid = false;
+    if (!n) return null;
     const md = matchValidDetail(raw, valid);
     const mine = overrides["u:" + n];
-    if (md && !(md.kind === "typo" && mine)) {
-      key = "v:" + normText(md.name);
-      label = md.name;
-      state = "valid";
-      autoTypo = md.kind === "typo";
-    } else {
-      key = "u:" + n;
-      label = raw.trim();
-      state = closed2 ? "invalid" : "unknown";
-      autoInvalid = closed2;
-      const ov = overrides[key];
-      if (ov) autoInvalid = false;
-      if (ov === "valid") state = "valid";
-      else if (ov === "invalid") state = "invalid";
-      else if (ov && typeof ov === "object") {
-        const target = valid.find((v2) => v2.name === ov.mapTo);
-        if (target) {
-          key = "v:" + normText(target.name);
-          label = target.name;
-          state = "valid";
-        }
+    if (md && !(md.kind === "typo" && mine)) return { key: "v:" + normText(md.name), label: md.name, state: "valid", autoTypo: md.kind === "typo", autoInvalid: false };
+    let key = "u:" + n, label = raw.trim(), state = closed2 ? "invalid" : "unknown";
+    let autoInvalid = closed2;
+    const ov = overrides[key];
+    if (ov) autoInvalid = false;
+    if (ov === "valid") state = "valid";
+    else if (ov === "invalid") state = "invalid";
+    else if (ov && typeof ov === "object" && "mapTo" in ov) {
+      const target = valid.find((v2) => v2.name === ov.mapTo);
+      if (target) {
+        key = "v:" + normText(target.name);
+        label = target.name;
+        state = "valid";
       }
     }
-    const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
+    return { key, label, state, autoTypo: false, autoInvalid };
+  };
+  const resolve = (pid, seen = []) => {
+    const raw = answers[pid];
+    if (raw === void 0) return null;
+    const ov = overrides["a:" + pid];
+    if (!ov) return base(pid, raw);
+    if (ov === "invalid") return { key: "x:" + pid, label: raw.trim(), state: "invalid", autoTypo: false, autoInvalid: false };
+    if (ov === "valid") {
+      const b2 = base(pid, raw);
+      if (b2 && b2.state === "valid") return { ...b2, autoTypo: false };
+      const n = normText(raw);
+      return n ? { key: "p:" + n, label: raw.trim(), state: "valid", autoTypo: false, autoInvalid: false } : null;
+    }
+    if ("mapTo" in ov) {
+      const target = valid.find((v2) => v2.name === ov.mapTo);
+      return target ? { key: "v:" + normText(target.name), label: target.name, state: "valid", autoTypo: false, autoInvalid: false } : base(pid, raw);
+    }
+    if ("sameAs" in ov) {
+      if (ov.sameAs === pid || seen.includes(ov.sameAs) || answers[ov.sameAs] === void 0) return base(pid, raw);
+      const o = resolve(ov.sameAs, [...seen, pid]);
+      return o ? { ...o, autoTypo: false } : base(pid, raw);
+    }
+    return base(pid, raw);
+  };
+  const groups = /* @__PURE__ */ new Map();
+  for (const [pid, raw] of Object.entries(answers)) {
+    const r = resolve(pid);
+    if (!r) continue;
+    const g = groups.get(r.key) ?? { key: r.key, label: r.label, state: r.state, members: [], raw: {} };
     g.members.push(pid);
     g.raw[pid] = raw;
-    if (autoTypo) (g.auto ??= []).push(pid);
-    if (autoInvalid) g.autoInvalid = true;
-    groups.set(key, g);
+    if (r.autoTypo) (g.auto ??= []).push(pid);
+    if (r.autoInvalid) g.autoInvalid = true;
+    if (overrides["a:" + pid]) (g.manual ??= []).push(pid);
+    groups.set(r.key, g);
   }
   return [...groups.values()];
 }
@@ -33779,7 +33797,7 @@ function normalizeTaskCore(raw) {
       return { mode: "match", prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x3) => num(x3)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) };
     }
     case "vote":
-      return { mode: "vote", prompt: str(r.prompt, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 300) };
+      return { mode: "vote", prompt: str(r.prompt, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 300), ...str(r.candidate, 40) ? { candidate: str(r.candidate, 40) } : {} };
     case "link":
       return {
         mode: "link",
@@ -34286,7 +34304,7 @@ var ContentService = class _ContentService {
       const had = !!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get(pk.id);
       const run = (sql, ...args) => Number(this.db.prepare(sql).run(...args).changes);
       for (const [id, sc] of Object.entries(this.seed.scenes)) report.created.scenes += run("INSERT OR IGNORE INTO scenes(id,data,builtin,updated) VALUES(?,?,1,?)", id, JSON.stringify({ ...sc, builtin: true }), t);
-      const ids = [];
+      const ids2 = [];
       let surprise = "", final = "";
       for (const tile of this.seed.tiles) {
         const taskIds = [];
@@ -34297,12 +34315,12 @@ var ContentService = class _ContentService {
         });
         const cat = { title: tile.title, topic: tile.topic, icon: tile.icon, color: tile.color, kind: tile.kind, football: tile.football, blurb: tile.blurb, taskIds };
         report.created.categories += run("INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)", tile.id, JSON.stringify(cat), t, t);
-        if (tile.kind === "tile") ids.push(tile.id);
+        if (tile.kind === "tile") ids2.push(tile.id);
         else if (tile.kind === "surprise") surprise = tile.id;
         else final = tile.id;
       }
       if (!had && this.seed.tiles.length) {
-        const pack = { name: pk.name, description: pk.description, categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
+        const pack = { name: pk.name, description: pk.description, categoryIds: ids2, surprise, final, rules: { ...DEFAULT_RULES } };
         this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pk.id, JSON.stringify(pack), t, t);
         const pub = this.publish(pk.id, "Mitgeliefertes Standardpaket (aus content/tiles.ts)");
         report.created.packs = 1;
@@ -34332,6 +34350,7 @@ var ContentService = class _ContentService {
           const ref = this.publish(sh.pack.id, "Mitgeliefertes Showpaket (fester Ablauf)").ref;
           report.created.packs++;
           report.showCreated = true;
+          if (sh.revision) this.setSetting("rev:" + sh.pack.id, String(sh.revision));
           if (sh === this.seed.show) report.showRef = ref;
           else report.extraRefs.push(ref);
         } else {
@@ -34686,45 +34705,78 @@ var ContentService = class _ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
-  static KEEP_PACKS = ["show-5", "show-4z", "show-3"];
-  static BOARD_PACKS = ["show-5", "show-4z"];
+  static KEEP_PACKS = ["show-4z", "show-5", "show-3"];
+  static REFRESH_PACKS = ["show-4z", "show-5"];
+  static MAIN_PACK = "show-4z";
+  seedShow(id) {
+    return (this.seed.extraShows ?? []).find((x3) => x3.pack.id === id);
+  }
+  revisionOf(id) {
+    return Number(this.setting("rev:" + id) ?? 0);
+  }
   cleanupPlan() {
     const packs = this.listPacks();
     const rows = packs.map((p) => {
       const keep = _ContentService.KEEP_PACKS.includes(p.id);
-      let action = keep ? p.status === "archived" ? "keep-archived" : "keep" : p.status === "archived" ? "archived" : "archive";
+      const action = keep ? p.status === "archived" ? "keep-archived" : "keep" : p.status === "archived" ? "archived" : "archive";
       let needsUpdate = false;
-      if (keep && p.status !== "archived" && _ContentService.BOARD_PACKS.includes(p.id)) {
+      if (keep && p.status !== "archived" && _ContentService.REFRESH_PACKS.includes(p.id)) {
+        const sh2 = this.seedShow(p.id);
         const ref = p.currentVersion !== null ? `${p.id}@${p.currentVersion}` : "";
-        let cur = false;
+        let boards = false;
         try {
-          cur = !!ref && this.resolveBook(ref).rules?.boardEveryRound === true;
+          boards = !!ref && this.resolveBook(ref).rules?.boardEveryRound === true;
         } catch {
-          cur = false;
+          boards = false;
         }
-        needsUpdate = !cur;
+        needsUpdate = !boards || !!sh2?.revision && this.revisionOf(p.id) < sh2.revision;
       }
-      return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate };
+      const sh = this.seedShow(p.id);
+      const needsRename = keep && p.status !== "archived" && p.id === "show-3" && p.data.name !== _ContentService.BACKUP_NAME;
+      return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate, needsRename, revision: sh?.revision ?? null };
     });
     const archive = rows.filter((r) => r.action === "archive").map((r) => r.id);
     const update = rows.filter((r) => r.needsUpdate).map((r) => r.id);
+    const rename3 = rows.filter((r) => r.needsRename).map((r) => r.id);
     const missing = _ContentService.KEEP_PACKS.filter((id) => !packs.some((p) => p.id === id));
-    return { rows, archive, update, missing, clean: !archive.length && !update.length, main: "show-5" };
+    return { rows, archive, update, rename: rename3, missing, clean: !archive.length && !update.length && !rename3.length, main: _ContentService.MAIN_PACK };
+  }
+  static BACKUP_NAME = "Reus 65 Mio (Backup, alt)";
+  /** Veröffentlicht den aktuellen Inhaltsstand (Fragen, Ablauf, Regeln) eines mitgelieferten Pakets als NEUE Version desselben Pakets. */
+  refreshFromSeed(id, note2) {
+    const sh = this.seedShow(id);
+    if (!sh) throw new ApiError(404, "Kein mitgeliefertes Paket: " + id);
+    this.installSeed();
+    const p = this.getPack(id);
+    this.updatePack(id, {
+      name: sh.pack.name,
+      description: sh.pack.description,
+      categoryIds: [],
+      surprise: "",
+      final: "",
+      show: sh.steps,
+      rules: { ...DEFAULT_RULES, ...sh.pack.rules ?? {}, tasksPerMode: p.rules.tasksPerMode, boardEveryRound: true }
+    });
+    const r = this.publish(id, note2);
+    if (sh.revision) this.setSetting("rev:" + id, String(sh.revision));
+    return r.ref;
   }
   cleanupApply() {
     const plan = this.cleanupPlan();
-    const archived = [], updated = [];
-    for (const id of plan.archive) {
-      this.setPackStatus(id, "archived");
-      archived.push(id);
-    }
-    for (const id of plan.update) {
-      const p = this.getPack(id);
-      this.updatePack(id, { ...p, rules: { ...p.rules, boardEveryRound: true }, ifUpdated: void 0 });
-      const r = this.publish(id, "Marktwert-Update nach jeder Runde (Paketbereinigung)");
-      updated.push(r.ref);
-    }
-    return { archived, updated, plan: this.cleanupPlan() };
+    const archived = [], updated = [], renamed = [];
+    this.tx(() => {
+      for (const id of plan.archive) {
+        this.setPackStatus(id, "archived");
+        archived.push(id);
+      }
+      for (const id of plan.update) updated.push(this.refreshFromSeed(id, "Praxistest 4: aktualisierter Inhalt (neue Version, kein neues Paket)"));
+      for (const id of plan.rename) {
+        const p = this.getPack(id);
+        this.updatePack(id, { ...p, name: _ContentService.BACKUP_NAME, ifUpdated: void 0 });
+        renamed.push(id);
+      }
+    });
+    return { archived, updated, renamed, plan: this.cleanupPlan() };
   }
   /** Welche Ablaufmodelle ein veröffentlichter Stand unterstützt. */
   flowsOf(ref) {
@@ -34737,7 +34789,7 @@ var ContentService = class _ContentService {
   }
   defaultRef() {
     const l = this.listPublished();
-    return (l.find((x3) => x3.id === "show-5") ?? l[0])?.ref ?? this.legacyRef();
+    return (l.find((x3) => x3.id === _ContentService.MAIN_PACK) ?? l.find((x3) => x3.id === "show-5") ?? l[0])?.ref ?? this.legacyRef();
   }
   /** Ältere Räume ohne Paketangabe (bookId 'legacy') laufen mit dem ersten mitgelieferten Stand, der in dieser Datenbank existiert. */
   legacyRef() {
@@ -34764,8 +34816,8 @@ var ContentService = class _ContentService {
   export(scope) {
     const out = { format: "outplay-content", version: 2, app: "OUTPLAY", exportedAt: new Date(this.now()).toISOString() };
     const wantScenes = (qs) => {
-      const ids = new Set(qs.filter((q2) => q2.task.mode === "glitch").map((q2) => q2.task.scene));
-      return this.listScenes().filter((s) => ids.has(s.id) || !s.builtin && scope !== "all" && scope === "questions").map((s) => ({ id: s.id, title: s.title, builtin: !!s.builtin, template: s.template ?? null, data: { id: s.id, title: s.title, bg: s.bg, items: s.items, changes: s.changes } }));
+      const ids2 = new Set(qs.filter((q2) => q2.task.mode === "glitch").map((q2) => q2.task.scene));
+      return this.listScenes().filter((s) => ids2.has(s.id) || !s.builtin && scope !== "all" && scope === "questions").map((s) => ({ id: s.id, title: s.title, builtin: !!s.builtin, template: s.template ?? null, data: { id: s.id, title: s.title, bg: s.bg, items: s.items, changes: s.changes } }));
     };
     if (scope === "questions") {
       const qs = this.listQuestions();
@@ -35981,11 +36033,13 @@ var link = {
     return base;
   }
 };
+var HOST_CANDIDATE = "host:candidate";
+var validTarget = (c, tg) => c.players.some((x3) => x3.id === tg) || tg === HOST_CANDIDATE && !!c.task.candidate;
 var voteVotes = (c) => {
   const counts = {};
   for (const p of c.players) {
     const tg = c.round.pm[p.id]?.target;
-    if (tg && c.players.some((x3) => x3.id === tg)) (counts[tg] ??= []).push(p.id);
+    if (tg && validTarget(c, tg)) (counts[tg] ??= []).push(p.id);
   }
   return counts;
 };
@@ -36000,7 +36054,7 @@ var vote = {
   submit(c, pid, payload) {
     if (c.round.stage !== "open") return err2("closed");
     const target = String(payload?.target ?? "");
-    if (!c.players.some((p) => p.id === target)) return err2("invalid_target");
+    if (!validTarget(c, target)) return err2("invalid_target");
     if (target === pid && c.players.length > 2) return err2("self_vote");
     const cur = c.round.pm[pid];
     if (cur) return cur.target === target ? { ok: true, dup: true } : err2("already_submitted");
@@ -36015,20 +36069,31 @@ var vote = {
     const t = c.task;
     const counts = voteVotes(c);
     const max2 = Math.max(0, ...Object.values(counts).map((v2) => v2.length));
-    const winners = Object.entries(counts).filter(([, v2]) => v2.length === max2 && max2 > 0).map(([k2]) => k2);
+    const winners = max2 >= 2 ? Object.entries(counts).filter(([, v2]) => v2.length === max2).map(([k2]) => k2) : [];
     const rows = c.players.map((p) => {
       const tg = c.round.pm[p.id]?.target ?? null;
       const ok = !!tg && winners.includes(tg);
       return { pid: p.id, target: tg, correct: ok, points: ok ? t.points : 0 };
     });
+    const cand = t.candidate ? [{ pid: HOST_CANDIDATE, name: t.candidate, host: true }] : [];
     return {
-      entries: rows.filter((r) => r.target).map((r) => ({ pid: r.pid, delta: r.points, label: r.correct ? `Mehrheit: ${nm(c, r.target)}` : "nicht die Mehrheit" })),
-      reveal: { prompt: t.prompt, explain: t.explain, points: t.points, winners, max: max2, counts: c.players.map((p) => ({ pid: p.id, votes: (counts[p.id] ?? []).length, voters: counts[p.id] ?? [] })).sort((a, b2) => b2.votes - a.votes), rows }
+      entries: rows.filter((r) => r.target).map((r) => ({ pid: r.pid, delta: r.points, label: r.correct ? `Konsens: ${r.target === HOST_CANDIDATE ? t.candidate : nm(c, r.target)}` : "kein Konsens" })),
+      reveal: {
+        prompt: t.prompt,
+        explain: t.explain,
+        points: t.points,
+        winners,
+        max: max2,
+        noConsensus: winners.length === 0,
+        candidate: t.candidate ?? null,
+        counts: [...c.players.map((p) => ({ pid: p.id, votes: (counts[p.id] ?? []).length, voters: counts[p.id] ?? [] })), ...cand.map((x3) => ({ pid: x3.pid, name: x3.name, host: true, votes: (counts[x3.pid] ?? []).length, voters: counts[x3.pid] ?? [] }))].sort((a, b2) => b2.votes - a.votes),
+        rows
+      }
     };
   },
   view(c, a) {
     const t = c.task;
-    const base = { prompt: t.prompt, points: t.points, answeredCount: c.players.filter((p) => !!c.round.pm[p.id]?.target).length, playerCount: c.players.length };
+    const base = { prompt: t.prompt, points: t.points, answeredCount: c.players.filter((p) => !!c.round.pm[p.id]?.target).length, playerCount: c.players.length, candidate: t.candidate ? { id: HOST_CANDIDATE, name: t.candidate } : null };
     if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid]?.target ?? null;
     return base;
   }
@@ -36422,14 +36487,14 @@ var Engine = class _Engine {
     switch (step) {
       case "wall": {
         room.phase = "wall";
-        const ids = this.active(room).map((p) => p.id);
-        if (!room.pickOrder.length) room.pickOrder = shuffled(ids, rng(room.seed));
+        const ids2 = this.active(room).map((p) => p.id);
+        if (!room.pickOrder.length) room.pickOrder = shuffled(ids2, rng(room.seed));
         let guard = 0;
         do {
           room.pickerId = room.pickOrder[room.pickNo % room.pickOrder.length];
           room.pickNo++;
           guard++;
-        } while (guard <= room.pickOrder.length && !ids.includes(room.pickerId));
+        } while (guard <= room.pickOrder.length && !ids2.includes(room.pickerId));
         break;
       }
       case "surprise": {
@@ -36711,7 +36776,12 @@ var Engine = class _Engine {
       case "h.review": {
         if (c.task.mode !== "unique" && c.task.mode !== "link" || r.stage !== "review" && r.stage !== "locked") return bad("wrong_phase");
         r.m.overrides ??= {};
-        r.m.overrides[a.groupKey] = a.decision;
+        const dec = a.decision;
+        const key = String(a.groupKey ?? "").slice(0, 120);
+        const okDec = dec === "valid" || dec === "invalid" || dec === "auto" || dec && typeof dec === "object" && (typeof dec.mapTo === "string" || typeof dec.sameAs === "string");
+        if (!key || !okDec) return bad("invalid");
+        if (dec === "auto") delete r.m.overrides[key];
+        else r.m.overrides[key] = dec;
         return ok;
       }
     }
@@ -36874,7 +36944,7 @@ var Engine = class _Engine {
         default: {
           const k2 = this.stepKind(room, Math.max(0, room.planIdx));
           if (k2 === "board") return this.boardName(room);
-          if (k2 === "final") return "FINAL LOCK";
+          if (k2 === "final") return this.finalName(room);
           if (k2 === "surprise") return "\xDCberraschungsrunde";
           const r = this.roundNumber(room, room.planIdx);
           return `Runde ${r.n} von ${r.of}`;
@@ -36893,13 +36963,18 @@ var Engine = class _Engine {
         const step = room.plan[Math.max(0, room.planIdx)];
         const idx = room.planIdx;
         const surprise = room.plan.indexOf("surprise");
-        if (room.round && this.curTile(room)?.kind === "final") return "Akt 4 \u2013 FINAL LOCK";
+        if (room.round && this.curTile(room)?.kind === "final") return "Akt 4 \u2013 " + this.finalName(room);
         if (room.round && this.curTile(room)?.kind === "surprise") return "Akt 2 \u2013 \xDCberraschungsrunde";
         if (idx < surprise || surprise < 0) return step === "board" ? this.boardName(room) : "Akt 1 \u2013 Kategorienwand";
         if (idx === surprise) return "Akt 2 \u2013 \xDCberraschungsrunde";
         return "Akt 3 \u2013 Die Jagd";
       }
     }
+  }
+  /** Name des Finales: KICKBASE-KONSENS (Gruppenabstimmung) oder FINAL LOCK – nie beides. */
+  finalName(room) {
+    const f = this.bk(room).tiles.find((t) => t.kind === "final");
+    return f?.tasks.some((t) => t.mode === "vote") ? "KICKBASE-KONSENS" : "FINAL LOCK";
   }
   /** Einheitliche Bezeichnung der Zwischenstände (Paketregel boardTitle; bei „Zwischenstand nach jeder Runde“ standardmäßig Marktwert-Update). */
   boardName(room) {
@@ -36910,9 +36985,9 @@ var Engine = class _Engine {
     const nxt = room.plan[room.planIdx + 1];
     if (nxt && nxt.startsWith("tile:")) {
       const t = this.tile(room, nxt.slice(5));
-      return t ? t.kind === "final" ? "FINAL LOCK" : t.kind === "surprise" ? "\xDCberraschungsrunde" : `Runde: ${t.title}` : "n\xE4chste Runde";
+      return t ? t.kind === "final" ? this.finalName(room) : t.kind === "surprise" ? "\xDCberraschungsrunde" : `Runde: ${t.title}` : "n\xE4chste Runde";
     }
-    return nxt === "wall" ? "Kategorienwand" : nxt === "board" ? this.boardName(room) : nxt === "surprise" ? "\xDCberraschungsrunde" : nxt === "final" ? "FINAL LOCK" : "Siegerehrung";
+    return nxt === "wall" ? "Kategorienwand" : nxt === "board" ? this.boardName(room) : nxt === "surprise" ? "\xDCberraschungsrunde" : nxt === "final" ? this.finalName(room) : "Siegerehrung";
   }
   roundView(room, c, aud) {
     const tile = this.curTile(room);
@@ -36983,19 +37058,19 @@ function buildPreview(rawTask, scenes, meta = {}) {
   const eng = new Engine({ tiles: [tile], scenes, rules: { startCredit: 200 } });
   let now = 19e11;
   const { room } = eng.newRoom("PREV", now);
-  const ids = [];
+  const ids2 = [];
   SAMPLE_NAMES.forEach((n, i2) => {
     const r = eng.join(room, n, av(i2 + 1), now);
-    if (r.ok) ids.push(r.player.id);
+    if (r.ok) ids2.push(r.player.id);
   });
   const H3 = (a) => eng.act(room, { role: "host" }, "", a, now);
-  const P3 = (i2, a) => eng.act(room, { role: "player", pid: ids[i2] }, "", a, now);
+  const P3 = (i2, a) => eng.act(room, { role: "player", pid: ids2[i2] }, "", a, now);
   H3({ k: "h.startShow" });
   H3({ k: "h.introDone" });
   H3({ k: "h.pick", tileId: "preview" });
   const frames = [];
   const snap = (label) => {
-    const mk2 = (role) => JSON.parse(JSON.stringify(eng.buildView(room, { role, pid: ids[0] }, now)));
+    const mk2 = (role) => JSON.parse(JSON.stringify(eng.buildView(room, { role, pid: ids2[0] }, now)));
     const f = { label, tv: mk2("tv"), player: mk2("player"), host: mk2("host") };
     for (const v2 of [f.tv, f.player, f.host]) {
       if (v2.round) v2.round.kind = kind;
@@ -37025,7 +37100,7 @@ function buildPreview(rawTask, scenes, meta = {}) {
           for (let i2 = 0; i2 < 3; i2++) {
             const slot = fn(i2, item, k2);
             if (slot !== null) {
-              const pm = room.round.pm[ids[i2]];
+              const pm = room.round.pm[ids2[i2]];
               const free = pm ? pm.slots.map((s, idx) => s === -1 ? idx : -1).filter((x3) => x3 >= 0) : [0, 1, 2, 3, 4];
               const use = free.includes(slot) ? slot : free[0];
               P3(i2, { k: "submit", payload: { step: k2, slot: use } });
@@ -37045,8 +37120,8 @@ function buildPreview(rawTask, scenes, meta = {}) {
       snap("Alle Tipps sichtbar \u2013 Eins\xE4tze");
       const bet = t.bets[1] ?? 0;
       P3(0, { k: "submit", payload: { amount: 0, target: null } });
-      P3(1, { k: "submit", payload: bet ? { amount: bet, target: ids[0] } : { amount: 0, target: null } });
-      P3(2, { k: "submit", payload: bet ? { amount: bet, target: ids[2] } : { amount: 0, target: null } });
+      P3(1, { k: "submit", payload: bet ? { amount: bet, target: ids2[0] } : { amount: 0, target: null } });
+      P3(2, { k: "submit", payload: bet ? { amount: bet, target: ids2[2] } : { amount: 0, target: null } });
       H3({ k: "h.lock" });
       snap("Eins\xE4tze gesperrt");
       break;
@@ -37088,10 +37163,10 @@ function buildPreview(rawTask, scenes, meta = {}) {
     }
     case "vote": {
       snap("Aufgabe l\xE4uft");
-      P3(0, { k: "submit", payload: { target: ids[1] } });
-      P3(1, { k: "submit", payload: { target: ids[2] } });
-      P3(2, { k: "submit", payload: { target: ids[1] } });
-      P3(3, { k: "submit", payload: { target: ids[1] } });
+      P3(0, { k: "submit", payload: { target: ids2[1] } });
+      P3(1, { k: "submit", payload: { target: ids2[2] } });
+      P3(2, { k: "submit", payload: { target: ids2[1] } });
+      P3(3, { k: "submit", payload: { target: ids2[1] } });
       snap("Stimmen abgegeben");
       H3({ k: "h.lock" });
       snap("Gesperrt");
@@ -37132,7 +37207,7 @@ function buildPreview(rawTask, scenes, meta = {}) {
   snap("Aufl\xF6sung");
   const result = room.round.result;
   const scores = SAMPLE_NAMES.map((name, i2) => {
-    const es = result.entries.filter((e) => e.pid === ids[i2]);
+    const es = result.entries.filter((e) => e.pid === ids2[i2]);
     return { name, points: es.reduce((a, e) => a + e.delta, 0), label: es.map((e) => e.label).join(" + ") || "keine Abgabe" };
   });
   return { ok: true, problems: [], frames, scores, formula: FORMULAS[task.mode], sampleNames: SAMPLE_NAMES };
@@ -38573,9 +38648,10 @@ var SEED_SHOW2 = { pack: SHOW2_PACK, pool: POOL2, rounds: SHOW2_ROUNDS, steps: S
 // content/show3.ts
 var SHOW3_PACK = {
   id: "show-3",
-  name: "Reus 65 Mio",
-  description: "Der feste Showablauf mit Proberunden, Sortier-Variante bei BLIND RANK und fairerer SETZ-AUF-MICH-Wertung. Sieger: Reus65Mio-Champion.",
+  name: "Reus 65 Mio (Backup, alt)",
+  description: "Altes Backup-Paket: Der feste Showablauf mit Proberunden, Sortier-Variante bei BLIND RANK und fairerer SETZ-AUF-MICH-Wertung. Sieger: Reus65Mio-Champion.",
   rules: {
+    startCredit: 200,
     showTitle: "Reus 65 Mio",
     winnerTitle: "Reus65Mio-Champion",
     tasksPerMode: 4,
@@ -39036,9 +39112,88 @@ var SEED_SHOW_B43K = {
   steps: BESTOF2_STEPS.map((s) => s.k === "final" ? { k: "final", cat: "b42-final-kk" } : s)
 };
 
+// content/bestof3.ts
+var SHOWMASTER_CANDIDATE = "Michael (Showmaster)";
+var find = (id) => [...POOL2, ...BESTOF_NEW, ...BESTOF2_NEW].find((q2) => q2.id === id);
+var derive = (id, from, mut) => {
+  const q2 = find(from);
+  const task = JSON.parse(JSON.stringify(q2.task));
+  mut(task);
+  return { id, topic: q2.topic, task };
+};
+var BESTOF3_NEW = [
+  derive("b44-match-tier", "s4-match-tierrekorde", (t) => {
+    t.pairs.find((p) => p.left === "Giraffe").right = "Tier mit der gr\xF6\xDFten K\xF6rperh\xF6he an Land";
+    t.explain = t.explain.replace("Giraffe (bis ca. 5,5 m)", "Giraffe (bis ca. 5,5 m K\xF6rperh\xF6he, das h\xF6chste Landtier)");
+  }),
+  derive("b44-match-t03", "b42-match-t03", (t) => {
+    t.pairs.find((p) => /Haaland/.test(p.left)).left = "Erling Haaland (danach Salzburg)";
+    t.explain = "Nicht das teuerste Team, sondern der \xFCbersehene letzte Schritt vor dem Durchbruch ist entscheidend: Haaland spielte bei Molde, bevor er nach Salzburg wechselte.";
+  }),
+  derive("b44-rank-t05", "b43-rank-t05", (t) => {
+    t.prompt = "Sortiere diese f\xFCnf Karten nach dem Alter beim ersten Bundesliga-Einsatz \u2013 die j\xFCngsten zuerst.";
+    t.items[0] = { text: "Youssoufa Moukoko & Niko Ili\u010Devi\u0107", value: "jeweils 16 Jahre, 1 Tag" };
+    t.explain = "Moukoko und Ili\u010Devi\u0107 halten den Rekord gemeinsam: Moukoko deb\xFCtierte 2020 mit 16 Jahren und 1 Tag, der Frankfurter Niko Ili\u010Devi\u0107 stellte ihn am 1. November 2026 ein. Danach folgen G\xFCther (3 Tage), Wanner (15 Tage), Lemke (214 Tage) und Bischof (264 Tage).";
+  }),
+  // Quelle: bundesliga.com – „Jüngste Spieler der Bundesliga-Geschichte“ (Moukoko, Iličević)
+  derive("b44-unique-p20", "b42-unique-p20", (t) => {
+    t.prompt = "Nenne einen Verein au\xDFerhalb von Deutschland, England und Spanien, der schon einmal die Champions League oder den fr\xFCheren Europapokal gewonnen hat.";
+  }),
+  // Antwortkatalog + Erklärung unverändert
+  derive("b44-link-t11", "b42-link-t11", (t) => {
+    t.clues[0] = "Ein dramatischer R\xFCckschlag und ein historischer Triumph lagen bei mir nur zwei Jahre auseinander.";
+  })
+];
+var vote4 = (n, prompt, explain) => ({ id: `b44-kk-${n}`, topic: "Gruppenfrage", task: { mode: "vote", prompt, seconds: 45, points: 100, explain, candidate: SHOWMASTER_CANDIDATE } });
+var BESTOF3_KK = [
+  vote4(1, "Wer w\xFCrde von uns am ehesten 65 Millionen f\xFCr einen Spieler ausgeben, nur damit ihn kein Konkurrent bekommt?", "Der Konsens zeigt, wem die Gruppe das gr\xF6\xDFte Blockade-Gebot zutraut."),
+  vote4(2, "Wer kontrolliert seine Kickbase-Aufstellung f\xFCnf Minuten vor Anpfiff noch einmal panisch?", "Menschenkenntnis statt Fu\xDFballwissen."),
+  vote4(3, "Wer sorgt in unserer Gruppe am h\xE4ufigsten f\xFCr Ragebait?", "Wer provoziert, wird erkannt \u2013 meistens von allen."),
+  vote4(4, "Wer w\xFCrde bei einem gemeinsamen Urlaub am ehesten den Zug oder Flug verpassen?", "Der Konsens zeigt, wer besser fr\xFCher losfahren sollte."),
+  vote4(5, "Wer w\xFCrde in einer Quizshow am \xFCberzeugendsten eine komplett falsche Antwort geben?", "Selbstbewusstsein schl\xE4gt Wissen \u2013 zumindest in der Wahrnehmung der Gruppe.")
+];
+var SWAP2 = { "s4-match-tierrekorde": "b44-match-tier", "b42-match-t03": "b44-match-t03", "b43-rank-t05": "b44-rank-t05", "b42-unique-p20": "b44-unique-p20", "b42-link-t11": "b44-link-t11" };
+var DROP = /* @__PURE__ */ new Set(["s3-match-spiele", "s3-unique-orchester"]);
+var sw = (id) => SWAP2[id] ?? id;
+var ids = (xs) => xs.filter((x3) => !DROP.has(x3)).map(sw);
+var BESTOF3_PLAN = Object.fromEntries(Object.entries(BESTOF2_PLAN).map(([m, l]) => [m, l.filter((x3) => !DROP.has(x3.id)).map((x3) => ({ id: sw(x3.id), fb: x3.fb }))]));
+var baseOf = (id) => [...BESTOF2_ROUNDS, ...BESTOF_ROUNDS].find((r) => r.id === id);
+var CAT = { "b43-r2": "b44-r2", "b43-r3": "b44-r3", "b42-sur": "b44-sur", "b42-r6": "b44-r6" };
+var BESTOF3_ROUNDS = Object.entries(CAT).map(([from, id]) => {
+  const r = baseOf(from);
+  return { ...r, id, taskIds: ids(r.taskIds) };
+});
+var BESTOF3_FINAL = {
+  id: "b44-final-kk",
+  title: "KICKBASE-KONSENS",
+  topic: "Das gro\xDFe Finale",
+  icon: "\u{1F91D}",
+  color: COLORS.GR,
+  kind: "final",
+  football: false,
+  blurb: "F\xFCnf Fragen: W\xE4hle geheim eine Person \u2013 auch Michael (Showmaster) steht zur Wahl. Wer die meistgew\xE4hlte Person tippt, bekommt 100 Punkte (max. 500). Die Rangliste bleibt verborgen.",
+  taskIds: [1, 2, 3, 4, 5].map((n) => `b44-kk-${n}`)
+};
+var STEPS = BESTOF2_STEPS.map((s) => s.k === "board" || s.k === "final" ? s : { ...s, cat: CAT[s.cat] ?? s.cat });
+var RULES3 = { ...SEED_SHOW_B43.pack.rules, startCredit: 0 };
+var SEED_SHOW_B44 = {
+  revision: 2,
+  pack: { id: "show-5", name: "Reus 65 Mio \u2013 Best of \xB7 FINAL LOCK", description: "Best-of-Show mit je einer Probe pro Modus, Marktwert-Update nach jeder Runde und FINAL LOCK als Finale. Alternative zur Hauptshow mit KICKBASE-KONSENS. Start mit 0 Punkten.", rules: RULES3 },
+  pool: [...BESTOF2_NEW, ...BESTOF3_NEW],
+  rounds: [...BESTOF2_ROUNDS, ...BESTOF3_ROUNDS],
+  steps: STEPS
+};
+var SEED_SHOW_B44K = {
+  revision: 2,
+  pack: { id: "show-4z", name: "Reus 65 Mio \u2013 Best of \xB7 KICKBASE-KONSENS (Hauptshow)", description: "Hauptshow: Best-of mit Marktwert-Update nach jeder Runde und dem Finale KICKBASE-KONSENS (5 Fragen, max. 500 Punkte, Michael als Kandidat). Start mit 0 Punkten.", rules: RULES3 },
+  pool: BESTOF3_KK,
+  rounds: [BESTOF3_FINAL],
+  steps: STEPS.map((s) => s.k === "final" ? { k: "final", cat: BESTOF3_FINAL.id } : s)
+};
+
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B43, SEED_SHOW_B43K];
+var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K];
 
 // server/vercel.ts
 var ConflictError = class extends Error {

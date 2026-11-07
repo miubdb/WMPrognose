@@ -93,3 +93,11 @@ Gegenüber `show-4`: **CL-Finale 2028** („In welchem Stadion wird das Champion
 **Sichere Bereinigung:** Admin → Tab *Daten* → Karte „Pakete aufräumen“. Sie zeigt vorab, welche Pakete archiviert werden und welche Best-of-Pakete eine neue Version bekommen. Nach Bestätigung wird automatisch eine Datenbanksicherung (`data/backups/…`) angelegt. Aktiv bleiben `show-5` (Haupt), `show-4z` (Finale KICKBASE-KONSENS), `show-3` (Backup); alle anderen werden archiviert – nie gelöscht. Bereits archivierte Pakete werden nie reaktiviert; Räume behalten ihren Paketstand; der Vorgang ist wiederholbar.
 
 **Marktwert-Update:** Pakete mit der Regel `boardEveryRound` zeigen nach jeder Runde automatisch ein Update (das letzte vor dem Finale als „Letztes Marktwert-Update“, danach Rangliste ausgeblendet bis zur Siegerehrung). Die Bereinigung veröffentlicht diese Regel als **neue Version** von show-5 / show-4z (kein neues Paket).
+
+## Praxistest 4 – KICKBASE-KONSENS als Hauptfinale (Update auf dem Windows-Laptop)
+
+1. Neuen Stand holen (`git pull`) bzw. Update-Paket einspielen und OUTPLAY neu starten.
+2. Admin → Tab *Daten* → Karte „Pakete aufräumen & aktualisieren“ → **Sicher aktualisieren**. Vorher wird automatisch eine Datenbanksicherung nach `data\backups` geschrieben. Die Karte listet vorab genau, was passiert.
+3. Ergebnis: `show-4z` (Hauptshow, KICKBASE-KONSENS, vorausgewählt) und `show-5` (FINAL LOCK) erhalten den neuen Stand als **neue Version** (keine neuen Paket-IDs). `show-3` bleibt Backup, alles andere archiviert. Alte Versionen, bestehende Räume, Fragen und die Karte bleiben unverändert; archivierte Pakete werden nicht reaktiviert. Der Vorgang ist wiederholbar.
+
+Änderungen: Startguthaben 0 · MATCHMAKER/EINZIGARTIG je Probe + 5 Wertungsfragen (insgesamt 40) · neue Fragen als neue IDs (`b44-*`), alte bleiben im Pool · SORTIER'S! gibt mit einem Klick ab · EINZIGARTIG: jede Antwort vom Showmaster korrigierbar · SETZ AUF MICH: Netto-Anzeige · KONSENS: 5 × 100 Punkte, Michael (Showmaster) als Kandidat ohne Punkte.

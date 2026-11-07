@@ -43,6 +43,8 @@ export function normalizePack(raw: any): PackData {
 }
 
 export interface SeedShow {
+  /** Inhaltsstand des Pakets; höher als der in der Datenbank vermerkte Stand → „Aktualisieren“ im Admin veröffentlicht eine neue Version */
+  revision?: number;
   pack: { id: string; name: string; description: string; rules?: Partial<PackRules> };
   pool: { id: string; topic: string; task: TaskDef }[];
   rounds: { id: string; title: string; topic: string; icon: string; color: string; kind: 'tile' | 'surprise' | 'final'; football: boolean; blurb: string; taskIds: string[] }[];
@@ -116,7 +118,7 @@ export class ContentService {
         if (!exists) {
           const pack: PackData = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: '', final: '', rules: { ...DEFAULT_RULES, ...(sh.pack.rules ?? {}) } as Required<PackRules>, show: sh.steps };
           this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(sh.pack.id, JSON.stringify(pack), t, t);
-          const ref = this.publish(sh.pack.id, 'Mitgeliefertes Showpaket (fester Ablauf)').ref; report.created.packs++; report.showCreated = true;
+          const ref = this.publish(sh.pack.id, 'Mitgeliefertes Showpaket (fester Ablauf)').ref; report.created.packs++; report.showCreated = true; if (sh.revision) this.setSetting('rev:' + sh.pack.id, String(sh.revision));
           if (sh === this.seed.show) report.showRef = ref; else report.extraRefs.push(ref);
         } else { const row = this.listPacks().find(p => p.id === sh.pack.id); const ref = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : ''; if (sh === this.seed.show) report.showRef = ref; }
       }
@@ -411,44 +413,61 @@ export class ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
-  static readonly KEEP_PACKS = ['show-5', 'show-4z', 'show-3'];
-  static readonly BOARD_PACKS = ['show-5', 'show-4z'];
+  static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3'];
+  static readonly REFRESH_PACKS = ['show-4z', 'show-5'];
+  static readonly MAIN_PACK = 'show-4z';
+  private seedShow(id: string) { return (this.seed.extraShows ?? []).find(x => x.pack.id === id); }
+  private revisionOf(id: string) { return Number(this.setting('rev:' + id) ?? 0); }
   cleanupPlan() {
     const packs = this.listPacks();
     const rows = packs.map(p => {
       const keep = ContentService.KEEP_PACKS.includes(p.id);
-      let action: 'archive' | 'keep' | 'archived' | 'keep-archived' = keep ? (p.status === 'archived' ? 'keep-archived' : 'keep') : (p.status === 'archived' ? 'archived' : 'archive');
+      const action: 'archive' | 'keep' | 'archived' | 'keep-archived' = keep ? (p.status === 'archived' ? 'keep-archived' : 'keep') : (p.status === 'archived' ? 'archived' : 'archive');
       let needsUpdate = false;
-      if (keep && p.status !== 'archived' && ContentService.BOARD_PACKS.includes(p.id)) {
+      if (keep && p.status !== 'archived' && ContentService.REFRESH_PACKS.includes(p.id)) {
+        const sh = this.seedShow(p.id);
         const ref = p.currentVersion !== null ? `${p.id}@${p.currentVersion}` : '';
-        let cur = false; try { cur = !!ref && this.resolveBook(ref).rules?.boardEveryRound === true; } catch { cur = false; }
-        needsUpdate = !cur;
+        let boards = false; try { boards = !!ref && this.resolveBook(ref).rules?.boardEveryRound === true; } catch { boards = false; }
+        needsUpdate = !boards || (!!sh?.revision && this.revisionOf(p.id) < sh.revision);
       }
-      return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate };
+      const sh = this.seedShow(p.id);
+      const needsRename = keep && p.status !== 'archived' && p.id === 'show-3' && p.data.name !== ContentService.BACKUP_NAME;
+      return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate, needsRename, revision: sh?.revision ?? null };
     });
     const archive = rows.filter(r => r.action === 'archive').map(r => r.id);
     const update = rows.filter(r => r.needsUpdate).map(r => r.id);
+    const rename = rows.filter(r => r.needsRename).map(r => r.id);
     const missing = ContentService.KEEP_PACKS.filter(id => !packs.some(p => p.id === id));
-    return { rows, archive, update, missing, clean: !archive.length && !update.length, main: 'show-5' };
+    return { rows, archive, update, rename, missing, clean: !archive.length && !update.length && !rename.length, main: ContentService.MAIN_PACK };
+  }
+  static readonly BACKUP_NAME = 'Reus 65 Mio (Backup, alt)';
+  /** Veröffentlicht den aktuellen Inhaltsstand (Fragen, Ablauf, Regeln) eines mitgelieferten Pakets als NEUE Version desselben Pakets. */
+  private refreshFromSeed(id: string, note: string) {
+    const sh = this.seedShow(id); if (!sh) throw new ApiError(404, 'Kein mitgeliefertes Paket: ' + id);
+    this.installSeed();   // ergänzt nur fehlende Fragen/Kategorien (INSERT OR IGNORE), verändert nichts Vorhandenes
+    const p = this.getPack(id);
+    this.updatePack(id, { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: '', final: '', show: sh.steps,
+      rules: { ...DEFAULT_RULES, ...(sh.pack.rules ?? {}), tasksPerMode: p.rules.tasksPerMode, boardEveryRound: true } });
+    const r = this.publish(id, note);
+    if (sh.revision) this.setSetting('rev:' + id, String(sh.revision));
+    return r.ref;
   }
   cleanupApply() {
     const plan = this.cleanupPlan();
-    const archived: string[] = [], updated: string[] = [];
-    for (const id of plan.archive) { this.setPackStatus(id, 'archived'); archived.push(id); }
-    for (const id of plan.update) {
-      const p = this.getPack(id);
-      this.updatePack(id, { ...p, rules: { ...p.rules, boardEveryRound: true }, ifUpdated: undefined });
-      const r = this.publish(id, 'Marktwert-Update nach jeder Runde (Paketbereinigung)');
-      updated.push(r.ref);
-    }
-    return { archived, updated, plan: this.cleanupPlan() };
+    const archived: string[] = [], updated: string[] = [], renamed: string[] = [];
+    this.tx(() => {
+      for (const id of plan.archive) { this.setPackStatus(id, 'archived'); archived.push(id); }
+      for (const id of plan.update) updated.push(this.refreshFromSeed(id, 'Praxistest 4: aktualisierter Inhalt (neue Version, kein neues Paket)'));
+      for (const id of plan.rename) { const p = this.getPack(id); this.updatePack(id, { ...p, name: ContentService.BACKUP_NAME, ifUpdated: undefined }); renamed.push(id); }
+    });
+    return { archived, updated, renamed, plan: this.cleanupPlan() };
   }
   /** Welche Ablaufmodelle ein veröffentlichter Stand unterstützt. */
   flowsOf(ref: string): { show: boolean; classic: boolean } {
     try { const b = this.resolveBook(ref); return { show: !!b.show?.length, classic: b.show?.length ? !!b.classic : true }; }
     catch { return { show: false, classic: true }; }
   }
-    defaultRef(): string { const l = this.listPublished(); return (l.find(x => x.id === 'show-5') ?? l[0])?.ref ?? this.legacyRef(); }
+    defaultRef(): string { const l = this.listPublished(); return (l.find(x => x.id === ContentService.MAIN_PACK) ?? l.find(x => x.id === 'show-5') ?? l[0])?.ref ?? this.legacyRef(); }
   /** Ältere Räume ohne Paketangabe (bookId 'legacy') laufen mit dem ersten mitgelieferten Stand, der in dieser Datenbank existiert. */
   private legacyRef(): string { for (const id of ['standard-1', 'standard-2']) if (this.db.prepare('SELECT 1 FROM pack_versions WHERE id=?').get(id + '@1')) return id + '@1'; return this.seedPack.id + '@1'; }
   /** Fester Stand für einen Raum (Cache, da unveränderlich). */

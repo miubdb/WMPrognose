@@ -563,7 +563,10 @@ export class Engine {
       case 'h.review': {
         if ((c.task.mode !== 'unique' && c.task.mode !== 'link') || (r.stage !== 'review' && r.stage !== 'locked')) return bad('wrong_phase');
         r.m.overrides ??= {};
-        r.m.overrides[a.groupKey] = a.decision;
+        const dec = a.decision as any; const key = String(a.groupKey ?? '').slice(0, 120);
+        const okDec = dec === 'valid' || dec === 'invalid' || dec === 'auto' || (dec && typeof dec === 'object' && (typeof dec.mapTo === 'string' || typeof dec.sameAs === 'string'));
+        if (!key || !okDec) return bad('invalid');
+        if (dec === 'auto') delete r.m.overrides[key]; else r.m.overrides[key] = dec;     // „auto“ stellt die automatische Entscheidung wieder her
         return ok;
       }
     }
@@ -684,7 +687,7 @@ export class Engine {
         default: {
           const k = this.stepKind(room, Math.max(0, room.planIdx));
           if (k === 'board') return this.boardName(room);
-          if (k === 'final') return 'FINAL LOCK';
+          if (k === 'final') return this.finalName(room);
           if (k === 'surprise') return 'Überraschungsrunde';
           const r = this.roundNumber(room, room.planIdx); return `Runde ${r.n} von ${r.of}`;
         }
@@ -698,7 +701,7 @@ export class Engine {
         const step = room.plan[Math.max(0, room.planIdx)];
         const idx = room.planIdx;
         const surprise = room.plan.indexOf('surprise');
-        if (room.round && this.curTile(room)?.kind === 'final') return 'Akt 4 – FINAL LOCK';
+        if (room.round && this.curTile(room)?.kind === 'final') return 'Akt 4 – ' + this.finalName(room);
         if (room.round && this.curTile(room)?.kind === 'surprise') return 'Akt 2 – Überraschungsrunde';
         if (idx < surprise || surprise < 0) return step === 'board' ? this.boardName(room) : 'Akt 1 – Kategorienwand';
         if (idx === surprise) return 'Akt 2 – Überraschungsrunde';
@@ -706,12 +709,14 @@ export class Engine {
       }
     }
   }
+  /** Name des Finales: KICKBASE-KONSENS (Gruppenabstimmung) oder FINAL LOCK – nie beides. */
+  finalName(room: Room): string { const f = this.bk(room).tiles.find(t => t.kind === 'final'); return f?.tasks.some(t => t.mode === 'vote') ? 'KICKBASE-KONSENS' : 'FINAL LOCK'; }
   /** Einheitliche Bezeichnung der Zwischenstände (Paketregel boardTitle; bei „Zwischenstand nach jeder Runde“ standardmäßig Marktwert-Update). */
   boardName(room: Room): string { const r = this.bk(room).rules; return r?.boardTitle || (r?.boardEveryRound ? 'Marktwert-Update' : 'Zwischenstand'); }
   private planNextLabel(room: Room): string {
     const nxt = room.plan[room.planIdx + 1];
-    if (nxt && nxt.startsWith('tile:')) { const t = this.tile(room, nxt.slice(5)); return t ? (t.kind === 'final' ? 'FINAL LOCK' : t.kind === 'surprise' ? 'Überraschungsrunde' : `Runde: ${t.title}`) : 'nächste Runde'; }
-    return nxt === 'wall' ? 'Kategorienwand' : nxt === 'board' ? this.boardName(room) : nxt === 'surprise' ? 'Überraschungsrunde' : nxt === 'final' ? 'FINAL LOCK' : 'Siegerehrung';
+    if (nxt && nxt.startsWith('tile:')) { const t = this.tile(room, nxt.slice(5)); return t ? (t.kind === 'final' ? this.finalName(room) : t.kind === 'surprise' ? 'Überraschungsrunde' : `Runde: ${t.title}`) : 'nächste Runde'; }
+    return nxt === 'wall' ? 'Kategorienwand' : nxt === 'board' ? this.boardName(room) : nxt === 'surprise' ? 'Überraschungsrunde' : nxt === 'final' ? this.finalName(room) : 'Siegerehrung';
   }
 
   private roundView(room: Room, c: Ctx, aud: Audience): RoundView {

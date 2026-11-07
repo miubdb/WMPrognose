@@ -9,7 +9,7 @@ import { Store } from '../server/store';
 import { SCENES, diffZones, variantItems } from '../shared/scenes';
 import { scoreGlitch, groupUnique, scoreRankExact } from '../shared/scoring';
 import { analyzeShow } from '../shared/analysis';
-import { TILES, SEED_PACK, SEED_SHOW, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, EXTRA_SHOWS } from '../content';
+import { TILES, SEED_PACK, SEED_SHOW, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, EXTRA_SHOWS, SEED_SHOW_B43, SEED_SHOW_B43K, SEED_SHOW_B44, SEED_SHOW_B44K } from '../content';
 import { BESTOF_PLAN, BESTOF_NEW, BESTOF_KK } from '../content/bestof';
 import { BESTOF2_NEW, BESTOF2_PLAN } from '../content/bestof2';
 import { shuffledPool } from '../server/modes';
@@ -18,6 +18,9 @@ import type { Action, Book, TaskDef, View } from '../shared/types';
 
 const fresh = () => new ContentService(new Store(join(mkdtempSync(join(tmpdir(), 'outplay-b42-')), 'c.db')), { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: EXTRA_SHOWS });
 const CS = fresh();
+/** Stand Praxistest 3 (show-5 / show-4z in der alten Fassung) – für die Regressionstests der damaligen Änderungen */
+const freshP3 = () => new ContentService(new Store(join(mkdtempSync(join(tmpdir(), 'outplay-p3-')), 'c.db')), { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: [...EXTRA_SHOWS.filter(x => x !== SEED_SHOW_B44 && x !== SEED_SHOW_B44K), SEED_SHOW_B43, SEED_SHOW_B43K] });
+const CS3 = freshP3();
 const B42: Book = CS.resolveBook('show-4@1'), B42K: Book = CS.resolveBook('show-3z@1');
 const MODES = ['geo', 'match', 'rank', 'glitch', 'estimate', 'link', 'unique'] as const;
 const regular = (b: Book) => b.tiles.filter(t => t.kind !== 'final').flatMap(t => t.tasks.filter(x => !x.practice));
@@ -246,7 +249,7 @@ test('C09 / T03 / T05 / C19: redaktionelle Fassung (Transfermarkt-Maßstab, Haal
 
 
 // ---------------------------------------------------------------- Praxistest 3: Best of 42, Version 2 (show-5 / show-4z)
-const V2: Book = CS.resolveBook('show-5@1'), V2K: Book = CS.resolveBook('show-4z@1');
+const V2: Book = CS3.resolveBook('show-5@1'), V2K: Book = CS3.resolveBook('show-4z@1');
 
 test('Best of 42 v2 (show-5): 42 + 7, 21/21, genau die vier Änderungen; show-4 bleibt unverändert', () => {
   assert.equal(regular(V2).length, 42); assert.equal(V2.tiles.reduce((n, t) => n + t.tasks.filter(x => x.practice).length, 0), 7);
@@ -296,5 +299,5 @@ test('SORTIER’S! mit Moukoko: fünf eindeutige Positionen nach Bundesliga.com,
 test('Best of 42 v2: komplett durchspielbar (Probe + 6), auch KONSENS-Variante; 4/5/6 je Modus als neue Version', () => {
   const g = playAll(V2, 'show-5@1'); assert.equal(g.room.phase, 'ceremony'); assert.equal(g.log.scored, 46); assert.equal(g.log.practice, 7); assert.equal(g.log.boards, 7); assert.equal(g.log.leaks, 0);
   const k = playAll(V2K, 'show-4z@1'); assert.equal(k.room.phase, 'ceremony'); assert.equal(k.log.scored, 45);
-  const c = fresh(); for (const n of [4, 5, 6]) { const p = c.getPack('show-5'); c.updatePack('show-5', { ...p, rules: { ...p.rules, tasksPerMode: n } }); const pub = c.publish('show-5', `${n}`); const b = c.resolveBook(pub.ref); assert.equal(regular(b).length, 7 * n); }
+  const c = freshP3(); for (const n of [4, 5, 6]) { const p = c.getPack('show-5'); c.updatePack('show-5', { ...p, rules: { ...p.rules, tasksPerMode: n } }); const pub = c.publish('show-5', `${n}`); const b = c.resolveBook(pub.ref); assert.equal(regular(b).length, 7 * n); }
 });

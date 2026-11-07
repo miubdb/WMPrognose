@@ -6,6 +6,7 @@ import { MapView } from '../ui/MapView';
 import { SceneView } from '../ui/SceneView';
 import { initAudio, play, setMusic, setSoundEnabled } from '../ui/audio';
 import type { PlayerPublic, RoundView, View } from '../../../shared/types';
+import { estimateNetLine } from '../../../shared/util';
 
 /** Sichtbarer Modusname: SORTIER’S! (Karten sortieren); nur die klassische Nacheinander-Variante heißt weiter BLIND RANK. */
 export const modeName = (r: { mode: string; data?: any }) => (r.mode === 'rank' && r.data?.variant === 'sequence' ? 'BLIND RANK' : MODE_NAME[r.mode]);
@@ -20,7 +21,7 @@ const MODE_RULES: Record<string, string[]> = {
   codebreak: ['Knacke das Rätsel mit Logik.', 'Hinweise helfen – kosten aber Punkte.', 'Drei Versuche, Tempo zählt kaum.'],
   unique: ['Nenne eine gültige Antwort.', 'Nur eine Antwort, die kein anderer nennt, bringt Punkte.', 'Doppelte und ungültige Antworten zählen 0.'],
   match: ['Sechs Begriffe links, sechs Partner rechts.', 'Verbinde auf dem Handy, was zusammengehört.', '50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.'],
-  vote: ['Alle bekommen dieselbe Gruppenfrage.', 'Du wählst geheim einen Mitspieler – nicht dich selbst.', 'Punkte gibt es für die Wahl mit den meisten Stimmen.'],
+  vote: ['Fünf Fragen – wähle geheim eine Person (nicht dich selbst).', 'Meiste Stimmen = Konsens: Wer richtig tippt, bekommt +100.', 'Maximal 500 Punkte · keine Minuspunkte · Einzelstimmen zählen nicht.'],
   link: ['Vier Hinweise erscheinen nacheinander.', 'Je früher du die Lösung nennst, desto mehr Punkte.', 'Nur ein Versuch – die Antwort bleibt geheim.'],
 };
 
@@ -333,7 +334,7 @@ function EstimateTv({ view, round }: { view: View; round: RoundView }) {
             </div>); })}
         </div>
         <div className="estcols">
-          <PointsList view={view} rows={view.players.map(p => { const g = guesses.find(x => x.pid === p.id); const b = bets.find(x => x.pid === p.id); return { pid: p.id, points: (g?.points ?? 0) + (g?.bonus ?? 0) + (b?.delta ?? 0), note: [g ? `Platz ${g.place}${g.bonus ? ` · Bonus +${g.bonus}` : ''}` : 'keine Schätzung', b ? `${b.won ? '✅' : '❌'} ${b.amount} auf ${pl(view, b.target)?.name}` : ''].filter(Boolean).join(' · ') }; }).sort((a, b) => b.points - a.points)} />
+          <PointsList view={view} rows={view.players.map(p => { const g = guesses.find(x => x.pid === p.id); const b = bets.find(x => x.pid === p.id); return { pid: p.id, points: (g?.points ?? 0) + (g?.bonus ?? 0) + (b?.delta ?? 0), note: (g ? `Platz ${g.place}${g.bonus ? ` · Bonus +${g.bonus}` : ''} · ` : 'keine Schätzung · ') + estimateNetLine((g?.points ?? 0) + (g?.bonus ?? 0), b ? b.delta : null) + (b ? ` ${b.won ? '✅' : '❌'} auf ${pl(view, b.target)?.name}` : '') }; }).sort((a, b) => b.points - a.points)} />
           <div><ul className="estsummary">{(rev.summary ?? []).map((l: string, i: number) => <li key={i}>{l}</li>)}</ul><Explain text={rev.explain} /></div>
         </div>
       </div>
@@ -449,18 +450,24 @@ function VoteTv({ view, round }: { view: View; round: RoundView }) {
       <p className="hint big">{d.answeredCount} von {d.playerCount} haben gewählt – die Stimmen bleiben geheim.</p><AnswerRow players={view.players} /></div>
   );
   const max = Math.max(1, rev.max);
+  const shown = rev.counts.filter((c: any) => c.votes > 0).slice().reverse();   // Spannung: wenigste Stimmen zuerst, Konsens zuletzt
+  const none = rev.counts.filter((c: any) => c.votes === 0);
+  const nameOf = (c: any) => c.host ? c.name : pl(view, c.pid)?.name ?? '?';
   return (
     <div className="votetv reveal"><div className="bigq small">{rev.prompt}</div>
       <div className="votebars">
-        {rev.counts.map((c: any, i: number) => { const p = pl(view, c.pid); if (!p) return null; const win = rev.winners.includes(c.pid); return (
-          <div key={c.pid} className={`vbar ${win ? 'win' : ''}`} style={{ animationDelay: `${0.3 + i * 0.35}s` }}>
-            <div className="who"><Avatar a={p.avatar} size={52} /><b>{p.name}</b></div>
-            <div className="track"><div className="fill" style={{ width: `${(c.votes / max) * 100}%` }} /></div>
+        {shown.map((c: any, i: number) => { const p = c.host ? null : pl(view, c.pid); const win = rev.winners.includes(c.pid); const last = i === shown.length - 1; return (
+          <div key={c.pid} className={`vbar ${win ? 'win' : ''}`} style={{ animationDelay: `${0.4 + i * 0.9}s` }}>
+            <div className="who">{c.host ? <span className="hostav" aria-hidden>🎙️</span> : p ? <Avatar a={p.avatar} size={52} /> : null}<b>{nameOf(c)}</b></div>
+            <div className="track"><div className="fill" style={{ width: `${(c.votes / max) * 100}%`, animationDelay: `${0.6 + i * 0.9}s` }} /></div>
             <div className="voters">{c.voters.map((v: string) => { const vp = pl(view, v); return vp ? <Avatar key={v} a={vp.avatar} size={30} /> : null; })}</div>
-            <strong>{c.votes}{win ? ' 🤝' : ''}</strong>
+            <strong>{c.votes}{win ? ' 🤝' : ''}{last && !win ? '' : ''}</strong>
           </div>); })}
       </div>
-      <p className="rankhow">Wer die meisten Stimmen bekommt, gewinnt den Konsens – wer ihn gewählt hat, erhält je <b>{rev.points} Punkte</b>{rev.winners.length > 1 ? ' (Gleichstand: alle häufigsten Wahlen zählen)' : ''}.</p>
+      {none.length > 0 && <p className="muted small">Keine Stimmen: {none.map(nameOf).join(', ')}</p>}
+      {rev.noConsensus
+        ? <p className="rankhow"><b>Kein Konsens</b> – jede Person nur eine Stimme, niemand bekommt Punkte.</p>
+        : <p className="rankhow">Konsens{rev.winners.length > 1 ? ' (Gleichstand: alle Spitzenwahlen zählen)' : ''}: wer ihn getippt hat, erhält <b>+{rev.points} Punkte</b>.</p>}
       <Explain text={rev.explain} />
     </div>
   );

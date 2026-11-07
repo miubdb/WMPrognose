@@ -24,7 +24,7 @@ test('Bereinigung: Vorschau ändert nichts; Ausführen archiviert nur ältere Pa
   assert.deepEqual(counts(c), before, 'keine Fragen/Kategorien/Pakete/Versionen verloren');
   const pub = c.listPublished().map(p => p.id).sort(); assert.deepEqual(pub, ['show-3', 'show-4z', 'show-5']);
   for (const id of OLD) { const p = c.listPacksView().find(x => x.id === id); if (p) assert.equal(p.status, 'archived', id); }
-  assert.match(c.defaultRef(), /^show-5@/);
+  assert.match(c.defaultRef(), /^show-4z@/);
   assert.ok(c.cleanupPlan().clean, 'danach nichts mehr zu tun'); const again = c.cleanupApply(); assert.deepEqual([again.archived, again.updated], [[], []]);
   assert.ok(r.archived.length >= 5);
 });

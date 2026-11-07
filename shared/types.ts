@@ -125,7 +125,7 @@ export interface LinkTask {
 /** Proberunde: interaktive Beispielaufgabe ohne Wertung (Punkte werden nie vergeben). */
 export interface TaskBase { practice?: boolean; /** Redaktionshinweis: offene Prüfpflicht / Vorbehalt – erscheint als Warnung bei der Paketprüfung */ review?: string }
 /** KICKBASE-KONSENS (nur Finale): alle beantworten dieselbe Gruppenfrage, indem sie geheim einen Mitspieler wählen; Punkte für die Wahl(en) mit den meisten Stimmen. */
-export interface VoteTask { mode: 'vote'; prompt: string; seconds: number; points: number; explain: string }
+export interface VoteTask { mode: 'vote'; prompt: string; seconds: number; points: number; explain: string; /** zusätzlicher wählbarer Kandidat ohne Spielerkonto (z. B. „Michael (Showmaster)“) */ candidate?: string }
 export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask | VoteTask) & TaskBase;
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
@@ -315,7 +315,7 @@ export type Action =
   | { k: 'h.restartTask' }
   | { k: 'h.skipTask' }
   | { k: 'h.skipTile' }
-  | { k: 'h.review'; groupKey: string; decision: 'valid' | 'invalid' | { mapTo: string } }
+  | { k: 'h.review'; groupKey: string; decision: 'valid' | 'invalid' | 'auto' | { mapTo: string } | { sameAs: string } }
   | { k: 'h.adjust'; pid: string; delta: number; note: string }
   | { k: 'h.release'; pid: string }
   | { k: 'h.remove'; pid: string }

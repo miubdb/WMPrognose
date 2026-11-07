@@ -239,7 +239,7 @@ function Packs({ rev, bump }: { rev: number; bump: () => void }) {
   const act = async (fn: () => Promise<any>, ok = '') => { const r = await fn(); if (!r.ok) t.show(errText(r)); else { bump(); if (ok) t.show(ok); } };
   return (
     <div>
-      <div className="row between"><h2>Pakete</h2><button className="btn primary" onClick={() => setEdit({ name: '', description: '', categoryIds: [], surprise: '', final: '', rules: { startCredit: 200, maxFootball: 2, maxPerMode: 2 } })}>＋ Neues Paket</button></div>
+      <div className="row between"><h2>Pakete</h2><button className="btn primary" onClick={() => setEdit({ name: '', description: '', categoryIds: [], surprise: '', final: '', rules: { startCredit: 0, maxFootball: 2, maxPerMode: 2 } })}>＋ Neues Paket</button></div>
       <div className="catgrid">{data.map((p: any) => (
         <div key={p.id} className="catcard" style={{ ['--c' as any]: p.status === 'published' ? '#22c55e' : p.status === 'archived' ? '#6b7280' : '#f5b82e' }}>
           <button className="catmain" aria-label="Öffnen" onClick={() => setEdit(p)}>
@@ -534,20 +534,20 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
   useEffect(loadCl, [loadCl]);
   const runCleanup = async () => {
     if (!cl) return;
-    const lines = [...cl.archive.map((i: string) => '• archivieren: ' + i), ...cl.update.map((i: string) => '• neue Version (Marktwert-Update nach jeder Runde): ' + i)].join('\n');
+    const lines = [...cl.archive.map((i: string) => '• archivieren: ' + i), ...cl.update.map((i: string) => '• neue Version mit aktuellem Inhalt (Start 0 Punkte, KONSENS-Finale, Fragenänderungen): ' + i), ...(cl.rename ?? []).map((i: string) => '• umbenennen: ' + i)].join('\n');
     if (!confirm('Paketbereinigung jetzt ausführen?\n\n' + lines + '\n\nVorher wird automatisch eine Datenbanksicherung angelegt. Nichts wird gelöscht; laufende und beendete Räume behalten ihren Stand.')) return;
     const r = await adm('POST', '/cleanup', {});
-    if (r.ok) { setClMsg(`Fertig. Archiviert: ${r.data.archived.join(', ') || '–'} · Neue Version: ${r.data.updated.join(', ') || '–'}${r.data.backupFile ? ' · Sicherung: ' + r.data.backupFile : ''}`); bump(); loadCl(); } else setClMsg(errText(r));
+    if (r.ok) { setClMsg(`Fertig. Archiviert: ${r.data.archived.join(', ') || '–'} · Neue Version: ${r.data.updated.join(', ') || '–'}${(r.data.renamed ?? []).length ? ' · Umbenannt: ' + r.data.renamed.join(', ') : ''}${r.data.backupFile ? ' · Sicherung: ' + r.data.backupFile : ''}`); bump(); loadCl(); } else setClMsg(errText(r));
   };
   return (
     <div>
       <h2>Daten</h2>
       {cl && (
         <div className="card">
-          <h3>Pakete aufräumen</h3>
-          <p className="muted small">Aktiv bleiben: show-5 (Hauptpaket), show-4z (Finale KICKBASE-KONSENS), show-3 (Backup). Alles andere wird archiviert – nie gelöscht.</p>
-          <ul className="small">{cl.rows.map((r: any) => <li key={r.id}><b>{r.id}</b> {r.name} – {r.action === 'archive' ? 'wird archiviert' : r.action === 'archived' ? 'bereits archiviert' : r.action === 'keep-archived' ? 'bleibt archiviert (nicht reaktiviert)' : r.needsUpdate ? 'bleibt aktiv, bekommt neue Version' : 'bleibt aktiv'}</li>)}</ul>
-          {cl.clean ? <p className="small">✔ Alles aufgeräumt – nichts zu tun.</p> : <button className="btn" onClick={runCleanup}>Bereinigung ausführen ({cl.archive.length} archivieren, {cl.update.length} aktualisieren)</button>}
+          <h3>Pakete aufräumen &amp; aktualisieren</h3>
+          <p className="muted small">Aktiv bleiben: show-4z (Hauptshow mit KICKBASE-KONSENS), show-5 (Alternative mit FINAL LOCK), show-3 (altes Backup). Alles andere wird archiviert – nie gelöscht. Die beiden Best-of-Pakete bekommen den aktuellen Inhalt als NEUE Version (kein neues Paket, laufende Räume bleiben unverändert).</p>
+          <ul className="small">{cl.rows.map((r: any) => <li key={r.id}><b>{r.id}</b> {r.name} – {r.action === 'archive' ? 'wird archiviert' : r.action === 'archived' ? 'bereits archiviert' : r.action === 'keep-archived' ? 'bleibt archiviert (nicht reaktiviert)' : r.needsUpdate ? 'bleibt aktiv, bekommt neue Version' : r.needsRename ? 'bleibt aktiv, wird umbenannt' : 'bleibt aktiv'}</li>)}</ul>
+          {cl.clean ? <p className="small">✔ Alles aufgeräumt – nichts zu tun.</p> : <button className="btn" onClick={runCleanup}>Sicher aktualisieren ({cl.archive.length} archivieren, {cl.update.length} neue Version{(cl.rename ?? []).length ? ', ' + cl.rename.length + ' umbenennen' : ''})</button>}
           {clMsg && <p className="small">{clMsg}</p>}
         </div>
       )}

@@ -89,3 +89,10 @@ export function expandShowSteps<T extends { k: string }>(show: T[], rules?: { bo
   });
   return out;
 }
+
+/** SETZ AUF MICH: verständliche Netto-Anzeige, z. B. „Schätzung +30 · Wette −100 = −70 Punkte“. */
+export function estimateNetLine(estimate: number, bet: number | null): string {
+  const sg = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
+  if (bet === null) return `Schätzung ${sg(estimate)} Punkte`;
+  return `Schätzung ${sg(estimate)} · Wette ${sg(bet)} = ${sg(estimate + bet)} Punkte`;
+}

@@ -604,9 +604,11 @@ const link: ModeImpl = {
 // =====================================================================
 // KICKBASE-KONSENS (nur Finale): geheime Wahl eines Mitspielers, Punkte für die Wahl mit den meisten Stimmen
 // =====================================================================
+export const HOST_CANDIDATE = 'host:candidate';
+const validTarget = (c: Ctx, tg: string) => c.players.some(x => x.id === tg) || (tg === HOST_CANDIDATE && !!(c.task as VoteTask).candidate);
 const voteVotes = (c: Ctx) => {
   const counts: Record<string, string[]> = {};
-  for (const p of c.players) { const tg = c.round.pm[p.id]?.target; if (tg && c.players.some(x => x.id === tg)) (counts[tg] ??= []).push(p.id); }
+  for (const p of c.players) { const tg = c.round.pm[p.id]?.target; if (tg && validTarget(c, tg)) (counts[tg] ??= []).push(p.id); }
   return counts;
 };
 const vote: ModeImpl = {
@@ -616,7 +618,7 @@ const vote: ModeImpl = {
   submit(c, pid, payload) {
     if (c.round.stage !== 'open') return err('closed');
     const target = String(payload?.target ?? '');
-    if (!c.players.some(p => p.id === target)) return err('invalid_target');
+    if (!validTarget(c, target)) return err('invalid_target');
     if (target === pid && c.players.length > 2) return err('self_vote');          // nicht für sich selbst stimmen (ab 3 Spielern)
     const cur = c.round.pm[pid];
     if (cur) return cur.target === target ? { ok: true, dup: true } : err('already_submitted');
@@ -629,16 +631,19 @@ const vote: ModeImpl = {
     const t = c.task as VoteTask;
     const counts = voteVotes(c);
     const max = Math.max(0, ...Object.values(counts).map(v => v.length));
-    const winners = Object.entries(counts).filter(([, v]) => v.length === max && max > 0).map(([k]) => k);   // Gleichstand: alle häufigsten Wahlen werden anerkannt
+    // Konsens nur ab zwei Stimmen; bei Gleichstand zählen alle Spitzenwahlen (jede hat dann mindestens zwei Stimmen). Einzelstimmen für alle = 0 Punkte.
+    const winners = max >= 2 ? Object.entries(counts).filter(([, v]) => v.length === max).map(([k]) => k) : [];
     const rows = c.players.map(p => { const tg = c.round.pm[p.id]?.target ?? null; const ok = !!tg && winners.includes(tg); return { pid: p.id, target: tg, correct: ok, points: ok ? t.points : 0 }; });
+    const cand = t.candidate ? [{ pid: HOST_CANDIDATE, name: t.candidate, host: true }] : [];
     return {
-      entries: rows.filter(r => r.target).map(r => ({ pid: r.pid, delta: r.points, label: r.correct ? `Mehrheit: ${nm(c, r.target!)}` : 'nicht die Mehrheit' })),
-      reveal: { prompt: t.prompt, explain: t.explain, points: t.points, winners, max, counts: c.players.map(p => ({ pid: p.id, votes: (counts[p.id] ?? []).length, voters: counts[p.id] ?? [] })).sort((a, b) => b.votes - a.votes), rows },
+      entries: rows.filter(r => r.target).map(r => ({ pid: r.pid, delta: r.points, label: r.correct ? `Konsens: ${r.target === HOST_CANDIDATE ? t.candidate : nm(c, r.target!)}` : 'kein Konsens' })),
+      reveal: { prompt: t.prompt, explain: t.explain, points: t.points, winners, max, noConsensus: winners.length === 0, candidate: t.candidate ?? null,
+        counts: [...c.players.map(p => ({ pid: p.id, votes: (counts[p.id] ?? []).length, voters: counts[p.id] ?? [] })), ...cand.map(x => ({ pid: x.pid, name: x.name, host: true, votes: (counts[x.pid] ?? []).length, voters: counts[x.pid] ?? [] }))].sort((a, b) => b.votes - a.votes), rows },
     };
   },
   view(c, a) {
     const t = c.task as VoteTask;
-    const base: any = { prompt: t.prompt, points: t.points, answeredCount: c.players.filter(p => !!c.round.pm[p.id]?.target).length, playerCount: c.players.length };
+    const base: any = { prompt: t.prompt, points: t.points, answeredCount: c.players.filter(p => !!c.round.pm[p.id]?.target).length, playerCount: c.players.length, candidate: t.candidate ? { id: HOST_CANDIDATE, name: t.candidate } : null };
     if (a.role === 'player' && a.pid) base.mine = c.round.pm[a.pid]?.target ?? null;
     return base;
   },

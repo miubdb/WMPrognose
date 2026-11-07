@@ -205,6 +205,8 @@ export interface UniqueGroup {
   auto?: string[];
   /** vollständige Antwortliste: unbekannte Antwort automatisch als ungültig gewertet (Showmaster kann korrigieren) */
   autoInvalid?: boolean;
+  /** pids, für die der Showmaster eine Einzelentscheidung getroffen hat (Auto wiederherstellen möglich) */
+  manual?: string[];
 }
 /**
  * Ordnet eine Eingabe der Liste gültiger Antworten zu.
@@ -241,36 +243,60 @@ export function matchValidDetail(input: string, valid: UniqueTask['valid']): { n
   return { name: target, kind: 'typo' };
 }
 export function matchValid(input: string, valid: UniqueTask['valid']): string | null { return matchValidDetail(input, valid)?.name ?? null; }
+export type UniqueOverride = 'valid' | 'invalid' | { mapTo: string } | { sameAs: string };
+/**
+ * Gruppiert die Antworten. Automatische Erkennung ist der Standard; der Showmaster kann
+ *  • je Antwort (Schlüssel „a:<pid>“) entscheiden: gültig / ungültig / identisch mit Katalogeintrag (mapTo) oder mit der Antwort eines anderen Spielers (sameAs),
+ *  • (älter) je unbekanntem Begriff entscheiden (Schlüssel „u:<normalisierter Text>“).
+ * Ohne Eintrag gilt die automatische Entscheidung.
+ */
 export function groupUnique(
   answers: Record<string, string>,
   valid: UniqueTask['valid'],
-  overrides: Record<string, 'valid' | 'invalid' | { mapTo: string }> = {},
+  overrides: Record<string, UniqueOverride> = {},
   closed = false,
 ): UniqueGroup[] {
-  const groups = new Map<string, UniqueGroup>();
-  for (const [pid, raw] of Object.entries(answers)) {
-    const n = normText(raw);
-    if (!n) continue;
-    let key: string, label: string, state: UniqueGroup['state']; let autoTypo = false; let autoInvalid = false;
+  type Res = { key: string; label: string; state: UniqueGroup['state']; autoTypo: boolean; autoInvalid: boolean };
+  const base = (pid: string, raw: string): Res | null => {
+    const n = normText(raw); if (!n) return null;
     const md = matchValidDetail(raw, valid);
     const mine = overrides['u:' + n];
-    if (md && !(md.kind === 'typo' && mine)) { key = 'v:' + normText(md.name); label = md.name; state = 'valid'; autoTypo = md.kind === 'typo'; }
-    else {
-      key = 'u:' + n; label = raw.trim(); state = closed ? 'invalid' : 'unknown'; autoInvalid = closed;
-      const ov = overrides[key]; if (ov) autoInvalid = false;
-      if (ov === 'valid') state = 'valid';
-      else if (ov === 'invalid') state = 'invalid';
-      else if (ov && typeof ov === 'object') {
-        const target = valid.find(v => v.name === ov.mapTo);
-        if (target) { key = 'v:' + normText(target.name); label = target.name; state = 'valid'; }
-      }
+    if (md && !(md.kind === 'typo' && mine)) return { key: 'v:' + normText(md.name), label: md.name, state: 'valid', autoTypo: md.kind === 'typo', autoInvalid: false };
+    let key = 'u:' + n, label = raw.trim(), state: UniqueGroup['state'] = closed ? 'invalid' : 'unknown'; let autoInvalid = closed;
+    const ov = overrides[key]; if (ov) autoInvalid = false;
+    if (ov === 'valid') state = 'valid';
+    else if (ov === 'invalid') state = 'invalid';
+    else if (ov && typeof ov === 'object' && 'mapTo' in ov) { const target = valid.find(v => v.name === ov.mapTo); if (target) { key = 'v:' + normText(target.name); label = target.name; state = 'valid'; } }
+    return { key, label, state, autoTypo: false, autoInvalid };
+  };
+  const resolve = (pid: string, seen: string[] = []): Res | null => {
+    const raw = answers[pid]; if (raw === undefined) return null;
+    const ov = overrides['a:' + pid];
+    if (!ov) return base(pid, raw);
+    if (ov === 'invalid') return { key: 'x:' + pid, label: raw.trim(), state: 'invalid', autoTypo: false, autoInvalid: false };
+    if (ov === 'valid') {
+      const b = base(pid, raw);
+      if (b && b.state === 'valid') return { ...b, autoTypo: false };           // bereits gültig: Entscheidung bestätigt (kein Tippfehler-Hinweis mehr)
+      const n = normText(raw); return n ? { key: 'p:' + n, label: raw.trim(), state: 'valid', autoTypo: false, autoInvalid: false } : null;
     }
-    const g = groups.get(key) ?? { key, label, state, members: [], raw: {} };
+    if ('mapTo' in ov) { const target = valid.find(v => v.name === ov.mapTo); return target ? { key: 'v:' + normText(target.name), label: target.name, state: 'valid', autoTypo: false, autoInvalid: false } : base(pid, raw); }
+    if ('sameAs' in ov) {
+      if (ov.sameAs === pid || seen.includes(ov.sameAs) || answers[ov.sameAs] === undefined) return base(pid, raw);
+      const o = resolve(ov.sameAs, [...seen, pid]); return o ? { ...o, autoTypo: false } : base(pid, raw);
+    }
+    return base(pid, raw);
+  };
+  const groups = new Map<string, UniqueGroup>();
+  for (const [pid, raw] of Object.entries(answers)) {
+    const r = resolve(pid); if (!r) continue;
+    const g = groups.get(r.key) ?? { key: r.key, label: r.label, state: r.state, members: [], raw: {} };
+    // Mehrere Mitglieder mit gleichem Schlüssel, aber (durch Einzelentscheidung) abweichendem Zustand: gültige Entscheidung gewinnt nicht automatisch – der Zustand der ersten Auflösung bleibt
     g.members.push(pid);
     g.raw[pid] = raw;
-    if (autoTypo) (g.auto ??= []).push(pid);
-    if (autoInvalid) g.autoInvalid = true;
-    groups.set(key, g);
+    if (r.autoTypo) (g.auto ??= []).push(pid);
+    if (r.autoInvalid) g.autoInvalid = true;
+    if (overrides['a:' + pid]) (g.manual ??= []).push(pid);
+    groups.set(r.key, g);
   }
   return [...groups.values()];
 }

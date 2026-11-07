@@ -338,3 +338,6 @@ details summary { cursor: pointer; font-weight: 700; }
 }
 
 .boardtv h1{text-transform:uppercase;letter-spacing:.12em;background:linear-gradient(90deg,#f5b82e,#fff3c4,#f5b82e);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+.votecard.host{border-style:dashed}.hostav{display:inline-grid;place-items:center;width:72px;height:72px;border-radius:50%;background:#2a3350;font-size:34px}.vbar .hostav{width:52px;height:52px;font-size:26px}
+.decide.mini{display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px;align-items:center}
