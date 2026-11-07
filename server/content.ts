@@ -413,7 +413,7 @@ export class ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
-  static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3'];
+  static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3', 'show-after'];
   static readonly REFRESH_PACKS = ['show-4z', 'show-5'];
   static readonly MAIN_PACK = 'show-4z';
   private seedShow(id: string) { return (this.seed.extraShows ?? []).find(x => x.pack.id === id); }

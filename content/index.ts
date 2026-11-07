@@ -9,5 +9,6 @@ import { SEED_SHOW3, SEED_SHOW4 } from './show3';
 import { SEED_SHOW_B42, SEED_SHOW_B42K } from './bestof';
 import { SEED_SHOW_B43, SEED_SHOW_B43K } from './bestof2';
 import { SEED_SHOW_B44, SEED_SHOW_B44K } from './bestof3';
-export const EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K];   // show-5 / show-4z: Stand Praxistest 4 (enthält den Inhalt der Praxistest-3-Fassung B43 als Basis)
+import { SEED_SHOW_AFTER } from './aftershow';
+export const EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K, SEED_SHOW_AFTER];   // show-5 / show-4z: Stand Praxistest 4 (enthält den Inhalt der Praxistest-3-Fassung B43 als Basis)
 export { TILES, SEED_PACK, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B43, SEED_SHOW_B43K, SEED_SHOW_B44, SEED_SHOW_B44K };
