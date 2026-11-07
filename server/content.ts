@@ -414,7 +414,7 @@ export class ContentService {
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
   static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3', 'show-after'];
-  static readonly REFRESH_PACKS = ['show-4z', 'show-5'];
+  static readonly REFRESH_PACKS = ['show-4z', 'show-5', 'show-after'];
   static readonly MAIN_PACK = 'show-4z';
   private seedShow(id: string) { return (this.seed.extraShows ?? []).find(x => x.pack.id === id); }
   private revisionOf(id: string) { return Number(this.setting('rev:' + id) ?? 0); }
