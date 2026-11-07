@@ -147,10 +147,10 @@ function playAll(book: Book, ref: string) {
   return { room, log, eng, ids, view, host };
 }
 
-test('Best of 42: kompletter Durchlauf mit 7 Bots – 49 Aufgaben (42 gewertet + 7 Proben) + FINAL LOCK + 3 Zwischenstände + Siegerehrung, nichts vorzeitig sichtbar', () => {
+test('Best of 42: kompletter Durchlauf mit 7 Bots – 49 Aufgaben (42 gewertet + 7 Proben) + FINAL LOCK + 7 Marktwert-Updates + Siegerehrung, nichts vorzeitig sichtbar', () => {
   const g = playAll(B42, 'show-4@1');
   assert.equal(g.room.phase, 'ceremony'); assert.deepEqual(g.log.tiles, ['b42-r1', 'b42-r2', 'b42-r3', 'b42-sur', 'b42-r4', 'b42-r5', 'b42-r6', 's3-final']);
-  assert.equal(g.log.practice, 7); assert.equal(g.log.scored, 42 + 4, '42 reguläre + 4 Finale-Aufgaben'); assert.equal(g.log.boards, 3); assert.equal(g.log.leaks, 0);
+  assert.equal(g.log.practice, 7); assert.equal(g.log.scored, 42 + 4, '42 reguläre + 4 Finale-Aufgaben'); assert.equal(g.log.boards, 7); assert.equal(g.log.leaks, 0);
   assert.deepEqual([...g.log.modes].sort(), [...MODES].sort());
   assert.ok(g.room.players[6].score >= 0 && g.room.players[0].score > 200, 'Punkte wurden vergeben');
   assert.equal(g.view('tv').room.hideScores === true || g.room.phase === 'ceremony', true);
@@ -294,7 +294,7 @@ test('SORTIER’S! mit Moukoko: fünf eindeutige Positionen nach Bundesliga.com,
 });
 
 test('Best of 42 v2: komplett durchspielbar (Probe + 6), auch KONSENS-Variante; 4/5/6 je Modus als neue Version', () => {
-  const g = playAll(V2, 'show-5@1'); assert.equal(g.room.phase, 'ceremony'); assert.equal(g.log.scored, 46); assert.equal(g.log.practice, 7); assert.equal(g.log.boards, 3); assert.equal(g.log.leaks, 0);
+  const g = playAll(V2, 'show-5@1'); assert.equal(g.room.phase, 'ceremony'); assert.equal(g.log.scored, 46); assert.equal(g.log.practice, 7); assert.equal(g.log.boards, 7); assert.equal(g.log.leaks, 0);
   const k = playAll(V2K, 'show-4z@1'); assert.equal(k.room.phase, 'ceremony'); assert.equal(k.log.scored, 45);
   const c = fresh(); for (const n of [4, 5, 6]) { const p = c.getPack('show-5'); c.updatePack('show-5', { ...p, rules: { ...p.rules, tasksPerMode: n } }); const pub = c.publish('show-5', `${n}`); const b = c.resolveBook(pub.ref); assert.equal(regular(b).length, 7 * n); }
 });

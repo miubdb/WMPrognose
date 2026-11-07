@@ -76,3 +76,16 @@ export function shuffled<T>(arr: T[], rand: () => number): T[] {
   }
   return a;
 }
+
+/** Fester Showablauf mit Zwischenständen: Ist rules.boardEveryRound gesetzt, folgt auf JEDE Runde/Überraschung automatisch ein Zwischenstand (auch vor dem Finale);
+ *  nach dem Finale kommt direkt die Siegerehrung. Bereits vorhandene Zwischenstände werden nicht doppelt eingefügt. */
+export function expandShowSteps<T extends { k: string }>(show: T[], rules?: { boardEveryRound?: boolean }): T[] {
+  if (!rules?.boardEveryRound) return show;
+  const out: T[] = [];
+  show.forEach((st, i) => {
+    if (st.k === 'board') { if (out.length && out[out.length - 1].k !== 'board') out.push(st); return; }
+    out.push(st);
+    if (st.k !== 'final' && show[i + 1]?.k !== 'board') out.push({ k: 'board' } as T);
+  });
+  return out;
+}

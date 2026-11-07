@@ -529,9 +529,28 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
     const r = await adm('POST', '/standard', {});
     if (r.ok) { setStdMsg(r.data.alreadyInstalled ? 'Bereits installiert – nichts geändert.' : `Installiert: ${r.data.created.questions} Fragen, ${r.data.created.categories} Kategorien, ${r.data.created.packs} Paket(e) ${[r.data.ref, r.data.showRef, ...(r.data.extraRefs ?? [])].filter(Boolean).join(', ')}${r.data.archived.length ? ' · archiviert: ' + r.data.archived.join(', ') : ''}${r.data.backupFile ? ' · Sicherung vor der Installation: ' + r.data.backupFile : ''}`); bump(); loadStd(); } else setStdMsg(errText(r));
   };
+  const [cl, setCl] = useState<any>(null); const [clMsg, setClMsg] = useState('');
+  const loadCl = useCallback(() => { adm('GET', '/cleanup').then(r => r.ok && setCl(r.data)); }, []);
+  useEffect(loadCl, [loadCl]);
+  const runCleanup = async () => {
+    if (!cl) return;
+    const lines = [...cl.archive.map((i: string) => '• archivieren: ' + i), ...cl.update.map((i: string) => '• neue Version (Marktwert-Update nach jeder Runde): ' + i)].join('\n');
+    if (!confirm('Paketbereinigung jetzt ausführen?\n\n' + lines + '\n\nVorher wird automatisch eine Datenbanksicherung angelegt. Nichts wird gelöscht; laufende und beendete Räume behalten ihren Stand.')) return;
+    const r = await adm('POST', '/cleanup', {});
+    if (r.ok) { setClMsg(`Fertig. Archiviert: ${r.data.archived.join(', ') || '–'} · Neue Version: ${r.data.updated.join(', ') || '–'}${r.data.backupFile ? ' · Sicherung: ' + r.data.backupFile : ''}`); bump(); loadCl(); } else setClMsg(errText(r));
+  };
   return (
     <div>
       <h2>Daten</h2>
+      {cl && (
+        <div className="card">
+          <h3>Pakete aufräumen</h3>
+          <p className="muted small">Aktiv bleiben: show-5 (Hauptpaket), show-4z (Finale KICKBASE-KONSENS), show-3 (Backup). Alles andere wird archiviert – nie gelöscht.</p>
+          <ul className="small">{cl.rows.map((r: any) => <li key={r.id}><b>{r.id}</b> {r.name} – {r.action === 'archive' ? 'wird archiviert' : r.action === 'archived' ? 'bereits archiviert' : r.action === 'keep-archived' ? 'bleibt archiviert (nicht reaktiviert)' : r.needsUpdate ? 'bleibt aktiv, bekommt neue Version' : 'bleibt aktiv'}</li>)}</ul>
+          {cl.clean ? <p className="small">✔ Alles aufgeräumt – nichts zu tun.</p> : <button className="btn" onClick={runCleanup}>Bereinigung ausführen ({cl.archive.length} archivieren, {cl.update.length} aktualisieren)</button>}
+          {clMsg && <p className="small">{clMsg}</p>}
+        </div>
+      )}
       {std && !std.installed && (
         <div className="card warnbox">
           <h3>🆕 Neues Showpaket &amp; erweiterter Fragenpool verfügbar</h3>

@@ -5,7 +5,7 @@ import type {
 } from '../shared/types';
 import { AVATAR_LIMITS } from '../shared/types';
 import { applyClamped } from '../shared/scoring';
-import { hashSeed, rng, shuffled } from '../shared/util';
+import { expandShowSteps, hashSeed, rng, shuffled } from '../shared/util';
 import type { PlanStep, PlayerRec, Room, RoundState } from './model';
 import { MODES, type Audience, type Ctx } from './modes';
 import { SCENES } from '../shared/scenes';
@@ -32,7 +32,7 @@ export class Engine {
   // ---------------------------------------------------------------- Räume
   /** Ablaufplan der festen Show aus dem Paket (Runden → 'tile:<id>', Zwischenstände → 'board'). */
   static showPlan(book: Book): PlanStep[] {
-    return (book.show ?? []).map(s => (s.k === 'board' ? 'board' : (`tile:${s.cat}` as PlanStep)));
+    return expandShowSteps(book.show ?? [], book.rules).map(s => (s.k === 'board' ? 'board' : (`tile:${s.cat}` as PlanStep)));
   }
   newRoom(code: string, now: number, bookId = 'legacy', flowReq: Flow = 'classic'): { room: Room; hostKey: string } {
     const book = typeof this.src === 'function' ? this.src(bookId) : this.src;
@@ -348,7 +348,7 @@ export class Engine {
         const finalNext = this.stepKind(room, room.planIdx + 1) === 'final';
         const afterSurprise = this.stepKind(room, room.planIdx - 1) === 'surprise';
         room.scoreboard = {
-          title: finalNext ? 'Letzter sichtbarer Stand' : afterSurprise ? 'Zwischenstand nach der Überraschung' : (this.bk(room).rules?.boardTitle || 'Zwischenstand'),
+          title: finalNext ? (this.boardName(room) === 'Zwischenstand' ? 'Letzter sichtbarer Stand' : `Letztes ${this.boardName(room)}`) : this.boardName(room),
           reason: finalNext ? 'Im Finale wird die Rangliste verborgen – alles ist noch möglich!' : `Nach ${nPlayed} gespielten ${room.flow === 'show' ? 'Runden' : 'Kategorien'}${afterSurprise ? ' und der Überraschungsrunde' : ''}`,
           prev,
         };
@@ -458,7 +458,7 @@ export class Engine {
       }
       case 'h.scoreboard': {
         if (a.show && room.phase === 'wall') {
-          room.scoreboard = { title: 'Zwischenstand', reason: 'Zwischendurch eingeblendet', prev: { ...room.lastBoard }, manual: true };
+          room.scoreboard = { title: this.boardName(room), reason: 'Zwischendurch eingeblendet', prev: { ...room.lastBoard }, manual: true };
           room.lastBoard = Object.fromEntries(this.active(room).map(p => [p.id, p.score]));
           room.phase = 'scoreboard';
           return ok;
@@ -602,7 +602,7 @@ export class Engine {
         reduced: room.reduced, hideScores: hide,
         act: this.actLabel(room),
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === 'show' ? room.plan.filter(x => x.startsWith('tile:')).length : room.plan.filter(s => s === 'wall').length + 2 },
-        flow: room.flow ?? 'classic',
+        flow: room.flow ?? 'classic', boardName: this.boardName(room),
         brand: { title: this.bk(room).rules?.showTitle || 'OUTPLAY', winner: this.bk(room).rules?.winnerTitle || 'OUTPLAY-Champion', tagline: this.bk(room).rules?.tagline || undefined, winnerLine: this.bk(room).rules?.winnerLine || undefined },
         liveRank: room.liveRank ?? true, music: room.music ?? { on: false, vol: 25 },
         ...(room.flow === 'show' ? { agenda: this.agenda(room) } : {}),
@@ -664,7 +664,7 @@ export class Engine {
     const list: NonNullable<View['room']['agenda']> = [];
     room.plan.forEach((s, i) => {
       const state: 'done' | 'now' | 'todo' = room.phase === 'ceremony' || room.phase === 'ended' || i < room.planIdx ? 'done' : i === room.planIdx && room.phase !== 'lobby' && room.phase !== 'intro' ? 'now' : 'todo';
-      if (s === 'board') { list.push({ k: 'board', title: 'Zwischenstand', state }); return; }
+      if (s === 'board') { list.push({ k: 'board', title: this.boardName(room), state }); return; }
       const t = s.startsWith('tile:') ? this.tile(room, s.slice(5)) : undefined;
       if (t) list.push({ k: t.kind === 'tile' ? 'round' : t.kind, title: t.title, icon: t.icon, mode: t.tasks[0]?.mode, tasks: t.tasks.filter(x => !x.practice).length, state });
     });
@@ -683,7 +683,7 @@ export class Engine {
         case 'ceremony': case 'ended': return 'Siegerehrung';
         default: {
           const k = this.stepKind(room, Math.max(0, room.planIdx));
-          if (k === 'board') return 'Zwischenstand';
+          if (k === 'board') return this.boardName(room);
           if (k === 'final') return 'FINAL LOCK';
           if (k === 'surprise') return 'Überraschungsrunde';
           const r = this.roundNumber(room, room.planIdx); return `Runde ${r.n} von ${r.of}`;
@@ -700,16 +700,18 @@ export class Engine {
         const surprise = room.plan.indexOf('surprise');
         if (room.round && this.curTile(room)?.kind === 'final') return 'Akt 4 – FINAL LOCK';
         if (room.round && this.curTile(room)?.kind === 'surprise') return 'Akt 2 – Überraschungsrunde';
-        if (idx < surprise || surprise < 0) return step === 'board' ? 'Zwischenstand' : 'Akt 1 – Kategorienwand';
+        if (idx < surprise || surprise < 0) return step === 'board' ? this.boardName(room) : 'Akt 1 – Kategorienwand';
         if (idx === surprise) return 'Akt 2 – Überraschungsrunde';
         return 'Akt 3 – Die Jagd';
       }
     }
   }
+  /** Einheitliche Bezeichnung der Zwischenstände (Paketregel boardTitle; bei „Zwischenstand nach jeder Runde“ standardmäßig Marktwert-Update). */
+  boardName(room: Room): string { const r = this.bk(room).rules; return r?.boardTitle || (r?.boardEveryRound ? 'Marktwert-Update' : 'Zwischenstand'); }
   private planNextLabel(room: Room): string {
     const nxt = room.plan[room.planIdx + 1];
     if (nxt && nxt.startsWith('tile:')) { const t = this.tile(room, nxt.slice(5)); return t ? (t.kind === 'final' ? 'FINAL LOCK' : t.kind === 'surprise' ? 'Überraschungsrunde' : `Runde: ${t.title}`) : 'nächste Runde'; }
-    return nxt === 'wall' ? 'Kategorienwand' : nxt === 'board' ? 'Zwischenstand' : nxt === 'surprise' ? 'Überraschungsrunde' : nxt === 'final' ? 'FINAL LOCK' : 'Siegerehrung';
+    return nxt === 'wall' ? 'Kategorienwand' : nxt === 'board' ? this.boardName(room) : nxt === 'surprise' ? 'Überraschungsrunde' : nxt === 'final' ? 'FINAL LOCK' : 'Siegerehrung';
   }
 
   private roundView(room: Room, c: Ctx, aud: Audience): RoundView {

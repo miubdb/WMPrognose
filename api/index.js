@@ -33413,6 +33413,19 @@ function shuffled(arr, rand) {
   }
   return a;
 }
+function expandShowSteps(show, rules) {
+  if (!rules?.boardEveryRound) return show;
+  const out = [];
+  show.forEach((st, i2) => {
+    if (st.k === "board") {
+      if (out.length && out[out.length - 1].k !== "board") out.push(st);
+      return;
+    }
+    out.push(st);
+    if (st.k !== "final" && show[i2 + 1]?.k !== "board") out.push({ k: "board" });
+  });
+  return out;
+}
 
 // shared/scoring.ts
 var EST_TABLE = [1, 0.75, 0.55, 0.4, 0.28, 0.18, 0.1];
@@ -34120,7 +34133,7 @@ function analyzeShow(book) {
   const rounds = [];
   const order = [];
   let boards = 0;
-  for (const st of book.show) {
+  for (const st of expandShowSteps(book.show, book.rules)) {
     if (st.k === "board") {
       boards++;
       continue;
@@ -34173,7 +34186,7 @@ function bookHash(book) {
   return sha(canonical({ tiles, rules: book.rules ?? {} }));
 }
 var J2 = (s) => JSON.parse(s);
-var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: "", winnerLine: "", boardTitle: "", uniquePoints: 0 };
+var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: "", winnerLine: "", boardTitle: "", uniquePoints: 0, boardEveryRound: false };
 function normalizePack(raw) {
   const r = raw ?? {};
   const s = (v2, m) => typeof v2 === "string" ? v2.trim().slice(0, m) : "";
@@ -34201,11 +34214,12 @@ function normalizePack(raw) {
       tagline: s(r.rules?.tagline, 80),
       winnerLine: s(r.rules?.winnerLine, 80),
       boardTitle: s(r.rules?.boardTitle, 30),
-      uniquePoints: n(r.rules?.uniquePoints, 0, 0, 1e3)
+      uniquePoints: n(r.rules?.uniquePoints, 0, 0, 1e3),
+      boardEveryRound: r.rules?.boardEveryRound === true
     }
   };
 }
-var ContentService = class {
+var ContentService = class _ContentService {
   constructor(store, seed, now = Date.now) {
     this.store = store;
     this.seed = seed;
@@ -34666,6 +34680,52 @@ var ContentService = class {
   listPublished() {
     return this.listPacks().filter((p) => p.status === "published" && p.currentVersion !== null).map((p) => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
   }
+  /**
+   * Paketbereinigung: nur show-5 (Haupt), show-4z (Finale KICKBASE-KONSENS) und show-3 (Backup) bleiben aktiv.
+   * Alle anderen Pakete werden archiviert (nie gelöscht). Bereits archivierte Pakete bleiben archiviert.
+   * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
+   * laufende/beendete Räume behalten ihren bisherigen Stand.
+   */
+  static KEEP_PACKS = ["show-5", "show-4z", "show-3"];
+  static BOARD_PACKS = ["show-5", "show-4z"];
+  cleanupPlan() {
+    const packs = this.listPacks();
+    const rows = packs.map((p) => {
+      const keep = _ContentService.KEEP_PACKS.includes(p.id);
+      let action = keep ? p.status === "archived" ? "keep-archived" : "keep" : p.status === "archived" ? "archived" : "archive";
+      let needsUpdate = false;
+      if (keep && p.status !== "archived" && _ContentService.BOARD_PACKS.includes(p.id)) {
+        const ref = p.currentVersion !== null ? `${p.id}@${p.currentVersion}` : "";
+        let cur = false;
+        try {
+          cur = !!ref && this.resolveBook(ref).rules?.boardEveryRound === true;
+        } catch {
+          cur = false;
+        }
+        needsUpdate = !cur;
+      }
+      return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate };
+    });
+    const archive = rows.filter((r) => r.action === "archive").map((r) => r.id);
+    const update = rows.filter((r) => r.needsUpdate).map((r) => r.id);
+    const missing = _ContentService.KEEP_PACKS.filter((id) => !packs.some((p) => p.id === id));
+    return { rows, archive, update, missing, clean: !archive.length && !update.length, main: "show-5" };
+  }
+  cleanupApply() {
+    const plan = this.cleanupPlan();
+    const archived = [], updated = [];
+    for (const id of plan.archive) {
+      this.setPackStatus(id, "archived");
+      archived.push(id);
+    }
+    for (const id of plan.update) {
+      const p = this.getPack(id);
+      this.updatePack(id, { ...p, rules: { ...p.rules, boardEveryRound: true }, ifUpdated: void 0 });
+      const r = this.publish(id, "Marktwert-Update nach jeder Runde (Paketbereinigung)");
+      updated.push(r.ref);
+    }
+    return { archived, updated, plan: this.cleanupPlan() };
+  }
   /** Welche Ablaufmodelle ein veröffentlichter Stand unterstützt. */
   flowsOf(ref) {
     try {
@@ -34676,7 +34736,8 @@ var ContentService = class {
     }
   }
   defaultRef() {
-    return this.listPublished()[0]?.ref ?? this.legacyRef();
+    const l = this.listPublished();
+    return (l.find((x3) => x3.id === "show-5") ?? l[0])?.ref ?? this.legacyRef();
   }
   /** Ältere Räume ohne Paketangabe (bookId 'legacy') laufen mit dem ersten mitgelieferten Stand, der in dieser Datenbank existiert. */
   legacyRef() {
@@ -35994,7 +36055,7 @@ var Engine = class _Engine {
   // ---------------------------------------------------------------- Räume
   /** Ablaufplan der festen Show aus dem Paket (Runden → 'tile:<id>', Zwischenstände → 'board'). */
   static showPlan(book) {
-    return (book.show ?? []).map((s) => s.k === "board" ? "board" : `tile:${s.cat}`);
+    return expandShowSteps(book.show ?? [], book.rules).map((s) => s.k === "board" ? "board" : `tile:${s.cat}`);
   }
   newRoom(code2, now, bookId = "legacy", flowReq = "classic") {
     const book = typeof this.src === "function" ? this.src(bookId) : this.src;
@@ -36389,7 +36450,7 @@ var Engine = class _Engine {
         const finalNext = this.stepKind(room, room.planIdx + 1) === "final";
         const afterSurprise = this.stepKind(room, room.planIdx - 1) === "surprise";
         room.scoreboard = {
-          title: finalNext ? "Letzter sichtbarer Stand" : afterSurprise ? "Zwischenstand nach der \xDCberraschung" : this.bk(room).rules?.boardTitle || "Zwischenstand",
+          title: finalNext ? this.boardName(room) === "Zwischenstand" ? "Letzter sichtbarer Stand" : `Letztes ${this.boardName(room)}` : this.boardName(room),
           reason: finalNext ? "Im Finale wird die Rangliste verborgen \u2013 alles ist noch m\xF6glich!" : `Nach ${nPlayed} gespielten ${room.flow === "show" ? "Runden" : "Kategorien"}${afterSurprise ? " und der \xDCberraschungsrunde" : ""}`,
           prev
         };
@@ -36522,7 +36583,7 @@ var Engine = class _Engine {
       }
       case "h.scoreboard": {
         if (a.show && room.phase === "wall") {
-          room.scoreboard = { title: "Zwischenstand", reason: "Zwischendurch eingeblendet", prev: { ...room.lastBoard }, manual: true };
+          room.scoreboard = { title: this.boardName(room), reason: "Zwischendurch eingeblendet", prev: { ...room.lastBoard }, manual: true };
           room.lastBoard = Object.fromEntries(this.active(room).map((p) => [p.id, p.score]));
           room.phase = "scoreboard";
           return ok;
@@ -36700,6 +36761,7 @@ var Engine = class _Engine {
         act: this.actLabel(room),
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === "show" ? room.plan.filter((x3) => x3.startsWith("tile:")).length : room.plan.filter((s) => s === "wall").length + 2 },
         flow: room.flow ?? "classic",
+        boardName: this.boardName(room),
         brand: { title: this.bk(room).rules?.showTitle || "OUTPLAY", winner: this.bk(room).rules?.winnerTitle || "OUTPLAY-Champion", tagline: this.bk(room).rules?.tagline || void 0, winnerLine: this.bk(room).rules?.winnerLine || void 0 },
         liveRank: room.liveRank ?? true,
         music: room.music ?? { on: false, vol: 25 },
@@ -36781,7 +36843,7 @@ var Engine = class _Engine {
     room.plan.forEach((s, i2) => {
       const state = room.phase === "ceremony" || room.phase === "ended" || i2 < room.planIdx ? "done" : i2 === room.planIdx && room.phase !== "lobby" && room.phase !== "intro" ? "now" : "todo";
       if (s === "board") {
-        list2.push({ k: "board", title: "Zwischenstand", state });
+        list2.push({ k: "board", title: this.boardName(room), state });
         return;
       }
       const t = s.startsWith("tile:") ? this.tile(room, s.slice(5)) : void 0;
@@ -36811,7 +36873,7 @@ var Engine = class _Engine {
           return "Siegerehrung";
         default: {
           const k2 = this.stepKind(room, Math.max(0, room.planIdx));
-          if (k2 === "board") return "Zwischenstand";
+          if (k2 === "board") return this.boardName(room);
           if (k2 === "final") return "FINAL LOCK";
           if (k2 === "surprise") return "\xDCberraschungsrunde";
           const r = this.roundNumber(room, room.planIdx);
@@ -36833,11 +36895,16 @@ var Engine = class _Engine {
         const surprise = room.plan.indexOf("surprise");
         if (room.round && this.curTile(room)?.kind === "final") return "Akt 4 \u2013 FINAL LOCK";
         if (room.round && this.curTile(room)?.kind === "surprise") return "Akt 2 \u2013 \xDCberraschungsrunde";
-        if (idx < surprise || surprise < 0) return step === "board" ? "Zwischenstand" : "Akt 1 \u2013 Kategorienwand";
+        if (idx < surprise || surprise < 0) return step === "board" ? this.boardName(room) : "Akt 1 \u2013 Kategorienwand";
         if (idx === surprise) return "Akt 2 \u2013 \xDCberraschungsrunde";
         return "Akt 3 \u2013 Die Jagd";
       }
     }
+  }
+  /** Einheitliche Bezeichnung der Zwischenstände (Paketregel boardTitle; bei „Zwischenstand nach jeder Runde“ standardmäßig Marktwert-Update). */
+  boardName(room) {
+    const r = this.bk(room).rules;
+    return r?.boardTitle || (r?.boardEveryRound ? "Marktwert-Update" : "Zwischenstand");
   }
   planNextLabel(room) {
     const nxt = room.plan[room.planIdx + 1];
@@ -36845,7 +36912,7 @@ var Engine = class _Engine {
       const t = this.tile(room, nxt.slice(5));
       return t ? t.kind === "final" ? "FINAL LOCK" : t.kind === "surprise" ? "\xDCberraschungsrunde" : `Runde: ${t.title}` : "n\xE4chste Runde";
     }
-    return nxt === "wall" ? "Kategorienwand" : nxt === "board" ? "Zwischenstand" : nxt === "surprise" ? "\xDCberraschungsrunde" : nxt === "final" ? "FINAL LOCK" : "Siegerehrung";
+    return nxt === "wall" ? "Kategorienwand" : nxt === "board" ? this.boardName(room) : nxt === "surprise" ? "\xDCberraschungsrunde" : nxt === "final" ? "FINAL LOCK" : "Siegerehrung";
   }
   roundView(room, c, aud) {
     const tile = this.curTile(room);
@@ -37186,6 +37253,15 @@ async function handleAdmin(app, req, res, parts, url, readBody) {
         if (method === "POST") {
           const backupFile = app.preInstallBackup?.() ?? null;
           return json(200, { ...C2.installSeed({ archiveOlder: true }), backupFile });
+        }
+        break;
+      }
+      case "cleanup": {
+        if (method === "GET") return json(200, C2.cleanupPlan());
+        if (method === "POST") {
+          if (C2.cleanupPlan().clean) return json(200, { archived: [], updated: [], backupFile: null, plan: C2.cleanupPlan() });
+          const backupFile = app.preInstallBackup?.() ?? null;
+          return json(200, { ...C2.cleanupApply(), backupFile });
         }
         break;
       }
@@ -38878,7 +38954,7 @@ var BESTOF_STEPS = [
   { k: "board" },
   { k: "final", cat: "s3-final" }
 ];
-var RULES = { ...SHOW3_PACK.rules, tasksPerMode: 6, uniquePoints: 300 };
+var RULES = { ...SHOW3_PACK.rules, tasksPerMode: 6, uniquePoints: 300, boardEveryRound: true };
 var SEED_SHOW_B42 = {
   pack: { id: "show-4", name: "Reus 65 Mio \u2013 Best of 42", description: "7 Spielmodi \xD7 1 Probe + 6 Wertungsfragen (42, davon 21 Fu\xDFball/Kickbase), FINAL LOCK, 3 Marktwert-Updates. Sieger: Reus65Mio-Champion. Sehr lange Show (ca. 2,5 Std.).", rules: RULES },
   pool: BESTOF_NEW,

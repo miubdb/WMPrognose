@@ -1,5 +1,6 @@
 // Analyse eines Spielepakets: Spielzeit (erwartet/maximal), Verteilung der Modi und des Fußballanteils bei freier Kategorienwahl.
 import type { Book, TileDef } from './types';
+import { expandShowSteps } from './util';
 import { fixedShowSeconds, showSeconds, tileSeconds } from './timing';
 import { taskMax } from './validate';
 
@@ -81,7 +82,7 @@ export function analyzeShow(book: Book): ShowAnalysis | null {
   if (!book.show?.length) return null;
   const byId = new Map(book.tiles.map(t => [t.id, t]));
   const rounds: ShowAnalysis['rounds'] = []; const order: TileDef[] = []; let boards = 0;
-  for (const st of book.show) {
+  for (const st of expandShowSteps(book.show, book.rules)) {
     if (st.k === 'board') { boards++; continue; }
     const t = byId.get(st.cat); if (!t) continue;
     order.push(t);

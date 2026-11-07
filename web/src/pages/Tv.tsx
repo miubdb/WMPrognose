@@ -158,7 +158,7 @@ function LiveRank({ view }: { view: View }) {
   const rows = view.players.filter(p => p.score !== undefined && p.score !== null).slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   if (!rows.length) return null;
   return (
-    <aside className="liverank" aria-label="Zwischenstand">
+    <aside className="liverank" aria-label="Ranking">
       <small>Ranking</small>
       {rows.map((p, i) => <div key={p.id} className="lr"><b>{i + 1}</b><Avatar a={p.avatar} size={28} /><span>{p.name}</span><em>{(p.score ?? 0).toLocaleString('de-DE')}</em></div>)}
     </aside>
@@ -504,7 +504,7 @@ function BoardTv({ view }: { view: View }) {
   return (
     <div className="boardtv">
       <Header view={view} />
-      <h1>{b.title}</h1><p className="muted">{b.reason}</p>
+      <h1>{/markt/i.test(b.title) ? '📈 ' : ''}{b.title}</h1><p className="muted">{/markt/i.test(b.title) ? 'Wer steigt, wer fällt? · ' : ''}{b.reason}</p>
       <Leaderboard rows={rows.filter(r => r.name)} prev={prev} rowH={Math.min(110, Math.floor((window.innerHeight * 0.62) / Math.max(rows.length, 1)))} />
     </div>
   );

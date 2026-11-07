@@ -162,7 +162,7 @@ export const BESTOF_STEPS: ShowStep[] = [
   { k: 'final', cat: 's3-final' },
 ];
 
-const RULES = { ...SHOW3_PACK.rules, tasksPerMode: 6, uniquePoints: 300 };
+const RULES = { ...SHOW3_PACK.rules, tasksPerMode: 6, uniquePoints: 300, boardEveryRound: true };
 export const SEED_SHOW_B42: SeedShow = {
   pack: { id: 'show-4', name: 'Reus 65 Mio – Best of 42', description: '7 Spielmodi × 1 Probe + 6 Wertungsfragen (42, davon 21 Fußball/Kickbase), FINAL LOCK, 3 Marktwert-Updates. Sieger: Reus65Mio-Champion. Sehr lange Show (ca. 2,5 Std.).', rules: RULES },
   pool: BESTOF_NEW, rounds: BESTOF_ROUNDS, steps: BESTOF_STEPS,

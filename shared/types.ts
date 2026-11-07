@@ -143,6 +143,8 @@ export interface PackRules {
   tagline?: string; winnerLine?: string; boardTitle?: string;
   /** EINZIGARTIG: Punkte für eine einmalige gültige Antwort (0 = je Frage) */
   uniquePoints?: number;
+  /** Fester Ablauf: nach jeder Runde automatisch ein Zwischenstand („Marktwert-Update“) */
+  boardEveryRound?: boolean;
 }
 /** Ablaufmodell eines Raums: fester Showablauf (Standard) oder klassische Kategorienwand. */
 export type Flow = 'show' | 'classic';
@@ -253,6 +255,8 @@ export interface View {
     flow: Flow;
     /** Programmübersicht der festen Show (nur Flow 'show') */
     /** Branding aus den Paketregeln */
+    /** Bezeichnung der Zwischenstände (z. B. „Marktwert-Update“) */
+    boardName?: string;
     brand?: { title: string; winner: string; tagline?: string; winnerLine?: string };
     /** kleines Live-Ranking am TV-Rand (Showmaster schaltet) */
     liveRank?: boolean;

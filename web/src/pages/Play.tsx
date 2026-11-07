@@ -152,7 +152,7 @@ function Body({ view, act, serverNow, code, pid }: { view: View; act: any; serve
   if (ph === 'intro') return <div className="card center big"><div className="bigicon">🎬</div><h2>Die Show beginnt!</h2><p className="muted">Schau auf den Fernseher.</p></div>;
   if (ph === 'wall') return <WallCtl view={view} act={act} />;
   if (ph === 'round' && view.round) return <PhoneRound view={view} round={view.round} act={act} serverNow={serverNow} room={code} pid={pid} />;
-  if (ph === 'scoreboard') return <div className="card center big"><div className="bigicon">📊</div><h2>Zwischenstand</h2><p className="muted">Schau auf den Fernseher!</p>{view.me?.score != null && <div className="bignum">Platz {view.me.rank} · {view.me.score.toLocaleString('de-DE')}</div>}</div>;
+  if (ph === 'scoreboard') return <div className="card center big"><div className="bigicon">📊</div><h2>{view.scoreboard?.title ?? 'Zwischenstand'}</h2><p className="muted">Schau auf den Fernseher!</p>{view.me?.score != null && <div className="bignum">Platz {view.me.rank} · {view.me.score.toLocaleString('de-DE')}</div>}</div>;
   if (ph === 'ceremony') return <Ceremony view={view} pid={pid} />;
   return <div className="card center big"><div className="bigicon">🏁</div><h2>Danke fürs Mitspielen!</h2>{view.me?.rank != null && <div className="bignum">Platz {view.me.rank} · {view.me.score?.toLocaleString('de-DE')} Punkte</div>}</div>;
 }

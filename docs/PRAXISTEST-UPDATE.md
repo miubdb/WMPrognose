@@ -87,3 +87,9 @@ Gegenüber `show-4`: **CL-Finale 2028** („In welchem Stadion wird das Champion
 
 ## Aktualisierung auf dem Windows-Laptop (ohne Datenverlust)
 1. Server beenden, Ordner `data` kopieren. 2. `git pull origin claude/upbeat-galileo-4el50u`, `OUTPLAY-STARTEN.bat`. (Geo-Kurve, SORTIER’S!-Bedienung und Musik gelten sofort; laufende Räume behalten ihre Paketversion.) 3. `/admin` → Daten → **Installieren** (automatische Vor-Sicherung in `data\backups`). 4. `/host` wählt automatisch `show-5`; `show-4` bleibt als Fallback wählbar (im Admin archivierbar). Datenbank und `outplay-karte.mbtiles` werden nie überschrieben.
+
+## Paketbereinigung & Marktwert-Update (nach jeder Runde)
+
+**Sichere Bereinigung:** Admin → Tab *Daten* → Karte „Pakete aufräumen“. Sie zeigt vorab, welche Pakete archiviert werden und welche Best-of-Pakete eine neue Version bekommen. Nach Bestätigung wird automatisch eine Datenbanksicherung (`data/backups/…`) angelegt. Aktiv bleiben `show-5` (Haupt), `show-4z` (Finale KICKBASE-KONSENS), `show-3` (Backup); alle anderen werden archiviert – nie gelöscht. Bereits archivierte Pakete werden nie reaktiviert; Räume behalten ihren Paketstand; der Vorgang ist wiederholbar.
+
+**Marktwert-Update:** Pakete mit der Regel `boardEveryRound` zeigen nach jeder Runde automatisch ein Update (das letzte vor dem Finale als „Letztes Marktwert-Update“, danach Rangliste ausgeblendet bis zur Siegerehrung). Die Bereinigung veröffentlicht diese Regel als **neue Version** von show-5 / show-4z (kein neues Paket).

@@ -117,6 +117,15 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
         if (method === 'POST') { const backupFile = app.preInstallBackup?.() ?? null; return json(200, { ...C.installSeed({ archiveOlder: true }), backupFile }); }
         break;
       }
+      case 'cleanup': {   // Paketbereinigung: GET = Vorschau (ändert nichts), POST = ausführen (mit automatischer Sicherung)
+        if (method === 'GET') return json(200, C.cleanupPlan());
+        if (method === 'POST') {
+          if (C.cleanupPlan().clean) return json(200, { archived: [], updated: [], backupFile: null, plan: C.cleanupPlan() });
+          const backupFile = app.preInstallBackup?.() ?? null;
+          return json(200, { ...C.cleanupApply(), backupFile });
+        }
+        break;
+      }
       case 'backup': {
         if (method !== 'GET') break;
         const buf = app.backup();

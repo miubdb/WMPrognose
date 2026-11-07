@@ -21,7 +21,7 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
   const [packs, setPacks] = useState<{ id: string; name: string; version: number; description: string; show?: boolean; classic?: boolean }[]>([]);
   const [pack, setPack] = useState('');
   const [flow, setFlow] = useState<'show' | 'classic'>('show');
-  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { const l = r.data as any[]; setPacks(l); const f = l.some(p => p.show) ? 'show' : 'classic'; setFlow(f); setPack(([...l].filter(p => p[f]).sort((a, b) => b.id.localeCompare(a.id))[0] ?? l[0])?.id ?? '');   } }); }, []);
+  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { const l = r.data as any[]; setPacks(l); const f = l.some(p => p.show) ? 'show' : 'classic'; setFlow(f); setPack((l.find(p => p.id === 'show-5' && p[f]) ?? [...l].filter(p => p[f]).sort((a, b) => b.id.localeCompare(a.id))[0] ?? l[0])?.id ?? '');   } }); }, []);
   const usable = packs.filter(p => (p as any)[flow] !== false).sort((a, b) => b.id.localeCompare(a.id));
   const pickFlow = (f: 'show' | 'classic') => { setFlow(f); const l = packs.filter(p => (p as any)[f] !== false).sort((a, b) => b.id.localeCompare(a.id)); if (!l.some(p => p.id === pack)) setPack(l[0]?.id ?? ''); };
   const create = async () => {
@@ -143,7 +143,7 @@ function Main({ view, run, busy, serverNow, tvUrl, joinUrl, code }: { view: View
   );
   if (ph === 'intro') return <div className="card"><h2>Eröffnung läuft</h2><p>Die Kandidaten werden auf dem TV vorgestellt.</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.introDone' })}>{view.room.flow === 'show' ? '▶ Weiter zur ersten Runde' : '▶ Weiter zur Kategorienwand'}</button></div>;
   if (ph === 'wall') return <WallHost view={view} run={run} busy={busy} />;
-  if (ph === 'scoreboard') return <div className="card"><h2>Zwischenstand wird gezeigt</h2><p>{view.scoreboard?.reason}</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.continue' })}>▶ Weiter ({view.host?.planNext})</button></div>;
+  if (ph === 'scoreboard') return <div className="card"><h2>{view.scoreboard?.title ?? 'Zwischenstand'} wird gezeigt</h2><p>{view.scoreboard?.reason}</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.continue' })}>▶ Weiter ({view.host?.planNext})</button></div>;
   if (ph === 'ceremony') return (
     <div className="card"><h2>Siegerehrung</h2><p>Schritt {view.ceremony!.step + 1} von {view.ceremony!.steps}: <b>{view.ceremony!.stepTitle}</b></p>
       {view.ceremony!.step < view.ceremony!.steps - 1 ? <button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.ceremonyNext' })}>▶ Nächster Schritt</button> : <button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.end' })}>🏁 Show beenden</button>}
@@ -160,7 +160,7 @@ function Agenda({ view }: { view: View }) {
     <details className="card" open>
       <summary><b>Showablauf</b> <small className="muted">{view.room.act}</small></summary>
       <div className="agendahost">{ag.map((a, i) => (
-        <div key={i} className={`ah ${a.state}`}>{a.state === 'done' ? '✓' : a.state === 'now' ? '▶' : '○'} <span>{a.icon ?? '📊'} {a.k === 'board' ? 'Zwischenstand' : a.title}</span>{a.tasks ? <small>{a.tasks} Aufg.</small> : null}</div>))}</div>
+        <div key={i} className={`ah ${a.state}`}>{a.state === 'done' ? '✓' : a.state === 'now' ? '▶' : '○'} <span>{a.icon ?? '📊'} {a.k === 'board' ? (view.room.boardName ?? 'Zwischenstand') : a.title}</span>{a.tasks ? <small>{a.tasks} Aufg.</small> : null}</div>))}</div>
     </details>
   );
 }
@@ -175,7 +175,7 @@ function WallHost({ view, run, busy }: { view: View; run: Run; busy: boolean }) 
       <div className="row wrap">
         <label className="field inline"><span>Spieler wechseln</span>
           <select value={w.pickerId ?? ''} onChange={e => run({ k: 'h.setPicker', pid: e.target.value })}>{view.players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-        <button className="btn ghost" onClick={() => run({ k: 'h.scoreboard', show: true })}>📊 Zwischenstand zeigen</button>
+        <button className="btn ghost" onClick={() => run({ k: 'h.scoreboard', show: true })}>📊 {view.room.boardName ?? 'Zwischenstand'} zeigen</button>
       </div>
       <div className="hosttiles">
         {w.tiles.map(t => <button key={t.id} disabled={busy || t.status !== 'open' || !!t.blocked} className={`htile ${t.status}`} style={{ ['--c' as any]: t.color }} onClick={() => run({ k: 'h.pick', tileId: t.id })}><span>{t.icon}</span><b>{t.title}</b><small>{t.status === 'played' ? 'gespielt' : t.blocked ? '🔒 Limit' : 'öffnen'}</small></button>)}

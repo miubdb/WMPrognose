@@ -26,7 +26,7 @@ export function bookHash(book: Book): string {
 const J = <T>(s: string) => JSON.parse(s) as T;
 
 export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules>; /** fester Showablauf (optional) */ show?: ShowStep[] }
-export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: '', winnerLine: '', boardTitle: '', uniquePoints: 0 };
+export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: '', winnerLine: '', boardTitle: '', uniquePoints: 0, boardEveryRound: false };
 
 export function normalizePack(raw: any): PackData {
   const r = raw ?? {};
@@ -38,7 +38,7 @@ export function normalizePack(raw: any): PackData {
     ...(Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x: any): ShowStep | null => (x?.k === 'board' ? { k: 'board' } : (x?.k === 'round' || x?.k === 'surprise' || x?.k === 'final') && s(x.cat, 80) ? { k: x.k, cat: s(x.cat, 80) } : null)).filter((x: ShowStep | null): x is ShowStep => !!x) } : {}),
     rules: { startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1000), maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20), maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10), rankVariant: ['task', 'sequence', 'sort'].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant, showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle, winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle, tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6),
       estimateBets: Array.isArray(r.rules?.estimateBets) ? [...new Set<number>(r.rules.estimateBets.map((x: unknown) => Math.trunc(Number(x))).filter((x: number) => Number.isFinite(x) && x >= 0 && x <= 1000))].sort((a: number, b: number) => a - b).slice(0, 5) : [],
-      estimateBonus: n(r.rules?.estimateBonus, 0, 0, 500), tagline: s(r.rules?.tagline, 80), winnerLine: s(r.rules?.winnerLine, 80), boardTitle: s(r.rules?.boardTitle, 30), uniquePoints: n(r.rules?.uniquePoints, 0, 0, 1000) },
+      estimateBonus: n(r.rules?.estimateBonus, 0, 0, 500), tagline: s(r.rules?.tagline, 80), winnerLine: s(r.rules?.winnerLine, 80), boardTitle: s(r.rules?.boardTitle, 30), uniquePoints: n(r.rules?.uniquePoints, 0, 0, 1000), boardEveryRound: r.rules?.boardEveryRound === true },
   };
 }
 
@@ -405,12 +405,50 @@ export class ContentService {
   listPublished() {
     return this.listPacks().filter(p => p.status === 'published' && p.currentVersion !== null).map(p => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion!, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
   }
+  /**
+   * Paketbereinigung: nur show-5 (Haupt), show-4z (Finale KICKBASE-KONSENS) und show-3 (Backup) bleiben aktiv.
+   * Alle anderen Pakete werden archiviert (nie gelöscht). Bereits archivierte Pakete bleiben archiviert.
+   * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
+   * laufende/beendete Räume behalten ihren bisherigen Stand.
+   */
+  static readonly KEEP_PACKS = ['show-5', 'show-4z', 'show-3'];
+  static readonly BOARD_PACKS = ['show-5', 'show-4z'];
+  cleanupPlan() {
+    const packs = this.listPacks();
+    const rows = packs.map(p => {
+      const keep = ContentService.KEEP_PACKS.includes(p.id);
+      let action: 'archive' | 'keep' | 'archived' | 'keep-archived' = keep ? (p.status === 'archived' ? 'keep-archived' : 'keep') : (p.status === 'archived' ? 'archived' : 'archive');
+      let needsUpdate = false;
+      if (keep && p.status !== 'archived' && ContentService.BOARD_PACKS.includes(p.id)) {
+        const ref = p.currentVersion !== null ? `${p.id}@${p.currentVersion}` : '';
+        let cur = false; try { cur = !!ref && this.resolveBook(ref).rules?.boardEveryRound === true; } catch { cur = false; }
+        needsUpdate = !cur;
+      }
+      return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate };
+    });
+    const archive = rows.filter(r => r.action === 'archive').map(r => r.id);
+    const update = rows.filter(r => r.needsUpdate).map(r => r.id);
+    const missing = ContentService.KEEP_PACKS.filter(id => !packs.some(p => p.id === id));
+    return { rows, archive, update, missing, clean: !archive.length && !update.length, main: 'show-5' };
+  }
+  cleanupApply() {
+    const plan = this.cleanupPlan();
+    const archived: string[] = [], updated: string[] = [];
+    for (const id of plan.archive) { this.setPackStatus(id, 'archived'); archived.push(id); }
+    for (const id of plan.update) {
+      const p = this.getPack(id);
+      this.updatePack(id, { ...p, rules: { ...p.rules, boardEveryRound: true }, ifUpdated: undefined });
+      const r = this.publish(id, 'Marktwert-Update nach jeder Runde (Paketbereinigung)');
+      updated.push(r.ref);
+    }
+    return { archived, updated, plan: this.cleanupPlan() };
+  }
   /** Welche Ablaufmodelle ein veröffentlichter Stand unterstützt. */
   flowsOf(ref: string): { show: boolean; classic: boolean } {
     try { const b = this.resolveBook(ref); return { show: !!b.show?.length, classic: b.show?.length ? !!b.classic : true }; }
     catch { return { show: false, classic: true }; }
   }
-    defaultRef(): string { return this.listPublished()[0]?.ref ?? this.legacyRef(); }
+    defaultRef(): string { const l = this.listPublished(); return (l.find(x => x.id === 'show-5') ?? l[0])?.ref ?? this.legacyRef(); }
   /** Ältere Räume ohne Paketangabe (bookId 'legacy') laufen mit dem ersten mitgelieferten Stand, der in dieser Datenbank existiert. */
   private legacyRef(): string { for (const id of ['standard-1', 'standard-2']) if (this.db.prepare('SELECT 1 FROM pack_versions WHERE id=?').get(id + '@1')) return id + '@1'; return this.seedPack.id + '@1'; }
   /** Fester Stand für einen Raum (Cache, da unveränderlich). */
