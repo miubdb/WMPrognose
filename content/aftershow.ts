@@ -52,7 +52,7 @@ export const AFTERSHOW_NEW: PoolQuestion[] = [
       ['Paulaner', ['Paulaner Brauerei']],
       ['Spaten', ['Spatenbräu', 'Spaten Brauerei']],
     ],
-    'Nur sechs Brauereien liefern das offizielle Wiesn-Bier. Bei sieben Spielern sind Doppelnennungen unvermeidlich!'))),
+    'Nur sechs Brauereien liefern das offizielle Wiesn-Bier. Bei sieben Spielern sind Doppelnennungen unvermeidlich!')),
 ];
 
 export const AFTERSHOW_SELECTION: Record<string, string[]> = {
