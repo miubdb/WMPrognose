@@ -196,7 +196,7 @@ test('Installation auf bestehender DB: alte Inhalte/Pakete/Versionen byte-identi
   assert.equal(JSON.stringify(after.v.filter((x: any) => before.v.some((y: any) => y[0] === x[0]))), hashOld, 'bestehende Paketversionen unverändert');
   for (const [id, task] of before.q) assert.deepEqual(after.q.find((x: any) => x[0] === id)[1], task, 'Frage ' + id);
   for (const [id, ids, title] of before.c) assert.deepEqual(after.c.find((x: any) => x[0] === id).slice(1), [ids, title], 'Kategorie ' + id);
-  assert.deepEqual(after.v.map((x: any) => x[0]).sort(), ['show-1@1', 'show-2@1', 'show-2k@1', 'show-3@1', 'show-3z@1', 'show-4@1', 'show-4z@1', 'show-5@1', 'standard-2@1']);
+  assert.deepEqual(after.v.map((x: any) => x[0]).sort(), ['show-1@1', 'show-2@1', 'show-2k@1', 'show-3@1', 'show-3z@1', 'show-4@1', 'show-4z@1', 'show-5@1', 'show-after@1', 'standard-2@1']);
   const rep2 = cur.installSeed({ archiveOlder: true }); assert.deepEqual(rep2.created, { scenes: 0, questions: 0, categories: 0, packs: 0 }, 'Wiederholung legt nichts doppelt an');
   assert.equal(cur.seedStatus().installed, true);
 });

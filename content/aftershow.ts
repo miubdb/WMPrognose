@@ -8,7 +8,7 @@ const closed = (q: PoolQuestion): PoolQuestion => ({ ...q, task: { ...q.task, cl
 export const AFTERSHOW_NEW: PoolQuestion[] = [
   // Geo: der Tanzwahn von 1518 – verrückter historischer Ort statt einer Lösung, die schon im Fragetext steckt.
   geo('after2-geo-dance1518', 'Geschichte & Kurioses', 'europe', 60, 250,
-    '1518 tanzten in einer europäischen Stadt über Wochen Hunderte Menschen unkontrolliert auf den Straßen. Wo fand dieser historische „Tanzwahn“ statt?',
+    '1518 tanzten in einer Stadt im Elsass, nahe der heutigen deutsch-französischen Grenze, Hunderte Menschen unkontrolliert auf den Straßen. Wo fand dieser „Tanzwahn“ statt?',
     48.5839, 7.7455, 'Straßburg, Elsass, Frankreich',
     'Der Tanzwahn von 1518 ist in zeitgenössischen Chroniken dokumentiert. Was ihn auslöste, ist bis heute umstritten.'),
 
