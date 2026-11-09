@@ -203,6 +203,8 @@ const rank: ModeImpl = {
 // ESTIMATE (SETZ AUF MICH)
 // =====================================================================
 /** Wirksame Einsatzstufen und Bonus: Paketregel überschreibt die Fragenwerte (nur wenn gesetzt). */
+/** SETZ AUF MICH: höchstens die Hälfte des aktuellen Punktestands (abgerundet), auch im Finale. */
+export const maxBetOf = (balance: number) => Math.max(0, Math.floor(balance / 2));
 const betsOf = (c: Ctx) => (c.rules?.estimateBets?.length ? c.rules.estimateBets : (c.task as EstimateTask).bets);
 const bonusOf = (c: Ctx) => Math.max(0, c.rules?.estimateBonus ?? 0);
 const estimate: ModeImpl = {
@@ -226,9 +228,9 @@ const estimate: ModeImpl = {
     if (c.round.stage === 'bet') {
       const amount = Number(payload?.amount);
       const target = String(payload?.target ?? '');
-      if (!betsOf(c).includes(amount)) return err('invalid_bet');
+      if (!Number.isInteger(amount) || amount < 0) return err('invalid_bet');
       if (amount > 0) {
-        if (amount > balanceOf(c, pid)) return err('not_enough_points');
+        if (amount > maxBetOf(balanceOf(c, pid))) return err('not_enough_points');   // Limit: 50 % des aktuellen Punktestands (abgerundet)
         if (c.round.pm[target]?.guess === undefined) return err('invalid_target');
       }
       const val = { amount, target: amount > 0 ? target : null };
@@ -299,7 +301,7 @@ const estimate: ModeImpl = {
     if (a.role === 'player' && a.pid) {
       base.mine = c.round.pm[a.pid] ?? {};
       base.balance = balanceOf(c, a.pid);
-      base.allowance = base.balance;
+      base.allowance = base.balance; base.maxBet = maxBetOf(base.balance);
     }
     if (a.role === 'host') base.solution = `${t.answer} ${t.unit}`;
     return base;
@@ -619,7 +621,6 @@ const vote: ModeImpl = {
     if (c.round.stage !== 'open') return err('closed');
     const target = String(payload?.target ?? '');
     if (!validTarget(c, target)) return err('invalid_target');
-    if (target === pid && c.players.length > 2) return err('self_vote');          // nicht für sich selbst stimmen (ab 3 Spielern)
     const cur = c.round.pm[pid];
     if (cur) return cur.target === target ? { ok: true, dup: true } : err('already_submitted');
     c.round.pm[pid] = { target };

@@ -17,7 +17,7 @@ export const FORMULAS: Record<string, string> = {
   codebreak: 'Ohne Hinweis 100 %, mit 1/2/3 Hinweisen 75/50/25 %. Falsch = 0. Geschwindigkeit zählt nicht.',
   match: '50 Punkte je richtig verbundenem Paar, höchstens 300. Keine Minuspunkte, kein Zeitbonus – nur die Richtigkeit zählt. Die Zuordnung zählt, wie sie bei Ablauf der Zeit (oder bei der endgültigen Abgabe) steht.',
   link: 'Eine endgültige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.',
-  vote: 'KICKBASE-KONSENS: Jeder wählt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte – bei Gleichstand alle häufigsten Wahlen. Ab 3 Spielern nicht für sich selbst.',
+  vote: 'KICKBASE-KONSENS: Jeder wählt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte – bei Gleichstand alle häufigsten Wahlen. Man darf auch sich selbst wählen.',
   unique: 'Nur eine gültige, einmalige Antwort bringt Punkte. Mehrfach genannte gültige Antworten und ungültige Antworten = 0. Bei „vollständiger Antwortliste“ wird Unbekanntes automatisch ungültig, sonst prüft der Showmaster.',
 };
 

@@ -182,10 +182,9 @@ test('KICKBASE-KONSENS: Wertung – Michael vorn: nur seine Wähler; Gleichstand
   assert.deepEqual(rows[4].delta, [100, 100, 100, 100]);
 });
 
-test('KICKBASE-KONSENS: Gleichstand mit Einzelstimme als Spitze → kein Konsens; eigener Name nicht wählbar ab 3 Spielern, bei 2 Spielern erlaubt; Michael immer wählbar', () => {
+test('KICKBASE-KONSENS: Gleichstand mit Einzelstimme als Spitze → kein Konsens; Selbstwahl erlaubt; Michael immer wählbar', () => {
   const g = game(MAIN, 3); g.goto('b44-final-kk'); g.host({ k: 'h.begin' });
-  assert.equal(g.pl(0, { k: 'submit', payload: { target: g.ids[0] } }).ok, false, 'Selbstwahl ab 3 Spielern gesperrt'); assert.equal(g.pl(0, { k: 'submit', payload: { target: 'nobody' } }).ok, false);
-  assert.ok(g.pl(0, { k: 'submit', payload: { target: M } }).ok);
+  assert.equal(g.pl(0, { k: 'submit', payload: { target: 'nobody' } }).ok, false); assert.ok(g.pl(0, { k: 'submit', payload: { target: g.ids[0] } }).ok, 'Selbstwahl erlaubt (auch ab 3 Spielern)'); assert.ok(g.pl(1, { k: 'submit', payload: { target: M } }).ok);
   const two = game(MAIN, 2); two.goto('b44-final-kk'); two.host({ k: 'h.begin' }); assert.ok(two.pl(0, { k: 'submit', payload: { target: two.ids[0] } }).ok, 'zwei Spieler: Selbstwahl erlaubt');
   assert.ok(two.pl(1, { k: 'submit', payload: { target: M } }).ok);
   // zwei Spieler, beide wählen Michael → Konsens (2 Stimmen); verschiedene Ziele → kein Konsens

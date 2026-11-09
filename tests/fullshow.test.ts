@@ -241,20 +241,20 @@ test('Setz auf mich: Einsatz gewonnen/verloren nachvollziehbar, nie negativ, Min
   assert.equal(pl(1, { k: 'submit', payload: { amount: 200, target: ids[0] } }).err, 'not_enough_points');
   assert.ok(pl(1, { k: 'submit', payload: { amount: 0, target: null } }).ok);
   // p2 hat nur 150 Punkte: 200 ist nicht erlaubt, 100 auf sich selbst schon (und geht verloren)
-  assert.equal(pl(2, { k: 'submit', payload: { amount: 200, target: ids[2] } }).err, 'not_enough_points');
-  assert.ok(pl(2, { k: 'submit', payload: { amount: 100, target: ids[2] } }).ok);
-  assert.equal(pl(2, { k: 'submit', payload: { amount: 100, target: ids[1] } }).ok, false); // endgültig
-  // p0 setzt 100 auf sich (gewinnt)
-  assert.ok(pl(0, { k: 'submit', payload: { amount: 100, target: ids[0] } }).ok);
+  assert.equal(pl(2, { k: 'submit', payload: { amount: 100, target: ids[2] } }).err, 'not_enough_points', 'Limit: 50 % von 150 = 75');
+  assert.ok(pl(2, { k: 'submit', payload: { amount: 75, target: ids[2] } }).ok);
+  assert.equal(pl(2, { k: 'submit', payload: { amount: 50, target: ids[1] } }).ok, false); // endgültig
+  // p0 setzt das Maximum (50 % von 100) auf sich (gewinnt)
+  assert.ok(pl(0, { k: 'submit', payload: { amount: 50, target: ids[0] } }).ok);
   assert.equal(room.round!.stage, 'locked');
   assert.ok(host({ k: 'h.reveal' }).ok);
   const rev = room.round!.result!.reveal;
   assert.deepEqual(rev.winners, [ids[0]]);
-  assert.equal(room.players[0].score, 100 + 300 + 100); // Start 100 + bester Tipp 300 + Einsatz 100
+  assert.equal(room.players[0].score, 100 + 300 + 50); // Start 100 + bester Tipp 300 + Einsatz 50 (Maximum: 50 % von 100)
   assert.ok(room.players[2].score >= 0);
   const p2log = room.scoreLog.filter(e => e.pid === ids[2]);
   assert.ok(p2log.some(e => e.label.startsWith('Einsatz verloren')));
-  assert.equal(room.players[2].score, 150 + 30 - 100); // Platz 3 von 3 = 30 Punkte, Einsatz 100 verloren
+  assert.equal(room.players[2].score, 150 + 30 - 75); // Platz 3 von 3 = 30 Punkte, Einsatz 75 (Maximum: 50 % von 150) verloren
   void eng;
 });
 
@@ -313,12 +313,13 @@ test('Einsatz nur aus vorhandenen Punkten: 0 Punkte = kein positiver Einsatz, Ve
   pl(0, { k: 'submit', payload: { value: 533 } }); pl(1, { k: 'submit', payload: { value: 1000 } }); pl(2, { k: 'submit', payload: { value: 90000 } });
   assert.equal(pl(1, { k: 'submit', payload: { amount: 100, target: ids[2] } }).err, 'not_enough_points'); // 0 Punkte: kein Einsatz
   assert.ok(pl(1, { k: 'submit', payload: { amount: 0, target: null } }).ok);                            // aber schätzen darf er
-  assert.equal(pl(2, { k: 'submit', payload: { amount: 300, target: ids[0] } }).err, 'invalid_bet');       // nicht erlaubter Betrag
-  assert.ok(pl(2, { k: 'submit', payload: { amount: 200, target: ids[1] } }).ok);                         // 200 von 200 vorhanden: erlaubt
+  assert.equal(pl(2, { k: 'submit', payload: { amount: -5, target: ids[0] } }).err, 'invalid_bet'); assert.equal(pl(2, { k: 'submit', payload: { amount: 10.5, target: ids[0] } }).err, 'invalid_bet');
+  assert.equal(pl(2, { k: 'submit', payload: { amount: 101, target: ids[0] } }).err, 'not_enough_points', 'mehr als 50 % von 200');
+  assert.ok(pl(2, { k: 'submit', payload: { amount: 100, target: ids[1] } }).ok);                         // 50 % von 200 = 100: erlaubt
   pl(0, { k: 'submit', payload: { amount: 0, target: null } });
   host({ k: 'h.reveal' });
   const bet = room.scoreLog.find(e => e.pid === ids[2] && e.label.startsWith('Einsatz verloren'))!;
-  assert.equal(bet.applied, -200); // verliert genau den Einsatz – nie mehr, nie weniger
+  assert.equal(bet.applied, -100); // verliert genau den Einsatz – nie mehr, nie weniger
   assert.ok(room.players.every(p => p.score >= 0));
   assert.equal(room.players[1].score, room.scoreLog.filter(e => e.pid === ids[1]).reduce((a, e) => a + e.applied, 0));
 });

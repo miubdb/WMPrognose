@@ -21,7 +21,7 @@ const MODE_RULES: Record<string, string[]> = {
   codebreak: ['Knacke das Rätsel mit Logik.', 'Hinweise helfen – kosten aber Punkte.', 'Drei Versuche, Tempo zählt kaum.'],
   unique: ['Nenne eine gültige Antwort.', 'Nur eine Antwort, die kein anderer nennt, bringt Punkte.', 'Doppelte und ungültige Antworten zählen 0.'],
   match: ['Sechs Begriffe links, sechs Partner rechts.', 'Verbinde auf dem Handy, was zusammengehört.', '50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.'],
-  vote: ['Fünf Fragen – wähle geheim eine Person (nicht dich selbst).', 'Meiste Stimmen = Konsens: Wer richtig tippt, bekommt +100.', 'Maximal 500 Punkte · keine Minuspunkte · Einzelstimmen zählen nicht.'],
+  vote: ['Fünf Fragen – wähle geheim eine Person – auch dich selbst.', 'Meiste Stimmen = Konsens: Wer richtig tippt, bekommt +100.', 'Maximal 500 Punkte · keine Minuspunkte · Einzelstimmen zählen nicht.'],
   link: ['Vier Hinweise erscheinen nacheinander.', 'Je früher du die Lösung nennst, desto mehr Punkte.', 'Nur ein Versuch – die Antwort bleibt geheim.'],
 };
 
@@ -207,7 +207,7 @@ function taskLine(round: RoundView, cat?: string): string {
 function rulesFor(round: RoundView): string[] {
   const d = round.data ?? {};
   if (round.mode === 'rank' && d.variant === 'sort') return ['Fünf gemischte Karten liegen auf deinem Handy.', 'Ziehe sie auf die Plätze 1 bis 5 – oder erst Karte, dann Platz antippen.', `Je Karte auf der exakt richtigen Position: ${d.points ? Math.round(d.points / 5) : 50} Punkte.`];
-  if (round.mode === 'estimate' && d.bets) return ['Schätze geheim eine Zahl.', `Dann siehst du alle Tipps und setzt ${d.bets.filter((b: number) => b > 0).join(' oder ')} Punkte auf eine Schätzung – oder gar nichts.`, d.bonus ? `Die beste Schätzung bringt zusätzlich +${d.bonus} Punkte.` : 'Gewonnener Einsatz: plus. Verlorener: minus.'];
+  if (round.mode === 'estimate' && d.bets) return ['Schätze geheim eine Zahl.', `Dann siehst du alle Tipps und setzt bis zu 50 % deiner Punkte auf eine Schätzung – oder gar nichts.`, d.bonus ? `Die beste Schätzung bringt zusätzlich +${d.bonus} Punkte.` : 'Gewonnener Einsatz: plus. Verlorener: minus.'];
   return MODE_RULES[round.mode];
 }
 

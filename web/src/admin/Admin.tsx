@@ -431,7 +431,7 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
             <label className="field"><span>Gewinnerbezeichnung (Siegerehrung)</span><input value={p.rules.winnerTitle ?? ''} maxLength={40} placeholder="OUTPLAY-Champion" onChange={e => set('rules', { ...p.rules, winnerTitle: e.target.value })} /></label>
           </div>
           <div className="form2">
-            <label className="field"><span>SETZ AUF MICH – Einsatzstufen (Komma, leer = je Frage)</span><input value={(p.rules.estimateBets ?? []).join(', ')} placeholder="0, 50, 100" onChange={e => set('rules', { ...p.rules, estimateBets: e.target.value.split(/[ ,;]+/).filter(Boolean).map(Number).filter(n => Number.isFinite(n)) })} /></label>
+            <label className="field"><span>SETZ AUF MICH – (veraltet, wird nicht mehr verwendet: Einsatz = bis 50 % des Punktestands)</span><input value={(p.rules.estimateBets ?? []).join(', ')} placeholder="0, 50, 100" onChange={e => set('rules', { ...p.rules, estimateBets: e.target.value.split(/[ ,;]+/).filter(Boolean).map(Number).filter(n => Number.isFinite(n)) })} /></label>
             <label className="field"><span>EINZIGARTIG: Punkte je einmaliger Antwort (0 = je Frage)</span><input inputMode="numeric" value={p.rules.uniquePoints ?? 0} onChange={e => set('rules', { ...p.rules, uniquePoints: Number(e.target.value) || 0 })} /></label>
             <label className="field"><span>Bonus für die beste Schätzung (Punkte)</span><input inputMode="numeric" value={p.rules.estimateBonus ?? 0} onChange={e => set('rules', { ...p.rules, estimateBonus: Number(e.target.value) || 0 })} /></label>
           </div>

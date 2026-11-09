@@ -347,13 +347,13 @@ function kkgame(n = 7) {
   return { eng, room, ids, host, pl, view, advance };
 }
 
-test('KICKBASE-KONSENS: geheime Wahl, Punkte für die Mehrheitswahl, Gleichstand beide anerkannt, nicht für sich selbst, Rangliste verborgen, Siegerehrung funktioniert', () => {
+test('KICKBASE-KONSENS: geheime Wahl, Punkte für die Mehrheitswahl, Gleichstand beide anerkannt, Rangliste verborgen, Siegerehrung funktioniert', () => {
   assert.deepEqual(KK.tiles.find(t => t.id === 's5-final-kk')!.tasks.map(t => t.mode), ['vote', 'vote', 'vote']);
   assert.equal(CS2.resolveBook('show-3@1').tiles.find(t => t.kind === 'final')!.tasks[0].mode, 'geo', 'FINAL LOCK bleibt Standard/Fallback in show-3');
   const g = kkgame(); assert.equal(g.room.hideScores, true, 'Rangliste im Finale verborgen'); assert.equal(g.view('tv').room.hideScores, true);
   const start = g.room.players.map(p => p.score);
   g.host({ k: 'h.begin' });
-  assert.equal(g.pl(0, { k: 'submit', payload: { target: g.ids[0] } }).err, 'self_vote'); assert.equal(g.pl(0, { k: 'submit', payload: { target: 'unbekannt' } }).err, 'invalid_target');
+  assert.equal(g.pl(0, { k: 'submit', payload: { target: 'unbekannt' } }).err, 'invalid_target');
   // Stimmen: Ben ×3 (Spieler 0,2,3), Cem ×3 (1,4,5) → Gleichstand der häufigsten Wahlen; Spieler 7 (Index 6) enthält sich
   [[0, 1], [1, 2], [2, 1], [3, 1], [4, 2], [5, 2]].forEach(([i, t]) => assert.ok(g.pl(i, { k: 'submit', payload: { target: g.ids[t] } }).ok));
   assert.equal(g.pl(0, { k: 'submit', payload: { target: g.ids[3] } }).err, 'already_submitted'); assert.ok(g.pl(0, { k: 'submit', payload: { target: g.ids[1] } }).dup);

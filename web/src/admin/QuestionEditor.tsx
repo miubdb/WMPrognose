@@ -150,7 +150,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
             </>}
             {m === 'rank' && <>{sec('Sek. pro Begriff', 'secondsPerItem')}{sec('Punkte', 'points')}<label className="field"><span>Bedienung</span><select value={task.variant ?? 'sequence'} onChange={e => set('variant', e.target.value)}><option value="sequence">Begriffe nacheinander (klassisch)</option><option value="sort">Alle fünf sichtbar & sortieren</option></select></label></>}
             {m === 'estimate' && <>{sec('Zeit zum Schätzen (Sek.)', 'seconds')}{sec('Zeit zum Setzen (Sek.)', 'betSeconds')}{sec('Punkte', 'points')}
-              <Field label="Erlaubte Einsätze (Komma, mit 0) – eine Paketregel kann sie überschreiben"><input value={task.bets.join(', ')} onChange={e => set('bets', e.target.value.split(',').map((x: string) => x.trim()).filter(x => x !== ''))} /></Field></>}
+              <Field label="Einsatzstufen (veraltet – es gilt: bis 50 % des Punktestands)"><input value={task.bets.join(', ')} onChange={e => set('bets', e.target.value.split(',').map((x: string) => x.trim()).filter(x => x !== ''))} /></Field></>}
             {m === 'glitch' && <>
               <p className="small muted">Wertung: Treffer = volle Punkte, sonst 0 (keine Trostpunkte).</p>
               <Field label="Hinweis beim Betrachten"><input value={task.viewPrompt} maxLength={120} onChange={e => set('viewPrompt', e.target.value)} /></Field>

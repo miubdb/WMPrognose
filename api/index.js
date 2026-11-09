@@ -35599,6 +35599,7 @@ var rank = {
     return base;
   }
 };
+var maxBetOf = (balance) => Math.max(0, Math.floor(balance / 2));
 var betsOf = (c) => c.rules?.estimateBets?.length ? c.rules.estimateBets : c.task.bets;
 var bonusOf = (c) => Math.max(0, c.rules?.estimateBonus ?? 0);
 var estimate = {
@@ -35624,9 +35625,9 @@ var estimate = {
     if (c.round.stage === "bet") {
       const amount = Number(payload?.amount);
       const target = String(payload?.target ?? "");
-      if (!betsOf(c).includes(amount)) return err2("invalid_bet");
+      if (!Number.isInteger(amount) || amount < 0) return err2("invalid_bet");
       if (amount > 0) {
-        if (amount > balanceOf(c, pid)) return err2("not_enough_points");
+        if (amount > maxBetOf(balanceOf(c, pid))) return err2("not_enough_points");
         if (c.round.pm[target]?.guess === void 0) return err2("invalid_target");
       }
       const val = { amount, target: amount > 0 ? target : null };
@@ -35696,6 +35697,7 @@ var estimate = {
       base.mine = c.round.pm[a.pid] ?? {};
       base.balance = balanceOf(c, a.pid);
       base.allowance = base.balance;
+      base.maxBet = maxBetOf(base.balance);
     }
     if (a.role === "host") base.solution = `${t.answer} ${t.unit}`;
     return base;
@@ -36055,7 +36057,6 @@ var vote = {
     if (c.round.stage !== "open") return err2("closed");
     const target = String(payload?.target ?? "");
     if (!validTarget(c, target)) return err2("invalid_target");
-    if (target === pid && c.players.length > 2) return err2("self_vote");
     const cur = c.round.pm[pid];
     if (cur) return cur.target === target ? { ok: true, dup: true } : err2("already_submitted");
     c.round.pm[pid] = { target };
@@ -37035,7 +37036,7 @@ var FORMULAS = {
   codebreak: "Ohne Hinweis 100 %, mit 1/2/3 Hinweisen 75/50/25 %. Falsch = 0. Geschwindigkeit z\xE4hlt nicht.",
   match: "50 Punkte je richtig verbundenem Paar, h\xF6chstens 300. Keine Minuspunkte, kein Zeitbonus \u2013 nur die Richtigkeit z\xE4hlt. Die Zuordnung z\xE4hlt, wie sie bei Ablauf der Zeit (oder bei der endg\xFCltigen Abgabe) steht.",
   link: "Eine endg\xFCltige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.",
-  vote: "KICKBASE-KONSENS: Jeder w\xE4hlt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte \u2013 bei Gleichstand alle h\xE4ufigsten Wahlen. Ab 3 Spielern nicht f\xFCr sich selbst.",
+  vote: "KICKBASE-KONSENS: Jeder w\xE4hlt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte \u2013 bei Gleichstand alle h\xE4ufigsten Wahlen. Man darf auch sich selbst w\xE4hlen.",
   unique: "Nur eine g\xFCltige, einmalige Antwort bringt Punkte. Mehrfach genannte g\xFCltige Antworten und ung\xFCltige Antworten = 0. Bei \u201Evollst\xE4ndiger Antwortliste\u201C wird Unbekanntes automatisch ung\xFCltig, sonst pr\xFCft der Showmaster."
 };
 function buildPreview(rawTask, scenes, meta = {}) {

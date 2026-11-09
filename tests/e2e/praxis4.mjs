@@ -34,7 +34,7 @@ async function finale(N, PORT) {
   for (let q = 0; q < 5; q++) {
     await H({ k: 'h.begin' }); await waitH(v => v.round.stage === 'open');
     for (let i = 0; i < N; i++) await pages[i].waitForSelector('.votegrid');
-    const names = await pages[0].locator('.votecard b').allInnerTexts(); check(names.includes('Michael (Showmaster)') && names.length === (N <= 2 ? N : N - 1) + 1, `Q${q + 1}: Handy zeigt Michael (Showmaster) als Kandidaten (${names.length} Karten)`);
+    const names = await pages[0].locator('.votecard b').allInnerTexts(); check(names.includes('Michael (Showmaster)') && names.length === N + 1, `Q${q + 1}: Handy zeigt Michael (Showmaster) als Kandidaten (${names.length} Karten)`);
     txt = await tv.locator('body').innerText(); check(!/FINAL LOCK/.test(txt), `Q${q + 1}: TV ohne FINAL LOCK`);
     // Stimmen: Q1 alle Michael; Q2 Einzelstimmen (Kreis); Q3 alle auf S1 (S1 auf Michael)
     const pick = i => q === 0 ? 'Michael (Showmaster)' : q === 1 ? `S${((i + 1) % N) + 1}` : q === 2 ? (i === 0 ? 'Michael (Showmaster)' : 'S1') : q === 3 ? 'Michael (Showmaster)' : (i === 0 ? 'S2' : 'Michael (Showmaster)');

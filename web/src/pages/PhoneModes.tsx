@@ -283,9 +283,13 @@ function EstimatePhone({ round, act, room, d, view, pid }: Props & { d: any }) {
         </div>
         {!placed ? (
           <>
-            <div className="chips">{d.bets.map((b: number) => (
-              <button type="button" key={b} disabled={b > (d.allowance ?? d.balance ?? 0)} className={`chipbtn ${amount === b ? 'sel' : ''}`} onClick={() => setAmount(b)}>{b === 0 ? 'Kein Einsatz' : `${b} Punkte`}</button>
-            ))}</div>
+            {(d.maxBet ?? 0) > 0 ? <>
+              <div className="chips">{[...new Set([0, Math.floor(d.maxBet / 2), d.maxBet])].map((b: number) => (
+                <button type="button" key={b} className={`chipbtn ${amount === b ? 'sel' : ''}`} onClick={() => setAmount(b)}>{b === 0 ? 'Kein Einsatz' : b === d.maxBet ? `Max. ${b}` : `${b}`}</button>
+              ))}</div>
+              <input type="range" className="betslider" aria-label="Einsatz" min={0} max={d.maxBet} step={1} value={amount} onChange={e => setAmount(Number(e.target.value))} />
+              <p className="muted center small">Einsatz bis zu 50 % deines Punktestands (max. {d.maxBet}).</p>
+            </> : <p className="muted center small">Mit 0 Punkten kannst du nichts setzen.</p>}
             <BetBox d={d} view={view} amount={amount} target={target} />
             <button className="btn primary wide" disabled={snd.state === 'sending' || (amount > 0 && !target)}
               onClick={() => snd.send({ k: 'submit', payload: { amount, target: amount > 0 ? target : null } })}>
@@ -447,13 +451,13 @@ function VotePhone({ round, act, view, pid, d }: Props & { d: any }) {
   const snd = useSender(act);
   const [sel, setSel] = useState<string | null>(null);
   const mine: string | null = d.mine ?? null;
-  const others = view.players.filter(p => p.id !== pid || view.players.length <= 2);
+  const others = view.players;
   if (round.stage !== 'open') return <Waiting text={mine ? 'Stimme abgegeben' : 'Zeit abgelaufen'} sub="Gleich werden die Stimmen enthüllt …" />;
   if (mine) return <div className="vote"><div className="question">{d.prompt}</div><Status sent draft={false} /><p className="center">Du hast gewählt: <b>{view.players.find(p => p.id === mine)?.name ?? d.candidate?.name}</b></p><p className="muted center">Warte auf die anderen … ({d.answeredCount} von {d.playerCount} haben gewählt)</p></div>;
   return (
     <div className="vote">
       <div className="question">{d.prompt}</div>
-      <p className="muted center small">Wähle geheim eine Person. 100 Punkte, wenn deine Wahl die meisten Stimmen bekommt (mind. 2).</p>
+      <p className="muted center small">Wähle geheim eine Person – auch du selbst oder Michael. 100 Punkte, wenn deine Wahl die meisten Stimmen bekommt (mind. 2).</p>
       <div className="votegrid">{others.map(p => <button type="button" key={p.id} className={`votecard ${sel === p.id ? 'sel' : ''}`} onClick={() => setSel(p.id)}><Avatar a={p.avatar} size={72} /><b>{p.name}</b></button>)}{d.candidate && <button type="button" className={`votecard host ${sel === d.candidate.id ? 'sel' : ''}`} onClick={() => setSel(d.candidate.id)}><span className="hostav" aria-hidden>🎙️</span><b>{d.candidate.name}</b></button>}</div>
       <Status sent={false} draft={!!sel} sending={snd.state === 'sending'} msg={snd.msg} />
       <button className="btn primary wide" disabled={!sel || snd.state === 'sending'} onClick={() => sel && snd.send({ k: 'submit', payload: { target: sel } })}>{sel ? `Stimme für ${view.players.find(p => p.id === sel)?.name ?? d.candidate?.name} abgeben` : 'Mitspieler antippen'}</button>
