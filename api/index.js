@@ -152,13 +152,13 @@ var init_esm = __esm({
       for (var i2 = 0; i2 < 31; ++i2) {
         b2[i2] = start += 1 << eb[i2 - 1];
       }
-      var r = new i32(b2[30]);
+      var r2 = new i32(b2[30]);
       for (var i2 = 1; i2 < 30; ++i2) {
         for (var j2 = b2[i2]; j2 < b2[i2 + 1]; ++j2) {
-          r[j2] = j2 - b2[i2] << 5 | i2;
+          r2[j2] = j2 - b2[i2] << 5 | i2;
         }
       }
-      return { b: b2, r };
+      return { b: b2, r: r2 };
     };
     _a = freb(fleb, 2);
     fl = _a.b;
@@ -174,7 +174,7 @@ var init_esm = __esm({
       x = (x & 61680) >> 4 | (x & 3855) << 4;
       rev[i] = ((x & 65280) >> 8 | (x & 255) << 8) >> 1;
     }
-    hMap = (function(cd, mb, r) {
+    hMap = (function(cd, mb, r2) {
       var s = cd.length;
       var i2 = 0;
       var l = new u16(mb);
@@ -187,7 +187,7 @@ var init_esm = __esm({
         le[i2] = le[i2 - 1] + l[i2 - 1] << 1;
       }
       var co;
-      if (r) {
+      if (r2) {
         co = new u16(1 << mb);
         var rvb = 15 - mb;
         for (i2 = 0; i2 < s; ++i2) {
@@ -328,9 +328,9 @@ var init_esm = __esm({
             var clb = max(clt), clbmsk = (1 << clb) - 1;
             var clm = hMap(clt, clb, 1);
             for (var i2 = 0; i2 < tl; ) {
-              var r = clm[bits(dat, pos, clbmsk)];
-              pos += r & 15;
-              var s = r >> 4;
+              var r2 = clm[bits(dat, pos, clbmsk)];
+              pos += r2 & 15;
+              var s = r2 >> 4;
               if (s < 16) {
                 ldt[i2++] = s;
               } else {
@@ -476,26 +476,26 @@ function b(o, t) {
   return (t >>> 0) * 4294967296 + (o >>> 0);
 }
 function N(o, t) {
-  let e = t.buf, r = e[t.pos++], n = (r & 112) >> 4;
-  if (r < 128 || (r = e[t.pos++], n |= (r & 127) << 3, r < 128) || (r = e[t.pos++], n |= (r & 127) << 10, r < 128) || (r = e[t.pos++], n |= (r & 127) << 17, r < 128) || (r = e[t.pos++], n |= (r & 127) << 24, r < 128) || (r = e[t.pos++], n |= (r & 1) << 31, r < 128)) return b(o, n);
+  let e = t.buf, r2 = e[t.pos++], n = (r2 & 112) >> 4;
+  if (r2 < 128 || (r2 = e[t.pos++], n |= (r2 & 127) << 3, r2 < 128) || (r2 = e[t.pos++], n |= (r2 & 127) << 10, r2 < 128) || (r2 = e[t.pos++], n |= (r2 & 127) << 17, r2 < 128) || (r2 = e[t.pos++], n |= (r2 & 127) << 24, r2 < 128) || (r2 = e[t.pos++], n |= (r2 & 1) << 31, r2 < 128)) return b(o, n);
   throw new Error("Expected varint not more than 10 bytes");
 }
 function x2(o) {
-  let t = o.buf, e = t[o.pos++], r = e & 127;
-  return e < 128 || (e = t[o.pos++], r |= (e & 127) << 7, e < 128) || (e = t[o.pos++], r |= (e & 127) << 14, e < 128) || (e = t[o.pos++], r |= (e & 127) << 21, e < 128) ? r : (e = t[o.pos], r |= (e & 15) << 28, N(r, o));
+  let t = o.buf, e = t[o.pos++], r2 = e & 127;
+  return e < 128 || (e = t[o.pos++], r2 |= (e & 127) << 7, e < 128) || (e = t[o.pos++], r2 |= (e & 127) << 14, e < 128) || (e = t[o.pos++], r2 |= (e & 127) << 21, e < 128) ? r2 : (e = t[o.pos], r2 |= (e & 15) << 28, N(r2, o));
 }
-function I(o, t, e, r, n) {
-  return n === 0 ? r !== 0 ? [o - 1 - e, o - 1 - t] : [e, t] : [t, e];
+function I(o, t, e, r2, n) {
+  return n === 0 ? r2 !== 0 ? [o - 1 - e, o - 1 - t] : [e, t] : [t, e];
 }
 function q(o, t, e) {
   if (o > 26) throw new Error("Tile zoom level exceeds max safe number limit (26)");
   if (t >= 1 << o || e >= 1 << o) throw new Error("tile x/y outside zoom level bounds");
-  let r = ((1 << o) * (1 << o) - 1) / 3, n = o - 1, [s, i2] = [t, e];
+  let r2 = ((1 << o) * (1 << o) - 1) / 3, n = o - 1, [s, i2] = [t, e];
   for (let a = 1 << n; a > 0; a >>= 1) {
     let c = s & a, l = i2 & a;
-    r += (3 * c ^ l) * (1 << n), [s, i2] = I(a, s, i2, c, l), n--;
+    r2 += (3 * c ^ l) * (1 << n), [s, i2] = I(a, s, i2, c, l), n--;
   }
-  return r;
+  return r2;
 }
 function G(o) {
   let t = 3 * o + 1;
@@ -504,10 +504,10 @@ function G(o) {
 function ie(o) {
   let t = G(o) >> 1;
   if (t > 26) throw new Error("Tile zoom level exceeds max safe number limit (26)");
-  let e = ((1 << t) * (1 << t) - 1) / 3, r = o - e, n = 0, s = 0, i2 = 1 << t;
+  let e = ((1 << t) * (1 << t) - 1) / 3, r2 = o - e, n = 0, s = 0, i2 = 1 << t;
   for (let a = 1; a < i2; a <<= 1) {
-    let c = a & r / 2, l = a & (r ^ c);
-    [n, s] = I(a, n, s, c, l), r = r / 2, n += c, s += l;
+    let c = a & r2 / 2, l = a & (r2 ^ c);
+    [n, s] = I(a, n, s, c, l), r2 = r2 / 2, n += c, s += l;
   }
   return [t, n, s];
 }
@@ -518,8 +518,8 @@ function P(o, t) {
       if (typeof globalThis.DecompressionStream == "undefined") return decompressSync(new Uint8Array(o));
       let e = new Response(o).body;
       if (!e) throw new Error("Failed to read response stream");
-      let r = e.pipeThrough(new globalThis.DecompressionStream("gzip"));
-      return new Response(r).arrayBuffer();
+      let r2 = e.pipeThrough(new globalThis.DecompressionStream("gzip"));
+      return new Response(r2).arrayBuffer();
     }
     throw new Error("Compression method not supported");
   });
@@ -528,37 +528,37 @@ function _(o) {
   return o === 1 ? ".mvt" : o === 2 ? ".png" : o === 3 ? ".jpg" : o === 4 ? ".webp" : o === 5 ? ".avif" : o === 6 ? ".mlt" : "";
 }
 function Q(o, t) {
-  let e = 0, r = o.length - 1;
-  for (; e <= r; ) {
-    let n = r + e >> 1, s = t - o[n].tileId;
+  let e = 0, r2 = o.length - 1;
+  for (; e <= r2; ) {
+    let n = r2 + e >> 1, s = t - o[n].tileId;
     if (s > 0) e = n + 1;
-    else if (s < 0) r = n - 1;
+    else if (s < 0) r2 = n - 1;
     else return o[n];
   }
-  return r >= 0 && (o[r].runLength === 0 || t - o[r].tileId < o[r].runLength) ? o[r] : null;
+  return r2 >= 0 && (o[r2].runLength === 0 || t - o[r2].tileId < o[r2].runLength) ? o[r2] : null;
 }
 function y(o, t) {
-  let e = o.getUint32(t + 4, true), r = o.getUint32(t + 0, true);
-  return e * S(2, 32) + r;
+  let e = o.getUint32(t + 4, true), r2 = o.getUint32(t + 0, true);
+  return e * S(2, 32) + r2;
 }
 function X(o, t) {
-  let e = new DataView(o), r = e.getUint8(7);
-  if (r > 3) throw new Error(`Archive is spec version ${r} but this library supports up to spec version 3`);
-  return { specVersion: r, rootDirectoryOffset: y(e, 8), rootDirectoryLength: y(e, 16), jsonMetadataOffset: y(e, 24), jsonMetadataLength: y(e, 32), leafDirectoryOffset: y(e, 40), leafDirectoryLength: y(e, 48), tileDataOffset: y(e, 56), tileDataLength: y(e, 64), numAddressedTiles: y(e, 72), numTileEntries: y(e, 80), numTileContents: y(e, 88), clustered: e.getUint8(96) === 1, internalCompression: e.getUint8(97), tileCompression: e.getUint8(98), tileType: e.getUint8(99), minZoom: e.getUint8(100), maxZoom: e.getUint8(101), minLon: e.getInt32(102, true) / 1e7, minLat: e.getInt32(106, true) / 1e7, maxLon: e.getInt32(110, true) / 1e7, maxLat: e.getInt32(114, true) / 1e7, centerZoom: e.getUint8(118), centerLon: e.getInt32(119, true) / 1e7, centerLat: e.getInt32(123, true) / 1e7, etag: t };
+  let e = new DataView(o), r2 = e.getUint8(7);
+  if (r2 > 3) throw new Error(`Archive is spec version ${r2} but this library supports up to spec version 3`);
+  return { specVersion: r2, rootDirectoryOffset: y(e, 8), rootDirectoryLength: y(e, 16), jsonMetadataOffset: y(e, 24), jsonMetadataLength: y(e, 32), leafDirectoryOffset: y(e, 40), leafDirectoryLength: y(e, 48), tileDataOffset: y(e, 56), tileDataLength: y(e, 64), numAddressedTiles: y(e, 72), numTileEntries: y(e, 80), numTileContents: y(e, 88), clustered: e.getUint8(96) === 1, internalCompression: e.getUint8(97), tileCompression: e.getUint8(98), tileType: e.getUint8(99), minZoom: e.getUint8(100), maxZoom: e.getUint8(101), minLon: e.getInt32(102, true) / 1e7, minLat: e.getInt32(106, true) / 1e7, maxLon: e.getInt32(110, true) / 1e7, maxLat: e.getInt32(114, true) / 1e7, centerZoom: e.getUint8(118), centerLon: e.getInt32(119, true) / 1e7, centerLat: e.getInt32(123, true) / 1e7, etag: t };
 }
 function Z(o) {
-  let t = { buf: new Uint8Array(o), pos: 0 }, e = x2(t), r = [], n = 0;
+  let t = { buf: new Uint8Array(o), pos: 0 }, e = x2(t), r2 = [], n = 0;
   for (let s = 0; s < e; s++) {
     let i2 = x2(t);
-    r.push({ tileId: n + i2, offset: 0, length: 0, runLength: 1 }), n += i2;
+    r2.push({ tileId: n + i2, offset: 0, length: 0, runLength: 1 }), n += i2;
   }
-  for (let s = 0; s < e; s++) r[s].runLength = x2(t);
-  for (let s = 0; s < e; s++) r[s].length = x2(t);
+  for (let s = 0; s < e; s++) r2[s].runLength = x2(t);
+  for (let s = 0; s < e; s++) r2[s].length = x2(t);
   for (let s = 0; s < e; s++) {
     let i2 = x2(t);
-    i2 === 0 && s > 0 ? r[s].offset = r[s - 1].offset + r[s - 1].length : r[s].offset = i2 - 1;
+    i2 === 0 && s > 0 ? r2[s].offset = r2[s - 1].offset + r2[s - 1].length : r2[s].offset = i2 - 1;
   }
-  return r;
+  return r2;
 }
 function V(o, t) {
   return h(this, null, function* () {
@@ -568,9 +568,9 @@ function V(o, t) {
     return [s, [a, c.length, c]];
   });
 }
-function F(o, t, e, r, n, s) {
+function F(o, t, e, r2, n, s) {
   return h(this, null, function* () {
-    let i2 = yield o.getBytes(e, r, s, n.etag), a = yield t(i2.data, n.internalCompression), c = Z(a);
+    let i2 = yield o.getBytes(e, r2, s, n.etag), a = yield t(i2.data, n.internalCompression), c = Z(a);
     if (c.length === 0) throw new Error("Empty directory is invalid");
     return c;
   });
@@ -582,7 +582,7 @@ var init_esm2 = __esm({
     j = Object.defineProperty;
     S = Math.pow;
     d = (o, t) => j(o, "name", { value: t, configurable: true });
-    h = (o, t, e) => new Promise((r, n) => {
+    h = (o, t, e) => new Promise((r2, n) => {
       var s = (c) => {
         try {
           a(e.next(c));
@@ -595,19 +595,19 @@ var init_esm2 = __esm({
         } catch (l) {
           n(l);
         }
-      }, a = (c) => c.done ? r(c.value) : Promise.resolve(c.value).then(s, i2);
+      }, a = (c) => c.done ? r2(c.value) : Promise.resolve(c.value).then(s, i2);
       a((e = e.apply(o, t)).next());
     });
     re = d((o, t) => {
-      let e = false, r = "", n = L.GridLayer.extend({ createTile: d((s, i2) => {
+      let e = false, r2 = "", n = L.GridLayer.extend({ createTile: d((s, i2) => {
         let a = document.createElement("img"), c = new AbortController(), l = c.signal;
         return a.cancel = () => {
           c.abort();
         }, e || (o.getHeader().then((u) => {
-          u.tileType === 1 || u.tileType === 6 ? console.error("Error: archive contains vector tiles, but leafletRasterLayer is for displaying raster tiles. See https://github.com/protomaps/PMTiles/tree/main/js for details.") : u.tileType === 2 ? r = "image/png" : u.tileType === 3 ? r = "image/jpeg" : u.tileType === 4 ? r = "image/webp" : u.tileType === 5 && (r = "image/avif");
+          u.tileType === 1 || u.tileType === 6 ? console.error("Error: archive contains vector tiles, but leafletRasterLayer is for displaying raster tiles. See https://github.com/protomaps/PMTiles/tree/main/js for details.") : u.tileType === 2 ? r2 = "image/png" : u.tileType === 3 ? r2 = "image/jpeg" : u.tileType === 4 ? r2 = "image/webp" : u.tileType === 5 && (r2 = "image/avif");
         }), e = true), o.getZxy(s.z, s.x, s.y, l).then((u) => {
           if (u) {
-            let m = new Blob([u.data], { type: r }), g = window.URL.createObjectURL(m);
+            let m = new Blob([u.data], { type: r2 }), g = window.URL.createObjectURL(m);
             a.src = g;
           } else a.style.display = "none";
           a.cancel = void 0, i2(void 0, a);
@@ -622,8 +622,8 @@ var init_esm2 = __esm({
     }, "leafletRasterLayer");
     z = d((o) => (t, e) => {
       if (e instanceof AbortController) return o(t, e);
-      let r = new AbortController();
-      return o(t, r).then((n) => e(void 0, n.data, n.cacheControl || "", n.expires || ""), (n) => e(n)).catch((n) => e(n)), { cancel: d(() => r.abort(), "cancel") };
+      let r2 = new AbortController();
+      return o(t, r2).then((n) => e(void 0, n.data, n.cacheControl || "", n.expires || ""), (n) => e(n)).catch((n) => e(n)), { cancel: d(() => r2.abort(), "cancel") };
     }, "v3compat");
     A = class A2 {
       constructor(t) {
@@ -637,7 +637,7 @@ var init_esm2 = __esm({
             let f = yield p.getHeader();
             return e.signal.throwIfAborted(), (f.minLon >= f.maxLon || f.minLat >= f.maxLat) && console.error(`Bounds of PMTiles archive ${f.minLon},${f.minLat},${f.maxLon},${f.maxLat} are not valid.`), { data: { tiles: [`${t2.url}/{z}/{x}/{y}`], minzoom: f.minZoom, maxzoom: f.maxZoom, bounds: [f.minLon, f.minLat, f.maxLon, f.maxLat] } };
           }
-          let r = new RegExp(/pmtiles:\/\/(.+)\/(\d+)\/(\d+)\/(\d+)/), n = t2.url.match(r);
+          let r2 = new RegExp(/pmtiles:\/\/(.+)\/(\d+)\/(\d+)\/(\d+)/), n = t2.url.match(r2);
           if (!n) throw new Error("Invalid PMTiles protocol URL");
           let s = n[1], i2 = this.tiles.get(s);
           i2 || (i2 = new w(s), this.tiles.set(s, i2));
@@ -691,9 +691,9 @@ var init_esm2 = __esm({
     d(T, "FileSource");
     k = T;
     D = class D2 {
-      constructor(t, e = new Headers(), r = void 0) {
+      constructor(t, e = new Headers(), r2 = void 0) {
         var a, c;
-        this.url = t, this.customHeaders = e, this.credentials = r, this.mustReload = false;
+        this.url = t, this.customHeaders = e, this.credentials = r2, this.mustReload = false;
         let n = "";
         "navigator" in globalThis && (n = (c = (a = globalThis.navigator) == null ? void 0 : a.userAgent) != null ? c : "");
         let s = n.indexOf("Windows") > -1, i2 = /Chrome|Chromium|Edg|OPR|Brave/.test(n);
@@ -705,10 +705,10 @@ var init_esm2 = __esm({
       setHeaders(t) {
         this.customHeaders = t;
       }
-      getBytes(t, e, r, n) {
+      getBytes(t, e, r2, n) {
         return h(this, null, function* () {
           let s, i2;
-          r ? i2 = r : (s = new AbortController(), i2 = s.signal);
+          r2 ? i2 = r2 : (s = new AbortController(), i2 = s.signal);
           let a = new Headers(this.customHeaders);
           a.set("range", `bytes=${t}-${t + e - 1}`);
           let c;
@@ -741,30 +741,30 @@ var init_esm2 = __esm({
     d(V, "getHeaderAndRoot");
     d(F, "getDirectory");
     U = class U2 {
-      constructor(t = 100, e = true, r = P) {
-        this.cache = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r;
+      constructor(t = 100, e = true, r2 = P) {
+        this.cache = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r2;
       }
       getHeader(t) {
         return h(this, null, function* () {
-          let e = t.getKey(), r = this.cache.get(e);
-          if (r) return r.lastUsed = this.counter++, r.data;
+          let e = t.getKey(), r2 = this.cache.get(e);
+          if (r2) return r2.lastUsed = this.counter++, r2.data;
           let n = yield V(t, this.decompress);
           return n[1] && this.cache.set(n[1][0], { lastUsed: this.counter++, data: n[1][2] }), this.cache.set(e, { lastUsed: this.counter++, data: n[0] }), this.prune(), n[0];
         });
       }
-      getDirectory(t, e, r, n, s) {
+      getDirectory(t, e, r2, n, s) {
         return h(this, null, function* () {
-          let i2 = `${t.getKey()}|${n.etag || ""}|${e}|${r}`, a = this.cache.get(i2);
+          let i2 = `${t.getKey()}|${n.etag || ""}|${e}|${r2}`, a = this.cache.get(i2);
           if (a) return a.lastUsed = this.counter++, a.data;
-          let c = yield F(t, this.decompress, e, r, n, s);
+          let c = yield F(t, this.decompress, e, r2, n, s);
           return this.cache.set(i2, { lastUsed: this.counter++, data: c }), this.prune(), c;
         });
       }
       prune() {
         if (this.cache.size > this.maxCacheEntries) {
           let t = 1 / 0, e;
-          this.cache.forEach((r, n) => {
-            r.lastUsed < t && (t = r.lastUsed, e = n);
+          this.cache.forEach((r2, n) => {
+            r2.lastUsed < t && (t = r2.lastUsed, e = n);
           }), e && this.cache.delete(e);
         }
       }
@@ -777,13 +777,13 @@ var init_esm2 = __esm({
     d(U, "ResolvedValueCache");
     $ = U;
     M = class M2 {
-      constructor(t = 100, e = true, r = P) {
-        this.cache = /* @__PURE__ */ new Map(), this.invalidations = /* @__PURE__ */ new Map(), this.pendingFetches = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r;
+      constructor(t = 100, e = true, r2 = P) {
+        this.cache = /* @__PURE__ */ new Map(), this.invalidations = /* @__PURE__ */ new Map(), this.pendingFetches = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r2;
       }
       getHeader(t) {
         return h(this, null, function* () {
-          let e = t.getKey(), r = this.cache.get(e);
-          if (r) return r.lastUsed = this.counter++, yield r.data;
+          let e = t.getKey(), r2 = this.cache.get(e);
+          if (r2) return r2.lastUsed = this.counter++, yield r2.data;
           let n = new Promise((s, i2) => {
             V(t, this.decompress).then((a) => {
               a[1] && this.cache.set(a[1][0], { lastUsed: this.counter++, data: Promise.resolve(a[1][2]) }), s(a[0]), this.prune();
@@ -794,14 +794,14 @@ var init_esm2 = __esm({
           return this.cache.set(e, { lastUsed: this.counter++, data: n }), n;
         });
       }
-      trackSignal(t, e, r) {
-        e.refs++, r.addEventListener("abort", () => {
+      trackSignal(t, e, r2) {
+        e.refs++, r2.addEventListener("abort", () => {
           --e.refs <= 0 && this.pendingFetches.get(t) === e && (e.controller.abort(), this.cache.delete(t), this.pendingFetches.delete(t));
         }, { once: true });
       }
-      getDirectory(t, e, r, n, s) {
+      getDirectory(t, e, r2, n, s) {
         return h(this, null, function* () {
-          let i2 = `${t.getKey()}|${n.etag || ""}|${e}|${r}`, a = this.cache.get(i2);
+          let i2 = `${t.getKey()}|${n.etag || ""}|${e}|${r2}`, a = this.cache.get(i2);
           if (a) {
             a.lastUsed = this.counter++;
             let m = this.pendingFetches.get(i2);
@@ -810,7 +810,7 @@ var init_esm2 = __esm({
           let c = new AbortController(), l = { controller: c, refs: 0 };
           this.trackSignal(i2, l, s != null ? s : new AbortController().signal), this.pendingFetches.set(i2, l);
           let u = new Promise((m, g) => {
-            F(t, this.decompress, e, r, n, c.signal).then((p) => {
+            F(t, this.decompress, e, r2, n, c.signal).then((p) => {
               this.pendingFetches.delete(i2), m(p), this.prune();
             }).catch((p) => {
               g(p);
@@ -822,8 +822,8 @@ var init_esm2 = __esm({
       prune() {
         if (this.cache.size >= this.maxCacheEntries) {
           let t = 1 / 0, e;
-          this.cache.forEach((r, n) => {
-            r.lastUsed < t && (t = r.lastUsed, e = n);
+          this.cache.forEach((r2, n) => {
+            r2.lastUsed < t && (t = r2.lastUsed, e = n);
           }), e && this.cache.delete(e);
         }
       }
@@ -832,31 +832,31 @@ var init_esm2 = __esm({
           let e = t.getKey();
           if (this.invalidations.get(e)) return yield this.invalidations.get(e);
           this.cache.delete(t.getKey());
-          let r = new Promise((n, s) => {
+          let r2 = new Promise((n, s) => {
             this.getHeader(t).then((i2) => {
               n(), this.invalidations.delete(e);
             }).catch((i2) => {
               s(i2);
             });
           });
-          this.invalidations.set(e, r);
+          this.invalidations.set(e, r2);
         });
       }
     };
     d(M, "SharedPromiseCache");
     C = M;
     H = class H2 {
-      constructor(t, e, r) {
-        typeof t == "string" ? this.source = new E(t) : this.source = t, r ? this.decompress = r : this.decompress = P, e ? this.cache = e : this.cache = new C();
+      constructor(t, e, r2) {
+        typeof t == "string" ? this.source = new E(t) : this.source = t, r2 ? this.decompress = r2 : this.decompress = P, e ? this.cache = e : this.cache = new C();
       }
       getHeader() {
         return h(this, null, function* () {
           return yield this.cache.getHeader(this.source);
         });
       }
-      getZxyAttempt(t, e, r, n) {
+      getZxyAttempt(t, e, r2, n) {
         return h(this, null, function* () {
-          let s = q(t, e, r), i2 = yield this.cache.getHeader(this.source);
+          let s = q(t, e, r2), i2 = yield this.cache.getHeader(this.source);
           if (n == null || n.throwIfAborted(), t < i2.minZoom || t > i2.maxZoom) return;
           let a = i2.rootDirectoryOffset, c = i2.rootDirectoryLength;
           for (let l = 0; l <= 3; l++) {
@@ -874,20 +874,20 @@ var init_esm2 = __esm({
           throw new Error("Maximum directory depth exceeded");
         });
       }
-      getZxy(t, e, r, n) {
+      getZxy(t, e, r2, n) {
         return h(this, null, function* () {
           try {
-            return yield this.getZxyAttempt(t, e, r, n);
+            return yield this.getZxyAttempt(t, e, r2, n);
           } catch (s) {
-            if (s instanceof v) return this.cache.invalidate(this.source), yield this.getZxyAttempt(t, e, r, n);
+            if (s instanceof v) return this.cache.invalidate(this.source), yield this.getZxyAttempt(t, e, r2, n);
             throw s;
           }
         });
       }
       getMetadataAttempt() {
         return h(this, null, function* () {
-          let t = yield this.cache.getHeader(this.source), e = yield this.source.getBytes(t.jsonMetadataOffset, t.jsonMetadataLength, void 0, t.etag), r = yield this.decompress(e.data, t.internalCompression), n = new TextDecoder("utf-8");
-          return JSON.parse(n.decode(r));
+          let t = yield this.cache.getHeader(this.source), e = yield this.source.getBytes(t.jsonMetadataOffset, t.jsonMetadataLength, void 0, t.etag), r2 = yield this.decompress(e.data, t.internalCompression), n = new TextDecoder("utf-8");
+          return JSON.parse(n.decode(r2));
         });
       }
       getMetadata() {
@@ -902,8 +902,8 @@ var init_esm2 = __esm({
       }
       getTileJson(t) {
         return h(this, null, function* () {
-          let e = yield this.getHeader(), r = yield this.getMetadata(), n = _(e.tileType);
-          return { tilejson: "3.0.0", scheme: "xyz", tiles: [`${t}/{z}/{x}/{y}${n}`], vector_layers: r.vector_layers, attribution: r.attribution, description: r.description, name: r.name, version: r.version, bounds: [e.minLon, e.minLat, e.maxLon, e.maxLat], center: [e.centerLon, e.centerLat, e.centerZoom], minzoom: e.minZoom, maxzoom: e.maxZoom };
+          let e = yield this.getHeader(), r2 = yield this.getMetadata(), n = _(e.tileType);
+          return { tilejson: "3.0.0", scheme: "xyz", tiles: [`${t}/{z}/{x}/{y}${n}`], vector_layers: r2.vector_layers, attribution: r2.attribution, description: r2.description, name: r2.name, version: r2.version, bounds: [e.minLon, e.minLat, e.maxLon, e.maxLat], center: [e.centerLon, e.centerLat, e.centerZoom], minzoom: e.minZoom, maxzoom: e.maxZoom };
         });
       }
     };
@@ -5198,10 +5198,10 @@ var require_dist2 = __commonJS({
       }
       inst["~standard"] = { validate: (value) => {
         try {
-          let r = safeParse(inst, value);
-          return r.success ? { value: r.data } : { issues: r.error?.issues };
+          let r2 = safeParse(inst, value);
+          return r2.success ? { value: r2.data } : { issues: r2.error?.issues };
         } catch {
-          return safeParseAsync(inst, value).then((r) => r.success ? { value: r.data } : { issues: r.error?.issues });
+          return safeParseAsync(inst, value).then((r2) => r2.success ? { value: r2.data } : { issues: r2.error?.issues });
         }
       }, vendor: "zod", version: 1 };
     });
@@ -5424,8 +5424,8 @@ var require_dist2 = __commonJS({
           unrecognized.push(key);
           continue;
         }
-        let r = _catchall.run({ value: input[key], issues: [] }, ctx);
-        r instanceof Promise ? proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input))) : handlePropertyResult(r, payload, key, input);
+        let r2 = _catchall.run({ value: input[key], issues: [] }, ctx);
+        r2 instanceof Promise ? proms.push(r2.then((r22) => handlePropertyResult(r22, payload, key, input))) : handlePropertyResult(r2, payload, key, input);
       }
       return unrecognized.length && payload.issues.push({ code: "unrecognized_keys", keys: unrecognized, input, inst }), proms.length ? Promise.all(proms).then(() => payload) : payload;
     }
@@ -5457,8 +5457,8 @@ var require_dist2 = __commonJS({
         payload.value = {};
         let proms = [], shape = value.shape;
         for (let key of value.keys) {
-          let r = shape[key]._zod.run({ value: input[key], issues: [] }, ctx);
-          r instanceof Promise ? proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input))) : handlePropertyResult(r, payload, key, input);
+          let r2 = shape[key]._zod.run({ value: input[key], issues: [] }, ctx);
+          r2 instanceof Promise ? proms.push(r2.then((r22) => handlePropertyResult(r22, payload, key, input))) : handlePropertyResult(r2, payload, key, input);
         }
         return catchall ? handleCatchall(proms, input, payload, ctx, _normalized.value, inst) : proms.length ? Promise.all(proms).then(() => payload) : payload;
       };
@@ -5507,7 +5507,7 @@ var require_dist2 = __commonJS({
     });
     function handleUnionResults(results, final, inst, ctx) {
       for (let result of results) if (result.issues.length === 0) return final.value = result.value, final;
-      let nonaborted = results.filter((r) => !aborted(r));
+      let nonaborted = results.filter((r2) => !aborted(r2));
       return nonaborted.length === 1 ? (final.value = nonaborted[0].value, nonaborted[0]) : (final.issues.push({ code: "invalid_union", input: final.value, inst, errors: results.map((result) => result.issues.map((iss) => finalizeIssue(iss, ctx, config()))) }), final);
     }
     var $ZodUnion = $constructor("$ZodUnion", (inst, def) => {
@@ -5604,7 +5604,7 @@ var require_dist2 = __commonJS({
       }), inst._zod.parse = (payload, ctx) => {
         if (def.innerType._zod.optin === "optional") {
           let result = def.innerType._zod.run(payload, ctx);
-          return result instanceof Promise ? result.then((r) => handleOptionalResult(r, payload.value)) : handleOptionalResult(result, payload.value);
+          return result instanceof Promise ? result.then((r2) => handleOptionalResult(r2, payload.value)) : handleOptionalResult(result, payload.value);
         }
         return payload.value === void 0 ? payload : def.innerType._zod.run(payload, ctx);
       };
@@ -5673,9 +5673,9 @@ var require_dist2 = __commonJS({
     }
     var $ZodCustom = $constructor("$ZodCustom", (inst, def) => {
       $ZodCheck.init(inst, def), $ZodType.init(inst, def), inst._zod.parse = (payload, _2) => payload, inst._zod.check = (payload) => {
-        let input = payload.value, r = def.fn(input);
-        if (r instanceof Promise) return r.then((r2) => handleRefineResult(r2, payload, input, inst));
-        handleRefineResult(r, payload, input, inst);
+        let input = payload.value, r2 = def.fn(input);
+        if (r2 instanceof Promise) return r2.then((r22) => handleRefineResult(r22, payload, input, inst));
+        handleRefineResult(r2, payload, input, inst);
       };
     });
     function handleRefineResult(result, payload, input, inst) {
@@ -15331,11 +15331,11 @@ var require_webidl = __commonJS({
       return x3;
     };
     webidl.util.IntegerPart = function(n) {
-      const r = Math.floor(Math.abs(n));
+      const r2 = Math.floor(Math.abs(n));
       if (n < 0) {
-        return -1 * r;
+        return -1 * r2;
       }
-      return r;
+      return r2;
     };
     webidl.util.Stringify = function(V2) {
       const type = webidl.util.Type(V2);
@@ -17884,9 +17884,9 @@ var require_client_h1 = __commonJS({
         client2.emit("disconnect", client2[kUrl], [client2], err3);
         client2[kResume]();
       });
-      let closed2 = false;
+      let closed3 = false;
       socket.on("close", () => {
-        closed2 = true;
+        closed3 = true;
       });
       return {
         version: "h1",
@@ -17898,7 +17898,7 @@ var require_client_h1 = __commonJS({
           resumeH1(client);
         },
         destroy(err3, callback) {
-          if (closed2) {
+          if (closed3) {
             queueMicrotask(callback);
           } else {
             socket.destroy(err3).on("close", callback);
@@ -18524,9 +18524,9 @@ var require_client_h2 = __commonJS({
         client.emit("disconnect", client[kUrl], [client], err3);
         client[kResume]();
       });
-      let closed2 = false;
+      let closed3 = false;
       socket.on("close", () => {
-        closed2 = true;
+        closed3 = true;
       });
       return {
         version: "h2",
@@ -18538,7 +18538,7 @@ var require_client_h2 = __commonJS({
           resumeH2(client);
         },
         destroy(err3, callback) {
-          if (closed2) {
+          if (closed3) {
             queueMicrotask(callback);
           } else {
             socket.destroy(err3).on("close", callback);
@@ -27035,8 +27035,8 @@ var require_cache = __commonJS({
           if (typeof request === "string") {
             continue;
           }
-          const r = request[kState];
-          if (!urlIsHttpHttpsScheme(r.url) || r.method !== "GET") {
+          const r2 = request[kState];
+          if (!urlIsHttpHttpsScheme(r2.url) || r2.method !== "GET") {
             throw webidl.errors.exception({
               header: prefix,
               message: "Expected http/s scheme when method is not GET."
@@ -27045,19 +27045,19 @@ var require_cache = __commonJS({
         }
         const fetchControllers = [];
         for (const request of requests) {
-          const r = new Request2(request)[kState];
-          if (!urlIsHttpHttpsScheme(r.url)) {
+          const r2 = new Request2(request)[kState];
+          if (!urlIsHttpHttpsScheme(r2.url)) {
             throw webidl.errors.exception({
               header: prefix,
               message: "Expected http/s scheme."
             });
           }
-          r.initiator = "fetch";
-          r.destination = "subresource";
-          requestList.push(r);
+          r2.initiator = "fetch";
+          r2.destination = "subresource";
+          requestList.push(r2);
           const responsePromise = createDeferredPromise();
           fetchControllers.push(fetching({
-            request: r,
+            request: r2,
             processResponse(response) {
               if (response.type === "error" || response.status === 206 || response.status < 200 || response.status > 299) {
                 responsePromise.reject(webidl.errors.exception({
@@ -27209,20 +27209,20 @@ var require_cache = __commonJS({
         webidl.argumentLengthCheck(arguments, 1, prefix);
         request = webidl.converters.RequestInfo(request, prefix, "request");
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
-        let r = null;
+        let r2 = null;
         if (request instanceof Request2) {
-          r = request[kState];
-          if (r.method !== "GET" && !options.ignoreMethod) {
+          r2 = request[kState];
+          if (r2.method !== "GET" && !options.ignoreMethod) {
             return false;
           }
         } else {
           assert(typeof request === "string");
-          r = new Request2(request)[kState];
+          r2 = new Request2(request)[kState];
         }
         const operations = [];
         const operation = {
           type: "delete",
-          request: r,
+          request: r2,
           options
         };
         operations.push(operation);
@@ -27254,15 +27254,15 @@ var require_cache = __commonJS({
         const prefix = "Cache.keys";
         if (request !== void 0) request = webidl.converters.RequestInfo(request, prefix, "request");
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
-        let r = null;
+        let r2 = null;
         if (request !== void 0) {
           if (request instanceof Request2) {
-            r = request[kState];
-            if (r.method !== "GET" && !options.ignoreMethod) {
+            r2 = request[kState];
+            if (r2.method !== "GET" && !options.ignoreMethod) {
               return [];
             }
           } else if (typeof request === "string") {
-            r = new Request2(request)[kState];
+            r2 = new Request2(request)[kState];
           }
         }
         const promise = createDeferredPromise();
@@ -27272,7 +27272,7 @@ var require_cache = __commonJS({
             requests.push(requestResponse[0]);
           }
         } else {
-          const requestResponses = this.#queryCache(r, options);
+          const requestResponses = this.#queryCache(r2, options);
           for (const requestResponse of requestResponses) {
             requests.push(requestResponse[0]);
           }
@@ -27336,14 +27336,14 @@ var require_cache = __commonJS({
                   message: "put operation should have an associated response"
                 });
               }
-              const r = operation.request;
-              if (!urlIsHttpHttpsScheme(r.url)) {
+              const r2 = operation.request;
+              if (!urlIsHttpHttpsScheme(r2.url)) {
                 throw webidl.errors.exception({
                   header: "Cache.#batchCacheOperations",
                   message: "expected http or https scheme"
                 });
               }
-              if (r.method !== "GET") {
+              if (r2.method !== "GET") {
                 throw webidl.errors.exception({
                   header: "Cache.#batchCacheOperations",
                   message: "not get method"
@@ -27426,15 +27426,15 @@ var require_cache = __commonJS({
         return true;
       }
       #internalMatchAll(request, options, maxResponses = Infinity) {
-        let r = null;
+        let r2 = null;
         if (request !== void 0) {
           if (request instanceof Request2) {
-            r = request[kState];
-            if (r.method !== "GET" && !options.ignoreMethod) {
+            r2 = request[kState];
+            if (r2.method !== "GET" && !options.ignoreMethod) {
               return [];
             }
           } else if (typeof request === "string") {
-            r = new Request2(request)[kState];
+            r2 = new Request2(request)[kState];
           }
         }
         const responses = [];
@@ -27443,7 +27443,7 @@ var require_cache = __commonJS({
             responses.push(requestResponse[1]);
           }
         } else {
-          const requestResponses = this.#queryCache(r, options);
+          const requestResponses = this.#queryCache(r2, options);
           for (const requestResponse of requestResponses) {
             responses.push(requestResponse[1]);
           }
@@ -33466,7 +33466,7 @@ function scoreGeo(guesses, answer, budget, _nPlayers = 0, map2 = "germany") {
   const result = {};
   const dists = Object.entries(guesses).map(([pid, g]) => ({ pid, km: Math.round(haversineKm(g, answer)) }));
   const ranked = rankAscending(dists.map((d2) => ({ pid: d2.pid, value: d2.km })), 0);
-  for (const r of ranked) result[r.pid] = { km: r.value, place: r.place, points: geoPoints(r.value, budget, map2) };
+  for (const r2 of ranked) result[r2.pid] = { km: r2.value, place: r2.place, points: geoPoints(r2.value, budget, map2) };
   return result;
 }
 function rankVariantOf(t, rules) {
@@ -33516,12 +33516,12 @@ function scoreEstimate(guesses, answer, budget, nPlayers) {
   const errs = Object.entries(guesses).map(([pid, g]) => ({ pid, value: estimateError(g, answer) }));
   const ranked = rankAscending(errs, 1e-9);
   const out = {};
-  for (const r of ranked) {
-    out[r.pid] = {
-      err: r.value,
-      place: r.place,
-      points: Math.round(budget * placeFactor(EST_TABLE, r.place, Math.max(nPlayers, ranked.length))),
-      best: r.place === 1
+  for (const r2 of ranked) {
+    out[r2.pid] = {
+      err: r2.value,
+      place: r2.place,
+      points: Math.round(budget * placeFactor(EST_TABLE, r2.place, Math.max(nPlayers, ranked.length))),
+      best: r2.place === 1
     };
   }
   return out;
@@ -33616,15 +33616,15 @@ function matchValidDetail(input, valid) {
   if (mine.some((m) => others.some((o) => typoDistance(m, o) <= lim + 2))) return null;
   return { name: target, kind: "typo" };
 }
-function groupUnique(answers, valid, overrides = {}, closed2 = false) {
+function groupUnique(answers, valid, overrides = {}, closed3 = false) {
   const base = (pid, raw) => {
     const n = normText(raw);
     if (!n) return null;
     const md = matchValidDetail(raw, valid);
     const mine = overrides["u:" + n];
     if (md && !(md.kind === "typo" && mine)) return { key: "v:" + normText(md.name), label: md.name, state: "valid", autoTypo: md.kind === "typo", autoInvalid: false };
-    let key = "u:" + n, label = raw.trim(), state = closed2 ? "invalid" : "unknown";
-    let autoInvalid = closed2;
+    let key = "u:" + n, label = raw.trim(), state = closed3 ? "invalid" : "unknown";
+    let autoInvalid = closed3;
     const ov = overrides[key];
     if (ov) autoInvalid = false;
     if (ov === "valid") state = "valid";
@@ -33664,15 +33664,15 @@ function groupUnique(answers, valid, overrides = {}, closed2 = false) {
   };
   const groups = /* @__PURE__ */ new Map();
   for (const [pid, raw] of Object.entries(answers)) {
-    const r = resolve(pid);
-    if (!r) continue;
-    const g = groups.get(r.key) ?? { key: r.key, label: r.label, state: r.state, members: [], raw: {} };
+    const r2 = resolve(pid);
+    if (!r2) continue;
+    const g = groups.get(r2.key) ?? { key: r2.key, label: r2.label, state: r2.state, members: [], raw: {} };
     g.members.push(pid);
     g.raw[pid] = raw;
-    if (r.autoTypo) (g.auto ??= []).push(pid);
-    if (r.autoInvalid) g.autoInvalid = true;
+    if (r2.autoTypo) (g.auto ??= []).push(pid);
+    if (r2.autoInvalid) g.autoInvalid = true;
     if (overrides["a:" + pid]) (g.manual ??= []).push(pid);
-    groups.set(r.key, g);
+    groups.set(r2.key, g);
   }
   return [...groups.values()];
 }
@@ -33727,90 +33727,90 @@ function normalizeTask(raw) {
   return t;
 }
 function normalizeTaskCore(raw) {
-  const r = raw ?? {};
-  switch (r.mode) {
+  const r2 = raw ?? {};
+  switch (r2.mode) {
     case "geo":
-      return { mode: "geo", prompt: str(r.prompt, 300), map: r.map, answer: { lat: num(r.answer?.lat), lon: num(r.answer?.lon), label: str(r.answer?.label, 80) }, seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 500) };
+      return { mode: "geo", prompt: str(r2.prompt, 300), map: r2.map, answer: { lat: num(r2.answer?.lat), lon: num(r2.answer?.lon), label: str(r2.answer?.label, 80) }, seconds: num(r2.seconds), points: num(r2.points), explain: str(r2.explain, 500) };
     case "rank":
       return {
         mode: "rank",
-        prompt: str(r.prompt, 200),
-        topLabel: str(r.topLabel, 40),
-        bottomLabel: str(r.bottomLabel, 40),
-        items: (Array.isArray(r.items) ? r.items : []).slice(0, 5).map((i2) => ({ text: str(i2?.text, 60), ...str(i2?.value, 30) ? { value: str(i2?.value, 30) } : {} })),
-        order: Array.isArray(r.order) ? r.order.map((x3) => num(x3)) : [],
-        secondsPerItem: num(r.secondsPerItem),
-        points: num(r.points),
-        ...r.variant === "sort" ? { variant: "sort" } : {},
-        explain: str(r.explain, 500)
+        prompt: str(r2.prompt, 200),
+        topLabel: str(r2.topLabel, 40),
+        bottomLabel: str(r2.bottomLabel, 40),
+        items: (Array.isArray(r2.items) ? r2.items : []).slice(0, 5).map((i2) => ({ text: str(i2?.text, 60), ...str(i2?.value, 30) ? { value: str(i2?.value, 30) } : {} })),
+        order: Array.isArray(r2.order) ? r2.order.map((x3) => num(x3)) : [],
+        secondsPerItem: num(r2.secondsPerItem),
+        points: num(r2.points),
+        ...r2.variant === "sort" ? { variant: "sort" } : {},
+        explain: str(r2.explain, 500)
       };
     case "estimate":
       return {
         mode: "estimate",
-        prompt: str(r.prompt, 300),
-        unit: str(r.unit, 30),
-        answer: num(r.answer),
-        seconds: num(r.seconds),
-        betSeconds: num(r.betSeconds),
-        points: num(r.points),
-        bets: Array.isArray(r.bets) ? r.bets.map((b2) => num(b2)) : [],
-        explain: str(r.explain, 500)
+        prompt: str(r2.prompt, 300),
+        unit: str(r2.unit, 30),
+        answer: num(r2.answer),
+        seconds: num(r2.seconds),
+        betSeconds: num(r2.betSeconds),
+        points: num(r2.points),
+        bets: Array.isArray(r2.bets) ? r2.bets.map((b2) => num(b2)) : [],
+        explain: str(r2.explain, 500)
       };
     case "glitch":
       return {
         mode: "glitch",
-        prompt: str(r.prompt, 200),
-        viewPrompt: str(r.viewPrompt, 120),
-        scene: str(r.scene, 60),
-        viewSeconds: num(r.viewSeconds),
-        seconds: num(r.seconds),
-        points: num(r.points),
-        explain: str(r.explain, 500),
-        ...Array.isArray(r.zones) && r.zones.length ? { zones: r.zones.map((z2) => ({ x: num(z2?.x), y: num(z2?.y), r: num(z2?.r) })) } : {}
+        prompt: str(r2.prompt, 200),
+        viewPrompt: str(r2.viewPrompt, 120),
+        scene: str(r2.scene, 60),
+        viewSeconds: num(r2.viewSeconds),
+        seconds: num(r2.seconds),
+        points: num(r2.points),
+        explain: str(r2.explain, 500),
+        ...Array.isArray(r2.zones) && r2.zones.length ? { zones: r2.zones.map((z2) => ({ x: num(z2?.x), y: num(z2?.y), r: num(z2?.r) })) } : {}
       };
     case "codebreak":
       return {
         mode: "codebreak",
-        prompt: str(r.prompt, 400),
-        ...str(r.display, 400) ? { display: str(r.display, 400) } : {},
-        input: r.input === "text" ? "text" : "number",
-        answers: strList(r.answers, 8),
-        hints: strList(r.hints, 3, 200),
-        seconds: num(r.seconds),
-        points: num(r.points),
-        explain: str(r.explain, 500)
+        prompt: str(r2.prompt, 400),
+        ...str(r2.display, 400) ? { display: str(r2.display, 400) } : {},
+        input: r2.input === "text" ? "text" : "number",
+        answers: strList(r2.answers, 8),
+        hints: strList(r2.hints, 3, 200),
+        seconds: num(r2.seconds),
+        points: num(r2.points),
+        explain: str(r2.explain, 500)
       };
     case "unique":
       return {
         mode: "unique",
-        prompt: str(r.prompt, 300),
-        placeholder: str(r.placeholder, 40),
-        seconds: num(r.seconds),
-        pointsUnique: num(r.pointsUnique),
-        ...r.closed === true ? { closed: true } : {},
-        pointsShared: num(r.pointsShared),
-        explain: str(r.explain, 500),
-        valid: (Array.isArray(r.valid) ? r.valid : []).slice(0, 60).map((v2) => ({ name: str(v2?.name, 60), variants: strList(v2?.variants, 12, 60) }))
+        prompt: str(r2.prompt, 300),
+        placeholder: str(r2.placeholder, 40),
+        seconds: num(r2.seconds),
+        pointsUnique: num(r2.pointsUnique),
+        ...r2.closed === true ? { closed: true } : {},
+        pointsShared: num(r2.pointsShared),
+        explain: str(r2.explain, 500),
+        valid: (Array.isArray(r2.valid) ? r2.valid : []).slice(0, 60).map((v2) => ({ name: str(v2?.name, 60), variants: strList(v2?.variants, 12, 60) }))
       };
     case "match": {
-      const pairs = (Array.isArray(r.pairs) ? r.pairs : []).slice(0, MATCH_PAIRS).map((p) => ({ left: str(p?.left, 50), right: str(p?.right, 50) }));
-      return { mode: "match", prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x3) => num(x3)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) };
+      const pairs = (Array.isArray(r2.pairs) ? r2.pairs : []).slice(0, MATCH_PAIRS).map((p) => ({ left: str(p?.left, 50), right: str(p?.right, 50) }));
+      return { mode: "match", prompt: str(r2.prompt, 200), pairs, order: Array.isArray(r2.order) ? r2.order.map((x3) => num(x3)) : [], seconds: num(r2.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r2.explain, 500) };
     }
     case "vote":
-      return { mode: "vote", prompt: str(r.prompt, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 300), ...str(r.candidate, 40) ? { candidate: str(r.candidate, 40) } : {} };
+      return { mode: "vote", prompt: str(r2.prompt, 200), seconds: num(r2.seconds), points: num(r2.points), explain: str(r2.explain, 300), ...str(r2.candidate, 40) ? { candidate: str(r2.candidate, 40) } : {} };
     case "link":
       return {
         mode: "link",
-        prompt: str(r.prompt, 200),
-        clues: (Array.isArray(r.clues) ? r.clues : []).slice(0, 4).map((c) => str(c, 220)),
-        answer: str(r.answer, 80),
-        accept: strList(r.accept, 12, 80),
-        clueSeconds: num(r.clueSeconds, 20),
+        prompt: str(r2.prompt, 200),
+        clues: (Array.isArray(r2.clues) ? r2.clues : []).slice(0, 4).map((c) => str(c, 220)),
+        answer: str(r2.answer, 80),
+        accept: strList(r2.accept, 12, 80),
+        clueSeconds: num(r2.clueSeconds, 20),
         points: LINK_POINTS[0],
-        explain: str(r.explain, 500)
+        explain: str(r2.explain, 500)
       };
     default:
-      return r;
+      return r2;
   }
 }
 var inRange = (v2, a, b2) => Number.isFinite(v2) && v2 >= a && v2 <= b2;
@@ -33885,17 +33885,17 @@ function validateTask(t, sceneExists = () => true) {
 var CATEGORY_KINDS = ["tile", "surprise", "final"];
 var BUDGET = { tile: 1800, surprise: 3e3, final: 2e3 };
 function normalizeCategory(raw) {
-  const r = raw ?? {};
+  const r2 = raw ?? {};
   return {
-    title: str(r.title, 40),
-    topic: str(r.topic, 80),
-    icon: str(r.icon, 8) || "\u2753",
-    color: /^#[0-9a-fA-F]{6}$/.test(r.color ?? "") ? r.color : "#8b5cf6",
-    kind: CATEGORY_KINDS.includes(r.kind) ? r.kind : "tile",
-    football: !!r.football,
-    blurb: str(r.blurb, 300),
-    taskIds: Array.isArray(r.taskIds) ? r.taskIds.map((x3) => str(x3, 80)).filter(Boolean).slice(0, 12) : [],
-    disabled: !!r.disabled
+    title: str(r2.title, 40),
+    topic: str(r2.topic, 80),
+    icon: str(r2.icon, 8) || "\u2753",
+    color: /^#[0-9a-fA-F]{6}$/.test(r2.color ?? "") ? r2.color : "#8b5cf6",
+    kind: CATEGORY_KINDS.includes(r2.kind) ? r2.kind : "tile",
+    football: !!r2.football,
+    blurb: str(r2.blurb, 300),
+    taskIds: Array.isArray(r2.taskIds) ? r2.taskIds.map((x3) => str(x3, 80)).filter(Boolean).slice(0, 12) : [],
+    disabled: !!r2.disabled
   };
 }
 function validateCategory(c) {
@@ -33923,7 +33923,7 @@ function validateTemplate(t) {
     case "list":
       if (!Array.isArray(t.rows) || t.rows.length < 2 || t.rows.length > 9) e.push("Liste: 2\u20139 Zeilen");
       else {
-        if (t.rows.some((r) => !str2(r.label, 28) || !str2(r.value, 14))) e.push("Jede Zeile braucht Text (\u226428) und Wert (\u226414)");
+        if (t.rows.some((r2) => !str2(r2.label, 28) || !str2(r2.value, 14))) e.push("Jede Zeile braucht Text (\u226428) und Wert (\u226414)");
         if (!(t.changeRow >= 0 && t.changeRow < t.rows.length)) e.push("Ge\xE4nderte Zeile ung\xFCltig");
         else if (!str2(t.newValue, 14) || t.newValue === t.rows[t.changeRow].value) e.push("Neuer Wert fehlt oder ist unver\xE4ndert");
       }
@@ -33932,7 +33932,7 @@ function validateTemplate(t) {
       if (!Array.isArray(t.headers) || t.headers.length < 2 || t.headers.length > 7) e.push("Tabelle: 2\u20137 Spalten");
       else if (!Array.isArray(t.rows) || t.rows.length < 2 || t.rows.length > 10) e.push("Tabelle: 2\u201310 Zeilen");
       else {
-        if (t.rows.some((r) => !Array.isArray(r) || r.length !== t.headers.length || r.some((c) => typeof c !== "string" || c.length > 24))) e.push("Alle Zeilen brauchen genau so viele Zellen wie Spalten (\u226424 Zeichen)");
+        if (t.rows.some((r2) => !Array.isArray(r2) || r2.length !== t.headers.length || r2.some((c) => typeof c !== "string" || c.length > 24))) e.push("Alle Zeilen brauchen genau so viele Zellen wie Spalten (\u226424 Zeichen)");
         else if (!(t.changeRow >= 0 && t.changeRow < t.rows.length && t.changeCol >= 0 && t.changeCol < t.headers.length)) e.push("Ge\xE4nderte Zelle ung\xFCltig");
         else if (!str2(t.newValue, 24) || t.newValue === t.rows[t.changeRow][t.changeCol]) e.push("Neuer Wert fehlt oder ist unver\xE4ndert");
       }
@@ -33956,7 +33956,7 @@ function buildScene(id, t) {
       const items = [{ id: "panel", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#241a3a" }];
       const cw = 1e3 / t.cols, ch = 600 / t.rows;
       const size = Math.min(64, Math.floor(Math.min(cw, ch) * 0.8));
-      for (let r = 0; r < t.rows; r++) for (let c = 0; c < t.cols; c++) items.push(T3(`e${r}_${c}`, cw * c + cw / 2, ch * r + ch / 2 + size * 0.34, t.emoji, size, "#ffffff", { anchor: "middle" }));
+      for (let r2 = 0; r2 < t.rows; r2++) for (let c = 0; c < t.cols; c++) items.push(T3(`e${r2}_${c}`, cw * c + cw / 2, ch * r2 + ch / 2 + size * 0.34, t.emoji, size, "#ffffff", { anchor: "middle" }));
       return { ...base, bg: "#241a3a", items, changes: { [`e${t.oddRow}_${t.oddCol}`]: { text: t.oddEmoji } } };
     }
     case "list": {
@@ -33971,10 +33971,10 @@ function buildScene(id, t) {
         { id: "sep", t: "line", x: 170, y: 116, x2: 830, y2: 116, stroke: dark ? "#4a4a7a" : "#a0522d", sw: 3 }
       ];
       const step = Math.min(62, 420 / t.rows.length);
-      t.rows.forEach((r, i2) => {
+      t.rows.forEach((r2, i2) => {
         const y2 = 175 + i2 * step;
-        items.push(T3(`n${i2}`, 170, y2, r.label, 28, ink));
-        items.push(T3(`v${i2}`, 830, y2, r.value, 28, ink, { anchor: "end", mono: true, weight: 700 }));
+        items.push(T3(`n${i2}`, 170, y2, r2.label, 28, ink));
+        items.push(T3(`v${i2}`, 830, y2, r2.value, 28, ink, { anchor: "end", mono: true, weight: 700 }));
       });
       return { ...base, bg, items, changes: { [`v${t.changeRow}`]: { text: t.newValue } } };
     }
@@ -33988,10 +33988,10 @@ function buildScene(id, t) {
       const colX = (c) => c === 0 ? x0 : x0 + firstW + (x1 - x0 - firstW) / (n - 1) * c;
       t.headers.forEach((h2, c) => items.push(T3(`h${c}`, c === 0 ? x0 : colX(c), 104, h2, 18, "#9a8fd0", { anchor: c === 0 ? "start" : "end" })));
       const rh = Math.min(54, 440 / t.rows.length), fs = Math.min(26, Math.floor(rh * 0.5));
-      t.rows.forEach((row, r) => {
-        const y2 = 150 + r * rh;
-        items.push({ id: `bg${r}`, t: "rect", x: 20, y: y2 - rh * 0.68, w: 960, h: rh * 0.9, fill: r % 2 ? "#1a1340" : "#211852", rx: 8 });
-        row.forEach((cell, c) => items.push(T3(`c${r}_${c}`, c === 0 ? x0 : colX(c), y2, cell, fs, c === n - 1 ? "#14d9c0" : "#ffffff", { anchor: c === 0 ? "start" : "end", mono: c > 0, weight: c === 0 ? 600 : 400 })));
+      t.rows.forEach((row, r2) => {
+        const y2 = 150 + r2 * rh;
+        items.push({ id: `bg${r2}`, t: "rect", x: 20, y: y2 - rh * 0.68, w: 960, h: rh * 0.9, fill: r2 % 2 ? "#1a1340" : "#211852", rx: 8 });
+        row.forEach((cell, c) => items.push(T3(`c${r2}_${c}`, c === 0 ? x0 : colX(c), y2, cell, fs, c === n - 1 ? "#14d9c0" : "#ffffff", { anchor: c === 0 ? "start" : "end", mono: c > 0, weight: c === 0 ? 600 : 400 })));
       });
       return { ...base, bg: "#120c2b", items, changes: { [`c${t.changeRow}_${t.changeCol}`]: { text: t.newValue } } };
     }
@@ -34162,14 +34162,14 @@ function analyzeShow(book) {
     const pts = t.tasks.reduce((a, x3) => a + taskMax(x3), 0);
     rounds.push({ k: st.k, title: t.title, icon: t.icon, mode: t.mode, modes: [...new Set(t.tasks.map((x3) => x3.mode))], tasks: t.tasks.filter((x3) => !x3.practice).length, practice: t.tasks.filter((x3) => x3.practice).length, points: pts, expectedMin: +(tileSeconds(t, "expected", true) / 60).toFixed(1), maxMin: +(tileSeconds(t, "max", true) / 60).toFixed(1) });
   }
-  const modes = new Set(rounds.flatMap((r) => r.modes));
+  const modes = new Set(rounds.flatMap((r2) => r2.modes));
   const all = ["geo", "rank", "estimate", "glitch", "unique", "match", "link"];
-  const pointsMax = rounds.reduce((a, r) => a + r.points, 0);
-  const fin = rounds.filter((r) => r.k === "final").reduce((a, r) => a + r.points, 0);
+  const pointsMax = rounds.reduce((a, r2) => a + r2.points, 0);
+  const fin = rounds.filter((r2) => r2.k === "final").reduce((a, r2) => a + r2.points, 0);
   return {
     rounds,
     boards,
-    tasksTotal: rounds.reduce((a, r) => a + r.tasks, 0),
+    tasksTotal: rounds.reduce((a, r2) => a + r2.tasks, 0),
     minutesExpected: +(fixedShowSeconds(order, boards, "expected") / 60).toFixed(1),
     minutesMax: +(fixedShowSeconds(order, boards, "max") / 60).toFixed(1),
     pointsMax,
@@ -34206,34 +34206,34 @@ function bookHash(book) {
 var J2 = (s) => JSON.parse(s);
 var DEFAULT_RULES = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: "task", showTitle: "OUTPLAY", winnerTitle: "OUTPLAY-Champion", tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: "", winnerLine: "", boardTitle: "", uniquePoints: 0, boardEveryRound: false };
 function normalizePack(raw) {
-  const r = raw ?? {};
+  const r2 = raw ?? {};
   const s = (v2, m) => typeof v2 === "string" ? v2.trim().slice(0, m) : "";
   const n = (v2, d2, lo, hi) => {
     const x3 = Math.trunc(Number(v2));
     return Number.isFinite(x3) ? Math.max(lo, Math.min(hi, x3)) : d2;
   };
   return {
-    name: s(r.name, 60),
-    description: s(r.description, 300),
-    categoryIds: Array.isArray(r.categoryIds) ? [...new Set(r.categoryIds.map((x3) => s(x3, 80)).filter(Boolean))].slice(0, 20) : [],
-    surprise: s(r.surprise, 80),
-    final: s(r.final, 80),
-    ...Array.isArray(r.show) && r.show.length ? { show: r.show.slice(0, 40).map((x3) => x3?.k === "board" ? { k: "board" } : (x3?.k === "round" || x3?.k === "surprise" || x3?.k === "final") && s(x3.cat, 80) ? { k: x3.k, cat: s(x3.cat, 80) } : null).filter((x3) => !!x3) } : {},
+    name: s(r2.name, 60),
+    description: s(r2.description, 300),
+    categoryIds: Array.isArray(r2.categoryIds) ? [...new Set(r2.categoryIds.map((x3) => s(x3, 80)).filter(Boolean))].slice(0, 20) : [],
+    surprise: s(r2.surprise, 80),
+    final: s(r2.final, 80),
+    ...Array.isArray(r2.show) && r2.show.length ? { show: r2.show.slice(0, 40).map((x3) => x3?.k === "board" ? { k: "board" } : (x3?.k === "round" || x3?.k === "surprise" || x3?.k === "final") && s(x3.cat, 80) ? { k: x3.k, cat: s(x3.cat, 80) } : null).filter((x3) => !!x3) } : {},
     rules: {
-      startCredit: n(r.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3),
-      maxFootball: n(r.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20),
-      maxPerMode: n(r.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10),
-      rankVariant: ["task", "sequence", "sort"].includes(r.rules?.rankVariant) ? r.rules.rankVariant : DEFAULT_RULES.rankVariant,
-      showTitle: s(r.rules?.showTitle, 40) || DEFAULT_RULES.showTitle,
-      winnerTitle: s(r.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle,
-      tasksPerMode: n(r.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6),
-      estimateBets: Array.isArray(r.rules?.estimateBets) ? [...new Set(r.rules.estimateBets.map((x3) => Math.trunc(Number(x3))).filter((x3) => Number.isFinite(x3) && x3 >= 0 && x3 <= 1e3))].sort((a, b2) => a - b2).slice(0, 5) : [],
-      estimateBonus: n(r.rules?.estimateBonus, 0, 0, 500),
-      tagline: s(r.rules?.tagline, 80),
-      winnerLine: s(r.rules?.winnerLine, 80),
-      boardTitle: s(r.rules?.boardTitle, 30),
-      uniquePoints: n(r.rules?.uniquePoints, 0, 0, 1e3),
-      boardEveryRound: r.rules?.boardEveryRound === true
+      startCredit: n(r2.rules?.startCredit, DEFAULT_RULES.startCredit, 0, 1e3),
+      maxFootball: n(r2.rules?.maxFootball, DEFAULT_RULES.maxFootball, 0, 20),
+      maxPerMode: n(r2.rules?.maxPerMode, DEFAULT_RULES.maxPerMode, 1, 10),
+      rankVariant: ["task", "sequence", "sort"].includes(r2.rules?.rankVariant) ? r2.rules.rankVariant : DEFAULT_RULES.rankVariant,
+      showTitle: s(r2.rules?.showTitle, 40) || DEFAULT_RULES.showTitle,
+      winnerTitle: s(r2.rules?.winnerTitle, 40) || DEFAULT_RULES.winnerTitle,
+      tasksPerMode: n(r2.rules?.tasksPerMode, DEFAULT_RULES.tasksPerMode, 3, 6),
+      estimateBets: Array.isArray(r2.rules?.estimateBets) ? [...new Set(r2.rules.estimateBets.map((x3) => Math.trunc(Number(x3))).filter((x3) => Number.isFinite(x3) && x3 >= 0 && x3 <= 1e3))].sort((a, b2) => a - b2).slice(0, 5) : [],
+      estimateBonus: n(r2.rules?.estimateBonus, 0, 0, 500),
+      tagline: s(r2.rules?.tagline, 80),
+      winnerLine: s(r2.rules?.winnerLine, 80),
+      boardTitle: s(r2.rules?.boardTitle, 30),
+      uniquePoints: n(r2.rules?.uniquePoints, 0, 0, 1e3),
+      boardEveryRound: r2.rules?.boardEveryRound === true
     }
   };
 }
@@ -34272,9 +34272,9 @@ var ContentService = class _ContentService {
     }
     this.db.exec("BEGIN");
     try {
-      const r = fn();
+      const r2 = fn();
       this.db.exec("COMMIT");
-      return r;
+      return r2;
     } catch (e) {
       this.db.exec("ROLLBACK");
       throw e;
@@ -34339,9 +34339,9 @@ var ContentService = class _ContentService {
       for (const sh of [this.seed.show, ...this.seed.extraShows ?? []]) {
         if (!sh) continue;
         for (const q2 of sh.pool) report.created.questions += run("INSERT OR IGNORE INTO questions(id,mode,topic,data,archived,created,updated) VALUES(?,?,?,?,0,?,?)", q2.id, q2.task.mode, q2.topic, JSON.stringify(q2.task), t, t);
-        for (const r of sh.rounds) {
-          const cat = { title: r.title, topic: r.topic, icon: r.icon, color: r.color, kind: r.kind, football: r.football, blurb: r.blurb, taskIds: r.taskIds };
-          report.created.categories += run("INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)", r.id, JSON.stringify(cat), t, t);
+        for (const r2 of sh.rounds) {
+          const cat = { title: r2.title, topic: r2.topic, icon: r2.icon, color: r2.color, kind: r2.kind, football: r2.football, blurb: r2.blurb, taskIds: r2.taskIds };
+          report.created.categories += run("INSERT OR IGNORE INTO categories(id,data,created,updated) VALUES(?,?,?,?)", r2.id, JSON.stringify(cat), t, t);
         }
         const exists = !!this.db.prepare("SELECT 1 FROM packs WHERE id=?").get(sh.pack.id);
         if (!exists) {
@@ -34374,15 +34374,15 @@ var ContentService = class _ContentService {
     return { extras, id: pk.id, name: pk.name, installed: !!row && (!sh || !!shRow && !qMissing(sh)) && extras.every((e) => e.installed), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: (sh ? qMissing(sh) : 0) + (this.seed.extraShows ?? []).reduce((a, x3) => a + qMissing(x3), 0), status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
   }
   // ------------------------------------------------------------- Szenen
-  sceneRow(r) {
-    return J2(r.data);
+  sceneRow(r2) {
+    return J2(r2.data);
   }
   listScenes() {
-    return this.db.prepare("SELECT * FROM scenes ORDER BY builtin DESC, id").all().map((r) => this.sceneRow(r));
+    return this.db.prepare("SELECT * FROM scenes ORDER BY builtin DESC, id").all().map((r2) => this.sceneRow(r2));
   }
   getScene(id) {
-    const r = this.db.prepare("SELECT * FROM scenes WHERE id=?").get(id);
-    return r ? this.sceneRow(r) : null;
+    const r2 = this.db.prepare("SELECT * FROM scenes WHERE id=?").get(id);
+    return r2 ? this.sceneRow(r2) : null;
   }
   saveScene(id, tpl) {
     const errors = validateTemplate(tpl);
@@ -34407,29 +34407,29 @@ var ContentService = class _ContentService {
     return Object.fromEntries(this.listScenes().map((s) => [s.id, s]));
   }
   // ------------------------------------------------------------- Fragen
-  qRow(r) {
-    const task = J2(r.data);
+  qRow(r2) {
+    const task = J2(r2.data);
     const scenes = this.sceneMap();
     return {
-      id: r.id,
-      mode: r.mode,
-      topic: r.topic,
-      archived: !!r.archived,
+      id: r2.id,
+      mode: r2.mode,
+      topic: r2.topic,
+      archived: !!r2.archived,
       task,
-      updated: r.updated,
-      created: r.created,
+      updated: r2.updated,
+      created: r2.created,
       problems: validateTask(task, (id) => !!scenes[id])
     };
   }
   listQuestions(f = {}) {
     const usage = this.questionUsage();
     const needle = (f.q ?? "").toLowerCase();
-    return this.db.prepare("SELECT * FROM questions ORDER BY updated DESC").all().map((r) => ({ ...this.qRow(r), usedIn: usage[r.id] ?? [] })).filter((q2) => (f.archived === void 0 ? true : q2.archived === f.archived) && (!f.mode || q2.mode === f.mode) && (!f.topic || q2.topic === f.topic) && (!needle || (q2.task.prompt + " " + q2.topic + " " + q2.id + " " + q2.task.explain).toLowerCase().includes(needle)));
+    return this.db.prepare("SELECT * FROM questions ORDER BY updated DESC").all().map((r2) => ({ ...this.qRow(r2), usedIn: usage[r2.id] ?? [] })).filter((q2) => (f.archived === void 0 ? true : q2.archived === f.archived) && (!f.mode || q2.mode === f.mode) && (!f.topic || q2.topic === f.topic) && (!needle || (q2.task.prompt + " " + q2.topic + " " + q2.id + " " + q2.task.explain).toLowerCase().includes(needle)));
   }
   getQuestion(id) {
-    const r = this.db.prepare("SELECT * FROM questions WHERE id=?").get(id);
-    if (!r) throw new ApiError(404, "Frage nicht gefunden");
-    return { ...this.qRow(r), usedIn: this.questionUsage()[id] ?? [] };
+    const r2 = this.db.prepare("SELECT * FROM questions WHERE id=?").get(id);
+    if (!r2) throw new ApiError(404, "Frage nicht gefunden");
+    return { ...this.qRow(r2), usedIn: this.questionUsage()[id] ?? [] };
   }
   questionUsage() {
     const out = {};
@@ -34471,7 +34471,7 @@ var ContentService = class _ContentService {
   }
   // ------------------------------------------------------------- Kategorien
   listCategoriesRaw() {
-    return this.db.prepare("SELECT * FROM categories ORDER BY created, id").all().map((r) => ({ id: r.id, data: J2(r.data), updated: r.updated }));
+    return this.db.prepare("SELECT * FROM categories ORDER BY created, id").all().map((r2) => ({ id: r2.id, data: J2(r2.data), updated: r2.updated }));
   }
   catView(c, qs) {
     const tasks = c.data.taskIds.map((id) => qs.get(id)).filter(Boolean);
@@ -34526,7 +34526,7 @@ var ContentService = class _ContentService {
   }
   // ------------------------------------------------------------- Pakete
   listPacks() {
-    return this.db.prepare("SELECT * FROM packs ORDER BY created, id").all().map((r) => ({ id: r.id, data: J2(r.data), status: r.status, currentVersion: r.current_version, updated: r.updated }));
+    return this.db.prepare("SELECT * FROM packs ORDER BY created, id").all().map((r2) => ({ id: r2.id, data: J2(r2.data), status: r2.status, currentVersion: r2.current_version, updated: r2.updated }));
   }
   listPacksView() {
     return this.listPacks().map((p) => ({
@@ -34684,9 +34684,9 @@ var ContentService = class _ContentService {
   }
   versions(packId) {
     const p = this.getPack(packId);
-    return this.db.prepare("SELECT id,version,note,created,book FROM pack_versions WHERE pack_id=? ORDER BY version DESC").all(packId).map((r) => {
-      const b2 = J2(r.book);
-      return { ref: r.id, version: r.version, note: r.note, created: r.created, current: r.version === p.currentVersion, categories: b2.tiles.filter((t) => t.kind === "tile").length, questions: b2.tiles.reduce((a, t) => a + t.tasks.length, 0) };
+    return this.db.prepare("SELECT id,version,note,created,book FROM pack_versions WHERE pack_id=? ORDER BY version DESC").all(packId).map((r2) => {
+      const b2 = J2(r2.book);
+      return { ref: r2.id, version: r2.version, note: r2.note, created: r2.created, current: r2.version === p.currentVersion, categories: b2.tiles.filter((t) => t.kind === "tile").length, questions: b2.tiles.reduce((a, t) => a + t.tasks.length, 0) };
     });
   }
   rollback(packId, version) {
@@ -34705,8 +34705,8 @@ var ContentService = class _ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
-  static KEEP_PACKS = ["show-4z", "show-5", "show-3"];
-  static REFRESH_PACKS = ["show-4z", "show-5"];
+  static KEEP_PACKS = ["show-4z", "show-5", "show-3", "show-after"];
+  static REFRESH_PACKS = ["show-4z", "show-5", "show-after"];
   static MAIN_PACK = "show-4z";
   seedShow(id) {
     return (this.seed.extraShows ?? []).find((x3) => x3.pack.id === id);
@@ -34735,9 +34735,9 @@ var ContentService = class _ContentService {
       const needsRename = keep && p.status !== "archived" && p.id === "show-3" && p.data.name !== _ContentService.BACKUP_NAME;
       return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate, needsRename, revision: sh?.revision ?? null };
     });
-    const archive = rows.filter((r) => r.action === "archive").map((r) => r.id);
-    const update = rows.filter((r) => r.needsUpdate).map((r) => r.id);
-    const rename3 = rows.filter((r) => r.needsRename).map((r) => r.id);
+    const archive = rows.filter((r2) => r2.action === "archive").map((r2) => r2.id);
+    const update = rows.filter((r2) => r2.needsUpdate).map((r2) => r2.id);
+    const rename3 = rows.filter((r2) => r2.needsRename).map((r2) => r2.id);
     const missing = _ContentService.KEEP_PACKS.filter((id) => !packs.some((p) => p.id === id));
     return { rows, archive, update, rename: rename3, missing, clean: !archive.length && !update.length && !rename3.length, main: _ContentService.MAIN_PACK };
   }
@@ -34757,9 +34757,9 @@ var ContentService = class _ContentService {
       show: sh.steps,
       rules: { ...DEFAULT_RULES, ...sh.pack.rules ?? {}, tasksPerMode: p.rules.tasksPerMode, boardEveryRound: true }
     });
-    const r = this.publish(id, note2);
+    const r2 = this.publish(id, note2);
     if (sh.revision) this.setSetting("rev:" + id, String(sh.revision));
-    return r.ref;
+    return r2.ref;
   }
   cleanupApply() {
     const plan = this.cleanupPlan();
@@ -34801,9 +34801,9 @@ var ContentService = class _ContentService {
     if (ref === "legacy" || !ref) ref = this.legacyRef();
     const hit = this.cache.get(ref);
     if (hit) return hit;
-    const r = this.db.prepare("SELECT book FROM pack_versions WHERE id=?").get(ref);
-    if (!r) throw new ApiError(404, "Paketversion nicht gefunden");
-    const b2 = J2(r.book);
+    const r2 = this.db.prepare("SELECT book FROM pack_versions WHERE id=?").get(ref);
+    if (!r2) throw new ApiError(404, "Paketversion nicht gefunden");
+    const b2 = J2(r2.book);
     this.cache.set(ref, b2);
     return b2;
   }
@@ -35113,14 +35113,14 @@ function marketTable(id, title, rows, changes) {
     T4("c3", 700, 112, "ALTER", 18, "#8aa4c0", { weight: 700 }),
     T4("c4", 960, 112, "MARKTWERT", 18, "#8aa4c0", { anchor: "end", weight: 700 })
   ];
-  rows.forEach((r, i2) => {
+  rows.forEach((r2, i2) => {
     const y2 = 140 + i2 * 72;
     items.push({ id: `bg${i2}`, t: "rect", x: 20, y: y2, w: 960, h: 64, fill: i2 % 2 ? "#16283d" : "#1b3047", rx: 8 });
     items.push({ id: `dot${i2}`, t: "circle", x: 56, y: y2 + 32, r: 20, fill: ["#2d7fb8", "#c0392b", "#27ae60", "#8e44ad", "#e67e22", "#16a085"][i2 % 6] });
-    items.push(T4(`n${i2}`, 90, y2 + 41, r[0], 26, "#ffffff", { weight: 600 }));
-    items.push(T4(`v${i2}`, 420, y2 + 41, r[1], 24, "#c7d6e6"));
-    items.push(T4(`a${i2}`, 700, y2 + 41, r[2], 24, "#c7d6e6", { mono: true }));
-    items.push(T4(`w${i2}`, 960, y2 + 41, r[3], 26, "#ffd34d", { anchor: "end", weight: 700 }));
+    items.push(T4(`n${i2}`, 90, y2 + 41, r2[0], 26, "#ffffff", { weight: 600 }));
+    items.push(T4(`v${i2}`, 420, y2 + 41, r2[1], 24, "#c7d6e6"));
+    items.push(T4(`a${i2}`, 700, y2 + 41, r2[2], 24, "#c7d6e6", { mono: true }));
+    items.push(T4(`w${i2}`, 960, y2 + 41, r2[3], 26, "#ffd34d", { anchor: "end", weight: 700 }));
   });
   return { id, title, bg: "#0d1b2b", items, changes };
 }
@@ -35142,8 +35142,8 @@ function pitch(id, title, home, away, ball, changes) {
 function emojiGrid(id, title, cols, rows, symbols, changes) {
   const items = [{ id: "panel", t: "rect", x: 0, y: 0, w: 1e3, h: 600, fill: "#241a3a" }];
   const cw = 1e3 / cols, ch = 600 / rows;
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    items.push(T4(`e${r}_${c}`, cw * c + cw / 2, ch * r + ch / 2 + 22, symbols[(r * cols + c) % symbols.length], 64, "#ffffff", { anchor: "middle" }));
+  for (let r2 = 0; r2 < rows; r2++) for (let c = 0; c < cols; c++) {
+    items.push(T4(`e${r2}_${c}`, cw * c + cw / 2, ch * r2 + ch / 2 + 22, symbols[(r2 * cols + c) % symbols.length], 64, "#ffffff", { anchor: "middle" }));
   }
   return { id, title, bg: "#241a3a", items, changes };
 }
@@ -35226,13 +35226,13 @@ reg((() => {
     T4("h3", 400, 110, "ZIEL", 18, "#8aa4c0"),
     T4("h4", 940, 110, "GLEIS", 18, "#8aa4c0", { anchor: "end" })
   ];
-  rows.forEach((r, i2) => {
+  rows.forEach((r2, i2) => {
     const y2 = 160 + i2 * 70;
     items.push({ id: `row${i2}`, t: "line", x: 30, y: y2 + 22, x2: 970, y2: y2 + 22, stroke: "#1d3a5f", sw: 2 });
-    items.push(T4(`t${i2}`, 40, y2, r[0], 32, "#ffffff", { mono: true }));
-    items.push(T4(`z${i2}`, 190, y2, r[1], 30, "#c7d6e6"));
-    items.push(T4(`d${i2}`, 400, y2, r[2], 32, "#ffffff", { weight: 600 }));
-    items.push(T4(`g${i2}`, 940, y2, r[3], 34, "#00e5c7", { anchor: "end", weight: 800, mono: true }));
+    items.push(T4(`t${i2}`, 40, y2, r2[0], 32, "#ffffff", { mono: true }));
+    items.push(T4(`z${i2}`, 190, y2, r2[1], 30, "#c7d6e6"));
+    items.push(T4(`d${i2}`, 400, y2, r2[2], 32, "#ffffff", { weight: 600 }));
+    items.push(T4(`g${i2}`, 940, y2, r2[3], 34, "#00e5c7", { anchor: "end", weight: 800, mono: true }));
   });
   return { id: "timetable1", title: "Abfahrtstafel", bg: "#0b1f3a", items, changes: { g2: { text: "12" } } };
 })());
@@ -35243,10 +35243,10 @@ reg((() => {
     T4("title", 500, 70, "SUPERMARKT HEIMAT", 30, "#222222", { anchor: "middle", weight: 800 }),
     { id: "sep0", t: "line", x: 280, y: 95, x2: 720, y2: 95, stroke: "#999999", sw: 2 }
   ];
-  rows.forEach((r, i2) => {
+  rows.forEach((r2, i2) => {
     const y2 = 150 + i2 * 62;
-    items.push(T4(`n${i2}`, 285, y2, r[0], 28, "#222222"));
-    items.push(T4(`p${i2}`, 715, y2, r[1] + " \u20AC", 28, "#222222", { anchor: "end", mono: true }));
+    items.push(T4(`n${i2}`, 285, y2, r2[0], 28, "#222222"));
+    items.push(T4(`p${i2}`, 715, y2, r2[1] + " \u20AC", 28, "#222222", { anchor: "end", mono: true }));
   });
   items.push({ id: "sep1", t: "line", x: 280, y: 500, x2: 720, y2: 500, stroke: "#999999", sw: 2 });
   items.push(T4("sum", 285, 548, "SUMME", 32, "#222222", { weight: 800 }));
@@ -35296,10 +35296,10 @@ reg((() => {
     T4("title", 500, 100, "Gasthaus \u201EZum goldenen L\xF6wen\u201C", 36, "#5a3825", { anchor: "middle", weight: 800 }),
     { id: "sep", t: "line", x: 140, y: 125, x2: 860, y2: 125, stroke: "#a0522d", sw: 3 }
   ];
-  rows.forEach((r, i2) => {
+  rows.forEach((r2, i2) => {
     const y2 = 190 + i2 * 62;
-    items.push(T4(`n${i2}`, 140, y2, r[0], 30, "#3a2616"));
-    items.push(T4(`p${i2}`, 860, y2, r[1] + " \u20AC", 30, "#3a2616", { anchor: "end", mono: true, weight: 700 }));
+    items.push(T4(`n${i2}`, 140, y2, r2[0], 30, "#3a2616"));
+    items.push(T4(`p${i2}`, 860, y2, r2[1] + " \u20AC", 30, "#3a2616", { anchor: "end", mono: true, weight: 700 }));
   });
   return { id: "menu1", title: "Speisekarte", bg: "#2b1d12", items, changes: { p4: { text: "19,40 \u20AC" } } };
 })());
@@ -35466,14 +35466,14 @@ var geo = {
   score(c) {
     const t = c.task;
     const res = scoreGeo(c.round.pm, t.answer, t.points, c.players.length, t.map);
-    const entries = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points, label: `${r.km.toLocaleString("de-DE")} km daneben` }));
+    const entries = Object.entries(res).map(([pid, r2]) => ({ pid, delta: r2.points, label: `${r2.km.toLocaleString("de-DE")} km daneben` }));
     return {
       entries,
       reveal: {
         answer: t.answer,
         explain: t.explain,
         map: t.map,
-        guesses: Object.entries(res).map(([pid, r]) => ({ pid, ...c.round.pm[pid], km: r.km, place: r.place, points: r.points })).sort((a, b2) => a.km - b2.km)
+        guesses: Object.entries(res).map(([pid, r2]) => ({ pid, ...c.round.pm[pid], km: r2.km, place: r2.place, points: r2.points })).sort((a, b2) => a.km - b2.km)
       }
     };
   },
@@ -35561,11 +35561,11 @@ var rank = {
     const t = c.task;
     const rows = c.players.map((p) => {
       const slots = c.round.pm[p.id]?.slots ?? new Array(t.items.length).fill(-1);
-      const r = c.round.m?.sort ? scoreRankExact(c.round.pm[p.id]?.slots, t.points) : scoreRank(c.round.pm[p.id]?.slots, t.points);
-      return { pid: p.id, slots, correct: r.correct, total: r.total, points: r.points, placed: slots.filter((s) => s >= 0).length, pairs: rankPairDetail(slots) };
+      const r2 = c.round.m?.sort ? scoreRankExact(c.round.pm[p.id]?.slots, t.points) : scoreRank(c.round.pm[p.id]?.slots, t.points);
+      return { pid: p.id, slots, correct: r2.correct, total: r2.total, points: r2.points, placed: slots.filter((s) => s >= 0).length, pairs: rankPairDetail(slots) };
     });
     return {
-      entries: rows.filter((r) => r.placed > 0 || r.points > 0).map((r) => ({ pid: r.pid, delta: r.points, label: c.round.m?.sort ? `${r.correct} von 5 Begriffen auf der richtigen Position` : `${r.correct} von ${r.total} Paaren richtig` })),
+      entries: rows.filter((r2) => r2.placed > 0 || r2.points > 0).map((r2) => ({ pid: r2.pid, delta: r2.points, label: c.round.m?.sort ? `${r2.correct} von 5 Begriffen auf der richtigen Position` : `${r2.correct} von ${r2.total} Paaren richtig` })),
       reveal: { scoring: c.round.m?.sort ? "exact" : "pairs", items: t.items, explain: t.explain, rows, topLabel: t.topLabel, bottomLabel: t.bottomLabel, perPair: Math.round(t.points / 10 * 10) / 10, perPos: Math.round(t.points / 5), maxPoints: t.points }
     };
   },
@@ -35649,9 +35649,9 @@ var estimate = {
     const guesses = {};
     for (const [pid, pm] of Object.entries(c.round.pm)) if (pm.guess !== void 0 && c.players.some((p) => p.id === pid)) guesses[pid] = pm.guess;
     const res = scoreEstimate(guesses, t.answer, t.points, c.players.length);
-    const winners = Object.entries(res).filter(([, r]) => r.best).map(([pid]) => pid);
+    const winners = Object.entries(res).filter(([, r2]) => r2.best).map(([pid]) => pid);
     const bonus = bonusOf(c);
-    const entries = Object.entries(res).map(([pid, r]) => ({ pid, delta: r.points + (r.best ? bonus : 0), label: `Sch\xE4tzung Platz ${r.place}${r.best && bonus ? ` \xB7 Bonus +${bonus}` : ""}` }));
+    const entries = Object.entries(res).map(([pid, r2]) => ({ pid, delta: r2.points + (r2.best ? bonus : 0), label: `Sch\xE4tzung Platz ${r2.place}${r2.best && bonus ? ` \xB7 Bonus +${bonus}` : ""}` }));
     const bets = [];
     for (const p of c.players) {
       const b2 = c.round.pm[p.id]?.bet;
@@ -35669,7 +35669,7 @@ var estimate = {
         unit: t.unit,
         explain: t.explain,
         winners,
-        guesses: Object.entries(res).map(([pid, r]) => ({ pid, value: guesses[pid], place: r.place, points: r.points, bonus: r.best ? bonus : 0, best: r.best })).sort((a, b2) => a.place - b2.place),
+        guesses: Object.entries(res).map(([pid, r2]) => ({ pid, value: guesses[pid], place: r2.place, points: r2.points, bonus: r2.best ? bonus : 0, best: r2.best })).sort((a, b2) => a.place - b2.place),
         bets,
         // Klartext-Erklärung für TV und Handys: wer lag am besten, welche Wetten gewonnen/verloren
         summary: [
@@ -35736,7 +35736,7 @@ var glitch = {
     const zones = glitchZones(t, c.scenes);
     const rows = c.players.map((p) => ({ pid: p.id, tap: c.round.pm[p.id] ?? null, ...scoreGlitch(c.round.pm[p.id], zones, t.points) }));
     return {
-      entries: rows.filter((r) => r.tap).map((r) => ({ pid: r.pid, delta: r.points, label: r.hit ? "Treffer" : "Daneben" })),
+      entries: rows.filter((r2) => r2.tap).map((r2) => ({ pid: r2.pid, delta: r2.points, label: r2.hit ? "Treffer" : "Daneben" })),
       reveal: { zones, scene: t.scene, explain: t.explain, rows }
     };
   },
@@ -35813,7 +35813,7 @@ var code = {
       return { pid: p.id, solved: !!pm?.solved, hints: pm?.hints ?? 0, attempts: pm?.attempts ?? 0, points: scoreCode(!!pm?.solved, pm?.hints ?? 0, t.points) };
     });
     return {
-      entries: rows.filter((r) => r.solved).map((r) => ({ pid: r.pid, delta: r.points, label: r.hints ? `Gel\xF6st mit ${r.hints} Hinweis${r.hints > 1 ? "en" : ""}` : "Gel\xF6st ohne Hinweis" })),
+      entries: rows.filter((r2) => r2.solved).map((r2) => ({ pid: r2.pid, delta: r2.points, label: r2.hints ? `Gel\xF6st mit ${r2.hints} Hinweis${r2.hints > 1 ? "en" : ""}` : "Gel\xF6st ohne Hinweis" })),
       reveal: { answer: t.answers[0], explain: t.explain, rows, maxHints: Math.min(3, t.hints.length) }
     };
   },
@@ -35866,10 +35866,10 @@ var unique = {
     const t = c.task;
     const groups = uniqueGroups(c);
     const res = scoreUnique(groups, uniquePts(c), t.pointsShared);
-    const entries = Object.entries(res).map(([pid, r]) => ({
+    const entries = Object.entries(res).map(([pid, r2]) => ({
       pid,
-      delta: r.points,
-      label: r.kind === "unique" ? "Einzigartig!" : r.kind === "shared" ? "Mehrfach genannt \xB7 0 Punkte" : "Ung\xFCltige Antwort"
+      delta: r2.points,
+      label: r2.kind === "unique" ? "Einzigartig!" : r2.kind === "shared" ? "Mehrfach genannt \xB7 0 Punkte" : "Ung\xFCltige Antwort"
     }));
     return { entries, reveal: { explain: t.explain, groups, results: res, pointsUnique: uniquePts(c), pointsShared: 0, validNames: t.valid.map((v2) => v2.name) } };
   },
@@ -35916,11 +35916,11 @@ var match = {
     const t = c.task;
     const rows = c.players.map((p) => {
       const pm = c.round.pm[p.id];
-      const r = scoreMatch(pm?.pairs, t.order);
-      return { pid: p.id, submitted: !!pm && pm.pairs.some((x3) => x3 >= 0), final: !!pm?.final, pairs: pm?.pairs ?? blankPairs(), marks: r.rows, correct: r.correct, points: r.points };
+      const r2 = scoreMatch(pm?.pairs, t.order);
+      return { pid: p.id, submitted: !!pm && pm.pairs.some((x3) => x3 >= 0), final: !!pm?.final, pairs: pm?.pairs ?? blankPairs(), marks: r2.rows, correct: r2.correct, points: r2.points };
     });
     return {
-      entries: rows.filter((r) => r.submitted).map((r) => ({ pid: r.pid, delta: r.points, label: `${r.correct} von ${MATCH_PAIRS} Paaren richtig` })),
+      entries: rows.filter((r2) => r2.submitted).map((r2) => ({ pid: r2.pid, delta: r2.points, label: `${r2.correct} von ${MATCH_PAIRS} Paaren richtig` })),
       reveal: { pairs: t.pairs, order: t.order, right: t.order.map((i2) => t.pairs[i2].right), explain: t.explain, rows, pointsPerPair: MATCH_PAIR_POINTS }
     };
   },
@@ -35937,9 +35937,9 @@ var match = {
 };
 function linkLevel(c) {
   const t = c.task;
-  const r = c.round;
-  let lvl = r.m?.level ?? 0;
-  if (r.deadline !== null && r.pausedLeft === null && c.now >= r.deadline) lvl += 1 + Math.floor((c.now - r.deadline) / (clueSecs(t) * 1e3));
+  const r2 = c.round;
+  let lvl = r2.m?.level ?? 0;
+  if (r2.deadline !== null && r2.pausedLeft === null && c.now >= r2.deadline) lvl += 1 + Math.floor((c.now - r2.deadline) / (clueSecs(t) * 1e3));
   return lvl > 3 ? null : lvl;
 }
 function linkGroups(c) {
@@ -36017,7 +36017,7 @@ var link = {
       return { pid: p.id, answer: pm?.answer ?? null, level: pm ? pm.level : null, correct, points: correct ? LINK_POINTS[pm.level] : 0 };
     });
     return {
-      entries: rows.filter((r) => r.answer).map((r) => ({ pid: r.pid, delta: r.points, label: r.correct ? `Richtig nach Hinweis ${r.level + 1}` : "Falsch" })),
+      entries: rows.filter((r2) => r2.answer).map((r2) => ({ pid: r2.pid, delta: r2.points, label: r2.correct ? `Richtig nach Hinweis ${r2.level + 1}` : "Falsch" })),
       reveal: { answer: t.answer, clues: t.clues, explain: t.explain, rows, points: LINK_POINTS }
     };
   },
@@ -36078,7 +36078,7 @@ var vote = {
     });
     const cand = t.candidate ? [{ pid: HOST_CANDIDATE, name: t.candidate, host: true }] : [];
     return {
-      entries: rows.filter((r) => r.target).map((r) => ({ pid: r.pid, delta: r.points, label: r.correct ? `Konsens: ${r.target === HOST_CANDIDATE ? t.candidate : nm(c, r.target)}` : "kein Konsens" })),
+      entries: rows.filter((r2) => r2.target).map((r2) => ({ pid: r2.pid, delta: r2.points, label: r2.correct ? `Konsens: ${r2.target === HOST_CANDIDATE ? t.candidate : nm(c, r2.target)}` : "kein Konsens" })),
       reveal: {
         prompt: t.prompt,
         explain: t.explain,
@@ -36344,16 +36344,16 @@ var Engine = class _Engine {
   tick(room, now) {
     const c = this.ctx(room, now);
     if (!c || room.phase !== "round") return false;
-    const r = c.round;
+    const r2 = c.round;
     let changed = false;
     for (let guard = 0; guard < 8; guard++) {
-      if ((r.stage === "view" || r.stage === "open" || r.stage === "bet") && r.deadline !== null && now >= r.deadline && r.pausedLeft === null) {
-        const at = r.deadline;
+      if ((r2.stage === "view" || r2.stage === "open" || r2.stage === "bet") && r2.deadline !== null && now >= r2.deadline && r2.pausedLeft === null) {
+        const at = r2.deadline;
         const c2 = { ...c, now: at, setStage: (s, sec) => {
           c.setStage(s, sec);
           if (sec != null && !room.frozen) {
-            r.stageStartedAt = at;
-            r.deadline = at + sec * 1e3;
+            r2.stageStartedAt = at;
+            r2.deadline = at + sec * 1e3;
           }
         } };
         MODES2[c.task.mode].advance(c2);
@@ -36393,11 +36393,11 @@ var Engine = class _Engine {
         if (room.phase !== "round" || !room.round) return { ok: false, err: "no_round" };
         if (room.showPaused) return { ok: false, err: "paused" };
         const c = this.ctx(room, now);
-        const r = MODES2[c.task.mode].submit(c, pid, a.payload);
-        if (r.ok && !r.dup) {
+        const r2 = MODES2[c.task.mode].submit(c, pid, a.payload);
+        if (r2.ok && !r2.dup) {
           this.afterSubmit(room, c);
         }
-        return r;
+        return r2;
       }
       case "hint": {
         const c = this.ctx(room, now);
@@ -36546,18 +36546,18 @@ var Engine = class _Engine {
   }
   freeze(room, now) {
     room.frozen = true;
-    const r = room.round;
-    if (r && r.deadline !== null) {
-      r.pausedLeft = Math.max(0, r.deadline - now);
-      r.deadline = null;
+    const r2 = room.round;
+    if (r2 && r2.deadline !== null) {
+      r2.pausedLeft = Math.max(0, r2.deadline - now);
+      r2.deadline = null;
     }
   }
   unfreeze(room, now) {
     room.frozen = false;
-    const r = room.round;
-    if (r && r.pausedLeft !== null) {
-      r.deadline = now + r.pausedLeft;
-      r.pausedLeft = null;
+    const r2 = room.round;
+    if (r2 && r2.pausedLeft !== null) {
+      r2.deadline = now + r2.pausedLeft;
+      r2.pausedLeft = null;
     }
   }
   forceLock(c) {
@@ -36565,24 +36565,24 @@ var Engine = class _Engine {
     for (let i2 = 0; i2 < 12 && ["view", "open", "bet"].includes(c.round.stage); i2++) mode.advance(c);
   }
   doReveal(room, c, now) {
-    const r = c.round;
-    if (r.stage === "reveal") return { ok: true, dup: true };
-    if (r.stage === "intro") return { ok: false, err: "not_started" };
+    const r2 = c.round;
+    if (r2.stage === "reveal") return { ok: true, dup: true };
+    if (r2.stage === "intro") return { ok: false, err: "not_started" };
     this.forceLock(c);
     if (MODES2[c.task.mode].blockReveal?.(c)) return { ok: false, err: "review_needed" };
     const res = MODES2[c.task.mode].score(c);
     res.reveal = { ...res.reveal, missing: c.players.filter((p) => !MODES2[c.task.mode].answered(c, p.id)).map((p) => p.id) };
     if (c.task.practice) {
-      r.result = { entries: [], reveal: { ...res.reveal, practice: true } };
+      r2.result = { entries: [], reveal: { ...res.reveal, practice: true } };
     } else {
-      r.result = res;
+      r2.result = res;
       const key = this.scoreKey(room);
       this.dropEntries(room, key);
       for (const e of res.entries) this.addEntry(room, key, e.pid, e.delta, e.label, now);
       this.recompute(room);
     }
     c.setStage("reveal", null);
-    this.log(room, now, `Aufl\xF6sung: ${this.curTile(room).title} \xB7 Aufgabe ${r.taskIndex + 1}`);
+    this.log(room, now, `Aufl\xF6sung: ${this.curTile(room).title} \xB7 Aufgabe ${r2.taskIndex + 1}`);
     return { ok: true };
   }
   hostAction(room, a, now) {
@@ -36720,16 +36720,16 @@ var Engine = class _Engine {
     const c = this.ctx(room, now);
     if (!c || room.phase !== "round") return bad("no_round");
     const mode = MODES2[c.task.mode];
-    const r = c.round;
+    const r2 = c.round;
     switch (a.k) {
       case "h.begin": {
-        if (r.stage !== "intro") return { ok: true, dup: true };
+        if (r2.stage !== "intro") return { ok: true, dup: true };
         mode.begin(c);
-        this.log(room, now, `Aufgabe ${r.taskIndex + 1} gestartet`);
+        this.log(room, now, `Aufgabe ${r2.taskIndex + 1} gestartet`);
         return ok;
       }
       case "h.lock": {
-        if (!["view", "open", "bet"].includes(r.stage)) return { ok: true, dup: true };
+        if (!["view", "open", "bet"].includes(r2.stage)) return { ok: true, dup: true };
         if (c.task.mode === "link") this.forceLock(c);
         else mode.advance(c);
         this.afterSubmit(room, c);
@@ -36738,10 +36738,10 @@ var Engine = class _Engine {
       case "h.reveal":
         return this.doReveal(room, c, now);
       case "h.next": {
-        if (r.stage !== "reveal") return bad("not_revealed");
+        if (r2.stage !== "reveal") return bad("not_revealed");
         const tile = this.curTile(room);
-        if (r.taskIndex + 1 < tile.tasks.length) {
-          room.round = this.freshRound(tile.id, r.taskIndex + 1, now);
+        if (r2.taskIndex + 1 < tile.tasks.length) {
+          room.round = this.freshRound(tile.id, r2.taskIndex + 1, now);
           room.round.stageStartedAt = now;
           return ok;
         }
@@ -36750,24 +36750,24 @@ var Engine = class _Engine {
       }
       case "h.addTime": {
         const s = Math.max(1, Math.min(300, Math.trunc(Number(a.seconds) || 0)));
-        if (r.deadline !== null) r.deadline += s * 1e3;
-        else if (r.pausedLeft !== null) r.pausedLeft += s * 1e3;
-        else if (r.stage === "locked" && c.task.mode !== "rank") c.setStage("open", s);
+        if (r2.deadline !== null) r2.deadline += s * 1e3;
+        else if (r2.pausedLeft !== null) r2.pausedLeft += s * 1e3;
+        else if (r2.stage === "locked" && c.task.mode !== "rank") c.setStage("open", s);
         else return bad("no_timer");
         return ok;
       }
       case "h.restartTask": {
         this.dropEntries(room, this.scoreKey(room));
         this.recompute(room);
-        room.round = this.freshRound(r.tileId, r.taskIndex, now, r.attempt + 1);
-        this.log(room, now, `Aufgabe ${r.taskIndex + 1} wurde neu gestartet`);
+        room.round = this.freshRound(r2.tileId, r2.taskIndex, now, r2.attempt + 1);
+        this.log(room, now, `Aufgabe ${r2.taskIndex + 1} wurde neu gestartet`);
         return ok;
       }
       case "h.skipTask": {
         this.dropEntries(room, this.scoreKey(room));
         this.recompute(room);
         const tile = this.curTile(room);
-        if (r.taskIndex + 1 < tile.tasks.length) room.round = this.freshRound(tile.id, r.taskIndex + 1, now);
+        if (r2.taskIndex + 1 < tile.tasks.length) room.round = this.freshRound(tile.id, r2.taskIndex + 1, now);
         else this.finishTile(room, now);
         return ok;
       }
@@ -36775,14 +36775,14 @@ var Engine = class _Engine {
         this.finishTile(room, now);
         return ok;
       case "h.review": {
-        if (c.task.mode !== "unique" && c.task.mode !== "link" || r.stage !== "review" && r.stage !== "locked") return bad("wrong_phase");
-        r.m.overrides ??= {};
+        if (c.task.mode !== "unique" && c.task.mode !== "link" || r2.stage !== "review" && r2.stage !== "locked") return bad("wrong_phase");
+        r2.m.overrides ??= {};
         const dec = a.decision;
         const key = String(a.groupKey ?? "").slice(0, 120);
         const okDec = dec === "valid" || dec === "invalid" || dec === "auto" || dec && typeof dec === "object" && (typeof dec.mapTo === "string" || typeof dec.sameAs === "string");
         if (!key || !okDec) return bad("invalid");
-        if (dec === "auto") delete r.m.overrides[key];
-        else r.m.overrides[key] = dec;
+        if (dec === "auto") delete r2.m.overrides[key];
+        else r2.m.overrides[key] = dec;
         return ok;
       }
     }
@@ -36947,8 +36947,8 @@ var Engine = class _Engine {
           if (k2 === "board") return this.boardName(room);
           if (k2 === "final") return this.finalName(room);
           if (k2 === "surprise") return "\xDCberraschungsrunde";
-          const r = this.roundNumber(room, room.planIdx);
-          return `Runde ${r.n} von ${r.of}`;
+          const r2 = this.roundNumber(room, room.planIdx);
+          return `Runde ${r2.n} von ${r2.of}`;
         }
       }
     }
@@ -36979,8 +36979,8 @@ var Engine = class _Engine {
   }
   /** Einheitliche Bezeichnung der Zwischenstände (Paketregel boardTitle; bei „Zwischenstand nach jeder Runde“ standardmäßig Marktwert-Update). */
   boardName(room) {
-    const r = this.bk(room).rules;
-    return r?.boardTitle || (r?.boardEveryRound ? "Marktwert-Update" : "Zwischenstand");
+    const r2 = this.bk(room).rules;
+    return r2?.boardTitle || (r2?.boardEveryRound ? "Marktwert-Update" : "Zwischenstand");
   }
   planNextLabel(room) {
     const nxt = room.plan[room.planIdx + 1];
@@ -36992,12 +36992,12 @@ var Engine = class _Engine {
   }
   roundView(room, c, aud) {
     const tile = this.curTile(room);
-    const r = c.round;
+    const r2 = c.round;
     const mode = MODES2[c.task.mode];
-    const data = r.stage === "intro" ? { preview: true } : mode.view(c, aud);
-    const reveal = r.stage === "reveal" ? this.revealView(r.result?.reveal, aud) : null;
+    const data = r2.stage === "intro" ? { preview: true } : mode.view(c, aud);
+    const reveal = r2.stage === "reveal" ? this.revealView(r2.result?.reveal, aud) : null;
     return {
-      rid: `${tile.id}#${r.taskIndex}#${r.attempt}`,
+      rid: `${tile.id}#${r2.taskIndex}#${r2.attempt}`,
       tileId: tile.id,
       title: tile.title,
       topic: tile.topic,
@@ -37006,15 +37006,15 @@ var Engine = class _Engine {
       mode: c.task.mode,
       kind: tile.kind,
       blurb: tile.blurb,
-      taskIndex: r.taskIndex,
+      taskIndex: r2.taskIndex,
       taskCount: tile.tasks.length,
       practice: !!c.task.practice,
-      scoredIndex: c.task.practice ? 0 : tile.tasks.slice(0, r.taskIndex + 1).filter((x3) => !x3.practice).length,
+      scoredIndex: c.task.practice ? 0 : tile.tasks.slice(0, r2.taskIndex + 1).filter((x3) => !x3.practice).length,
       scoredCount: tile.tasks.filter((x3) => !x3.practice).length,
-      stage: r.stage,
-      deadline: r.deadline,
-      pausedLeft: r.pausedLeft,
-      stageSeconds: r.stageSeconds,
+      stage: r2.stage,
+      deadline: r2.deadline,
+      pausedLeft: r2.pausedLeft,
+      stageSeconds: r2.stageSeconds,
       points: c.task.mode === "unique" && c.rules?.uniquePoints ? c.rules.uniquePoints : mode.maxPoints(c.task),
       data,
       reveal
@@ -37061,8 +37061,8 @@ function buildPreview(rawTask, scenes, meta = {}) {
   const { room } = eng.newRoom("PREV", now);
   const ids2 = [];
   SAMPLE_NAMES.forEach((n, i2) => {
-    const r = eng.join(room, n, av(i2 + 1), now);
-    if (r.ok) ids2.push(r.player.id);
+    const r2 = eng.join(room, n, av(i2 + 1), now);
+    if (r2.ok) ids2.push(r2.player.id);
   });
   const H3 = (a) => eng.act(room, { role: "host" }, "", a, now);
   const P3 = (i2, a) => eng.act(room, { role: "player", pid: ids2[i2] }, "", a, now);
@@ -37449,8 +37449,8 @@ var AdminAuth = class {
   }
   check(token) {
     if (!token) return false;
-    const r = this.store.db.prepare("SELECT expires FROM admin_sessions WHERE hash=?").get(sha3(token));
-    return !!r && r.expires > this.now();
+    const r2 = this.store.db.prepare("SELECT expires FROM admin_sessions WHERE hash=?").get(sha3(token));
+    return !!r2 && r2.expires > this.now();
   }
   logout(token) {
     if (token) this.store.db.prepare("DELETE FROM admin_sessions WHERE hash=?").run(sha3(token));
@@ -37494,7 +37494,7 @@ var Store = class {
     this.ev.run(room, at, actor, req ?? null, JSON.stringify(action), JSON.stringify(result));
   }
   loadAll() {
-    return this.db.prepare("SELECT json FROM rooms").all().map((r) => JSON.parse(r.json));
+    return this.db.prepare("SELECT json FROM rooms").all().map((r2) => JSON.parse(r2.json));
   }
   deleteOlderThan(ts) {
     const old = this.db.prepare("SELECT code FROM rooms WHERE updated < ?").all(ts);
@@ -38690,7 +38690,7 @@ var BLURB = {
   "s4-r5": "Erst sch\xE4tzt jeder geheim eine Zahl. Dann setzt du 0, 50 oder 100 Punkte auf die Sch\xE4tzung, der du vertraust \u2013 die beste Sch\xE4tzung bringt zus\xE4tzlich 150 Bonuspunkte.",
   "s4-r1": "Setze deinen Pin auf der Karte \u2013 du kannst zoomen und ihn verschieben. Je n\xE4her dein Pin, desto mehr Punkte."
 };
-var SHOW3_ROUNDS = SHOW2_ROUNDS.map((r) => ({ ...r, id: r.id.replace("s4-", "s5-"), blurb: BLURB[r.id] ?? r.blurb, taskIds: r.taskIds.map(rename) }));
+var SHOW3_ROUNDS = SHOW2_ROUNDS.map((r2) => ({ ...r2, id: r2.id.replace("s4-", "s5-"), blurb: BLURB[r2.id] ?? r2.blurb, taskIds: r2.taskIds.map(rename) }));
 var SHOW3_STEPS = [
   { k: "round", cat: "s5-r1" },
   { k: "board" },
@@ -39015,7 +39015,7 @@ var ROUND_DEF = [
   { key: "link", id: "b42-r6", probe: PROBE("link"), src: "s5-r6" }
 ];
 var BESTOF_ROUNDS = ROUND_DEF.map((d2) => {
-  const base = SHOW3_ROUNDS.find((r) => r.id === d2.src);
+  const base = SHOW3_ROUNDS.find((r2) => r2.id === d2.src);
   return { ...base, id: d2.id, taskIds: [d2.probe, ...BESTOF_PLAN[d2.key].map((x3) => x3.id)] };
 });
 var BESTOF_STEPS = [
@@ -39090,12 +39090,12 @@ var SWAP = { "v2-heimspiel-2": "b43-geo-2028", "b42-geo-c04": "b43-geo-c04", "b4
 var mapId = (id) => SWAP[id] ?? id;
 var BESTOF2_PLAN = Object.fromEntries(Object.entries(BESTOF_PLAN).map(([m, l]) => [m, l.map((x3) => ({ id: mapId(x3.id), fb: x3.fb }))]));
 var CHANGED = { "b42-r1": "b43-r1", "b42-r2": "b43-r2", "b42-r3": "b43-r3" };
-var BESTOF2_ROUNDS = BESTOF_ROUNDS.filter((r) => CHANGED[r.id]).map((r) => ({
-  ...r,
-  id: CHANGED[r.id],
-  title: r.id === "b42-r3" ? "SORTIER\u2019S!" : r.title,
-  taskIds: r.taskIds.map(mapId),
-  blurb: r.id === "b42-r3" ? "F\xFCnf gemischte Karten liegen bereit. Ziehe sie auf dem Handy auf die Pl\xE4tze 1 bis 5 (oder erst Karte, dann Platz antippen) \u2013 je Karte auf der exakt richtigen Position gibt es 50 Punkte." : r.blurb
+var BESTOF2_ROUNDS = BESTOF_ROUNDS.filter((r2) => CHANGED[r2.id]).map((r2) => ({
+  ...r2,
+  id: CHANGED[r2.id],
+  title: r2.id === "b42-r3" ? "SORTIER\u2019S!" : r2.title,
+  taskIds: r2.taskIds.map(mapId),
+  blurb: r2.id === "b42-r3" ? "F\xFCnf gemischte Karten liegen bereit. Ziehe sie auf dem Handy auf die Pl\xE4tze 1 bis 5 (oder erst Karte, dann Platz antippen) \u2013 je Karte auf der exakt richtigen Position gibt es 50 Punkte." : r2.blurb
 }));
 var sub = (id) => CHANGED[id] ?? id;
 var BESTOF2_STEPS = SEED_SHOW_B42.steps.map((s) => s.k === "board" || s.k === "final" ? s : { ...s, cat: sub(s.cat) });
@@ -39158,11 +39158,11 @@ var DROP = /* @__PURE__ */ new Set(["s3-match-spiele", "s3-unique-orchester"]);
 var sw = (id) => SWAP2[id] ?? id;
 var ids = (xs) => xs.filter((x3) => !DROP.has(x3)).map(sw);
 var BESTOF3_PLAN = Object.fromEntries(Object.entries(BESTOF2_PLAN).map(([m, l]) => [m, l.filter((x3) => !DROP.has(x3.id)).map((x3) => ({ id: sw(x3.id), fb: x3.fb }))]));
-var baseOf = (id) => [...BESTOF2_ROUNDS, ...BESTOF_ROUNDS].find((r) => r.id === id);
+var baseOf = (id) => [...BESTOF2_ROUNDS, ...BESTOF_ROUNDS].find((r2) => r2.id === id);
 var CAT = { "b43-r2": "b44-r2", "b43-r3": "b44-r3", "b42-sur": "b44-sur", "b42-r6": "b44-r6" };
 var BESTOF3_ROUNDS = Object.entries(CAT).map(([from, id]) => {
-  const r = baseOf(from);
-  return { ...r, id, taskIds: ids(r.taskIds) };
+  const r2 = baseOf(from);
+  return { ...r2, id, taskIds: ids(r2.taskIds) };
 });
 var BESTOF3_FINAL = {
   id: "b44-final-kk",
@@ -39192,9 +39192,269 @@ var SEED_SHOW_B44K = {
   steps: STEPS.map((s) => s.k === "final" ? { k: "final", cat: BESTOF3_FINAL.id } : s)
 };
 
+// content/aftershow.ts
+var closed2 = (q2) => ({ ...q2, task: { ...q2.task, closed: true } });
+var AFTERSHOW_NEW = [
+  // Geo: der Tanzwahn von 1518 – verrückter historischer Ort statt einer Lösung, die schon im Fragetext steckt.
+  geo2(
+    "after2-geo-dance1518",
+    "Geschichte & Kurioses",
+    "europe",
+    60,
+    250,
+    "1518 tanzten in einer Stadt im Elsass, nahe der heutigen deutsch-franz\xF6sischen Grenze, Hunderte Menschen unkontrolliert auf den Stra\xDFen. Wo fand dieser \u201ETanzwahn\u201C statt?",
+    48.5839,
+    7.7455,
+    "Stra\xDFburg, Elsass, Frankreich",
+    "Der Tanzwahn von 1518 ist in zeitgen\xF6ssischen Chroniken dokumentiert. Was ihn ausl\xF6ste, ist bis heute umstritten."
+  ),
+  // Matchmaker 1: reale, aber in Erinnerung überraschende Vereinsstationen.
+  match2(
+    "after2-match-exclubs",
+    "Fu\xDFball",
+    "Welcher Star spielte tats\xE4chlich auch einmal f\xFCr diesen Verein?",
+    [
+      ["Kevin-Prince Boateng", "FC Barcelona"],
+      ["Lothar Matth\xE4us", "New York/New Jersey MetroStars"],
+      ["Franck Rib\xE9ry", "US Salernitana"],
+      ["Nuri \u015Eahin", "Real Madrid"],
+      ["Mario Balotelli", "Adana Demirspor"],
+      ["Ronaldo (Brasilien)", "Corinthians S\xE3o Paulo"]
+    ],
+    [3, 5, 0, 4, 1, 2],
+    "Ja, alle sechs Stationen sind echt! Boateng war 2019 bei Barcelona, Matth\xE4us 2000 in New York, Rib\xE9ry bei Salernitana, \u015Eahin bei Real Madrid, Balotelli bei Adana und Ronaldo bei Corinthians."
+  ),
+  // Matchmaker 2: überraschende Popkultur-Fußball-Gleichzeitigkeit (sechs verschiedene Jahre).
+  match2(
+    "after2-match-sameyear",
+    "Popkultur & Fu\xDFball",
+    "Welcher Fu\xDFballmoment geschah im selben Jahr wie dieses Popkultur-Ereignis?",
+    [
+      ["\u201ETitanic\u201C kommt ins Kino", "BVB gewinnt erstmals die Champions League"],
+      ["\u201EStar Wars: Episode I\u201C kommt ins Kino", "Manchester United gewinnt das CL-Finale in der Nachspielzeit"],
+      ["\u201EAvatar\u201C kommt ins Kino", "VfL Wolfsburg wird deutscher Meister"],
+      ["Ice Bucket Challenge geht viral", "Deutschland wird in Brasilien Weltmeister"],
+      ["Pok\xE9mon GO wird ver\xF6ffentlicht", "Portugal gewinnt die Europameisterschaft"],
+      ["\u201EBarbie\u201C kommt ins Kino", "Manchester City gewinnt erstmals die Champions League"]
+    ],
+    [4, 2, 5, 0, 3, 1],
+    "Die Paare geh\xF6ren zu 1997 (Titanic/BVB), 1999 (Star Wars/United), 2009 (Avatar/Wolfsburg), 2014 (Ice Bucket/WM), 2016 (Pok\xE9mon GO/Portugal) und 2023 (Barbie/Man City)."
+  ),
+  // Verbindung: beide Themen erlauben mehrere echte „Aha“-Hinweise statt Schulbuch-Raten.
+  link2(
+    "after2-link-mourinho",
+    "Fu\xDFball",
+    "Welche Person wird gesucht?",
+    [
+      "Meine Trainerkarriere begann auch damit, dass ich f\xFCr einen englischen Trainer \xFCbersetzte.",
+      "Sp\xE4ter gewann ich die Champions League mit zwei unterschiedlichen Vereinen.",
+      "Nach meinem Wechsel nach England gab ich mir einen selbstbewussten Spitznamen.",
+      "Ich bin Jos\xE9 Mourinho \u2013 \u201EThe Special One\u201C."
+    ],
+    "Jos\xE9 Mourinho",
+    ["Mourinho", "Jose Mourinho"],
+    "Mourinho \xFCbersetzte anfangs f\xFCr Bobby Robson, gewann die Champions League mit Porto (2004) und Inter (2010) und nannte sich \u201EThe Special One\u201C."
+  ),
+  link2(
+    "after2-link-bttf",
+    "Film & Popkultur",
+    "Welche Filmreihe wird gesucht?",
+    [
+      "F\xFCr den ersten Film wurde nach mehreren Wochen Drehzeit der Hauptdarsteller ausgetauscht.",
+      "Ein Sportwagen erreicht eine f\xFCr die Geschichte entscheidende Geschwindigkeit von 88 Meilen pro Stunde.",
+      "Die Handlung springt von 1985 zur\xFCck nach 1955 und sp\xE4ter auch ins Jahr 2015.",
+      "Marty McFly und Doc Brown reisen mit einem DeLorean durch die Zeit."
+    ],
+    "Zur\xFCck in die Zukunft",
+    ["Zurueck in die Zukunft", "Back to the Future", "Zur\xFCck in die Zukunft-Trilogie"],
+    "Michael J. Fox ersetzte Eric Stoltz mitten in den Dreharbeiten. Der DeLorean muss 88 mph erreichen, um durch die Zeit zu reisen."
+  ),
+  // 6 mögliche Lösungen für 7 Mitspieler: garantierte Doppelung, aber mit Fußballwissen lösbar.
+  closed2(unique2(
+    "after2-unique-bayernfinals",
+    "Fu\xDFball",
+    "Ein Finalgegner \u2026",
+    "Nenne einen Verein, den der FC Bayern bis einschlie\xDFlich 2026 in einem Finale des Europapokals der Landesmeister oder der Champions League besiegt hat.",
+    [
+      ["Atl\xE9tico Madrid", ["Atletico Madrid", "Atletico"]],
+      ["Leeds United", ["Leeds"]],
+      ["AS Saint-\xC9tienne", ["Saint Etienne", "Saint-Etienne", "Saint Etienne AS"]],
+      ["FC Valencia", ["Valencia", "Valencia CF"]],
+      ["Borussia Dortmund", ["BVB", "Dortmund"]],
+      ["Paris Saint-Germain", ["PSG", "Paris SG", "Paris"]]
+    ],
+    "Sechs Bayern-Siege: Atl\xE9tico (1974), Leeds (1975), Saint-\xC9tienne (1976), Valencia (2001), Dortmund (2013) und PSG (2020). Bei sieben Spielern muss mindestens eine Antwort doppelt vorkommen."
+  )),
+  link2(
+    "after-link-dassler",
+    "Fu\xDFball & Marken",
+    "Welche ZWEI Sportartikelmarken sind gesucht?",
+    [
+      "Am Anfang stand eine gemeinsame Schuhfabrik zweier Br\xFCder.",
+      "Nach einem Zerw\xFCrfnis gr\xFCndeten die Br\xFCder konkurrierende Unternehmen.",
+      "Beide Firmen sitzen in Herzogenaurach.",
+      "Der eine gr\xFCndete Puma, der andere Adidas."
+    ],
+    "Adidas und Puma",
+    ["Puma und Adidas", "Adidas & Puma", "Puma & Adidas"],
+    "Aus der Trennung von Adolf und Rudolf Dassler gingen Adidas und Puma hervor."
+  ),
+  closed2(unique2(
+    "after-unique-meister",
+    "Fu\xDFball",
+    "Ein Meisterverein \u2026",
+    "Nenne einen Verein, der seit Einf\xFChrung der Bundesliga 1963 mindestens einmal deutscher Meister wurde.",
+    [
+      ["FC Bayern M\xFCnchen", ["Bayern M\xFCnchen", "Bayern"]],
+      ["Borussia Dortmund", ["BVB", "Dortmund"]],
+      ["Borussia M\xF6nchengladbach", ["Gladbach"]],
+      ["Werder Bremen", ["Bremen"]],
+      ["Hamburger SV", ["HSV"]],
+      ["VfB Stuttgart", ["Stuttgart"]],
+      ["1. FC K\xF6ln", ["K\xF6ln", "Koeln"]],
+      ["1. FC Kaiserslautern", ["Kaiserslautern", "FCK"]],
+      ["VfL Wolfsburg", ["Wolfsburg"]],
+      ["Bayer 04 Leverkusen", ["Bayer Leverkusen", "Leverkusen"]],
+      ["1. FC N\xFCrnberg", ["N\xFCrnberg", "Nuernberg"]],
+      ["Eintracht Braunschweig", ["Braunschweig"]],
+      ["TSV 1860 M\xFCnchen", ["1860 M\xFCnchen", "1860"]]
+    ],
+    "Die 13 Meistervereine der Bundesliga-\xC4ra bis 2026 \u2013 eine doppelt genannte Antwort bringt null Punkte."
+  )),
+  // Die vier sehr gut bewerteten, in KICKBASE-KONSENS nicht gespielten Jury-Finalfragen:
+  geo2(
+    "after-final-gspon",
+    "Fu\xDFball",
+    "europe",
+    60,
+    400,
+    "Wo liegt die Ottmar-Hitzfeld-Arena, ein Fu\xDFballplatz auf rund 2.000 Metern H\xF6he mit Ligaspielen?",
+    46.2275,
+    7.9022,
+    "Ottmar-Hitzfeld-Arena, Gspon (Wallis, Schweiz)",
+    "In Gspon wird auf rund 2.000 Metern H\xF6he Fu\xDFball gespielt \u2013 der Platz ist sogar per Seilbahn erreichbar."
+  ),
+  rank2(
+    "after-final-fax",
+    "Geschichte",
+    "Sortiere diese Ereignisse chronologisch \u2013 das fr\xFCheste zuerst.",
+    "am fr\xFChesten",
+    "am sp\xE4testen",
+    [
+      ["Fax-Patent von Alexander Bain", "1843"],
+      ["Telefonpatent von Alexander Graham Bell", "1876"],
+      ["Coca-Cola wird eingef\xFChrt", "1886"],
+      ["Eiffelturm wird er\xF6ffnet", "1889"],
+      ["Titanic sinkt", "1912"]
+    ],
+    [3, 0, 4, 1, 2],
+    "Das Fax-Patent kam schon 1843 \u2013 lange vor dem Telefonpatent.",
+    500,
+    14
+  ),
+  est(
+    "after-final-tv2014",
+    "Fu\xDFball",
+    "Wie viele Millionen Menschen sahen das WM-Finale 2014 zwischen Deutschland und Argentinien durchschnittlich in der ARD? (Ohne Public Viewing.)",
+    "Mio. Zuschauer",
+    34.65,
+    "34,65 Millionen Menschen sahen das WM-Finale 2014 durchschnittlich im Ersten \u2013 86,3 % Marktanteil.",
+    [0, 50, 100],
+    300
+  ),
+  closed2(unique2(
+    "after-final-breweries",
+    "Wiesn",
+    "Eine Brauerei \u2026",
+    "Nenne eine der sechs M\xFCnchner Brauereien, deren Bier auf der Wiesn ausgeschenkt werden darf.",
+    [
+      ["Augustiner", ["Augustiner-Br\xE4u", "Augustiner Brauerei"]],
+      ["Hacker-Pschorr", ["Hacker Pschorr", "Hacker"]],
+      ["Hofbr\xE4u", ["Hofbraeu", "Hofbr\xE4uhaus", "Staatliches Hofbr\xE4uhaus"]],
+      ["L\xF6wenbr\xE4u", ["Loewenbraeu"]],
+      ["Paulaner", ["Paulaner Brauerei"]],
+      ["Spaten", ["Spatenbr\xE4u", "Spaten Brauerei"]]
+    ],
+    "Nur sechs Brauereien liefern das offizielle Wiesn-Bier. Bei sieben Spielern sind Doppelnennungen unvermeidlich!"
+  ))
+];
+var AFTERSHOW_SELECTION = {
+  geo: ["v2-heimspiel-3", "v2-heimspiel-4", "after2-geo-dance1518", "v2-orte-mit-geschichte-4"],
+  match: ["after2-match-exclubs", "after2-match-sameyear"],
+  rank: ["v2-fussball-zeitreise-1", "s3-rank-tech", "v2-wer-war-zuerst-2"],
+  glitch: ["s3-glitch-marktwerte", "s3-glitch-tabelle", "v2-alles-im-blick-2"],
+  estimate: ["s3-est-saarland", "v2-wahnsinnszahlen-1", "v2-sport-und-pop-2", "v2-wahnsinnszahlen-2"],
+  link: ["after-link-dassler", "after2-link-mourinho", "after2-link-bttf"],
+  unique: ["after-unique-meister", "after2-unique-bayernfinals"]
+};
+var r = (id, title, icon, color, kind, football, taskIds) => ({
+  id,
+  title,
+  icon,
+  color,
+  kind,
+  football,
+  topic: "Nachspielzeit",
+  blurb: "Nur ausgew\xE4hlte, beim letzten Spieleabend nicht verwendete Aufgaben.",
+  taskIds
+});
+var AFTERSHOW_ROUNDS = [
+  r("after2-r1", "WO ZUR H\xD6LLE?", "\u{1F5FA}\uFE0F", COLORS.TE, "tile", true, AFTERSHOW_SELECTION.geo),
+  r("after2-r2", "MATCHMAKER", "\u{1F9F2}", COLORS.PU, "tile", false, AFTERSHOW_SELECTION.match),
+  r("after-r3", "SORTIER\u2019S!", "\u23F3", COLORS.PK, "tile", true, AFTERSHOW_SELECTION.rank),
+  r("after2-sur", "EINZIGARTIG", "\u2728", COLORS.PK, "surprise", true, AFTERSHOW_SELECTION.unique),
+  r("after2-r4", "GLITCH", "\u{1F441}\uFE0F", COLORS.CY, "tile", true, AFTERSHOW_SELECTION.glitch),
+  r("after-r5", "SETZ AUF MICH", "\u{1F3AF}", COLORS.GO, "tile", true, AFTERSHOW_SELECTION.estimate),
+  r("after2-r6", "DIE VERBINDUNG", "\u{1F517}", COLORS.BL, "tile", false, AFTERSHOW_SELECTION.link),
+  r(
+    "after-final",
+    "FINAL LOCK \u2013 NACHSPIELZEIT",
+    "\u{1F512}",
+    COLORS.GR,
+    "final",
+    true,
+    ["after-final-gspon", "after-final-fax", "after-final-tv2014", "after-final-breweries"]
+  )
+];
+var AFTERSHOW_STEPS = [
+  { k: "round", cat: "after2-r1" },
+  { k: "round", cat: "after2-r2" },
+  { k: "round", cat: "after-r3" },
+  { k: "surprise", cat: "after2-sur" },
+  { k: "round", cat: "after2-r4" },
+  { k: "round", cat: "after-r5" },
+  { k: "round", cat: "after2-r6" },
+  { k: "final", cat: "after-final" }
+];
+var SEED_SHOW_AFTER = {
+  revision: 2,
+  pack: {
+    id: "show-after",
+    name: "Reus 65 Mio \u2013 Nachspielzeit (ungespielte Fragen)",
+    description: "21 sorgf\xE4ltig redigierte, in der Hauptshow nicht enthaltene Wertungsfragen, ohne wiederholte Proben. Dazu vier neue Finalaufgaben und Marktwert-Updates nach jeder Runde.",
+    rules: {
+      startCredit: 0,
+      tasksPerMode: 4,
+      rankVariant: "sort",
+      estimateBets: [0, 50, 100],
+      estimateBonus: 150,
+      uniquePoints: 300,
+      boardEveryRound: true,
+      showTitle: "Reus 65 Mio \u2013 Nachspielzeit",
+      winnerTitle: "Nachspielzeit-Champion",
+      tagline: "Nur frische Fragen f\xFCr den zweiten Spieleabend",
+      winnerLine: "Auch nach Abpfiff gibt es noch Punkte",
+      boardTitle: "Marktwert-Update"
+    }
+  },
+  pool: AFTERSHOW_NEW,
+  rounds: AFTERSHOW_ROUNDS,
+  steps: AFTERSHOW_STEPS
+};
+
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K];
+var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K, SEED_SHOW_AFTER];
 
 // server/vercel.ts
 var ConflictError = class extends Error {
@@ -39227,9 +39487,9 @@ var SdkBlobBackend = class {
     for (let attempt = 0; attempt < 4; attempt++) {
       const before = await this.head();
       if (!before) return null;
-      const r = await b2.get(this.pathname, { access: "private", useCache: false });
-      if (!r || r.statusCode !== 200) return null;
-      const bytes2 = Buffer.from(await new Response(r.stream).arrayBuffer());
+      const r2 = await b2.get(this.pathname, { access: "private", useCache: false });
+      if (!r2 || r2.statusCode !== 200) return null;
+      const bytes2 = Buffer.from(await new Response(r2.stream).arrayBuffer());
       const after = await this.head();
       if (after && after.etag === before.etag) return { bytes: bytes2, etag: after.etag };
     }
@@ -39239,8 +39499,8 @@ var SdkBlobBackend = class {
     const b2 = await this.sdk();
     try {
       const opts = { access: "private", addRandomSuffix: false, contentType: "application/octet-stream", cacheControlMaxAge: 60, allowOverwrite: !!ifMatch, ...ifMatch ? { ifMatch } : {} };
-      const r = await b2.put(this.pathname, bytes2, opts);
-      return r.etag ?? (await b2.head(this.pathname)).etag;
+      const r2 = await b2.put(this.pathname, bytes2, opts);
+      return r2.etag ?? (await b2.head(this.pathname)).etag;
     } catch (e) {
       if (e instanceof b2.BlobPreconditionFailedError || /already exists/i.test(String(e?.message))) {
         const c = new ConflictError("etag");

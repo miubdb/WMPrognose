@@ -210,7 +210,7 @@ test('Bestehende Datenbank (Stand Praxistest 3) wird sicher aktualisiert: neue V
   const plan = c.cleanupPlan(); assert.ok(plan.update.includes('show-5') && plan.update.includes('show-4z'), JSON.stringify(plan.update));
   const before = { q: c.listQuestions().length, cat: c.listCategories().length, packs: c.listPacksView().length };
   const r = c.cleanupApply();
-  assert.equal(r.updated.length, 2); assert.ok(r.updated.every(x => /^show-(5|4z)@\d+$/.test(x)));
+  assert.equal(r.updated.length, 3); assert.ok(r.updated.every(x => /^show-(5|4z|after)@\d+$/.test(x)));
   assert.equal(c.listPacksView().length, before.packs, 'keine neuen Pakete'); assert.ok(c.listQuestions().length >= before.q);
   assert.equal(JSON.stringify(c.resolveBook(`show-5@${old5}`)), oldBook, 'alte Version unverändert'); assert.equal(JSON.stringify(room.plan), planBefore); assert.equal(room.bookId, `show-5@${old5}`);
   assert.equal(c.getPack('show-4').status, 'archived', 'archivierte Pakete bleiben archiviert');
