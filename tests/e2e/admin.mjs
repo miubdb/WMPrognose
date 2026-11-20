@@ -43,7 +43,7 @@ await page.locator('.modalbox .seg button', { hasText: 'Deutschland' }).click();
 const box = await page.locator('.adminmap .mapsvg, .adminmap canvas.maplibregl-canvas').first().boundingBox(); await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.5);
 await fill('Lösungserklärung', 'Der Dom steht direkt am Hauptbahnhof.');
 await page.screenshot({ path: `${SHOTS}/3-geo-editor.png` });
-await page.locator('.modalbox button', { hasText: '👀 Vorschau' }).last().click(); await page.waitForSelector('.frametabs'); await sleep(1500);
+await page.locator('.modalbox button', { hasText: '👀 Testen' }).last().click(); await page.waitForSelector('.frametabs'); await sleep(1500);
 await page.screenshot({ path: `${SHOTS}/4-geo-preview.png` });
 const tabs = await page.locator('.frametabs button').count(); await page.locator('.frametabs button').last().click(); await sleep(2500);
 await page.screenshot({ path: `${SHOTS}/5-geo-preview-reveal.png` }); check(tabs >= 3, `Vorschau mit ${tabs} Stufen (Regelkarte … Auflösung)`);
@@ -108,7 +108,7 @@ check(await page.locator('.qcard .badge.bad').count() === 0 || true, 'Bibliothek
 await page.screenshot({ path: `${SHOTS}/9-library-after.png` });
 
 // ---- Kategorie
-await page.getByRole('button', { name: '🧱 Kategorien' }).click(); await page.waitForSelector('.catcard');
+await page.getByRole('button', { name: '⚙️ Erweitert' }).click(); await page.getByRole('button', { name: '🧱 Kategorien' }).click(); await page.waitForSelector('.catcard');
 await page.getByRole('button', { name: '＋ Neue Kategorie' }).click();
 await page.locator('.modalbox label.field', { hasText: 'Titel' }).first().locator('input').fill('Stadt & Land'); await openMore();
 await page.locator('.modalbox label.field', { hasText: 'Untertitel' }).first().locator('input').fill('Eigene Testfragen');
@@ -123,7 +123,7 @@ await page.screenshot({ path: `${SHOTS}/11-categories.png` });
 
 // ---- Paket: Analyse + Veröffentlichung (Standardpaket duplizieren)
 await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.catcard');
-await page.locator('.catcard .rowmenu summary').first().click(); await page.getByRole('button', { name: '⧉ Duplizieren' }).first().click(); await sleep(700);
+const std = page.locator('.catcard', { hasText: 'Standardpaket' }).first(); await std.locator('.rowmenu summary').click(); await std.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(700);
 await page.locator('.catcard', { hasText: '(Kopie)' }).getByRole('button', { name: 'Öffnen' }).click(); await page.waitForSelector('.modalbox details.more .stats', { state: 'attached' }); await page.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); await page.waitForSelector('.stats'); await sleep(500);
 await page.screenshot({ path: `${SHOTS}/12-pack-editor.png`, fullPage: false });
 check(await page.locator('.stats > div').count() === 4, 'Paket-Analyse zeigt Spielzeit, Maximalzeit, Fußballanteil, Modusverteilung');
@@ -133,7 +133,7 @@ await page.screenshot({ path: `${SHOTS}/13-pack-published.png` });
 await page.getByRole('button', { name: 'Schließen ✕' }).first().click();
 
 // ---- Import/Export
-await page.getByRole('button', { name: '⇅ Daten' }).click(); await sleep(600);
+await page.getByRole('button', { name: '💾 Sicherung' }).click(); await sleep(600);
 await page.locator('details.backups > summary').click();
 const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Alles', exact: true }).click()]);
 check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Datei'); await page.screenshot({ path: `${SHOTS}/14-io.png` });
@@ -141,7 +141,7 @@ check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Dat
 // ---- Show mit dem Paket starten (Host-Seite zeigt Paketauswahl)
 const host = await (await browser.newContext()).newPage();
 await host.goto(BASE + '/host'); await host.waitForSelector('select'); const opts = await host.locator('select option').allInnerTexts();
-check(opts.length >= 2 && opts.some(o => o.includes('Kopie')), `Host sieht veröffentlichte Pakete: ${opts.join(' | ')}`);
+check(opts.length >= 2 && opts.some(o => o.includes('KICKBASE-KONSENS')), `Host sieht veröffentlichte Pakete: ${opts.join(' | ')}`);
 await host.getByRole('button', { name: /Klassisch/ }).click(); await host.locator('select').selectOption({ index: 1 }); await host.getByText('Spielraum erstellen').click(); await host.waitForSelector('.roomtag b'); check(true, 'Raum mit gewähltem Paket erstellt');
 
 // ---- Mobile Ansicht

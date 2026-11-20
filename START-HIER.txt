@@ -1,0 +1,20 @@
+OUTPLAY – SCHNELLSTART (Windows)
+================================
+
+1. Doppelklick auf  OUTPLAY-STARTEN.bat
+   (beim allerersten Mal einmalig Internet nötig, dauert ca. 1 Minute)
+
+2. Im schwarzen Fenster stehen zwei Adressen:
+   - Showmaster-Pult  ->  im Browser auf dem Laptop öffnen
+   - Verwaltung       ->  Fragen & Pakete (Start-Seite erklärt alles)
+
+3. Im Showmaster-Pult Paket wählen (Hauptshow ist vorausgewählt),
+   Raum erstellen, den Fernseher öffnen, Handys scannen den QR-Code.
+
+Beenden: Fenster schließen. Die Show geht beim nächsten Start weiter.
+
+Weitere Dateien (nur bei Bedarf):
+  OUTPLAY-KARTE-LADEN.bat       Karte (offline) einmalig laden
+  OUTPLAY-WIEDERHERSTELLEN.bat  Sicherung zurückspielen
+
+Welche Spiele gibt es?  ->  docs\SPIELE.md

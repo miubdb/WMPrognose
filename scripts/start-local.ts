@@ -44,24 +44,24 @@ if (!host) {
 }
 const base = host ? (/^https?:\/\//.test(host) ? host : `http://${host}`) : '';
 
+const url = base || `http://localhost:${PORT}`;
 line();
-line('══════════════════════════════════════════════════════════════');
-line('  OUTPLAY läuft lokal – kein Internet nötig');
-line('══════════════════════════════════════════════════════════════');
-line(`  Showmaster (Laptop/Tablet):   ${base || `http://localhost:${PORT}`}/host`);
-line(`  Admin (Fragen & Pakete):      ${base || `http://localhost:${PORT}`}/admin`);
-line('  TV-Ansicht: Auf dem Laptop (am Fernseher) im Browser öffnen:');
-line(`                                http://localhost:${PORT}/tv/RAUMCODE   (Raumcode steht im Showmaster-Pult)`);
-line('                                Der QR-Code auf dem TV enthält automatisch die WLAN-Adresse:');
-line(`                                ${base ? base + '/play/RAUMCODE' : '(keine Netzwerkadresse gefunden)'}`);
-line(`  Datenbank:                    ${join(dataDir, 'outplay.db')}`);
-line(`  Automatische Backups:         ${join(dataDir, 'backups')}`);
-if (existsSync(join(dataDir, 'admin-passwort.txt'))) line(`  Admin-Passwort (1. Start):    siehe ${join(dataDir, 'admin-passwort.txt')}`);
-line('  Beenden: dieses Fenster schließen oder Strg+C');
-line('══════════════════════════════════════════════════════════════');
-line('  Windows fragt beim ersten Start nach der Firewall: nur "Private Netzwerke" erlauben.');
+line('══════════════════════════════════════════════════');
+line('  OUTPLAY läuft ✓   (kein Internet nötig)');
+line('══════════════════════════════════════════════════');
+line('  1. Showmaster-Pult (Laptop/Tablet):');
+line(`       ${url}/host`);
+line('  2. Fernseher: dieselbe Adresse mit /tv/ + Raumcode');
+line('     (der Raumcode steht im Showmaster-Pult)');
+line('  3. Handys: QR-Code auf dem Fernseher scannen');
+line();
+line(`  Verwaltung (Fragen & Pakete):  ${url}/admin`);
+if (existsSync(join(dataDir, 'admin-passwort.txt'))) line(`  Admin-Passwort: Datei ${join(dataDir, 'admin-passwort.txt')}`);
+if (!existsSync(join(dataDir, 'outplay.db'))) line('  Erster Start: Windows fragt nach der Firewall – „Private Netzwerke“ erlauben.');
+line('  Beenden: Fenster schließen');
+line('══════════════════════════════════════════════════');
 line();
 
-const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { stdio: 'inherit', env: { ...process.env, PORT: String(PORT), OUTPLAY_HOST: base || '' } });
+const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { stdio: 'inherit', env: { ...process.env, PORT: String(PORT), OUTPLAY_HOST: base || '', OUTPLAY_QUIET: '1' } });
 child.on('exit', code => process.exit(code ?? 0));
 for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => child.kill(sig));

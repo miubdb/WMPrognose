@@ -341,3 +341,6 @@ details summary { cursor: pointer; font-weight: 700; }
 
 .votecard.host{border-style:dashed}.hostav{display:inline-grid;place-items:center;width:72px;height:72px;border-radius:50%;background:#2a3350;font-size:34px}.vbar .hostav{width:52px;height:52px;font-size:26px}
 .decide.mini{display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px;align-items:center}
+.home .card{margin:12px 0}.card.attn{border:2px solid #f5b82e}.bigbtns{display:flex;flex-wrap:wrap;gap:10px}.bigbtns .btn{flex:1 1 220px;padding:14px;font-size:1.05rem}
+.packlist{list-style:none;padding:0;display:grid;gap:6px}.packlist li{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}.packlist li.main{border:1px solid #22c55e}
+.gametab td{vertical-align:top}.gametab .nowrap{white-space:nowrap}

@@ -217,3 +217,10 @@ test('Bestehende Datenbank (Stand Praxistest 3) wird sicher aktualisiert: neue V
   assert.ok(c.cleanupPlan().clean, 'Zweiter Lauf: nichts mehr zu tun');
   const nb = c.resolveBook(r.updated.find(x => x.startsWith('show-4z'))!); assert.equal(nb.rules!.startCredit, 0); assert.equal(nb.tiles.find(t => t.kind === 'final')!.tasks.length, 5);
 });
+
+import { GAMES } from '../shared/games';
+import { ACTIVE_MODES } from '../shared/validate';
+test('Spieleliste (Admin-Startseite/docs/SPIELE.md) deckt genau die aktiven Modi plus beide Finals ab', () => {
+  const modes = GAMES.map(g => g.mode); for (const m of ACTIVE_MODES) assert.ok(modes.includes(m), m); assert.ok(modes.includes('vote') && modes.includes('final-lock'));
+  assert.equal(GAMES.length, ACTIVE_MODES.length + 2); assert.ok(!modes.includes('codebreak'));
+});

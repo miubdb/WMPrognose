@@ -8,9 +8,10 @@ import { adm, download, errText } from './api';
 import { MODE_HELP, MODE_ICON, QuestionEditor } from './QuestionEditor';
 import { Preview } from './Preview';
 import { SceneBuilder, ScenePair } from './SceneBuilder';
+import { CleanupCard, Home, type AdminTab } from './Home';
 
-type Tab = 'packs' | 'categories' | 'questions' | 'scenes' | 'io';
-const TABS: { id: Tab; label: string }[] = [{ id: 'questions', label: '❓ Fragen' }, { id: 'categories', label: '🧱 Kategorien' }, { id: 'packs', label: '📦 Pakete' }, { id: 'scenes', label: '🖼️ Szenen' }, { id: 'io', label: '⇅ Daten' }];
+type Tab = AdminTab;
+const TABS: { id: Tab; label: string }[] = [{ id: 'home', label: '🏠 Start' }, { id: 'questions', label: '❓ Fragen' }, { id: 'packs', label: '📦 Pakete' }, { id: 'io', label: '💾 Sicherung' }, { id: 'advanced', label: '⚙️ Erweitert' }];
 
 export function Admin() {
   const [state, setState] = useState<'loading' | 'in' | 'out' | 'setup'>('loading');
@@ -61,7 +62,8 @@ function Login({ onIn, online }: { onIn: () => void; online?: boolean }) {
 }
 
 function Shell({ onOut, online }: { onOut: () => void; online?: boolean }) {
-  const [tab, setTab] = useState<Tab>((sessionStorage.getItem('admtab') as Tab) || 'questions');
+  const [tab, setTab] = useState<Tab>(TABS.some(t => t.id === sessionStorage.getItem('admtab')) ? (sessionStorage.getItem('admtab') as Tab) : 'home');
+  const [adv, setAdv] = useState<'categories' | 'scenes'>('categories');
   const [rev, setRev] = useState(0);            // erzwingt Neuladen der Listen
   const bump = () => setRev(x => x + 1);
   const go = (t: Tab) => { setTab(t); sessionStorage.setItem('admtab', t); };
@@ -74,10 +76,13 @@ function Shell({ onOut, online }: { onOut: () => void; online?: boolean }) {
         <button className="btn small ghost" onClick={async () => { await adm('POST', '/logout'); onOut(); }}>Abmelden</button>
         <nav>{TABS.map(t => <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => go(t.id)}>{t.label}</button>)}</nav>
       </div>
+      {tab === 'home' && <Home go={go} online={!!online} bump={bump} />}
       {tab === 'packs' && <Packs rev={rev} bump={bump} />}
-      {tab === 'categories' && <Categories rev={rev} bump={bump} />}
       {tab === 'questions' && <Library rev={rev} bump={bump} />}
-      {tab === 'scenes' && <Scenes rev={rev} bump={bump} />}
+      {tab === 'advanced' && <>
+        <p className="muted small">Für Fortgeschrittene: Kategorien bündeln Fragen zu Runden, Szenen sind die Bilder für GLITCH. Für den normalen Abend nicht nötig.</p>
+        <div className="chipsrow"><button className={`chip ${adv === 'categories' ? 'on' : ''}`} onClick={() => setAdv('categories')}>🧱 Kategorien</button><button className={`chip ${adv === 'scenes' ? 'on' : ''}`} onClick={() => setAdv('scenes')}>🖼️ Szenen</button></div>
+        {adv === 'categories' ? <Categories rev={rev} bump={bump} /> : <Scenes rev={rev} bump={bump} />}</>}
       {tab === 'io' && <IO bump={bump} online={!!online} />}
     </div>
   );
@@ -128,7 +133,7 @@ function Library({ rev, bump }: { rev: number; bump: () => void }) {
             <span className="qtext"><span className="qprompt">{x.task.prompt || <i>(ohne Text)</i>}</span>
               <span className="qmeta">{x.topic || MODE_LABEL[x.mode as Mode]} · {taskMax(x.task)} P.{x.usedIn.length ? ` · ${x.usedIn.length}× verwendet` : ''}{x.problems.length > 0 && <span className="badge bad" title={x.problems.join('\n')}>⚠ unvollständig</span>}</span></span>
           </button>
-          <button className="btn small gold" disabled={x.problems.length > 0} onClick={() => setPrev(x)} aria-label="Vorschau">👀</button>
+          <button className="btn small gold" disabled={x.problems.length > 0} onClick={() => setPrev(x)} aria-label="Vorschau">👀<span className="hide-s"> Testen</span></button>
           <RowMenu>
             <button onClick={() => act(() => adm('POST', `/questions/${x.id}/duplicate`))}>⧉ Duplizieren</button>
             <button onClick={() => act(() => adm('PUT', '/questions/' + x.id, { archived: !x.archived, ifUpdated: x.updated }))}>{x.archived ? '↩ Aus Archiv holen' : '🗄 Archivieren'}</button>
@@ -235,11 +240,13 @@ function CategoryEditor({ cat, onClose, onSaved }: { cat: any; onClose: () => vo
 function Packs({ rev, bump }: { rev: number; bump: () => void }) {
   const { data } = useList<any>('/packs', rev);
   const [edit, setEdit] = useState<any>(null);
+  const [neu, setNeu] = useState(false);
   const t = useToast();
   const act = async (fn: () => Promise<any>, ok = '') => { const r = await fn(); if (!r.ok) t.show(errText(r)); else { bump(); if (ok) t.show(ok); } };
   return (
     <div>
-      <div className="row between"><h2>Pakete</h2><button className="btn primary" onClick={() => setEdit({ name: '', description: '', categoryIds: [], surprise: '', final: '', rules: { startCredit: 0, maxFootball: 2, maxPerMode: 2 } })}>＋ Neues Paket</button></div>
+      <div className="row between"><h2>Pakete</h2><button className="btn primary" onClick={() => setNeu(true)}>＋ Neues Paket</button></div>
+      <p className="muted small">Aktive Pakete sind grün. Ein neues Paket startet als Kopie eines bestehenden – du tauschst dann nur noch Fragen aus.</p>
       <div className="catgrid">{data.map((p: any) => (
         <div key={p.id} className="catcard" style={{ ['--c' as any]: p.status === 'published' ? '#22c55e' : p.status === 'archived' ? '#6b7280' : '#f5b82e' }}>
           <button className="catmain" aria-label="Öffnen" onClick={() => setEdit(p)}>
@@ -256,8 +263,35 @@ function Packs({ rev, bump }: { rev: number; bump: () => void }) {
           </RowMenu>
         </div>))}</div>
       {edit && <PackEditor pack={edit} onClose={() => { setEdit(null); bump(); }} />}
+      {neu && <NewPack packs={data.filter((p: any) => p.show?.length)} onClose={() => setNeu(false)} onCreated={p => { setNeu(false); bump(); setEdit(p); }} />}
       <Toast msg={t.msg} />
     </div>
+  );
+}
+
+/** Einfaches „Neues Paket“: Name, Vorlage (Kopie eines bestehenden Pakets), Länge. Danach öffnet sich der Editor zum Fragen-Tauschen. */
+function NewPack({ packs, onClose, onCreated }: { packs: any[]; onClose: () => void; onCreated: (p: any) => void }) {
+  const base = packs.find(p => p.status === 'published') ?? packs[0];
+  const [name, setName] = useState(''); const [from, setFrom] = useState(base?.id ?? ''); const [len, setLen] = useState(0); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const go = async () => {
+    if (!name.trim() || !from) { setErr('Bitte einen Namen eingeben.'); return; }
+    setBusy(true); const d = await adm('POST', `/packs/${from}/duplicate`);
+    if (!d.ok) { setBusy(false); setErr(errText(d)); return; }
+    const p = d.data; const rules = { ...p.rules, ...(len ? { tasksPerMode: len } : {}) };
+    const u = await adm('PUT', '/packs/' + p.id, { ...p, name: name.trim(), rules, ifUpdated: p.updated }); setBusy(false);
+    if (!u.ok) { setErr(errText(u)); return; }
+    onCreated(u.data);
+  };
+  return (
+    <div className="modal" onClick={onClose}><div className="modalbox" onClick={e => e.stopPropagation()}>
+      <div className="row between"><h2>📦 Neues Paket</h2><button className="btn small ghost" onClick={onClose}>Schließen ✕</button></div>
+      <label className="field"><span>Name</span><input autoFocus value={name} maxLength={60} placeholder="z. B. Spieleabend Dezember" onChange={e => setName(e.target.value)} /></label>
+      <label className="field"><span>Startpunkt: Kopie von</span><select value={from} onChange={e => setFrom(e.target.value)}>{packs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+      <label className="field"><span>Länge</span><select value={len} onChange={e => setLen(Number(e.target.value))}><option value={0}>wie die Vorlage</option><option value={4}>Kompakt (4 Fragen je Spiel)</option><option value={5}>Mittel (5 Fragen je Spiel)</option><option value={6}>Lang (6 Fragen je Spiel)</option></select></label>
+      {err && <div className="status bad">{err}</div>}
+      <p className="muted small">Das neue Paket ist zunächst ein Entwurf. Danach tauschst du Fragen aus und klickst auf „Veröffentlichen“.</p>
+      <div className="actionbar"><span className="spacer" /><button className="btn primary" disabled={busy} onClick={go}>Paket anlegen</button></div>
+    </div></div>
   );
 }
 
@@ -413,18 +447,21 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
           <label className="field"><span>Finale</span><select value={p.final} onChange={e => set('final', e.target.value)}><option value="">– wählen –</option>{cats.filter((c: any) => c.kind === 'final').map((c: any) => <option key={c.id} value={c.id}>{c.icon} {c.title}</option>)}</select></label>
         </div>
 </>}
-        <details className="more"><summary>Spielregeln</summary>
+        <details className="more"><summary>Einstellungen (Länge, Startpunkte)</summary>
           <label className="field"><span>Beschreibung</span><input value={p.description} maxLength={300} onChange={e => set('description', e.target.value)} /></label>
           <div className="form2">
             <label className="field"><span>Startguthaben</span><input inputMode="numeric" value={p.rules.startCredit} onChange={e => setRule('startCredit', e.target.value)} /></label>
-            <label className="field"><span>Max. Fußball-Kacheln</span><input inputMode="numeric" value={p.rules.maxFootball} onChange={e => setRule('maxFootball', e.target.value)} /></label>
+          </div>
+          <div className="form2">
+            <label className="field"><span>Länge der Show (gewertete Aufgaben je Spielmodus)</span><select value={p.rules.tasksPerMode ?? 4} onChange={e => set('rules', { ...p.rules, tasksPerMode: Number(e.target.value) })}><option value={4}>Kompakte Show – 4 Aufgaben je Spielmodus</option><option value={5}>Längere Show – 5 Aufgaben je Spielmodus</option><option value={6}>Best-of-Show – 6 Aufgaben je Spielmodus (sehr lang, ca. 2,5 Std.)</option></select></label>
+          </div>
+          <details className="more"><summary>Experten-Einstellungen (meist nicht nötig)</summary>
+          <div className="form2">
+                        <label className="field"><span>Max. Fußball-Kacheln</span><input inputMode="numeric" value={p.rules.maxFootball} onChange={e => setRule('maxFootball', e.target.value)} /></label>
             <label className="field"><span>Max. Kacheln je Modus</span><input inputMode="numeric" value={p.rules.maxPerMode} onChange={e => setRule('maxPerMode', e.target.value)} /></label>
           </div>
           <div className="form2">
             <label className="field"><span>SORTIER’S! / BLIND RANK – Bedienung</span><select value={p.rules.rankVariant ?? 'task'} onChange={e => set('rules', { ...p.rules, rankVariant: e.target.value })}><option value="task">je Frage festgelegt (Standard: nacheinander)</option><option value="sequence">immer nacheinander (klassisch)</option><option value="sort">immer: SORTIER’S! (fünf Karten auf Plätze ziehen)</option></select></label>
-          </div>
-          <div className="form2">
-            <label className="field"><span>Länge der Show (gewertete Aufgaben je Spielmodus)</span><select value={p.rules.tasksPerMode ?? 4} onChange={e => set('rules', { ...p.rules, tasksPerMode: Number(e.target.value) })}><option value={4}>Kompakte Show – 4 Aufgaben je Spielmodus</option><option value={5}>Längere Show – 5 Aufgaben je Spielmodus</option><option value={6}>Best-of-Show – 6 Aufgaben je Spielmodus (sehr lang, ca. 2,5 Std.)</option></select></label>
           </div>
           <div className="form2">
             <label className="field"><span>Showtitel (TV-Eröffnung)</span><input value={p.rules.showTitle ?? ''} maxLength={40} placeholder="OUTPLAY" onChange={e => set('rules', { ...p.rules, showTitle: e.target.value })} /></label>
@@ -441,6 +478,7 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
             <label className="field"><span>Zeile unter dem Sieger</span><input value={p.rules.winnerLine ?? ''} maxLength={80} onChange={e => set('rules', { ...p.rules, winnerLine: e.target.value })} /></label>
             <label className="field"><span>Titel der Zwischenstände</span><input value={p.rules.boardTitle ?? ''} maxLength={30} placeholder="Zwischenstand" onChange={e => set('rules', { ...p.rules, boardTitle: e.target.value })} /></label>
           </div>
+          </details>
           <p className="muted small">Paketname oben ändern. Änderungen gelten für neue Räume, sobald du das Paket neu veröffentlichst (neue Version); laufende Räume bleiben unverändert.</p>
         </details>
         {ana && <details className="more" open={ana.errors.length > 0}><summary>{ana.errors.length ? `⚠ ${ana.errors.length} Fehler` : '✓ Prüfung'}{a?.combos ? ` · ca. ${a.combos.minutesExpected.min}–${a.combos.minutesExpected.max} min` : ''}</summary>
@@ -529,28 +567,10 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
     const r = await adm('POST', '/standard', {});
     if (r.ok) { setStdMsg(r.data.alreadyInstalled ? 'Bereits installiert – nichts geändert.' : `Installiert: ${r.data.created.questions} Fragen, ${r.data.created.categories} Kategorien, ${r.data.created.packs} Paket(e) ${[r.data.ref, r.data.showRef, ...(r.data.extraRefs ?? [])].filter(Boolean).join(', ')}${r.data.archived.length ? ' · archiviert: ' + r.data.archived.join(', ') : ''}${r.data.backupFile ? ' · Sicherung vor der Installation: ' + r.data.backupFile : ''}`); bump(); loadStd(); } else setStdMsg(errText(r));
   };
-  const [cl, setCl] = useState<any>(null); const [clMsg, setClMsg] = useState('');
-  const loadCl = useCallback(() => { adm('GET', '/cleanup').then(r => r.ok && setCl(r.data)); }, []);
-  useEffect(loadCl, [loadCl]);
-  const runCleanup = async () => {
-    if (!cl) return;
-    const lines = [...cl.archive.map((i: string) => '• archivieren: ' + i), ...cl.update.map((i: string) => '• neue Version mit aktuellem Inhalt (Start 0 Punkte, KONSENS-Finale, Fragenänderungen): ' + i), ...(cl.rename ?? []).map((i: string) => '• umbenennen: ' + i)].join('\n');
-    if (!confirm('Paketbereinigung jetzt ausführen?\n\n' + lines + '\n\nVorher wird automatisch eine Datenbanksicherung angelegt. Nichts wird gelöscht; laufende und beendete Räume behalten ihren Stand.')) return;
-    const r = await adm('POST', '/cleanup', {});
-    if (r.ok) { setClMsg(`Fertig. Archiviert: ${r.data.archived.join(', ') || '–'} · Neue Version: ${r.data.updated.join(', ') || '–'}${(r.data.renamed ?? []).length ? ' · Umbenannt: ' + r.data.renamed.join(', ') : ''}${r.data.backupFile ? ' · Sicherung: ' + r.data.backupFile : ''}`); bump(); loadCl(); } else setClMsg(errText(r));
-  };
   return (
     <div>
-      <h2>Daten</h2>
-      {cl && (
-        <div className="card">
-          <h3>Pakete aufräumen &amp; aktualisieren</h3>
-          <p className="muted small">Aktiv bleiben: show-4z (Hauptshow mit KICKBASE-KONSENS), show-5 (Alternative mit FINAL LOCK), show-3 (altes Backup). Alles andere wird archiviert – nie gelöscht. Die beiden Best-of-Pakete bekommen den aktuellen Inhalt als NEUE Version (kein neues Paket, laufende Räume bleiben unverändert).</p>
-          <ul className="small">{cl.rows.map((r: any) => <li key={r.id}><b>{r.id}</b> {r.name} – {r.action === 'archive' ? 'wird archiviert' : r.action === 'archived' ? 'bereits archiviert' : r.action === 'keep-archived' ? 'bleibt archiviert (nicht reaktiviert)' : r.needsUpdate ? 'bleibt aktiv, bekommt neue Version' : r.needsRename ? 'bleibt aktiv, wird umbenannt' : 'bleibt aktiv'}</li>)}</ul>
-          {cl.clean ? <p className="small">✔ Alles aufgeräumt – nichts zu tun.</p> : <button className="btn" onClick={runCleanup}>Sicher aktualisieren ({cl.archive.length} archivieren, {cl.update.length} neue Version{(cl.rename ?? []).length ? ', ' + cl.rename.length + ' umbenennen' : ''})</button>}
-          {clMsg && <p className="small">{clMsg}</p>}
-        </div>
-      )}
+      <h2>Sicherung &amp; Update</h2>
+      <CleanupCard bump={bump} />
       {std && !std.installed && (
         <div className="card warnbox">
           <h3>🆕 Neues Showpaket &amp; erweiterter Fragenpool verfügbar</h3>

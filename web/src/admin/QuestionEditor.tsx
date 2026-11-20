@@ -172,7 +172,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
           <span className="maxline">{Number.isFinite(taskMax(norm)) ? taskMax(norm) : '?'} P.</span>
           {problems.length > 0 && <button className="btn small ghost warnchip" onClick={() => setShowProblems(v => !v)}>⚠ {problems.length}<span className="hide-s"> offen</span></button>}
           <span className="spacer" />
-          <button className="btn gold" disabled={problems.length > 0} onClick={() => setPrev(true)}>👀<span className="hide-s"> Vorschau</span></button>
+          <button className="btn gold" disabled={problems.length > 0} onClick={() => setPrev(true)}>👀<span className="hide-s"> Testen</span></button>
           <button className="btn primary" disabled={busy} onClick={save}>💾 Speichern</button>
         </div>
       </div>

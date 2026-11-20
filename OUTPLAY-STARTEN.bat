@@ -30,5 +30,5 @@ if not exist node_modules (
 
 node --import tsx scripts\start-local.ts
 echo.
-echo  OUTPLAY wurde beendet. Falls das ungewollt war: Datei erneut starten - die Show wird aus der Datenbank fortgesetzt.
+echo  OUTPLAY wurde beendet. Zum Weiterspielen diese Datei erneut starten.
 pause
