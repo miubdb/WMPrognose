@@ -1,14 +1,12 @@
-import { writeFileSync } from 'node:fs';
 import { App } from './app';
-import { BOOK, EXTRA_SHOWS, SEED_PACK, SEED_SHOW } from '../content';
+import { STANDARD_MAIN, STANDARD_SECOND, STANDARD_SHOWS } from '../content';
 
 const port = Number(process.env.PORT ?? 8080);
 const dataDir = process.env.DATA_DIR ?? './data';
 const app = new App({
-  book: BOOK,
-  seedPack: SEED_PACK,
-  seedShow: SEED_SHOW,
-  extraShows: EXTRA_SHOWS,
+  book: { tiles: [] },   // frische Installation: keine Alt-Pakete, nur die zwei Standardpakete
+  extraShows: STANDARD_SHOWS,
+  standard: { main: STANDARD_MAIN, second: STANDARD_SECOND },
   dbFile: `${dataDir}/outplay.db`,
   backupDir: `${dataDir}/backups`,
   staticDir: process.env.STATIC_DIR ?? 'dist',
@@ -17,11 +15,6 @@ const app = new App({
   adminPassword: process.env.ADMIN_PASSWORD || undefined,
   mapFile: process.env.MAP_FILE || undefined,
 });
-if (app.auth.initialPassword) {
-  const f = `${dataDir}/admin-passwort.txt`;
-  writeFileSync(f, app.auth.initialPassword + '\n');
-  console.log(`\n=== ADMIN-PASSWORT (nur beim ersten Start erzeugt): ${app.auth.initialPassword}\n    gespeichert in ${f} – bitte notieren und die Datei danach löschen. Alternativ ADMIN_PASSWORD setzen. ===\n`);
-}
 app.listen(port).then(p => !process.env.OUTPLAY_QUIET && console.log(`JANIQUIZITION läuft auf Port ${p} (Daten: ${dataDir}, Räume geladen: ${app.rooms.size})`));
 const stop = () => { app.close().finally(() => process.exit(0)); };
 process.on('SIGINT', stop);

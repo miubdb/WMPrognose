@@ -16,7 +16,7 @@ async function pickAndBegin(s: Awaited<ReturnType<typeof setupShow>>, tileId: st
   const v = await s.host.waitFor(x => x.room.phase === 'wall', 3000, 'wall');
   const picker = s.players.find((_, i) => s.ids[i] === v.wall!.pickerId)!;
   const r = await picker.act({ k: 'pick', tileId });
-  assert.ok(r.ok, r.err);
+  assert.ok(r.ok, r.err ?? "");
   await s.tv.waitFor(x => x.room.phase === 'round' && x.round?.tileId === tileId, 3000, 'round');
   assert.equal((await s.host.act({ k: 'h.begin' })).ok, true);
   await s.players[0].waitFor(x => x.round?.stage === 'open' || x.round?.stage === 'view');
@@ -60,7 +60,7 @@ test('A1–A20: Raum, Lobby, 6 echte Clients, Kategorienwand, Geo-Runde, Wertung
   const guesses = [ans, { lat: 46, lon: 80 }, { lat: 40, lon: 100 }, { lat: 0, lon: 0 }, { lat: -30, lon: -60 }];
   for (let i = 0; i < 5; i++) {
     const r = await s.players[i].act({ k: 'submit', payload: guesses[i] });
-    assert.ok(r.ok, r.err);
+    assert.ok(r.ok, r.err ?? "");
   }
   // TV sieht: wer abgegeben hat, nicht was
   const tvv = await s.tv.waitFor(v => v.players.filter(p => p.answered).length === 5);

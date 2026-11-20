@@ -6,14 +6,9 @@ const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const SESSION_MS = 12 * 3600 * 1000;
 
 export class AdminAuth {
-  /** Nur gesetzt, wenn beim ersten Start ein Passwort erzeugt wurde (wird einmal ausgegeben). */
-  initialPassword: string | null = null;
+  static readonly MIN_LEN = 12;
   /** passwordRequiredFromEnv: Online-Betrieb – kein automatisch erzeugtes Passwort, Anmeldung nur mit ADMIN_PASSWORD. */
   constructor(private store: Store, private envPassword: string | undefined, private now: () => number, private opts: { passwordRequiredFromEnv?: boolean } = {}) {
-    if (!envPassword && !opts.passwordRequiredFromEnv && !this.get('admin_hash')) {
-      this.initialPassword = randomBytes(9).toString('base64url');
-      this.set('admin_hash', this.hash(this.initialPassword));
-    }
     this.store.db.prepare('DELETE FROM admin_sessions WHERE expires < ?').run(this.now());
   }
   private get(k: string): string | null { return (this.store.db.prepare('SELECT value FROM settings WHERE key=?').get(k) as any)?.value ?? null; }
@@ -30,7 +25,12 @@ export class AdminAuth {
     const test = scryptSync(pw, Buffer.from(salt, 'hex'), 32);
     return timingSafeEqual(test, Buffer.from(hex, 'hex'));
   }
-  setPassword(pw: string) { if (pw.length < 8) throw new Error('mindestens 8 Zeichen'); this.set('admin_hash', this.hash(pw)); this.store.db.exec('DELETE FROM admin_sessions'); }
+  /** Lokale Erstinstallation: noch kein Passwort gewählt (es gibt bewusst kein Standard- oder Zufallspasswort). */
+  get setupNeeded(): boolean { return !this.envPassword && !this.opts.passwordRequiredFromEnv && !this.get('admin_hash'); }
+  setPassword(pw: string) { if (typeof pw !== 'string' || pw.length < AdminAuth.MIN_LEN) throw new Error(`Das Passwort braucht mindestens ${AdminAuth.MIN_LEN} Zeichen.`); if (pw.length > 200) throw new Error('Das Passwort ist zu lang.'); this.set('admin_hash', this.hash(pw)); this.store.db.exec('DELETE FROM admin_sessions'); }
+  /** Erst-Einrichtung: setzt das Passwort NUR, solange noch keines existiert, und meldet direkt an. */
+  setup(pw: string): string { if (!this.setupNeeded) throw new Error('Die Einrichtung ist bereits abgeschlossen.'); this.setPassword(pw); return this.newSession(); }
+  private newSession(): string { const token = randomBytes(32).toString('base64url'); this.store.db.prepare('INSERT INTO admin_sessions(hash,expires) VALUES(?,?)').run(sha(token), this.now() + SESSION_MS); return token; }
   get configured(): boolean { return !!this.envPassword || !!this.get('admin_hash'); }
   private failKey(ip: string) { return 'fails:' + sha(ip).slice(0, 16); }
   /** Gibt ein Sitzungs-Token zurück oder null / 'limited'. Fehlversuche werden in der Datenbank gezählt (überleben Neustarts und gelten für alle Instanzen). */
@@ -45,9 +45,7 @@ export class AdminAuth {
       return null;
     }
     this.store.db.prepare('DELETE FROM settings WHERE key=?').run(key);
-    const token = randomBytes(32).toString('base64url');
-    this.store.db.prepare('INSERT INTO admin_sessions(hash,expires) VALUES(?,?)').run(sha(token), this.now() + SESSION_MS);
-    return token;
+    return this.newSession();
   }
   check(token: string | undefined): boolean {
     if (!token) return false;

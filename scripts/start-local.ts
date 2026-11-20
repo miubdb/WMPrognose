@@ -12,7 +12,7 @@ const line = (s = '') => console.log(s);
 const die = (m: string): never => { console.error('\n✗ ' + m + '\n'); process.exit(1); };
 
 const [maj, min] = process.versions.node.split('.').map(Number);
-if (maj < 22 || (maj === 22 && min < 13)) die(`Node.js ${process.versions.node} ist zu alt. Benötigt wird Node 22.13 oder neuer (LTS) – https://nodejs.org`);
+if (maj < 24) die(`Node.js ${process.versions.node} ist zu alt. Benötigt wird Node 24 oder neuer (LTS) – https://nodejs.org`);
 
 const newest = (dir: string): number => { let m = 0; if (!existsSync(dir)) return 0; for (const f of readdirSync(dir)) { const p = join(dir, f); const s = statSync(p); m = Math.max(m, s.isDirectory() ? newest(p) : s.mtimeMs); } return m; };
 const dist = join('dist', 'index.html');

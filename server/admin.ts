@@ -26,6 +26,15 @@ function cookie(req: IncomingMessage, name: string): string | undefined {
   return undefined;
 }
 
+/** Nur Zugriffe direkt vom eigenen Rechner (localhost) – nicht aus dem WLAN, nicht über Proxys. */
+export function isLocalRequest(req: IncomingMessage): boolean {
+  const a = req.socket.remoteAddress ?? '';
+  if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(a)) return false;
+  if (req.headers['x-forwarded-for'] || req.headers['forwarded']) return false;
+  const host = String(req.headers.host ?? '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  return ['localhost', '127.0.0.1', '::1'].includes(host);
+}
+
 export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: ServerResponse, parts: string[], url: URL, readBody: (limit: number) => Promise<any>) {
   const json = (status: number, body: unknown, headers: Record<string, string> = {}) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers });
@@ -48,8 +57,17 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
       if (!t) return json(401, { err: 'Falsches Passwort' });
       return json(200, { ok: true }, { 'set-cookie': `${COOKIE}=${t}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${12 * 3600}${secure}` });
     }
+    // ---- Erst-Einrichtung (lokal): eigenes Passwort wählen – nur am Rechner selbst, nur solange noch keins existiert
+    if (a === 'setup' && method === 'POST') {
+      if (!app.auth.setupNeeded) return json(409, { err: 'Die Einrichtung ist bereits abgeschlossen.' });
+      if (!isLocalRequest(req)) return json(403, { err: 'Die Einrichtung ist nur direkt an dem Computer möglich, auf dem JANIQUIZITION läuft (Adresse http://localhost:…/admin).' });
+      const body = await readBody(4096);
+      if (String(body.password ?? '') !== String(body.confirm ?? '')) return json(400, { err: 'Die beiden Passwörter sind nicht gleich.' });
+      try { const t = app.auth.setup(String(body.password ?? '')); return json(200, { ok: true }, { 'set-cookie': `${COOKIE}=${t}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${12 * 3600}${secure}` }); }
+      catch (e: any) { return json(400, { err: e.message }); }
+    }
     const authed = app.auth.check(token);
-    if (a === 'me') return json(authed ? 200 : 401, { ok: authed });
+    if (a === 'me') return json(authed ? 200 : 401, { ok: authed, setup: app.auth.setupNeeded, local: isLocalRequest(req) });
     if (a === 'logout' && method === 'POST') { app.auth.logout(token); return json(200, { ok: true }, { 'set-cookie': `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0` }); }
     if (!authed) return json(401, { err: 'Nicht angemeldet' });
     // ---- CSRF: Schreibzugriffe nur mit Custom-Header und passender Herkunft

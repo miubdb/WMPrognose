@@ -5,7 +5,7 @@
   "description": "JANIQUIZITION – interaktive Multiplayer-Gameshow",
   "type": "module",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=24"
   },
   "scripts": {
     "dev:server": "tsx watch server/index.ts",
@@ -21,33 +21,33 @@
   },
   "dependencies": {
     "@protomaps/basemaps": "^5.7.2",
-    "@vercel/blob": "^2.8.2",
-    "d3-geo": "^3.1.1",
-    "maplibre-gl": "^6.16.0",
+    "@vercel/blob": "^2.9.0",
+    "d3-geo": "^3.1.2",
+    "maplibre-gl": "^6.19.0",
     "qrcode": "^1.5.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "topojson-client": "^3.1.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.15",
     "world-atlas": "^2.0.2",
-    "ws": "^8.18.0"
+    "ws": "^8.23.0"
   },
   "devDependencies": {
     "@mapbox/vector-tile": "^3.0.0",
-    "@types/d3-geo": "^3.1.0",
-    "@types/node": "^22.10.0",
-    "@types/qrcode": "^1.5.5",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
+    "@types/d3-geo": "^3.1.1",
+    "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/topojson-client": "^3.1.5",
-    "@types/ws": "^8.5.13",
-    "@vitejs/plugin-react": "^4.3.4",
-    "concurrently": "^9.1.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
     "esbuild": "^0.28.2",
-    "pbf": "^5.1.2",
+    "pbf": "^5.2.0",
     "pmtiles": "^4.5.0",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
     "vt-pbf": "^3.1.3"
   }
 }

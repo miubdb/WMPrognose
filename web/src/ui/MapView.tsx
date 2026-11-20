@@ -140,7 +140,7 @@ export function MapViewSvg({ kind, mode, pin, onPin, pins = [], answer, fit, dis
       g.current = null; setDrag(null);
     }
   };
-  const wheelRef = useRef<(e: WheelEvent) => void>();
+  const wheelRef = useRef<((e: WheelEvent) => void) | undefined>(undefined);
   wheelRef.current = (e: WheelEvent) => { e.preventDefault(); zoomAt(toSvg(e.clientX, e.clientY), e.deltaY < 0 ? 1.3 : 1 / 1.3); };
   useEffect(() => { const el = svgRef.current; if (!el) return; const f = (e: WheelEvent) => wheelRef.current?.(e); el.addEventListener('wheel', f, { passive: false }); return () => el.removeEventListener('wheel', f); }, []);
 

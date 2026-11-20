@@ -2318,14 +2318,14 @@ var require_signals = __commonJS({
       description,
       action,
       forced = false,
-      standard
+      standard: standard2
     }) {
       const {
         signals: { [name]: constantSignal }
       } = _os.constants;
       const supported = constantSignal !== void 0;
       const number = supported ? constantSignal : defaultNumber;
-      return { name, number, description, supported, action, forced, standard };
+      return { name, number, description, supported, action, forced, standard: standard2 };
     };
   }
 });
@@ -2343,10 +2343,10 @@ var require_main = __commonJS({
       const signals = (0, _signals.getSignals)();
       return signals.reduce(getSignalByName, {});
     };
-    var getSignalByName = function(signalByNameMemo, { name, number, description, supported, action, forced, standard }) {
+    var getSignalByName = function(signalByNameMemo, { name, number, description, supported, action, forced, standard: standard2 }) {
       return {
         ...signalByNameMemo,
-        [name]: { name, number, description, supported, action, forced, standard }
+        [name]: { name, number, description, supported, action, forced, standard: standard2 }
       };
     };
     var signalsByName = getSignalsByName();
@@ -2362,7 +2362,7 @@ var require_main = __commonJS({
       if (signal === void 0) {
         return {};
       }
-      const { name, description, supported, action, forced, standard } = signal;
+      const { name, description, supported, action, forced, standard: standard2 } = signal;
       return {
         [number]: {
           name,
@@ -2371,7 +2371,7 @@ var require_main = __commonJS({
           supported,
           action,
           forced,
-          standard
+          standard: standard2
         }
       };
     };
@@ -30717,7 +30717,7 @@ var require_throttleit = __commonJS({
   }
 });
 
-// node_modules/@vercel/blob/dist/chunk-XKVPKJPO.js
+// node_modules/@vercel/blob/dist/chunk-VIBDXTF6.js
 import { Readable } from "stream";
 async function toReadableStream(value) {
   if (value instanceof ReadableStream) {
@@ -31251,6 +31251,17 @@ function addOptimizeImageParams(params, optimizeImage) {
     params.set("format", optimizeImageFormatToMimeType[optimizeImage.format]);
   }
 }
+function toPutBlobResult(response) {
+  return {
+    url: response.url,
+    downloadUrl: response.downloadUrl,
+    pathname: response.pathname,
+    contentType: response.contentType,
+    contentDisposition: response.contentDisposition,
+    etag: response.etag,
+    ...response.expiresAt && { expiresAt: new Date(response.expiresAt) }
+  };
+}
 function createPutHeaders(allowedOptions, options) {
   const headers = {};
   headers[putOptionHeaderMap.access] = options.access;
@@ -31276,6 +31287,9 @@ function createPutHeaders(allowedOptions, options) {
   }
   if (allowedOptions.includes("cacheControlMaxAge") && options.cacheControlMaxAge !== void 0) {
     headers[putOptionHeaderMap.cacheControlMaxAge] = options.cacheControlMaxAge.toString();
+  }
+  if (allowedOptions.includes("ttlDays") && options.ttlDays !== void 0) {
+    headers[putOptionHeaderMap.ttlDays] = options.ttlDays.toString();
   }
   return headers;
 }
@@ -31364,7 +31378,7 @@ async function completeMultipartUpload({
       options
     );
     debug("mpu: complete", response);
-    return response;
+    return toPutBlobResult(response);
   } catch (error) {
     if (error instanceof TypeError && (error.message === "Failed to fetch" || error.message === "fetch failed")) {
       throw new BlobServiceNotAvailable();
@@ -31842,14 +31856,7 @@ function createPutMethod({
         },
         optionsWithPresignedUrlPayload
       );
-      return {
-        url: response2.url,
-        downloadUrl: response2.downloadUrl,
-        pathname: response2.pathname,
-        contentType: response2.contentType,
-        contentDisposition: response2.contentDisposition,
-        etag: response2.etag
-      };
+      return toPutBlobResult(response2);
     }
     if (options.multipart === true) {
       return uncontrolledMultipartUpload(
@@ -31874,14 +31881,7 @@ function createPutMethod({
         onUploadProgress
       }
     );
-    return {
-      url: response.url,
-      downloadUrl: response.downloadUrl,
-      pathname: response.pathname,
-      contentType: response.contentType,
-      contentDisposition: response.contentDisposition,
-      etag: response.etag
-    };
+    return toPutBlobResult(response);
   };
 }
 function contentTypeAllowedByList(contentType, allowed) {
@@ -31979,6 +31979,14 @@ function validateUrlOnlyPresignUploadOptions(urlOptions, label) {
       );
     }
   }
+  if (urlOptions.ttlDays !== void 0) {
+    const n = urlOptions.ttlDays;
+    if (!Number.isInteger(n) || n < 1 || n > MAX_PRESIGN_TTL_DAYS) {
+      throw new Error(
+        `${label}: ttlDays must be an integer between 1 and ${MAX_PRESIGN_TTL_DAYS}.`
+      );
+    }
+  }
 }
 function sortedContentTypesCsv(types) {
   return [...types].sort((a, b2) => a < b2 ? -1 : a > b2 ? 1 : 0).join(",");
@@ -32073,6 +32081,9 @@ function buildPresignCanonicalQueryEntries(args) {
   }
   if (urlOptions.ifMatch !== void 0) {
     entries.push([BLOB_PRESIGN_QUERY_IF_MATCH, urlOptions.ifMatch]);
+  }
+  if (urlOptions.ttlDays !== void 0) {
+    entries.push([BLOB_PRESIGN_QUERY_TTL_DAYS, String(urlOptions.ttlDays)]);
   }
   if (urlOptions.onUploadCompleted !== void 0) {
     const { callbackUrl, tokenPayload } = urlOptions.onUploadCompleted;
@@ -32372,9 +32383,9 @@ async function createFolder(pathname, options = { access: "public" }) {
     pathname: response.pathname
   };
 }
-var import_is_buffer, import_oidc, import_async_retry, import_undici, import_throttleit, import_throttleit2, supportsNewBlobFromArrayBuffer, parseRegExp, map, defaultVercelBlobApiUrl, BlobError, disallowedPathnameCharacters, supportsRequestStreams, TEXT_ENCODER, createChunkTransformStream, addPresignedParams, debugIsActive, _a2, _b2, _a22, DOMException2, objectToString, isError, errorMessages, hasFetch, hasFetchWithUploadProgress, CHUNK_SIZE, blobFetch, hasXhr, blobXhr, blobRequest, MAXIMUM_PATHNAME_LENGTH, BlobAccessError, BlobOidcEnvironmentNotAllowedError, BlobContentTypeNotAllowedError, BlobPathnameMismatchError, BlobClientTokenExpiredError, BlobFileTooLargeError, BlobStoreNotFoundError, BlobStoreSuspendedError, BlobUnknownError, BlobNotFoundError, BlobServiceNotAvailable, BlobServiceRateLimited, BlobRequestAbortedError, BlobPreconditionFailedError, BLOB_API_VERSION, optimizeImageFormatToMimeType, putOptionHeaderMap, maxConcurrentUploads, partSizeInBytes, maxBytesInMemory, BLOB_PRESIGN_QUERY_VALID_UNTIL, BLOB_PRESIGN_QUERY_MAXIMUM_SIZE, BLOB_PRESIGN_QUERY_ALLOWED_CONTENT_TYPES, BLOB_PRESIGN_QUERY_ADD_RANDOM_SUFFIX, BLOB_PRESIGN_QUERY_ALLOW_OVERWRITE, BLOB_PRESIGN_QUERY_CACHE_CONTROL_MAX_AGE, BLOB_PRESIGN_QUERY_IF_MATCH, BLOB_PRESIGN_QUERY_CALLBACK_URL, BLOB_PRESIGN_QUERY_CALLBACK_TOKEN_PAYLOAD, PRESIGN_CANONICAL_QUERY_KEYS, MAX_PRESIGN_CALLBACK_URL_CHARS, MAX_PRESIGN_CALLBACK_TOKEN_PAYLOAD_CHARS, MAX_PRESIGN_CACHE_CONTROL_MAX_AGE_SECONDS, MAX_PRESIGN_IF_MATCH_LENGTH, IF_MATCH_CONTROL_CHARS_RE, utf8Encoder;
-var init_chunk_XKVPKJPO = __esm({
-  "node_modules/@vercel/blob/dist/chunk-XKVPKJPO.js"() {
+var import_is_buffer, import_oidc, import_async_retry, import_undici, import_throttleit, import_throttleit2, supportsNewBlobFromArrayBuffer, parseRegExp, map, defaultVercelBlobApiUrl, BlobError, disallowedPathnameCharacters, supportsRequestStreams, TEXT_ENCODER, createChunkTransformStream, addPresignedParams, debugIsActive, _a2, _b2, _a22, DOMException2, objectToString, isError, errorMessages, hasFetch, hasFetchWithUploadProgress, CHUNK_SIZE, blobFetch, hasXhr, blobXhr, blobRequest, MAXIMUM_PATHNAME_LENGTH, BlobAccessError, BlobOidcEnvironmentNotAllowedError, BlobContentTypeNotAllowedError, BlobPathnameMismatchError, BlobClientTokenExpiredError, BlobFileTooLargeError, BlobStoreNotFoundError, BlobStoreSuspendedError, BlobUnknownError, BlobNotFoundError, BlobServiceNotAvailable, BlobServiceRateLimited, BlobRequestAbortedError, BlobPreconditionFailedError, BLOB_API_VERSION, optimizeImageFormatToMimeType, putOptionHeaderMap, maxConcurrentUploads, partSizeInBytes, maxBytesInMemory, BLOB_PRESIGN_QUERY_VALID_UNTIL, BLOB_PRESIGN_QUERY_MAXIMUM_SIZE, BLOB_PRESIGN_QUERY_ALLOWED_CONTENT_TYPES, BLOB_PRESIGN_QUERY_ADD_RANDOM_SUFFIX, BLOB_PRESIGN_QUERY_ALLOW_OVERWRITE, BLOB_PRESIGN_QUERY_CACHE_CONTROL_MAX_AGE, BLOB_PRESIGN_QUERY_IF_MATCH, BLOB_PRESIGN_QUERY_TTL_DAYS, BLOB_PRESIGN_QUERY_CALLBACK_URL, BLOB_PRESIGN_QUERY_CALLBACK_TOKEN_PAYLOAD, PRESIGN_CANONICAL_QUERY_KEYS, MAX_PRESIGN_CALLBACK_URL_CHARS, MAX_PRESIGN_CALLBACK_TOKEN_PAYLOAD_CHARS, MAX_PRESIGN_CACHE_CONTROL_MAX_AGE_SECONDS, MAX_PRESIGN_TTL_DAYS, MAX_PRESIGN_IF_MATCH_LENGTH, IF_MATCH_CONTROL_CHARS_RE, utf8Encoder;
+var init_chunk_VIBDXTF6 = __esm({
+  "node_modules/@vercel/blob/dist/chunk-VIBDXTF6.js"() {
     init_lib();
     import_is_buffer = __toESM(require_is_buffer(), 1);
     import_oidc = __toESM(require_dist3(), 1);
@@ -32726,7 +32737,8 @@ var init_chunk_XKVPKJPO = __esm({
       allowOverwrite: "x-allow-overwrite",
       contentType: "x-content-type",
       access: "x-vercel-blob-access",
-      ifMatch: "x-if-match"
+      ifMatch: "x-if-match",
+      ttlDays: "x-ttl-days"
     };
     maxConcurrentUploads = typeof window !== "undefined" ? 6 : 8;
     partSizeInBytes = 8 * 1024 * 1024;
@@ -32738,6 +32750,7 @@ var init_chunk_XKVPKJPO = __esm({
     BLOB_PRESIGN_QUERY_ALLOW_OVERWRITE = "vercel-blob-allow-overwrite";
     BLOB_PRESIGN_QUERY_CACHE_CONTROL_MAX_AGE = "vercel-blob-cache-control-max-age";
     BLOB_PRESIGN_QUERY_IF_MATCH = "vercel-blob-if-match";
+    BLOB_PRESIGN_QUERY_TTL_DAYS = "vercel-blob-ttl-days";
     BLOB_PRESIGN_QUERY_CALLBACK_URL = "vercel-blob-callback-url";
     BLOB_PRESIGN_QUERY_CALLBACK_TOKEN_PAYLOAD = "vercel-blob-callback-token-payload";
     PRESIGN_CANONICAL_QUERY_KEYS = [
@@ -32749,11 +32762,13 @@ var init_chunk_XKVPKJPO = __esm({
       BLOB_PRESIGN_QUERY_CALLBACK_URL,
       BLOB_PRESIGN_QUERY_IF_MATCH,
       BLOB_PRESIGN_QUERY_MAXIMUM_SIZE,
+      BLOB_PRESIGN_QUERY_TTL_DAYS,
       BLOB_PRESIGN_QUERY_VALID_UNTIL
     ];
     MAX_PRESIGN_CALLBACK_URL_CHARS = 4096;
     MAX_PRESIGN_CALLBACK_TOKEN_PAYLOAD_CHARS = 8192;
     MAX_PRESIGN_CACHE_CONTROL_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+    MAX_PRESIGN_TTL_DAYS = 730;
     MAX_PRESIGN_IF_MATCH_LENGTH = 256;
     IF_MATCH_CONTROL_CHARS_RE = /[\x00-\x1f\x7f]/;
     utf8Encoder = new TextEncoder();
@@ -32795,6 +32810,7 @@ __export(dist_exports, {
   putFromUrl: () => putFromUrl,
   putImage: () => putImage,
   rename: () => rename2,
+  setTtl: () => setTtl,
   uploadPart: () => uploadPart2
 });
 async function del(urlOrPathname, options) {
@@ -32839,7 +32855,8 @@ async function head(urlOrPathname, options) {
     contentDisposition: response.contentDisposition,
     cacheControl: response.cacheControl,
     uploadedAt: new Date(response.uploadedAt),
-    etag: response.etag
+    etag: response.etag,
+    ...response.expiresAt && { expiresAt: new Date(response.expiresAt) }
   };
 }
 function extractPathnameFromUrl(url) {
@@ -33045,6 +33062,9 @@ async function copy(fromUrlOrPathname, toPathname, options) {
   if (options.ifMatch) {
     headers["x-if-match"] = options.ifMatch;
   }
+  if (options.ttlDays !== void 0) {
+    headers["x-ttl-days"] = options.ttlDays.toString();
+  }
   const params = new URLSearchParams({
     pathname: toPathname,
     fromUrl: fromUrlOrPathname
@@ -33064,7 +33084,8 @@ async function copy(fromUrlOrPathname, toPathname, options) {
     pathname: response.pathname,
     contentType: response.contentType,
     contentDisposition: response.contentDisposition,
-    etag: response.etag
+    etag: response.etag,
+    ...response.expiresAt && { expiresAt: new Date(response.expiresAt) }
   };
 }
 async function rename2(fromUrlOrPathname, toPathname, options) {
@@ -33105,6 +33126,9 @@ async function rename2(fromUrlOrPathname, toPathname, options) {
   if (options.ifMatch) {
     headers["x-if-match"] = options.ifMatch;
   }
+  if (options.ttlDays !== void 0) {
+    headers["x-ttl-days"] = options.ttlDays.toString();
+  }
   const params = new URLSearchParams({
     pathname: toPathname,
     fromUrl: fromUrlOrPathname
@@ -33124,18 +33148,22 @@ async function rename2(fromUrlOrPathname, toPathname, options) {
     pathname: response.pathname,
     contentType: response.contentType,
     contentDisposition: response.contentDisposition,
-    etag: response.etag
+    etag: response.etag,
+    ...response.expiresAt && { expiresAt: new Date(response.expiresAt) }
   };
 }
-function toPutBlobResult(response) {
-  return {
-    url: response.url,
-    downloadUrl: response.downloadUrl,
-    pathname: response.pathname,
-    contentType: response.contentType,
-    contentDisposition: response.contentDisposition,
-    etag: response.etag
-  };
+async function setTtl(urlOrPathname, options) {
+  const body = Array.isArray(urlOrPathname) ? { urls: urlOrPathname, ttlDays: options.ttlDays } : { url: urlOrPathname, ttlDays: options.ttlDays };
+  return requestApi(
+    "/set-ttl",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: options.abortSignal
+    },
+    options
+  );
 }
 async function putImage(pathname, bodyOrUrl, options) {
   if (!(options == null ? void 0 : options.optimizeImage)) {
@@ -33148,7 +33176,13 @@ async function putImage(pathname, bodyOrUrl, options) {
     }
     const putOptions2 = await createPutOptions({ pathname, options });
     const headers2 = createPutHeaders(
-      ["cacheControlMaxAge", "addRandomSuffix", "allowOverwrite", "ifMatch"],
+      [
+        "cacheControlMaxAge",
+        "addRandomSuffix",
+        "allowOverwrite",
+        "ifMatch",
+        "ttlDays"
+      ],
       putOptions2
     );
     const params2 = new URLSearchParams({
@@ -33177,7 +33211,13 @@ async function putImage(pathname, bodyOrUrl, options) {
   }
   const putOptions = await createPutOptions({ pathname, options });
   const headers = createPutHeaders(
-    ["cacheControlMaxAge", "addRandomSuffix", "allowOverwrite", "ifMatch"],
+    [
+      "cacheControlMaxAge",
+      "addRandomSuffix",
+      "allowOverwrite",
+      "ifMatch",
+      "ttlDays"
+    ],
     putOptions
   );
   validateOptimizeImageSourceContentType(
@@ -33206,7 +33246,13 @@ async function putFromUrl(pathname, url, options) {
     throw new BlobError("optimizeImage is required, see usage");
   }
   const headers = createPutHeaders(
-    ["cacheControlMaxAge", "addRandomSuffix", "allowOverwrite", "ifMatch"],
+    [
+      "cacheControlMaxAge",
+      "addRandomSuffix",
+      "allowOverwrite",
+      "ifMatch",
+      "ttlDays"
+    ],
     putOptions
   );
   const params = new URLSearchParams({ pathname, url });
@@ -33220,19 +33266,12 @@ async function putFromUrl(pathname, url, options) {
     },
     putOptions
   );
-  return {
-    url: response.url,
-    downloadUrl: response.downloadUrl,
-    pathname: response.pathname,
-    contentType: response.contentType,
-    contentDisposition: response.contentDisposition,
-    etag: response.etag
-  };
+  return toPutBlobResult(response);
 }
 var import_undici2, put, createMultipartUpload2, createMultipartUploader, uploadPart2, completeMultipartUpload2;
 var init_dist = __esm({
   "node_modules/@vercel/blob/dist/index.js"() {
-    init_chunk_XKVPKJPO();
+    init_chunk_VIBDXTF6();
     import_undici2 = __toESM(require_undici(), 1);
     put = createPutMethod({
       allowedOptions: [
@@ -33240,7 +33279,8 @@ var init_dist = __esm({
         "addRandomSuffix",
         "allowOverwrite",
         "contentType",
-        "ifMatch"
+        "ifMatch",
+        "ttlDays"
       ]
     });
     createMultipartUpload2 = createCreateMultipartUploadMethod({
@@ -33249,7 +33289,8 @@ var init_dist = __esm({
         "addRandomSuffix",
         "allowOverwrite",
         "contentType",
-        "ifMatch"
+        "ifMatch",
+        "ttlDays"
       ]
     });
     createMultipartUploader = createCreateMultipartUploaderMethod({
@@ -33258,7 +33299,8 @@ var init_dist = __esm({
         "addRandomSuffix",
         "allowOverwrite",
         "contentType",
-        "ifMatch"
+        "ifMatch",
+        "ttlDays"
       ]
     });
     uploadPart2 = createUploadPartMethod({
@@ -34379,6 +34421,7 @@ var ContentService = class _ContentService {
       this.installSeed();
       this.setSetting("seeded", "1");
       this.wasSeeded = true;
+      if (this.seed.standard && !this.setting("curated")) this.setSetting("curated", JSON.stringify({ ...this.seed.standard, at: this.now() }));
     }
   }
   store;
@@ -34506,7 +34549,7 @@ var ContentService = class _ContentService {
     const shRow = sh ? this.listPacks().find((p) => p.id === sh.pack.id) : void 0;
     const qMissing = (x3) => x3.pool.filter((q2) => !this.db.prepare("SELECT 1 FROM questions WHERE id=?").get(q2.id)).length;
     const extras = (this.seed.extraShows ?? []).map((x3) => ({ id: x3.pack.id, name: x3.pack.name, installed: !!this.listPacks().find((p) => p.id === x3.pack.id) && qMissing(x3) === 0 }));
-    return { extras, id: pk.id, name: pk.name, installed: !!row && (!sh || !!shRow && !qMissing(sh)) && extras.every((e) => e.installed), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: (sh ? qMissing(sh) : 0) + (this.seed.extraShows ?? []).reduce((a, x3) => a + qMissing(x3), 0), status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
+    return { extras, id: pk.id, name: pk.name, installed: (!this.seed.tiles.length || !!row) && (!sh || !!shRow && !qMissing(sh)) && extras.every((e) => e.installed), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: (sh ? qMissing(sh) : 0) + (this.seed.extraShows ?? []).reduce((a, x3) => a + qMissing(x3), 0), status: row?.status ?? null, olderPacks: this.listPacks().filter((p) => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== "archived").map((p) => ({ id: p.id, name: p.data.name })) };
   }
   // ------------------------------------------------------------- Szenen
   sceneRow(r2) {
@@ -34929,7 +34972,7 @@ var ContentService = class _ContentService {
     const archive = rows.filter((r2) => r2.action === "archive").map((r2) => r2.id);
     const update = rows.filter((r2) => r2.needsUpdate).map((r2) => r2.id);
     const rename3 = rows.filter((r2) => r2.needsRename).map((r2) => r2.id);
-    const missing = _ContentService.KEEP_PACKS.filter((id) => !packs.some((p) => p.id === id));
+    const missing = cur ? [] : _ContentService.KEEP_PACKS.filter((id) => !packs.some((p) => p.id === id));
     const install = !this.seedStatus().installed;
     return { rows, archive, update, rename: rename3, missing, install, clean: !archive.length && !update.length && !rename3.length && !install, main: _ContentService.MAIN_PACK };
   }
@@ -38318,6 +38361,13 @@ function cookie(req, name) {
   }
   return void 0;
 }
+function isLocalRequest(req) {
+  const a = req.socket.remoteAddress ?? "";
+  if (!["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(a)) return false;
+  if (req.headers["x-forwarded-for"] || req.headers["forwarded"]) return false;
+  const host = String(req.headers.host ?? "").replace(/:\d+$/, "").replace(/^\[|\]$/g, "");
+  return ["localhost", "127.0.0.1", "::1"].includes(host);
+}
 async function handleAdmin(app, req, res, parts, url, readBody) {
   const json = (status, body, headers = {}) => {
     res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers });
@@ -38338,8 +38388,20 @@ async function handleAdmin(app, req, res, parts, url, readBody) {
       if (!t) return json(401, { err: "Falsches Passwort" });
       return json(200, { ok: true }, { "set-cookie": `${COOKIE}=${t}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${12 * 3600}${secure}` });
     }
+    if (a === "setup" && method === "POST") {
+      if (!app.auth.setupNeeded) return json(409, { err: "Die Einrichtung ist bereits abgeschlossen." });
+      if (!isLocalRequest(req)) return json(403, { err: "Die Einrichtung ist nur direkt an dem Computer m\xF6glich, auf dem JANIQUIZITION l\xE4uft (Adresse http://localhost:\u2026/admin)." });
+      const body = await readBody(4096);
+      if (String(body.password ?? "") !== String(body.confirm ?? "")) return json(400, { err: "Die beiden Passw\xF6rter sind nicht gleich." });
+      try {
+        const t = app.auth.setup(String(body.password ?? ""));
+        return json(200, { ok: true }, { "set-cookie": `${COOKIE}=${t}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${12 * 3600}${secure}` });
+      } catch (e) {
+        return json(400, { err: e.message });
+      }
+    }
     const authed = app.auth.check(token);
-    if (a === "me") return json(authed ? 200 : 401, { ok: authed });
+    if (a === "me") return json(authed ? 200 : 401, { ok: authed, setup: app.auth.setupNeeded, local: isLocalRequest(req) });
     if (a === "logout" && method === "POST") {
       app.auth.logout(token);
       return json(200, { ok: true }, { "set-cookie": `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0` });
@@ -38478,25 +38540,20 @@ async function handleAdmin(app, req, res, parts, url, readBody) {
 import { createHash as createHash4, randomBytes as randomBytes3, scryptSync, timingSafeEqual } from "node:crypto";
 var sha3 = (s) => createHash4("sha256").update(s).digest("hex");
 var SESSION_MS = 12 * 3600 * 1e3;
-var AdminAuth = class {
+var AdminAuth = class _AdminAuth {
   /** passwordRequiredFromEnv: Online-Betrieb – kein automatisch erzeugtes Passwort, Anmeldung nur mit ADMIN_PASSWORD. */
   constructor(store, envPassword, now, opts = {}) {
     this.store = store;
     this.envPassword = envPassword;
     this.now = now;
     this.opts = opts;
-    if (!envPassword && !opts.passwordRequiredFromEnv && !this.get("admin_hash")) {
-      this.initialPassword = randomBytes3(9).toString("base64url");
-      this.set("admin_hash", this.hash(this.initialPassword));
-    }
     this.store.db.prepare("DELETE FROM admin_sessions WHERE expires < ?").run(this.now());
   }
   store;
   envPassword;
   now;
   opts;
-  /** Nur gesetzt, wenn beim ersten Start ein Passwort erzeugt wurde (wird einmal ausgegeben). */
-  initialPassword = null;
+  static MIN_LEN = 12;
   get(k2) {
     return this.store.db.prepare("SELECT value FROM settings WHERE key=?").get(k2)?.value ?? null;
   }
@@ -38519,10 +38576,26 @@ var AdminAuth = class {
     const test = scryptSync(pw, Buffer.from(salt, "hex"), 32);
     return timingSafeEqual(test, Buffer.from(hex, "hex"));
   }
+  /** Lokale Erstinstallation: noch kein Passwort gewählt (es gibt bewusst kein Standard- oder Zufallspasswort). */
+  get setupNeeded() {
+    return !this.envPassword && !this.opts.passwordRequiredFromEnv && !this.get("admin_hash");
+  }
   setPassword(pw) {
-    if (pw.length < 8) throw new Error("mindestens 8 Zeichen");
+    if (typeof pw !== "string" || pw.length < _AdminAuth.MIN_LEN) throw new Error(`Das Passwort braucht mindestens ${_AdminAuth.MIN_LEN} Zeichen.`);
+    if (pw.length > 200) throw new Error("Das Passwort ist zu lang.");
     this.set("admin_hash", this.hash(pw));
     this.store.db.exec("DELETE FROM admin_sessions");
+  }
+  /** Erst-Einrichtung: setzt das Passwort NUR, solange noch keines existiert, und meldet direkt an. */
+  setup(pw) {
+    if (!this.setupNeeded) throw new Error("Die Einrichtung ist bereits abgeschlossen.");
+    this.setPassword(pw);
+    return this.newSession();
+  }
+  newSession() {
+    const token = randomBytes3(32).toString("base64url");
+    this.store.db.prepare("INSERT INTO admin_sessions(hash,expires) VALUES(?,?)").run(sha3(token), this.now() + SESSION_MS);
+    return token;
   }
   get configured() {
     return !!this.envPassword || !!this.get("admin_hash");
@@ -38547,9 +38620,7 @@ var AdminAuth = class {
       return null;
     }
     this.store.db.prepare("DELETE FROM settings WHERE key=?").run(key);
-    const token = randomBytes3(32).toString("base64url");
-    this.store.db.prepare("INSERT INTO admin_sessions(hash,expires) VALUES(?,?)").run(sha3(token), this.now() + SESSION_MS);
-    return token;
+    return this.newSession();
   }
   check(token) {
     if (!token) return false;
@@ -40728,6 +40799,27 @@ var SEED_SHOW_SPIELMODI = {
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
 var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K, SEED_SHOW_AFTER, SEED_SHOW_NEWGAMES, SEED_SHOW_SPIELMODI];
+var ALL_SHOWS = [SEED_SHOW, ...EXTRA_SHOWS, SEED_SHOW_B43, SEED_SHOW_B43K];
+var POOL_ALL = new Map([...TILES.flatMap((t) => t.tasks.map((task, i2) => ({ id: `${t.id}-${i2 + 1}`, topic: t.topic, task }))), ...ALL_SHOWS.flatMap((x3) => x3.pool)].map((q2) => [q2.id, q2]));
+var ROUNDS_ALL = new Map([...ALL_SHOWS.flatMap((x3) => x3.rounds), ...TILES.map((t) => ({ id: t.id, title: t.title, topic: t.topic, icon: t.icon, color: t.color, kind: t.kind, football: t.football, blurb: t.blurb, taskIds: t.tasks.map((_2, i2) => `${t.id}-${i2 + 1}`) }))].map((r2) => [r2.id, r2]));
+function standard(sh, name, description) {
+  const cats = [...new Set(sh.steps.filter((x3) => x3.k !== "board").map((x3) => x3.cat))];
+  const rounds = cats.map((id) => {
+    const r2 = ROUNDS_ALL.get(id);
+    if (!r2) throw new Error("Runde fehlt im Standardpaket: " + id);
+    return r2;
+  });
+  const pool = [...new Set(rounds.flatMap((r2) => r2.taskIds))].map((id) => {
+    const q2 = POOL_ALL.get(id);
+    if (!q2) throw new Error("Frage fehlt im Standardpaket: " + id);
+    return q2;
+  });
+  return { ...sh, pack: { ...sh.pack, name, description }, rounds, pool };
+}
+var STANDARD_SHOWS = [
+  standard(SEED_SHOW_B44K, "Kickbase-Abend bei MJ \u2013 Hauptversion", "Der komplette Abend: Best-of mit je einer Probe pro Spielmodus, Marktwert-Update nach jeder Runde und dem Finale KICKBASE-KONSENS. Start mit 0 Punkten."),
+  standard(SEED_SHOW_AFTER, "Kickbase-Abend bei MJ \u2013 Zweite Version", "Der zweite Abend \u201ENachspielzeit\u201C mit frischen Fragen, die in der Hauptversion nicht vorkommen, und Marktwert-Update nach jeder Runde.")
+];
 
 // server/vercel.ts
 var ConflictError = class extends Error {

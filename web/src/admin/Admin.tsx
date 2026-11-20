@@ -12,15 +12,16 @@ import { guard } from './ui';
 const TABS: { id: AdminTab; label: string }[] = [{ id: 'home', label: '🏠 Start' }, { id: 'questions', label: '❓ Fragen' }, { id: 'packs', label: '📦 Pakete' }, { id: 'io', label: '💾 Sicherung & Update' }, { id: 'more', label: '🧱 Weitere Inhalte' }];
 
 export function Admin() {
-  const [state, setState] = useState<'loading' | 'in' | 'out' | 'setup'>('loading');
+  const [state, setState] = useState<'loading' | 'in' | 'out' | 'setup' | 'first'>('loading'); const [local, setLocal] = useState(true);
   const [health, setHealth] = useState<any>(null);
   useEffect(() => {
     fetch('/api/health').then(r => r.json()).then(setHealth).catch(() => setHealth(null));
-    adm('GET', '/me').then(r => setState(r.status === 503 ? 'setup' : r.ok ? 'in' : 'out'));
+    adm('GET', '/me').then(r => { setLocal(r.data?.local !== false); setState(r.status === 503 ? 'setup' : r.data?.setup ? 'first' : r.ok ? 'in' : 'out'); });
     const f = () => setState('out'); window.addEventListener('outplay-admin-401', f); return () => window.removeEventListener('outplay-admin-401', f);
   }, []);
   if (state === 'loading') return <div className="adm"><p className="pulse">Lade …</p></div>;
   if (state === 'setup' || (health?.mode === 'online' && (!health.storage?.configured || !health.admin?.passwordConfigured))) return <Setup health={health} />;
+  if (state === 'first') return <FirstSetup local={local} onDone={() => { try { localStorage.setItem('adm.welcome', '1'); } catch { /* */ } setState('in'); }} />;
   if (state === 'out') return <Login onIn={() => setState('in')} online={health?.mode === 'online'} />;
   return <Shell onOut={() => setState('out')} online={health?.mode === 'online'} />;
 }
@@ -42,6 +43,28 @@ function Setup({ health }: { health: any }) {
   );
 }
 
+function FirstSetup({ local, onDone }: { local: boolean; onDone: () => void }) {
+  const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const ok = pw.length >= 12 && pw === pw2;
+  const go = async () => { setBusy(true); setErr(''); const r = await adm('POST', '/setup', { password: pw, confirm: pw2 }); setBusy(false); if (r.ok) onDone(); else setErr(errText(r)); };
+  if (!local) return (
+    <div className="hostlogin"><div className="logo"><Brand /></div><h2>Willkommen bei JANIQUIZITION</h2>
+      <div className="card"><p>Die Einrichtung des Admin-Zugangs ist aus Sicherheitsgründen nur <b>an dem Computer selbst</b> möglich, auf dem JANIQUIZITION läuft.</p><p className="small muted">Öffne dort im Browser die Adresse <code>http://localhost:8080/admin</code>.</p></div></div>);
+  return (
+    <div className="hostlogin"><div className="logo"><Brand /></div><h2>Willkommen bei JANIQUIZITION</h2>
+      <div className="card">
+        <p>Richte deinen Admin-Zugang ein, damit nur du Fragen und Spieleabende verändern kannst.</p>
+        <label className="field"><span>Admin-Passwort wählen</span><input type="password" autoFocus autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} /></label>
+        <p className={`small ${pw.length >= 12 ? 'okc' : 'muted'}`} style={{ margin: '-4px 0 8px' }}>{pw.length >= 12 ? '✓ Lang genug' : `Mindestens 12 Zeichen (noch ${Math.max(0, 12 - pw.length)}) – am besten ein Satz, den du dir merken kannst.`}</p>
+        <label className="field"><span>Passwort wiederholen</span><input type="password" autoComplete="new-password" value={pw2} onChange={e => setPw2(e.target.value)} onKeyDown={e => e.key === 'Enter' && ok && go()} /></label>
+        {pw2 && pw !== pw2 && <p className="small" style={{ color: '#ff9a9a' }}>Die Passwörter sind nicht gleich.</p>}
+        {err && <div className="status bad">{err}</div>}
+        <button className="btn primary wide" disabled={!ok || busy} onClick={go}>Passwort speichern &amp; loslegen</button>
+        <p className="small muted" style={{ marginTop: 10 }}>Das Passwort gilt nur auf diesem Computer und wird nirgends hin gesendet. Mitspieler brauchen es nicht.</p>
+      </div>
+    </div>);
+}
+
 function Login({ onIn, online }: { onIn: () => void; online?: boolean }) {
   const [pw, setPw] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const go = async () => { setBusy(true); setErr(''); const r = await adm('POST', '/login', { password: pw }); setBusy(false); if (r.ok) onIn(); else setErr(errText(r)); };
@@ -51,7 +74,7 @@ function Login({ onIn, online }: { onIn: () => void; online?: boolean }) {
       <h2>Admin-Bereich</h2>
       <div className="card">
         <label className="field"><span>Admin-Passwort</span><input type="password" autoFocus value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && pw && go()} /></label>
-        <details className="more"><summary>Passwort vergessen?</summary><p className="small muted">{online ? <>Es ist die Umgebungsvariable <code>ADMIN_PASSWORD</code> im Vercel-Projekt.</> : <>Beim ersten Start erzeugt: Datei <code>data/admin-passwort.txt</code> (oder <code>ADMIN_PASSWORD</code>).</>}</p></details>
+        <details className="more"><summary>Passwort vergessen?</summary><p className="small muted">{online ? <>Es ist die Umgebungsvariable <code>ADMIN_PASSWORD</code> im Vercel-Projekt.</> : <>Im Programmordner <b>JANIQUIZITION-PASSWORT-ZURUECKSETZEN.bat</b> doppelklicken. Danach legst du hier ein neues Passwort fest. Deine Fragen, Pakete und Spielstände bleiben erhalten.</>}</p></details>
         {err && <div className="status bad">{err}</div>}
         <button className="btn primary wide" disabled={!pw || busy} onClick={go}>Anmelden</button>
       </div>

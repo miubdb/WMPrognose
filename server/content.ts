@@ -53,8 +53,8 @@ export interface SeedShow {
 
 export class ContentService {
   private cache = new Map<string, Book>();
-  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene>; pack?: { id: string; name: string; description: string }; show?: SeedShow; /** weitere mitgelieferte Showpakete (z. B. „Reus 65 Mio“) */ extraShows?: SeedShow[] }, private now: () => number = Date.now) {
-    if (!this.setting('seeded')) { this.installSeed(); this.setSetting('seeded', '1'); this.wasSeeded = true; }
+  constructor(private store: Store, private seed: { tiles: TileDef[]; scenes: Record<string, Scene>; pack?: { id: string; name: string; description: string }; show?: SeedShow; /** weitere mitgelieferte Showpakete (z. B. „Reus 65 Mio“) */ extraShows?: SeedShow[]; /** Neuinstallation mit genau zwei Standardpaketen: wird beim ersten Start als dauerhafte Kuratierung gespeichert */ standard?: { main: string; second: string } }, private now: () => number = Date.now) {
+    if (!this.setting('seeded')) { this.installSeed(); this.setSetting('seeded', '1'); this.wasSeeded = true; if (this.seed.standard && !this.setting('curated')) this.setSetting('curated', JSON.stringify({ ...this.seed.standard, at: this.now() })); }
   }
   private get db() { return this.store.db; }
   private setting(k: string): string | null { return (this.db.prepare('SELECT value FROM settings WHERE key=?').get(k) as any)?.value ?? null; }
@@ -134,7 +134,7 @@ export class ContentService {
     const sh = this.seed.show; const shRow = sh ? this.listPacks().find(p => p.id === sh.pack.id) : undefined;
     const qMissing = (x: SeedShow) => x.pool.filter(q => !this.db.prepare('SELECT 1 FROM questions WHERE id=?').get(q.id)).length;
     const extras = (this.seed.extraShows ?? []).map(x => ({ id: x.pack.id, name: x.pack.name, installed: !!this.listPacks().find(p => p.id === x.pack.id) && qMissing(x) === 0 }));
-    return { extras, id: pk.id, name: pk.name, installed: !!row && (!sh || (!!shRow && !qMissing(sh))) && extras.every(e => e.installed), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: (sh ? qMissing(sh) : 0) + (this.seed.extraShows ?? []).reduce((a, x) => a + qMissing(x), 0), status: row?.status ?? null, olderPacks: this.listPacks().filter(p => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== 'archived').map(p => ({ id: p.id, name: p.data.name })) };
+    return { extras, id: pk.id, name: pk.name, installed: (!this.seed.tiles.length || !!row) && (!sh || (!!shRow && !qMissing(sh))) && extras.every(e => e.installed), classicInstalled: !!row, show: sh ? { id: sh.pack.id, name: sh.pack.name, installed: !!shRow } : null, poolMissing: (sh ? qMissing(sh) : 0) + (this.seed.extraShows ?? []).reduce((a, x) => a + qMissing(x), 0), status: row?.status ?? null, olderPacks: this.listPacks().filter(p => p.id !== pk.id && /^standard-\d+$/.test(p.id) && p.status !== 'archived').map(p => ({ id: p.id, name: p.data.name })) };
   }
 
   // ------------------------------------------------------------- Szenen
@@ -476,7 +476,7 @@ export class ContentService {
     const archive = rows.filter(r => r.action === 'archive').map(r => r.id);
     const update = rows.filter(r => r.needsUpdate).map(r => r.id);
     const rename = rows.filter(r => r.needsRename).map(r => r.id);
-    const missing = ContentService.KEEP_PACKS.filter(id => !packs.some(p => p.id === id));
+    const missing = cur ? [] : ContentService.KEEP_PACKS.filter(id => !packs.some(p => p.id === id));
     const install = !this.seedStatus().installed;   // mitgelieferte neue Pakete/Fragen fehlen noch (werden nur ergänzt)
     return { rows, archive, update, rename, missing, install, clean: !archive.length && !update.length && !rename.length && !install, main: ContentService.MAIN_PACK };
   }

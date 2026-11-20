@@ -46,6 +46,7 @@ export interface AppOptions {
   mapFile?: string;
   seedPack?: { id: string; name: string; description: string };
   seedShow?: import('./content').SeedShow;
+  standard?: { main: string; second: string };
   extraShows?: import('./content').SeedShow[];
 }
 
@@ -103,7 +104,7 @@ export class App {
     this.tiles = new LocalTiles(opts.mapFile ?? join(dirname(opts.dbFile), 'maps', 'outplay-karte.mbtiles'));
     this.clock = opts.clock ?? Date.now;
     this.store = new Store(opts.dbFile);
-    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack, show: opts.seedShow, extraShows: opts.extraShows }, this.clock);
+    this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack, show: opts.seedShow, extraShows: opts.extraShows, standard: opts.standard }, this.clock);
     this.auth = new AdminAuth(this.store, opts.adminPassword, this.clock);
     this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer(), preInstallBackup: () => this.preInstallBackup(), roomUsage: () => this.roomUsage() };
     this.engine = new Engine((id: string) => this.content.resolveBook(id));
