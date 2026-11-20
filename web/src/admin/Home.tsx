@@ -1,75 +1,63 @@
-import { useCallback, useEffect, useState } from 'react';
-import { GAMES, INACTIVE_GAMES, PLANNED_GAMES } from '../../../shared/games';
-import { adm, download, errText } from './api';
+import { useEffect, useState } from 'react';
+import { GAMES, INACTIVE_GAMES } from '../../../shared/games';
+import { adm } from './api';
+import { Badge, fmtDate } from './ui';
+import { UpdateBar, UpdateDetails, type useUpdate } from './Update';
 
-export type AdminTab = 'home' | 'questions' | 'packs' | 'io' | 'advanced';
+export type AdminTab = 'home' | 'questions' | 'packs' | 'io' | 'more';
 
-/** „Pakete aufräumen & aktualisieren“ – zeigt vorab, was passiert; legt vor dem Ausführen automatisch eine Sicherung an. */
-export function CleanupCard({ bump, onlyIfNeeded }: { bump: () => void; onlyIfNeeded?: boolean }) {
-  const [cl, setCl] = useState<any>(null); const [msg, setMsg] = useState('');
-  const load = useCallback(() => { adm('GET', '/cleanup').then(r => r.ok && setCl(r.data)); }, []);
-  useEffect(load, [load]);
-  if (!cl || (onlyIfNeeded && cl.clean)) return null;
-  const run = async () => {
-    const lines = [...(cl.install ? ['• neue Spiele und Fragen ergänzen (nichts Vorhandenes wird verändert)'] : []), ...cl.archive.map((i: string) => '• archivieren: ' + i), ...cl.update.map((i: string) => '• neue Version mit aktuellem Inhalt: ' + i), ...(cl.rename ?? []).map((i: string) => '• umbenennen: ' + i)].join('\n');
-    if (!confirm('Jetzt aktualisieren?\n\n' + lines + '\n\nVorher wird automatisch eine Datenbanksicherung angelegt. Nichts wird gelöscht; laufende und beendete Räume behalten ihren Stand.')) return;
-    const r = await adm('POST', '/cleanup', {});
-    if (r.ok) { setMsg(`Fertig ✓${r.data.backupFile ? ' · Sicherung: ' + r.data.backupFile : ''}`); bump(); load(); } else setMsg(errText(r));
-  };
+/** Startseite: Status, drei Hauptaktionen, wichtigste Pakete, Update-Hinweis, Spielübersicht zum Aufklappen. */
+export function Home({ go, online, u, openPack }: { go: (t: AdminTab) => void; online: boolean; u: ReturnType<typeof useUpdate>; openPack: (id: string) => void; bump: () => void }) {
+  const [packs, setPacks] = useState<any[] | null>(null); const [ov, setOv] = useState<any>(null); const [showDetails, setShowDetails] = useState(false);
+  useEffect(() => { adm('GET', '/packs').then(r => r.ok && setPacks(r.data)); adm('GET', '/overview').then(r => r.ok && setOv(r.data)); }, [u.state]);
+  const active = (packs ?? []).filter(p => p.status === 'published');
+  // Hauptshow nur, wenn sie wirklich veröffentlicht und nicht archiviert ist (kein Hinweis auf archivierte Pakete)
+  const main = active.find(p => `${p.id}@${p.currentVersion}` === ov?.defaultRef);
+  const recent = [...(packs ?? [])].filter(p => p.status !== 'archived').sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0))[0];
+  const shown = [recent, main].filter((p, i, a) => p && a.indexOf(p) === i) as any[];
+  const rounds = (p: any) => (p.show?.length ? p.show.filter((x: any) => x.k !== 'board').length : p.categoryIds?.length ?? 0);
+  const games = GAMES.filter(g => g.kind === 'Spiel');
   return (
-    <div className={`card ${cl.clean ? '' : 'attn'}`}>
-      <h3>{cl.clean ? '✔ Alles aktuell' : '🔄 Update verfügbar'}</h3>
-      {cl.clean
-        ? <p className="muted small">Aktiv: Hauptshow (KICKBASE-KONSENS), Alternative (FINAL LOCK) und das alte Backup-Paket. Nichts zu tun.</p>
-        : <>
-          <p className="small">Neue Spiele, Fragen und Regeln als <b>neue Version</b>. Nichts wird gelöscht, laufende Räume bleiben unverändert, eine Sicherung entsteht automatisch.</p>
-          <ul className="small">{cl.install && <li><b>Neue Spiele und Fragen</b> – werden ergänzt</li>}{cl.rows.filter((r: any) => r.action === 'archive' || r.needsUpdate || r.needsRename).map((r: any) => <li key={r.id}><b>{r.name}</b> – {r.action === 'archive' ? 'wird archiviert' : r.needsUpdate ? 'bekommt neue Version' : 'wird umbenannt'}</li>)}</ul>
-          <button className="btn primary" onClick={run}>Jetzt sicher aktualisieren</button>
-        </>}
-      {msg && <p className="small">{msg}</p>}
-    </div>
-  );
-}
-
-/** Startseite des Admin-Bereichs: was ist bereit, was funktioniert, was kann ich tun – ohne Fachbegriffe. */
-export function Home({ go, online, bump }: { go: (t: AdminTab) => void; online: boolean; bump: () => void }) {
-  const [packs, setPacks] = useState<any[]>([]); const [ov, setOv] = useState<any>(null);
-  useEffect(() => { adm('GET', '/packs').then(r => r.ok && setPacks(r.data)); adm('GET', '/overview').then(r => r.ok && setOv(r.data)); }, []);
-  const active = packs.filter(p => p.status === 'published');
-  const main = ov?.defaultRef?.split('@')[0];
-  const rounds = (p: any) => (p.show ?? []).filter((x: any) => x.k !== 'board').length;
-  return (
-    <div className="home">
-      <h2>Willkommen</h2>
-      <CleanupCard bump={bump} onlyIfNeeded />
-      <div className="card">
-        <h3>🎤 Heute spielen</h3>
-        {!online && <p><a className="btn primary" href="/host">Showmaster-Pult öffnen</a></p>}
-        <ul className="packlist">{active.map(p => (
-          <li key={p.id} className={p.id === main ? 'main' : ''}>
-            <b>{p.name}</b>{p.id === main && <span className="badge ok">Hauptshow</span>}
-            <small className="muted"> · {rounds(p) ? `${rounds(p)} Runden` : `${p.categoryIds?.length ?? 0} Kategorien`} · v{p.currentVersion}</small>
-          </li>))}
-          {!active.length && <li className="muted">Noch kein veröffentlichtes Paket.</li>}</ul>
-      </div>
-      <div className="card">
-        <h3>Was möchtest du tun?</h3>
-        <div className="bigbtns">
-          <button className="btn" onClick={() => go('questions')}>❓ Frage erstellen oder testen</button>
-          <button className="btn" onClick={() => go('packs')}>📦 Paket erstellen oder ändern</button>
-          <button className="btn" onClick={async () => { const r = await adm('GET', '/export?scope=all'); if (r.ok) download('JANIQUIZITION-Sicherung-Inhalte.json', r.data); }}>💾 Inhalte sichern</button>
+    <div className="dash">
+      <section className="hero">
+        <div><h2>JANIQUIZITION – Verwaltung</h2><p className="muted" style={{ margin: 0 }}>Bereit für den nächsten Spieleabend?</p></div>
+        <div className="statchips" aria-label="Status">
+          <Badge kind={online ? 'info' : 'ok'}>{online ? '☁️ Online' : '💻 Lokal'}</Badge>
+          <Badge>{packs ? active.length : '…'} aktive Pakete</Badge>
+          <Badge>{ov ? ov.questions : '…'} Fragen</Badge>
         </div>
-      </div>
-      <div className="card">
-        <h3>🎮 Alle Spiele ({GAMES.filter(g => g.kind === 'Spiel').length} + Finale)</h3>
+      </section>
+
+      <UpdateBar u={u} onDetails={() => setShowDetails(!showDetails)} />
+      {showDetails && u.plan && <div className="softcard"><UpdateDetails plan={u.plan} /><p className="small muted">Alle Einzelheiten und die Ausführung findest du auch unter <button className="btn tiny quiet" onClick={() => go('io')}>Sicherung &amp; Update</button>.</p></div>}
+
+      <section>
+        <h3 style={{ margin: '0 0 8px' }}>Was möchtest du machen?</h3>
+        <div className="bigactions">
+          <button className="bigaction primary" onClick={() => go('packs')}><b>📦 Show vorbereiten</b><span>Spielepaket zusammenstellen und veröffentlichen</span></button>
+          <button className="bigaction" onClick={() => go('questions')}><b>❓ Fragen verwalten</b><span>Fragen suchen, anlegen, ändern und testen</span></button>
+          {online
+            ? <div className="bigaction" aria-disabled="true"><b>🎤 Show starten</b><span>Online-Verwaltung: Die Show startest du am Laptop. Hier bereitest du Inhalte vor und überträgst sie per Export/Import.</span></div>
+            : <a className="bigaction" href="/host"><b>🎤 Show starten</b><span>Showmaster-Pult öffnen{main ? ` – Hauptshow: ${main.name}` : ''}</span></a>}
+        </div>
+      </section>
+
+      <section className="softcard">
+        <div className="row between" style={{ marginBottom: 8 }}><h3 style={{ margin: 0 }}>Spielepakete</h3><button className="btn small quiet" onClick={() => go('packs')}>Alle Pakete ansehen</button></div>
+        {packs && !shown.length && <p className="muted">Noch kein Paket vorhanden.</p>}
+        <div className="minipacks">{shown.map(p => (
+          <div key={p.id} className="minipack">
+            <div><b>{p.name}</b><span className="muted small">{p.status === 'published' ? `Veröffentlicht · v${p.currentVersion}` : 'Entwurf'} · {rounds(p)} Runden · {fmtDate(p.updated)}</span></div>
+            <span className="pageact">{p === main && <Badge kind="ok">Hauptshow</Badge>}<button className="btn small quiet" onClick={() => openPack(p.id)}>Öffnen</button></span>
+          </div>))}</div>
+      </section>
+
+      <details className="softcard more">
+        <summary><b>{games.length} Spielmodi + Finalspiele entdecken</b></summary>
         <div className="tablescroll"><table className="scoretab gametab"><thead><tr><th></th><th>Spiel</th><th>So geht’s</th><th>Punkte</th></tr></thead>
           <tbody>{GAMES.map(g => <tr key={g.mode}><td>{g.icon}</td><td><b>{g.name}</b>{g.kind === 'Finale' && <small className="muted"> Finale</small>}</td><td>{g.short}</td><td className="nowrap">{g.points}</td></tr>)}</tbody></table></div>
-        {PLANNED_GAMES.length > 0 && <details className="more"><summary>Geplant</summary>
-          <ul className="small">{PLANNED_GAMES.map(g => <li key={g.name}><b>{g.name}</b> – {g.note}</li>)}</ul></details>}
-        <details className="more"><summary>Nicht mehr aktiv</summary>
-          <ul className="small">{INACTIVE_GAMES.map(g => <li key={g.name}><b>{g.name}</b> – {g.note}</li>)}</ul></details>
-      </div>
-      <p className="muted small">Ablauf: Fragen anlegen → Paket zusammenstellen → veröffentlichen → im Showmaster-Pult wählen.</p>
+        <details className="more"><summary>Nicht mehr aktiv</summary><ul className="small">{INACTIVE_GAMES.map(g => <li key={g.name}><b>{g.name}</b> – {g.note}</li>)}</ul></details>
+      </details>
     </div>
   );
 }

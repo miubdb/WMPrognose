@@ -105,10 +105,12 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
       <div className="modalbox wide editor" onClick={e => e.stopPropagation()}>
         <div className="row between sticky-top"><h2>{MODE_ICON[m]} {id ? 'Frage bearbeiten' : 'Neue Frage'} <span className="muted modename">{MODE_LABEL[m]}</span></h2><button className="btn small ghost" onClick={onClose}>Schließen ✕</button></div>
 
+        <h4 className="step"><i>1</i> Frage &amp; Inhalt</h4>
         {(() => { const g = GAMES.find(x => x.mode === m); return g ? <div className="gameinfo"><b>{g.icon} {g.name}</b> – {g.short}<br /><span className="muted">Du legst an: {g.ask}</span></div> : null; })()}
 
         {m !== 'glitch' && <Field label={m === 'link' ? 'Überschrift' : m === 'impostor' ? 'Thema' : m === 'timeline' ? 'Frage (Ereignis)' : m === 'duel' || m === 'arena' ? 'Titel auf dem TV' : m === 'panic' ? 'Titel des Rätsels' : 'Fragetext'}><textarea rows={2} value={task.prompt} maxLength={300} placeholder={m === 'link' ? 'z. B. Wer oder was wird gesucht?' : m === 'match' ? 'z. B. Was haben diese Unternehmen ursprünglich hergestellt?' : 'Was soll gefragt werden?'} onChange={e => set('prompt', e.target.value)} /></Field>}
 
+        <h4 className="step"><i>2</i> Antwort &amp; Lösung</h4>
         {m === 'geo' && <>
           <Field label="Ortsname (für die Auflösung)"><input value={task.answer.label} maxLength={80} placeholder="z. B. Timbuktu, Mali" onChange={e => set('answer', { ...task.answer, label: e.target.value })} /></Field>
           <div className="seg" role="tablist">{([['germany', 'Deutschland'], ['europe', 'Europa'], ['world', 'Welt']] as const).map(([k, l]) => <button key={k} type="button" className={task.map === k ? 'on' : ''} onClick={() => set('map', k)}>{l}</button>)}</div>
@@ -229,7 +231,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
 
         <Field label="Lösungserklärung (optional, erscheint bei der Auflösung)"><textarea rows={2} value={task.explain} maxLength={500} placeholder="Ein Satz mit einem netten Zusatzfakt" onChange={e => set('explain', e.target.value)} /></Field>
 
-        <details className="more"><summary>Weitere Einstellungen</summary>
+        <details className="more"><summary><b>3 · Zeit, Punkte &amp; weitere Einstellungen</b> – die Standardwerte passen meist</summary>
           <div className="form2">
             <Field label="Thema (zum Filtern)"><input value={topic} maxLength={60} placeholder="z. B. Fußball, Geografie" onChange={e => setTopic(e.target.value)} /></Field>
             {m === 'geo' && <>
@@ -270,7 +272,7 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
           <span className="maxline">{Number.isFinite(taskMax(norm)) ? taskMax(norm) : '?'} P.</span>
           {problems.length > 0 && <button className="btn small ghost warnchip" onClick={() => setShowProblems(v => !v)}>⚠ {problems.length}<span className="hide-s"> offen</span></button>}
           <span className="spacer" />
-          <button className="btn gold" disabled={problems.length > 0} onClick={() => setPrev(true)}>👀<span className="hide-s"> Testen</span></button>
+          <button className="btn quiet" disabled={problems.length > 0} onClick={() => setPrev(true)}>👀<span className="hide-s"> Testen</span></button>
           <button className="btn primary" disabled={busy} onClick={save}>💾 Speichern</button>
         </div>
       </div>

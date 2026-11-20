@@ -143,7 +143,7 @@ export class OnlineAdmin {
       for (let attempt = 0; attempt < 6; attempt++) {
         let live: Live;
         try { live = await this.ensure(); } catch (e: any) { return sendJson(res, 503, { err: 'Speicher nicht erreichbar: ' + String(e?.message ?? e).slice(0, 200), setup: 'blob-error' }); }
-        if (method === 'POST' && parts[2] === 'standard' && this.backend!.snapshot) {   // vor dem Installieren des Standardpakets: unveränderte Kopie des gesamten Bestands
+        if (method === 'POST' && (parts[2] === 'standard' || parts[2] === 'cleanup') && this.backend!.snapshot) {   // vor dem Installieren des Standardpakets: unveränderte Kopie des gesamten Bestands
           try { const f = join(this.dir, 'pre.db'); if (existsSync(f)) rmSync(f); live.store.backupTo(f); const bytes = readFileSync(f); rmSync(f, { force: true }); await this.backend!.snapshot(bytes, 'vor-standardpaket-' + new Date(this.now()).toISOString().replace(/[:.]/g, '-')); }
           catch (e: any) { return sendJson(res, 503, { err: 'Sicherung vor der Installation fehlgeschlagen – nichts wurde verändert: ' + String(e?.message ?? e).slice(0, 160) }); }
         }

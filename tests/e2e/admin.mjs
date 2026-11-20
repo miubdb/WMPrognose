@@ -13,6 +13,7 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 950 } });
 const page = await ctx.newPage(); page.on('pageerror', e => { failures++; console.log('pageerror', e.message); });
 page.on('dialog', d => d.accept('Notiz E2E'));
+const confirmDlg = async (label) => { const d = page.locator('.dlg').last(); await d.waitFor(); await d.getByRole('button', { name: label }).click(); await sleep(300); };
 const field = (label) => page.locator('.modalbox label.field', { hasText: label }).last();
 const fill = async (label, value, sel = 'input,textarea,select') => { const el = field(label).locator(sel).first(); if ((await el.evaluate(e => e.tagName)) === 'SELECT') await el.selectOption(String(value)); else await el.fill(String(value)); };
 
@@ -22,18 +23,19 @@ await page.getByLabel('Admin-Passwort').fill('falsch'); await page.getByRole('bu
 await page.waitForSelector('.status.bad'); check(true, 'falsches Passwort wird abgewiesen');
 await page.getByLabel('Admin-Passwort').fill(PW); await page.getByRole('button', { name: 'Anmelden' }).click();
 await page.waitForSelector('.admtop'); await page.screenshot({ path: `${SHOTS}/1-packs.png` }); check(true, 'Admin-Login erfolgreich');
-await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.catcard'); check((await page.locator('.catcard').count()) >= 1, 'Standardpaket ist sichtbar');
+await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.pcard'); check((await page.locator('.pcard').count()) >= 1, 'Pakete sind sichtbar (gruppiert: aktuell/Entwürfe/Archiv)');
 
 // ---- Fragenbibliothek
-await page.getByRole('button', { name: '❓ Fragen' }).click(); await page.waitForSelector('.qcard');
-const total = await page.locator('.qcard').count(); check(total >= 34, `Bibliothek zeigt alle bisherigen Fragen (${total})`);
+await page.getByRole('button', { name: '❓ Fragen' }).click(); await page.waitForSelector('.qcard2');
+await page.getByRole('button', { name: /Mehr anzeigen/ }).click().catch(() => {}); await page.getByRole('button', { name: /Mehr anzeigen/ }).click().catch(() => {});
+const total = await page.locator('.qcard2').count(); check(total >= 34, `Bibliothek zeigt alle bisherigen Fragen (${total})`);
 await page.screenshot({ path: `${SHOTS}/2-library.png` });
-await page.getByPlaceholder('🔍 Suchen …').fill('Timbuktu'); await sleep(500);
-check(await page.locator('.qcard').count() === 1, 'Suche findet die Timbuktu-Frage');
-await page.getByPlaceholder('🔍 Suchen …').fill('');
+await page.getByPlaceholder('Frage suchen …').fill('Timbuktu'); await sleep(500);
+check(await page.locator('.qcard2').count() === 1, 'Suche findet die Timbuktu-Frage');
+await page.getByPlaceholder('Frage suchen …').fill('');
 
 const openMore = async () => { await page.locator('.modalbox').last().locator('details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); };
-const newQ = async (name) => { await page.locator('.newmenu summary').click(); await page.locator('.newmenu button', { hasText: name }).click(); await page.waitForSelector('.modalbox'); await openMore(); };
+const newQ = async (name) => { await page.getByRole('button', { name: '＋ Neue Frage' }).click(); await page.locator('.gamepick button', { hasText: name }).click(); await page.waitForSelector('.modalbox'); await openMore(); };
 const save = async () => { await page.locator('.modalbox').last().getByRole('button', { name: '💾 Speichern' }).click(); await page.waitForSelector('.toast'); await sleep(300); };
 
 // GEO
@@ -51,7 +53,7 @@ check(await page.locator('.scoretab td.pos').count() > 0, 'Vorschau zeigt Punkte
 await page.locator('.modal').last().getByRole('button', { name: 'Schließen ✕' }).first().click(); await sleep(300); await save();
 
 // RANK
-await newQ('BLIND RANK');
+await newQ('SORTIER’S!');
 await fill('Thema', 'Test-E2E'); await fill('Fragetext', 'Höhe der Gebäude – höchstes zuerst'); await fill('Platz 1 bedeutet', 'am höchsten'); await fill('Platz 5 bedeutet', 'am niedrigsten');
 const items = [['Burj Khalifa', '828 m'], ['Empire State Building', '443 m'], ['Eiffelturm', '330 m'], ['Kölner Dom', '157 m'], ['Freiheitsstatue', '93 m']];
 for (let i = 0; i < 5; i++) { await page.locator('.modalbox input[placeholder="Begriff ' + (i + 1) + '"]').fill(items[i][0]); await page.locator('.modalbox input[placeholder="Wert (Auflösung)"]').nth(i).fill(items[i][1]); }
@@ -80,9 +82,9 @@ for (const [i, t] of ['Er liegt auf einer Insel im Mittelmeer.', 'Hier wachsen r
 await fill('Hauptlösung', 'Malta'); await fill('Lösungserklärung', 'Malta ist ein Inselstaat.');
 await page.screenshot({ path: `${SHOTS}/7b-link-editor.png` });
 await save();
-check(await page.locator('.qcard', { hasText: 'Welche Insel wird gesucht' }).count() === 1, 'Die Verbindung: Frage gespeichert');
+check(await page.locator('.qcard2', { hasText: 'Welche Insel wird gesucht' }).count() === 1, 'Die Verbindung: Frage gespeichert');
 // CODEBREAK ist nicht mehr wählbar
-await page.locator('.newmenu summary').click(); check(await page.locator('.newmenu button', { hasText: 'CODEBREAK' }).count() === 0, 'CODEBREAK fehlt im Menü „Neue Frage“'); await page.locator('.newmenu summary').click();
+await page.getByRole('button', { name: '＋ Neue Frage' }).click(); check(await page.locator('.gamepick button', { hasText: 'CODEBREAK' }).count() === 0 && (await page.locator('.gamepick button').count()) >= 17, 'Spielauswahl: 17+ Spiele, kein CODEBREAK'); await page.keyboard.press('Escape');
 
 // UNIQUE
 await newQ('EINZIGARTIG');
@@ -103,12 +105,12 @@ await field('Suchauftrag').locator('input').fill('Welche Punktzahl wurde gefäls
 await fill('Lösungserklärung', 'Team B hat 8 Punkte.');
 await page.screenshot({ path: `${SHOTS}/8-glitch-editor.png` });
 await save();
-check(await page.locator('.qcard', { hasText: 'Welche Punktzahl' }).count() === 1, 'Glitch-Frage mit eigener Szene gespeichert');
-check(await page.locator('.qcard .badge.bad').count() === 0 || true, 'Bibliothek aktualisiert');
+check(await page.locator('.qcard2', { hasText: 'Welche Punktzahl' }).count() === 1, 'Glitch-Frage mit eigener Szene gespeichert');
+check(await page.locator('.qcard2 .sbadge.bad').count() === 0 || true, 'Bibliothek aktualisiert');
 await page.screenshot({ path: `${SHOTS}/9-library-after.png` });
 
 // ---- Kategorie
-await page.getByRole('button', { name: '⚙️ Erweitert' }).click(); await page.getByRole('button', { name: '🧱 Kategorien' }).click(); await page.waitForSelector('.catcard');
+await page.getByRole('button', { name: '🧱 Weitere Inhalte' }).click(); await page.waitForSelector('.ccard');
 await page.getByRole('button', { name: '＋ Neue Kategorie' }).click();
 await page.locator('.modalbox label.field', { hasText: 'Titel' }).first().locator('input').fill('Stadt & Land'); await openMore();
 await page.locator('.modalbox label.field', { hasText: 'Untertitel' }).first().locator('input').fill('Eigene Testfragen');
@@ -118,24 +120,24 @@ await page.getByRole('button', { name: '＋ Aus Fragen wählen' }).click(); awai
 await page.locator('.pickrow', { hasText: 'Kölner Dom?' }).click();
 await page.screenshot({ path: `${SHOTS}/10-category-editor.png` });
 await page.getByRole('button', { name: '💾 Kategorie speichern' }).click(); await page.waitForSelector('.toast'); await sleep(500);
-check(await page.locator('.catcard', { hasText: 'Stadt & Land' }).count() === 1, 'Kategorie angelegt und Frage zugeordnet');
+check(await page.locator('.ccard', { hasText: 'Stadt & Land' }).count() === 1, 'Kategorie angelegt und Frage zugeordnet');
 await page.screenshot({ path: `${SHOTS}/11-categories.png` });
 
 // ---- Paket: Analyse + Veröffentlichung (Standardpaket duplizieren)
-await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.catcard');
-const std = page.locator('.catcard', { hasText: 'Standardpaket' }).first(); await std.locator('.rowmenu summary').click(); await std.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(700);
-await page.locator('.catcard', { hasText: '(Kopie)' }).getByRole('button', { name: 'Öffnen' }).click(); await page.waitForSelector('.modalbox details.more .stats', { state: 'attached' }); await page.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); await page.waitForSelector('.stats'); await sleep(500);
+await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.pcard');
+await page.locator('.packgroup details summary').first().click().catch(() => {});
+const std = page.locator('.pcard', { hasText: 'Standardpaket' }).first(); await std.locator('.rowmenu summary').click(); await std.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(700);
+await page.locator('.pcard', { hasText: '(Kopie)' }).getByRole('button', { name: /^(Öffnen|Bearbeiten)$/ }).click(); await page.waitForSelector('.modalbox details.more .stats', { state: 'attached' }); await page.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); await page.waitForSelector('.stats'); await sleep(500);
 await page.screenshot({ path: `${SHOTS}/12-pack-editor.png`, fullPage: false });
 check(await page.locator('.stats > div').count() === 4, 'Paket-Analyse zeigt Spielzeit, Maximalzeit, Fußballanteil, Modusverteilung');
-await page.getByRole('button', { name: '🚀 Veröffentlichen' }).click(); await page.waitForSelector('.status.ok'); await sleep(500);
+await page.getByRole('button', { name: '🚀 Veröffentlichen' }).click(); check(/Bereits gestartete Räume bleiben unverändert/.test(await page.locator('.dlg').last().innerText()), 'Veröffentlichen erklärt: laufende Räume bleiben unverändert'); await confirmDlg('Veröffentlichen'); await page.waitForSelector('.status.ok'); await sleep(500);
 check((await page.locator('.status.ok').innerText()).includes('Veröffentlicht'), 'Paketkopie veröffentlicht (Version 1)');
 await page.screenshot({ path: `${SHOTS}/13-pack-published.png` });
 await page.getByRole('button', { name: 'Schließen ✕' }).first().click();
 
 // ---- Import/Export
 await page.getByRole('button', { name: '💾 Sicherung' }).click(); await sleep(600);
-await page.locator('details.backups > summary').click();
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Alles', exact: true }).click()]);
+check(await page.getByText('Keine Aktualisierung notwendig').count() + await page.getByText('Verfügbar').count() > 0, 'Sicherung: Update-Status eindeutig'); const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '💾 Inhalte sichern' }).click()]);
 check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Datei'); await page.screenshot({ path: `${SHOTS}/14-io.png` });
 
 // ---- Show mit dem Paket starten (Host-Seite zeigt Paketauswahl)
@@ -147,8 +149,8 @@ await host.getByRole('button', { name: /Klassisch/ }).click(); await host.locato
 // ---- Mobile Ansicht
 const m = await (await browser.newContext({ ...devices['Pixel 7'] })).newPage(); await m.goto(BASE + '/admin');
 await m.getByLabel('Admin-Passwort').fill(PW); await m.getByRole('button', { name: 'Anmelden' }).click(); await m.waitForSelector('.admtop');
-await m.getByRole('button', { name: '❓ Fragen' }).click(); await m.waitForSelector('.qcard'); await m.screenshot({ path: `${SHOTS}/15-mobile-library.png` });
-await m.locator('.qcard').first().getByRole('button', { name: 'Bearbeiten' }).click(); await sleep(700); await m.screenshot({ path: `${SHOTS}/16-mobile-editor.png` });
+await m.locator('nav').getByRole('button', { name: '❓ Fragen' }).click(); await m.waitForSelector('.qcard2'); await m.screenshot({ path: `${SHOTS}/15-mobile-library.png` });
+await m.locator('.qcard2').first().getByRole('button', { name: 'Bearbeiten' }).click(); await sleep(700); await m.screenshot({ path: `${SHOTS}/16-mobile-editor.png` });
 const overflow = await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2); check(!overflow, 'Mobil: kein horizontales Scrollen');
 
 await browser.close(); console.log(failures ? `\n${failures} FEHLER` : '\nE2E-Admin OK'); process.exit(failures ? 1 : 0);

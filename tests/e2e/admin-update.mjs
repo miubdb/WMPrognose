@@ -1,0 +1,17 @@
+import { createRequire } from 'node:module'; const require = createRequire('/home/user/WMPrognose/'); const { chromium } = require('playwright'); const sleep = ms => new Promise(r => setTimeout(r, ms));
+const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); let f = 0; const ck = (c, m) => { console.log(c ? '• ✓' : '✗ FEHLER:', m); if (!c) f++; };
+await p.goto('http://localhost:8092/admin'); await p.getByLabel('Admin-Passwort').fill('pw-e2e-12345'); await p.getByRole('button', { name: 'Anmelden' }).click(); await p.waitForSelector('.dash');
+await p.waitForSelector('.updatebar'); ck(/Update/.test(await p.locator('.updatebar').innerText()), 'Start: Update-Hinweis sichtbar');
+await p.getByRole('button', { name: 'Änderungen ansehen' }).click(); ck(await p.locator('.softcard details summary', { hasText: 'Änderungen ansehen' }).count() > 0, 'Start: Details auf Wunsch');
+await p.locator('.updatebar').getByRole('button', { name: 'Sicher aktualisieren' }).click(); const d = p.locator('.dlg'); await d.waitFor(); const txt = await d.innerText();
+ck(/Datenbanksicherung/.test(txt) && /Archivieren/.test(txt) && /Laufende/.test(txt), 'Bestätigung nennt Sicherung, Archivierung und laufende Räume getrennt');
+await d.getByRole('button', { name: 'Aktualisieren' }).click(); await p.waitForSelector('.updatebar.done', { timeout: 60000 }); const t2 = await p.locator('.updatebar').innerText(); ck(/Fertig/.test(t2) && !/Update verfügbar|Verfügbar/.test(t2), 'Start: nur „Fertig“, kein widersprüchliches „verfügbar“');
+await p.locator('nav').getByRole('button', { name: /Sicherung/ }).click(); await p.waitForSelector('#update'); const s = await p.locator('#update').innerText(); ck(/Abgeschlossen/.test(s) && !/Verfügbar/.test(s), 'Sicherung: Abgeschlossen, nicht „verfügbar“');
+await p.reload(); await p.waitForSelector('.admtop'); await p.locator('nav').getByRole('button', { name: /Sicherung/ }).click(); await sleep(800); ck(/Keine Aktualisierung notwendig/.test(await p.locator('#update').innerText()), 'Nach Neuladen: „Keine Aktualisierung notwendig“');
+await p.locator('nav').getByRole('button', { name: '🏠 Start' }).click(); await sleep(500); ck((await p.locator('.updatebar').count()) === 0, 'Start: Hinweis verschwunden');
+await p.locator('nav').getByRole('button', { name: '📦 Pakete' }).click(); await p.waitForSelector('.pcard'); ck((await p.locator('.packgroup details').count()) === 1, 'Pakete: Archiv eingeklappt'); const act = await p.locator('.packgroup').first().locator('.pcard').count(); console.log('  aktuelle Pakete:', act);
+await p.locator('nav').getByRole('button', { name: '🏠 Start' }).click(); await sleep(400); ck(/Hauptshow/.test(await p.locator('.dash').innerText()), 'Start: Hauptshow ist ein aktives, veröffentlichtes Paket');
+// Import ungültig
+await p.locator('nav').getByRole('button', { name: /Sicherung/ }).click(); await p.locator('input[type=file]').first().setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"foo":1}') }); await sleep(500); ck(/keine gültige/.test(await p.locator('#import').innerText()), 'Import: ungültige Datei wird erklärt');
+await p.locator('input[type=file]').first().setInputFiles({ name: 'y.json', mimeType: 'application/json', buffer: Buffer.from('kaputt') }); await sleep(500); ck(/nicht lesbar/.test(await p.locator('#import').innerText()), 'Import: unlesbare Datei wird erklärt');
+console.log(f ? f + ' Fehler' : 'OK'); await b.close();

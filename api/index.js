@@ -40819,7 +40819,7 @@ var OnlineAdmin = class {
         } catch (e) {
           return sendJson(res, 503, { err: "Speicher nicht erreichbar: " + String(e?.message ?? e).slice(0, 200), setup: "blob-error" });
         }
-        if (method === "POST" && parts[2] === "standard" && this.backend.snapshot) {
+        if (method === "POST" && (parts[2] === "standard" || parts[2] === "cleanup") && this.backend.snapshot) {
           try {
             const f = join(this.dir, "pre.db");
             if (existsSync3(f)) rmSync2(f);
