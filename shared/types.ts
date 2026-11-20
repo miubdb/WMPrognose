@@ -1,7 +1,7 @@
 // Gemeinsame Typen für Server, Inhalte und Client.
 
 /** 'codebreak' ist ein Altmodus: wird nicht mehr angeboten, bestehende Inhalte/Pakete bleiben aber les- und spielbar. */
-export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique' | 'match' | 'link' | 'vote';
+export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique' | 'match' | 'link' | 'vote' | 'bluff' | 'corridor' | 'twist';
 export type MapKind = 'world' | 'europe' | 'germany';
 
 // ---------- Avatar ----------
@@ -122,11 +122,17 @@ export interface LinkTask {
   points: number;
   explain: string;
 }
+/** LÜGEN HABEN KURZE BEINE: Alle erfinden eine glaubwürdige falsche Antwort, dann wird die echte unter allen gesucht. */
+export interface BluffTask { mode: 'bluff'; prompt: string; answer: string; accept: string[]; seconds: number; pickSeconds: number; points: number; bluffPoints: number; explain: string }
+/** SCHÄTZKORRIDOR: Einen Zahlenbereich angeben, der die Lösung enthält – je enger, desto mehr Punkte. */
+export interface CorridorTask { mode: 'corridor'; prompt: string; unit: string; answer: number; seconds: number; points: number; explain: string }
+/** VERDREHTE WELT: Ein bekannter Titel/Begriff wurde ins Gegenteil verdreht – wie lautet das Original? */
+export interface TwistTask { mode: 'twist'; prompt: string; twisted: string; answer: string; accept: string[]; seconds: number; points: number; explain: string }
 /** Proberunde: interaktive Beispielaufgabe ohne Wertung (Punkte werden nie vergeben). */
 export interface TaskBase { practice?: boolean; /** Redaktionshinweis: offene Prüfpflicht / Vorbehalt – erscheint als Warnung bei der Paketprüfung */ review?: string }
 /** KICKBASE-KONSENS (nur Finale): alle beantworten dieselbe Gruppenfrage, indem sie geheim einen Mitspieler wählen; Punkte für die Wahl(en) mit den meisten Stimmen. */
 export interface VoteTask { mode: 'vote'; prompt: string; seconds: number; points: number; explain: string; /** zusätzlicher wählbarer Kandidat ohne Spielerkonto (z. B. „Michael (Showmaster)“) */ candidate?: string }
-export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask | VoteTask) & TaskBase;
+export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask | VoteTask | BluffTask | CorridorTask | TwistTask) & TaskBase;
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
 export interface PackRules {

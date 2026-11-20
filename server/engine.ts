@@ -5,6 +5,7 @@ import type {
 } from '../shared/types';
 import { AVATAR_LIMITS } from '../shared/types';
 import { applyClamped } from '../shared/scoring';
+import { BRAND_NAME } from '../shared/brand';
 import { expandShowSteps, hashSeed, rng, shuffled } from '../shared/util';
 import type { PlanStep, PlayerRec, Room, RoundState } from './model';
 import { MODES, type Audience, type Ctx } from './modes';
@@ -606,7 +607,7 @@ export class Engine {
         act: this.actLabel(room),
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === 'show' ? room.plan.filter(x => x.startsWith('tile:')).length : room.plan.filter(s => s === 'wall').length + 2 },
         flow: room.flow ?? 'classic', boardName: this.boardName(room),
-        brand: { title: this.bk(room).rules?.showTitle || 'OUTPLAY', winner: this.bk(room).rules?.winnerTitle || 'OUTPLAY-Champion', tagline: this.bk(room).rules?.tagline || undefined, winnerLine: this.bk(room).rules?.winnerLine || undefined },
+        brand: { title: this.bk(room).rules?.showTitle || BRAND_NAME, winner: this.bk(room).rules?.winnerTitle || BRAND_NAME + '-Champion', tagline: this.bk(room).rules?.tagline || undefined, winnerLine: this.bk(room).rules?.winnerLine || undefined },
         liveRank: room.liveRank ?? true, music: room.music ?? { on: false, vol: 25 },
         ...(room.flow === 'show' ? { agenda: this.agenda(room) } : {}),
       },

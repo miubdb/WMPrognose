@@ -47,7 +47,7 @@ const base = host ? (/^https?:\/\//.test(host) ? host : `http://${host}`) : '';
 const url = base || `http://localhost:${PORT}`;
 line();
 line('══════════════════════════════════════════════════');
-line('  OUTPLAY läuft ✓   (kein Internet nötig)');
+line('  JANIQUIZITION läuft ✓   (kein Internet nötig)');
 line('══════════════════════════════════════════════════');
 line('  1. Showmaster-Pult (Laptop/Tablet):');
 line(`       ${url}/host`);

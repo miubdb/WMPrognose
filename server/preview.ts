@@ -18,6 +18,9 @@ export const FORMULAS: Record<string, string> = {
   match: '50 Punkte je richtig verbundenem Paar, höchstens 300. Keine Minuspunkte, kein Zeitbonus – nur die Richtigkeit zählt. Die Zuordnung zählt, wie sie bei Ablauf der Zeit (oder bei der endgültigen Abgabe) steht.',
   link: 'Eine endgültige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.',
   vote: 'KICKBASE-KONSENS: Jeder wählt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte – bei Gleichstand alle häufigsten Wahlen. Man darf auch sich selbst wählen.',
+  bluff: 'Richtige Antwort erkannt = Punkte (z. B. 200); für jeden Mitspieler, der auf deine erfundene Antwort hereinfällt, gibt es Täuschungspunkte (z. B. 100). Gleiche Lügen werden zusammengefasst. Die eigene Lüge ist nicht wählbar. Keine Minuspunkte.',
+  corridor: 'Nur Treffer zählen (Lösung liegt im Korridor): Punkte = Maximalpunkte × (1 − Breite ÷ (2 × |Lösung|)), mindestens 10 %. Schmal = viel, sehr breit = wenig, daneben = 0. Keine Minuspunkte.',
+  twist: 'Richtiges Original = Punkte; Schnelligkeit zählt: sofort 100 %, kurz vor Ablauf 50 %. Falsch = 0, ein Versuch. Tippfehler werden bei längeren Begriffen toleriert.',
   unique: 'Nur eine gültige, einmalige Antwort bringt Punkte. Mehrfach genannte gültige Antworten und ungültige Antworten = 0. Bei „vollständiger Antwortliste“ wird Unbekanntes automatisch ungültig, sonst prüft der Showmaster.',
 };
 
@@ -98,6 +101,24 @@ export function buildPreview(rawTask: unknown, scenes: Record<string, Scene>, me
       P(0, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5].map(posOf), final: true } });
       P(1, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5].map((i, k) => (k < 3 ? posOf(i) : posOf((i + 1) % 6))), final: true } });
       P(2, { k: 'submit', payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
+      snap('Antworten abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'bluff': {
+      snap('Lügen schreiben');
+      P(0, { k: 'submit', payload: { lie: 'Eine erfundene Antwort von Anna' } }); P(1, { k: 'submit', payload: { lie: 'Eine andere Erfindung von Ben' } }); P(2, { k: 'submit', payload: { lie: 'Cems Bluff' } }); P(3, { k: 'submit', payload: { lie: 'Danas Bluff' } });
+      H({ k: 'h.lock' }); snap('Wahrheit suchen');
+      const opts = (eng.buildView(room, { role: 'host' }, now).round?.data.options ?? []) as any[]; const truth = opts.find(o => o.truth), lie = opts.find(o => !o.truth);
+      P(0, { k: 'submit', payload: { option: truth.id } }); P(1, { k: 'submit', payload: { option: lie.id } }); P(2, { k: 'submit', payload: { option: truth.id } });
+      snap('Wahl abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'corridor': {
+      snap('Aufgabe läuft');
+      P(0, { k: 'submit', payload: { low: t.answer * 0.9, high: t.answer * 1.1 } }); P(1, { k: 'submit', payload: { low: t.answer * 0.2, high: t.answer * 3 } }); P(2, { k: 'submit', payload: { low: t.answer * 1.5, high: t.answer * 2 } });
+      snap('Korridore abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'twist': {
+      snap('Aufgabe läuft');
+      P(0, { k: 'submit', payload: { answer: t.answer } }); P(1, { k: 'submit', payload: { answer: 'Irgendwas Falsches' } });
       snap('Antworten abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
     }
     case 'vote': {

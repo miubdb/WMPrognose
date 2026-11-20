@@ -8,7 +8,7 @@ import { Preview } from './Preview';
 import { SceneBuilder, ScenePair } from './SceneBuilder';
 import { SceneView, sceneVariant } from '../ui/SceneView';
 
-export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨', match: '🧲', link: '🔗', vote: '🤝' };
+export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨', match: '🧲', link: '🔗', vote: '🤝', bluff: '😈', corridor: '↔️', twist: '🔄' };
 export const MODE_HELP: Record<string, string> = {
   geo: 'Spieler setzen einen Pin auf der Karte. Gewertet wird die Platzierung nach Entfernung.',
   rank: 'Fünf Begriffe erscheinen nacheinander; jeder muss sofort auf einen Rangplatz. Gewertet werden richtig angeordnete Paare.',
@@ -17,6 +17,9 @@ export const MODE_HELP: Record<string, string> = {
   codebreak: 'Ein Rätsel mit eindeutiger Lösung. Hinweise kosten Punkte, drei Versuche.',
   unique: 'Alle nennen eine gültige Antwort – nur einzigartige Antworten bringen volle Punkte.',
   match: 'Sechs Paare verbinden: je richtigem Paar 50 Punkte, höchstens 300. Keine Minuspunkte.',
+  bluff: 'Alle erfinden eine falsche Antwort, dann wird die echte gesucht. Punkte fürs Erkennen und fürs Täuschen.',
+  corridor: 'Einen Zahlenbereich (von … bis …) angeben: Treffer zählt, je enger desto mehr Punkte.',
+  twist: 'Ein bekannter Titel wurde ins Gegenteil verdreht – das Original eintippen, je schneller desto mehr Punkte.',
   link: 'Vier Hinweise erscheinen nacheinander (alle 12 s) – je früher die richtige Lösung, desto mehr Punkte (300/225/150/75).',
 };
 
@@ -29,6 +32,9 @@ export function newTask(mode: Mode): any {
     case 'codebreak': return { mode, prompt: '', display: '', input: 'number', answers: [], hints: ['', '', ''], seconds: 90, points: 300, explain: '' };
     case 'match': return { mode, prompt: '', pairs: [0, 1, 2, 3, 4, 5].map(() => ({ left: '', right: '' })), order: [2, 4, 0, 5, 1, 3], seconds: 60, points: 300, explain: '' };
     case 'vote': return { mode, prompt: '', seconds: 45, points: 600, explain: '' };
+    case 'bluff': return { mode, prompt: '', answer: '', accept: [], seconds: 45, pickSeconds: 30, points: 200, bluffPoints: 100, explain: '' };
+    case 'corridor': return { mode, prompt: '', unit: '', answer: '', seconds: 45, points: 300, explain: '' };
+    case 'twist': return { mode, prompt: 'Welcher bekannte Titel steckt dahinter?', twisted: '', answer: '', accept: [], seconds: 40, points: 300, explain: '' };
     case 'link': return { mode, prompt: 'Was oder wer wird gesucht?', clues: ['', '', '', ''], answer: '', accept: [], clueSeconds: 20, points: 300, explain: '' };
     case 'unique': return { mode, prompt: '', closed: false, placeholder: '', valid: [0, 1, 2].map(() => ({ name: '', variants: [] })), seconds: 45, pointsUnique: 500, pointsShared: 150, explain: '' };
   }
@@ -127,6 +133,22 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
           </div>
         </>}
 
+        {m === 'bluff' && <div className="form2">
+          <Field label="Richtige Antwort" hint="Kurz und eindeutig – die Spieler müssen sie zwischen ihren Erfindungen erkennen."><input value={task.answer} maxLength={60} onChange={e => set('answer', e.target.value)} /></Field>
+          <Field label="Weitere Schreibweisen der Wahrheit (eine pro Zeile)" hint="Wer genau diese schreibt, bekommt „zu nah an der Wahrheit“."><textarea rows={2} value={(task.accept ?? []).join('\n')} onChange={e => set('accept', e.target.value.split('\n'))} /></Field>
+        </div>}
+        {m === 'corridor' && <div className="form2">
+          <Field label="Richtige Zahl"><input inputMode="decimal" value={task.answer} onChange={e => set('answer', e.target.value)} /></Field>
+          <Field label="Einheit"><input value={task.unit} maxLength={30} placeholder="z. B. Meter" onChange={e => set('unit', e.target.value)} /></Field>
+        </div>}
+        {m === 'twist' && <>
+          <Field label="Verdrehter Text" hint="z. B. „Langsame und Neugierige“ für Fast & Furious"><input value={task.twisted} maxLength={200} onChange={e => set('twisted', e.target.value)} /></Field>
+          <div className="form2">
+            <Field label="Original (richtige Antwort)"><input value={task.answer} maxLength={80} onChange={e => set('answer', e.target.value)} /></Field>
+            <Field label="Weitere gültige Schreibweisen (eine pro Zeile)"><textarea rows={2} value={(task.accept ?? []).join('\n')} onChange={e => set('accept', e.target.value.split('\n'))} /></Field>
+          </div>
+        </>}
+
         {m === 'unique' && <>
           <b>Gültige Antworten</b>
           {task.valid.map((v: any, i: number) => (
@@ -157,6 +179,9 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
               {sec('Betrachtungszeit (Sek.)', 'viewSeconds')}{sec('Suchzeit (Sek.)', 'seconds')}{sec('Punkte', 'points')}</>}
             {m === 'match' && <>{sec('Zeit (Sek.)', 'seconds')}<p className="small muted">Fest: 50 Punkte je richtigem Paar (max. 300), keine Minuspunkte.</p></>}
             {m === 'vote' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Punkte je richtiger Wahl', 'points')}<Field label="Zusätzlicher Kandidat (optional, z. B. Showmaster)"><input value={task.candidate ?? ''} maxLength={40} onChange={e => set('candidate', e.target.value)} /></Field><p className="small muted">Nur im Finale einsetzbar. Jeder wählt geheim eine Person; Punkte für alle, die die Wahl mit den meisten Stimmen getroffen haben (mind. 2 Stimmen; bei Gleichstand zählen alle Spitzenwahlen). Der Zusatzkandidat bekommt keine Punkte.</p></>}
+            {m === 'bluff' && <>{sec('Zeit zum Erfinden (Sek.)', 'seconds')}{sec('Zeit zum Raten (Sek.)', 'pickSeconds')}{sec('Punkte fürs Erkennen', 'points')}{sec('Punkte je Hereingefallenem', 'bluffPoints')}</>}
+            {m === 'corridor' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Maximalpunkte', 'points')}<p className="small muted">Nur Treffer zählen; Punkte sinken mit der Breite des Bereichs (mind. 10 %).</p></>}
+            {m === 'twist' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Maximalpunkte', 'points')}<p className="small muted">Schnelligkeit zählt: sofort 100 %, am Ende 50 %.</p></>}
             {m === 'link' && <>{sec('Sekunden je Hinweis', 'clueSeconds')}<p className="small muted">Fest: 300 / 225 / 150 / 75 Punkte, eine endgültige Antwort je Spieler.</p></>}
             {m === 'unique' && <>
               <Field label="Platzhalter im Eingabefeld"><input value={task.placeholder} maxLength={40} onChange={e => set('placeholder', e.target.value)} /></Field>

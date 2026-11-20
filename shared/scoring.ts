@@ -320,3 +320,18 @@ export function applyClamped(balance: number, requested: number): number {
 /** Sekunden je Hinweis (DIE VERBINDUNG). Der frühere Standardwert 12 s wird – auch in bereits gespeicherten Fragen – als 20 s gespielt; jeder andere Wert gilt unverändert. */
 export const CLUE_SECONDS_DEFAULT = 20;
 export const clueSecs = (t: { clueSeconds: number }) => (t.clueSeconds === 12 ? CLUE_SECONDS_DEFAULT : t.clueSeconds);
+
+// ---------- SCHÄTZKORRIDOR
+/** Treffer = Lösung liegt im Korridor. Punkte sinken mit der relativen Breite (Breite / |Lösung|): schmal = volle Punkte, Breite = |Lösung| → 50 %, mindestens 10 %. Daneben = 0. */
+export function corridorPoints(low: number, high: number, answer: number, points: number): { hit: boolean; width: number; points: number } {
+  const width = Math.max(0, high - low); const hit = low <= answer && answer <= high;
+  if (!hit) return { hit, width, points: 0 };
+  const r = width / Math.max(Math.abs(answer), 1);
+  return { hit, width, points: Math.round(points * Math.max(0.1, 1 - r / 2)) };
+}
+// ---------- VERDREHTE WELT
+/** Schnelligkeit: sofort richtig = volle Punkte, kurz vor Ablauf 50 %. */
+export function twistPoints(points: number, elapsedMs: number, seconds: number): number {
+  const f = Math.min(1, Math.max(0, elapsedMs / (seconds * 1000)));
+  return Math.round(points * (1 - 0.5 * f));
+}

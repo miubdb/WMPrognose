@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Brand } from '../ui/Brand';
 import type { Mode } from '../../../shared/types';
 import { ACTIVE_MODES, MODE_LABEL, taskMax } from '../../../shared/validate';
 const MODES: Mode[] = [...ACTIVE_MODES, 'vote'];
@@ -31,7 +32,7 @@ function Setup({ health }: { health: any }) {
   const st = !!health?.storage?.configured, pw = !!health?.admin?.passwordConfigured;
   return (
     <div className="hostlogin">
-      <div className="logo">OUT<span>PLAY</span></div>
+      <div className="logo"><Brand /></div>
       <h2>Einrichtung nötig</h2>
       <div className="card">
         <ol className="setuplist">
@@ -49,7 +50,7 @@ function Login({ onIn, online }: { onIn: () => void; online?: boolean }) {
   const go = async () => { setBusy(true); setErr(''); const r = await adm('POST', '/login', { password: pw }); setBusy(false); if (r.ok) onIn(); else setErr(errText(r)); };
   return (
     <div className="hostlogin">
-      <div className="logo">OUT<span>PLAY</span></div>
+      <div className="logo"><Brand /></div>
       <h2>Admin-Bereich</h2>
       <div className="card">
         <label className="field"><span>Admin-Passwort</span><input type="password" autoFocus value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && pw && go()} /></label>
@@ -70,7 +71,7 @@ function Shell({ onOut, online }: { onOut: () => void; online?: boolean }) {
   return (
     <div className="adm">
       <div className="admtop">
-        <div className="logo tiny">OUT<span>PLAY</span> <small>Admin</small></div>
+        <div className="logo tiny"><Brand /> <small>Admin</small></div>
         <span className={`envchip ${online ? 'online' : 'local'}`} title={online ? 'Online-Admin: Inhalte vorbereiten' : 'Lokale Version auf diesem Rechner'}>{online ? '☁️ Online' : '💻 Lokal'}</span>
         <div className="spacer" />{!online && <a className="btn small ghost" href="/host">🎤 Zur Show</a>}
         <button className="btn small ghost" onClick={async () => { await adm('POST', '/logout'); onOut(); }}>Abmelden</button>

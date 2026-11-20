@@ -12,7 +12,7 @@ import { SCENES } from '../shared/scenes';
 import { AV, Admin, startEnv, type TestEnv } from './helpers';
 import type { Action, LinkTask, MatchTask, TileDef, View } from '../shared/types';
 import { LINK_POINTS, linkMatch, scoreMatch, validMatching } from '../shared/scoring';
-import { ACTIVE_MODES, MODE_LABEL, normalizeTask, validateTask } from '../shared/validate';
+import { ACTIVE_MODES, CORE_MODES, MODE_LABEL, normalizeTask, validateTask } from '../shared/validate';
 import { analyzeBook } from '../shared/analysis';
 
 const tile = (id: string) => TILES.find(t => t.id === id)!;
@@ -204,7 +204,7 @@ test('Neues Standardpaket: neun Kategorien, sieben Modi, 34 Aufgaben, Dauer 60â€
   const all = TILES.flatMap(t => t.tasks);
   assert.ok(all.length >= 32 && all.length <= 36, 'Aufgaben: ' + all.length);
   assert.ok(!all.some(k => k.mode === 'codebreak'));
-  assert.deepEqual(new Set(all.map(k => k.mode)), new Set(ACTIVE_MODES));
+  assert.deepEqual(new Set(all.map(k => k.mode)), new Set(CORE_MODES));
   const fin = TILES.find(t => t.kind === 'final')!;
   assert.ok(new Set(fin.tasks.map(k => k.mode)).size >= 3, 'Finale: mehrere unterschiedliche Aufgaben');
   for (const k of all) { const e = validateTask(normalizeTask(k), id => !!SCENES[id]); assert.deepEqual(e, [], k.prompt); }

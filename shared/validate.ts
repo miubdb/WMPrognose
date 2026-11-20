@@ -1,15 +1,17 @@
 // Validierung und Normalisierung von Aufgaben/Kategorien (Server UND Admin-Oberfläche verwenden dieselben Regeln).
-import type { TaskDef, Mode, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, VoteTask } from './types';
+import type { TaskDef, Mode, GeoTask, RankTask, EstimateTask, GlitchTask, CodeTask, UniqueTask, MatchTask, LinkTask, VoteTask, BluffTask, CorridorTask, TwistTask } from './types';
 import { LINK_POINTS, MATCH_PAIRS, MATCH_PAIR_POINTS } from './scoring';
 
 /** Alle Modi, die gespeicherte Inhalte enthalten dürfen (inkl. Altmodus). */
-export const MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link', 'vote', 'codebreak'];
+export const MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link', 'vote', 'codebreak', 'bluff', 'corridor', 'twist'];
 /** Die sieben aktiven Modi (Auswahl im Editor, neue Pakete). */
 /** Nur im Finale einsetzbarer Zusatzmodus (zählt nicht zu den sieben Modi, die jede Show enthält). */
 export const FINAL_ONLY_MODES: Mode[] = ['vote'];
-export const ACTIVE_MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link'];
+export const ACTIVE_MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link', 'bluff', 'corridor', 'twist'];
+/** Die sieben Spielmodi der Best-of-Show (für die Vollständigkeitsprüfung des Showablaufs). */
+export const CORE_MODES: Mode[] = ['geo', 'rank', 'estimate', 'glitch', 'unique', 'match', 'link'];
 export const isLegacyMode = (m: string) => m === 'codebreak';
-export const MODE_LABEL: Record<Mode, string> = { geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S! (BLIND RANK)', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS', codebreak: 'CODEBREAK (veraltet)' };
+export const MODE_LABEL: Record<Mode, string> = { bluff: 'LÜGEN HABEN KURZE BEINE', corridor: 'SCHÄTZKORRIDOR', twist: 'VERDREHTE WELT', geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S! (BLIND RANK)', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS', codebreak: 'CODEBREAK (veraltet)' };
 
 export function taskMax(t: TaskDef): number {
   if (t.practice) return 0;                          // Proberunden zählen nie zu den Punkten
@@ -19,6 +21,7 @@ export function taskMax(t: TaskDef): number {
     case 'match': return MATCH_PAIRS * MATCH_PAIR_POINTS;
     case 'link': return LINK_POINTS[0];
     case 'vote': return t.points;
+    case 'bluff': return t.points + 2 * t.bluffPoints;
     default: return t.points;
   }
 }
@@ -54,6 +57,9 @@ function normalizeTaskCore(raw: any): TaskDef {
       return { mode: 'match', prompt: str(r.prompt, 200), pairs, order: Array.isArray(r.order) ? r.order.map((x: unknown) => num(x)) : [], seconds: num(r.seconds, 60), points: MATCH_PAIRS * MATCH_PAIR_POINTS, explain: str(r.explain, 500) } as MatchTask;
     }
     case 'vote': return { mode: 'vote', prompt: str(r.prompt, 200), seconds: num(r.seconds), points: num(r.points), explain: str(r.explain, 300), ...(str(r.candidate, 40) ? { candidate: str(r.candidate, 40) } : {}) } as VoteTask;
+    case 'bluff': return { mode: 'bluff', prompt: str(r.prompt, 240), answer: str(r.answer, 60), accept: strList(r.accept, 8, 60), seconds: num(r.seconds, 45), pickSeconds: num(r.pickSeconds, 30), points: num(r.points, 200), bluffPoints: num(r.bluffPoints, 100), explain: str(r.explain, 500) } as BluffTask;
+    case 'corridor': return { mode: 'corridor', prompt: str(r.prompt, 240), unit: str(r.unit, 30), answer: num(r.answer), seconds: num(r.seconds, 45), points: num(r.points, 300), explain: str(r.explain, 500) } as CorridorTask;
+    case 'twist': return { mode: 'twist', prompt: str(r.prompt, 200), twisted: str(r.twisted, 200), answer: str(r.answer, 80), accept: strList(r.accept, 12, 80), seconds: num(r.seconds, 40), points: num(r.points, 300), explain: str(r.explain, 500) } as TwistTask;
     case 'link': return { mode: 'link', prompt: str(r.prompt, 200), clues: (Array.isArray(r.clues) ? r.clues : []).slice(0, 4).map((c: unknown) => str(c, 220)), answer: str(r.answer, 80), accept: strList(r.accept, 12, 80),
       clueSeconds: num(r.clueSeconds, 20), points: LINK_POINTS[0], explain: str(r.explain, 500) } as LinkTask;
     default: return r;
@@ -115,6 +121,21 @@ export function validateTask(t: TaskDef, sceneExists: (id: string) => boolean = 
     case 'vote':
       if (!inRange(t.seconds, 10, 180)) e.push('Zeitlimit 10–180 Sekunden');
       if (!inRange(t.points, 50, 1000)) e.push('Punkte 50–1000');
+      break;
+    case 'bluff':
+      if (!t.answer) e.push('Richtige Antwort fehlt');
+      if (!inRange(t.seconds, 10, 120) || !inRange(t.pickSeconds, 10, 90)) e.push('Zeiten: Schreiben 10–120 s, Raten 10–90 s');
+      if (!inRange(t.bluffPoints, 0, 1000)) e.push('Punkte fürs Täuschen 0–1000');
+      break;
+    case 'corridor':
+      if (!Number.isFinite(t.answer)) e.push('Lösung (Zahl) fehlt');
+      if (!t.unit) e.push('Einheit fehlt (z. B. „Meter“)');
+      if (!inRange(t.seconds, 10, 180)) e.push('Zeitlimit 10–180 Sekunden');
+      break;
+    case 'twist':
+      if (!t.twisted) e.push('Der verdrehte Text fehlt');
+      if (!t.answer) e.push('Originalantwort fehlt');
+      if (!inRange(t.seconds, 10, 120)) e.push('Zeitlimit 10–120 Sekunden');
       break;
     case 'link':
       if (t.clues.length !== 4 || t.clues.some(c => !c)) e.push('Genau vier Hinweise eintragen');

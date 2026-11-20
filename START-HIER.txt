@@ -1,4 +1,4 @@
-OUTPLAY – SCHNELLSTART (Windows)
+JANIQUIZITION – SCHNELLSTART (Windows)
 ================================
 
 1. Doppelklick auf  OUTPLAY-STARTEN.bat
@@ -17,4 +17,4 @@ Weitere Dateien (nur bei Bedarf):
   OUTPLAY-KARTE-LADEN.bat       Karte (offline) einmalig laden
   OUTPLAY-WIEDERHERSTELLEN.bat  Sicherung zurückspielen
 
-Welche Spiele gibt es?  ->  docs\SPIELE.md
+Welche Spiele gibt es?  ->  docs\SPIELE.md  (oder im Admin auf der Start-Seite)

@@ -413,7 +413,7 @@ export class ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
-  static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3', 'show-after'];
+  static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3', 'show-after', 'show-new'];
   static readonly REFRESH_PACKS = ['show-4z', 'show-5', 'show-after'];
   static readonly MAIN_PACK = 'show-4z';
   private seedShow(id: string) { return (this.seed.extraShows ?? []).find(x => x.pack.id === id); }
@@ -438,7 +438,8 @@ export class ContentService {
     const update = rows.filter(r => r.needsUpdate).map(r => r.id);
     const rename = rows.filter(r => r.needsRename).map(r => r.id);
     const missing = ContentService.KEEP_PACKS.filter(id => !packs.some(p => p.id === id));
-    return { rows, archive, update, rename, missing, clean: !archive.length && !update.length && !rename.length, main: ContentService.MAIN_PACK };
+    const install = !this.seedStatus().installed;   // mitgelieferte neue Pakete/Fragen fehlen noch (werden nur ergänzt)
+    return { rows, archive, update, rename, missing, install, clean: !archive.length && !update.length && !rename.length && !install, main: ContentService.MAIN_PACK };
   }
   static readonly BACKUP_NAME = 'Reus 65 Mio (Backup, alt)';
   /** Veröffentlicht den aktuellen Inhaltsstand (Fragen, Ablauf, Regeln) eines mitgelieferten Pakets als NEUE Version desselben Pakets. */
@@ -456,6 +457,7 @@ export class ContentService {
     const plan = this.cleanupPlan();
     const archived: string[] = [], updated: string[] = [], renamed: string[] = [];
     this.tx(() => {
+      if (plan.install) this.installSeed();
       for (const id of plan.archive) { this.setPackStatus(id, 'archived'); archived.push(id); }
       for (const id of plan.update) updated.push(this.refreshFromSeed(id, 'Praxistest 4: aktualisierter Inhalt (neue Version, kein neues Paket)'));
       for (const id of plan.rename) { const p = this.getPack(id); this.updatePack(id, { ...p, name: ContentService.BACKUP_NAME, ifUpdated: undefined }); renamed.push(id); }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Brand } from './ui/Brand';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { Play } from './pages/Play';
@@ -11,7 +12,7 @@ function Landing() {
   const c = code.trim().toUpperCase();
   return (
     <div className="landing">
-      <div className="logo huge">OUT<span>PLAY</span></div>
+      <div className="logo huge"><Brand /></div>
       <p className="tagline">Die interaktive Gameshow für deine Freunde</p>
       <div className="landcards">
         <div className="card"><h3>🎤 Showmaster</h3><p className="muted">Raum erstellen und die Show steuern.</p><a className="btn primary wide" href="/host">Show hosten</a><a className="linkbtn" href="/admin">⚙️ Admin (Fragen &amp; Pakete)</a></div>

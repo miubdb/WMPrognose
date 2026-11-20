@@ -6,6 +6,7 @@ import {
   scoreMatch, clueSecs, validMatching, MATCH_PAIRS, MATCH_PAIR_POINTS, LINK_POINTS, linkMatch,
 } from '../shared/scoring';
 import { normText } from '../shared/util';
+import { NEW_MODES } from './newmodes';
 import { SCENES, diffZones, variantItems, type Scene } from '../shared/scenes';
 import { parseNumber } from '../shared/util';
 
@@ -650,5 +651,5 @@ const vote: ModeImpl = {
   },
 };
 
-export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote };
+export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote, ...NEW_MODES };
 export { rankPairs };

@@ -11,12 +11,12 @@ var __require = /* @__PURE__ */ ((x3) => typeof require !== "undefined" ? requir
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x3 + '" is not supported');
 });
-var __esm = (fn, res, err3) => function __init() {
-  if (err3) throw err3[0];
+var __esm = (fn, res, err4) => function __init() {
+  if (err4) throw err4[0];
   try {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
   } catch (e) {
-    throw err3 = [e], e;
+    throw err4 = [e], e;
   }
 };
 var __commonJS = (cb, mod) => function __require2() {
@@ -1637,7 +1637,7 @@ var require_resolveCommand = __commonJS({
       if (shouldSwitchCwd) {
         try {
           process.chdir(parsed.options.cwd);
-        } catch (err3) {
+        } catch (err4) {
         }
       }
       let resolved;
@@ -1822,9 +1822,9 @@ var require_enoent = __commonJS({
       const originalEmit = cp.emit;
       cp.emit = function(name, arg1) {
         if (name === "exit") {
-          const err3 = verifyENOENT(arg1, parsed);
-          if (err3) {
-            return originalEmit.call(cp, "error", err3);
+          const err4 = verifyENOENT(arg1, parsed);
+          if (err4) {
+            return originalEmit.call(cp, "error", err4);
           }
         }
         return originalEmit.apply(cp, arguments);
@@ -6914,11 +6914,11 @@ var require_get_vercel_oidc_token_with_refresh = __commonJS({
     var import_token_error = require_token_error();
     async function getVercelOidcToken3(options) {
       let token = "";
-      let err3;
+      let err4;
       try {
         token = (0, import_get_vercel_oidc_token_sync.getVercelOidcTokenSync)();
       } catch (error) {
-        err3 = error;
+        err4 = error;
       }
       try {
         const [{ getTokenPayload, isExpired }, { refreshToken }] = await Promise.all([
@@ -6930,7 +6930,7 @@ var require_get_vercel_oidc_token_with_refresh = __commonJS({
           token = (0, import_get_vercel_oidc_token_sync.getVercelOidcTokenSync)();
         }
       } catch (error) {
-        let message = err3 instanceof Error ? err3.message : "";
+        let message = err4 instanceof Error ? err4.message : "";
         if (error instanceof Error) {
           message = `${message}
 ${error.message}`;
@@ -8761,9 +8761,9 @@ var require_decrypt2 = __commonJS({
       let cek;
       try {
         cek = await (0, decrypt_key_management_js_1.default)(alg, key, encryptedKey, joseHeader, options);
-      } catch (err3) {
-        if (err3 instanceof TypeError || err3 instanceof errors_js_1.JWEInvalid || err3 instanceof errors_js_1.JOSENotSupported) {
-          throw err3;
+      } catch (err4) {
+        if (err4 instanceof TypeError || err4 instanceof errors_js_1.JWEInvalid || err4 instanceof errors_js_1.JOSENotSupported) {
+          throw err4;
         }
         cek = (0, cek_js_1.default)(enc);
       }
@@ -10866,14 +10866,14 @@ var require_remote = __commonJS({
         }
         try {
           return await this._local(protectedHeader, token);
-        } catch (err3) {
-          if (err3 instanceof errors_js_1.JWKSNoMatchingKey) {
+        } catch (err4) {
+          if (err4 instanceof errors_js_1.JWKSNoMatchingKey) {
             if (this.coolingDown() === false) {
               await this.reload();
               return this._local(protectedHeader, token);
             }
           }
-          throw err3;
+          throw err4;
         }
       }
       async reload() {
@@ -10893,9 +10893,9 @@ var require_remote = __commonJS({
           }
           this._jwksTimestamp = Date.now();
           this._pendingFetch = void 0;
-        }).catch((err3) => {
+        }).catch((err4) => {
           this._pendingFetch = void 0;
-          throw err3;
+          throw err4;
         });
         await this._pendingFetch;
       }
@@ -11575,20 +11575,20 @@ var require_retry_operation = __commonJS({
       this._timeouts = [];
       this._cachedTimeouts = null;
     };
-    RetryOperation.prototype.retry = function(err3) {
+    RetryOperation.prototype.retry = function(err4) {
       if (this._timeout) {
         clearTimeout(this._timeout);
       }
-      if (!err3) {
+      if (!err4) {
         return false;
       }
       var currentTime = (/* @__PURE__ */ new Date()).getTime();
-      if (err3 && currentTime - this._operationStart >= this._maxRetryTime) {
-        this._errors.push(err3);
+      if (err4 && currentTime - this._operationStart >= this._maxRetryTime) {
+        this._errors.push(err4);
         this._errors.unshift(new Error("RetryOperation timeout occurred"));
         return false;
       }
-      this._errors.push(err3);
+      this._errors.push(err4);
       var timeout = this._timeouts.shift();
       if (timeout === void 0) {
         if (this._cachedTimeouts) {
@@ -11739,11 +11739,11 @@ var require_retry = __commonJS({
           var op = exports.operation(options);
           var args = Array.prototype.slice.call(arguments, 1);
           var callback = args.pop();
-          args.push(function(err3) {
-            if (op.retry(err3)) {
+          args.push(function(err4) {
+            if (op.retry(err4)) {
               return;
             }
-            if (err3) {
+            if (err4) {
               arguments[0] = op.mainError();
             }
             callback.apply(this, arguments);
@@ -11777,30 +11777,30 @@ var require_lib = __commonJS({
           options.randomize = true;
         }
         op = retrier.operation(options);
-        function bail(err3) {
-          reject(err3 || new Error("Aborted"));
+        function bail(err4) {
+          reject(err4 || new Error("Aborted"));
         }
-        function onError(err3, num2) {
-          if (err3.bail) {
-            bail(err3);
+        function onError(err4, num2) {
+          if (err4.bail) {
+            bail(err4);
             return;
           }
-          if (!op.retry(err3)) {
+          if (!op.retry(err4)) {
             reject(op.mainError());
           } else if (options.onRetry) {
-            options.onRetry(err3, num2);
+            options.onRetry(err4, num2);
           }
         }
         function runAttempt(num2) {
           var val;
           try {
             val = fn(bail, num2);
-          } catch (err3) {
-            onError(err3, num2);
+          } catch (err4) {
+            onError(err4, num2);
             return;
           }
-          Promise.resolve(val).then(resolve).catch(function catchIt(err3) {
-            onError(err3, num2);
+          Promise.resolve(val).then(resolve).catch(function catchIt(err4) {
+            onError(err4, num2);
           });
         }
         op.attempt(runAttempt);
@@ -12680,7 +12680,7 @@ var require_util = __commonJS({
     function isDestroyed(body) {
       return body && !!(body.destroyed || body[kDestroyed] || stream.isDestroyed?.(body));
     }
-    function destroy(stream2, err3) {
+    function destroy(stream2, err4) {
       if (stream2 == null || !isStream2(stream2) || isDestroyed(stream2)) {
         return;
       }
@@ -12688,10 +12688,10 @@ var require_util = __commonJS({
         if (Object.getPrototypeOf(stream2).constructor === IncomingMessage) {
           stream2.socket = null;
         }
-        stream2.destroy(err3);
-      } else if (err3) {
+        stream2.destroy(err4);
+      } else if (err4) {
         queueMicrotask(() => {
-          stream2.emit("error", err3);
+          stream2.emit("error", err4);
         });
       }
       if (stream2.destroyed !== true) {
@@ -12922,12 +12922,12 @@ var require_util = __commonJS({
       }
       obj[kListeners] = null;
     }
-    function errorRequest(client, request, err3) {
+    function errorRequest(client, request, err4) {
       try {
-        request.onError(err3);
+        request.onError(err4);
         assert(request.aborted);
-      } catch (err4) {
-        client.emit("error", err4);
+      } catch (err5) {
+        client.emit("error", err5);
       }
     }
     var kEnumerableProperty = /* @__PURE__ */ Object.create(null);
@@ -13172,8 +13172,8 @@ var require_diagnostics = __commonJS({
           reason
         );
       });
-      diagnosticsChannel.channel("undici:websocket:socket_error").subscribe((err3) => {
-        websocketDebuglog("connection errored - %s", err3.message);
+      diagnosticsChannel.channel("undici:websocket:socket_error").subscribe((err4) => {
+        websocketDebuglog("connection errored - %s", err4.message);
       });
       diagnosticsChannel.channel("undici:websocket:ping").subscribe((evt) => {
         websocketDebuglog("ping received");
@@ -13278,11 +13278,11 @@ var require_request = __commonJS({
             };
             this.body.on("end", this.endHandler);
           }
-          this.errorHandler = (err3) => {
+          this.errorHandler = (err4) => {
             if (this.abort) {
-              this.abort(err3);
+              this.abort(err4);
             } else {
-              this.error = err3;
+              this.error = err4;
             }
           };
           this.body.on("error", this.errorHandler);
@@ -13347,8 +13347,8 @@ var require_request = __commonJS({
         if (this[kHandler].onBodySent) {
           try {
             return this[kHandler].onBodySent(chunk);
-          } catch (err3) {
-            this.abort(err3);
+          } catch (err4) {
+            this.abort(err4);
           }
         }
       }
@@ -13359,8 +13359,8 @@ var require_request = __commonJS({
         if (this[kHandler].onRequestSent) {
           try {
             return this[kHandler].onRequestSent();
-          } catch (err3) {
-            this.abort(err3);
+          } catch (err4) {
+            this.abort(err4);
           }
         }
       }
@@ -13385,8 +13385,8 @@ var require_request = __commonJS({
         }
         try {
           return this[kHandler].onHeaders(statusCode, headers, resume, statusText);
-        } catch (err3) {
-          this.abort(err3);
+        } catch (err4) {
+          this.abort(err4);
         }
       }
       onData(chunk) {
@@ -13394,8 +13394,8 @@ var require_request = __commonJS({
         assert(!this.completed);
         try {
           return this[kHandler].onData(chunk);
-        } catch (err3) {
-          this.abort(err3);
+        } catch (err4) {
+          this.abort(err4);
           return false;
         }
       }
@@ -13469,8 +13469,8 @@ var require_request = __commonJS({
         }
         try {
           return this[kHandler].onComplete(trailers);
-        } catch (err3) {
-          this.onError(err3);
+        } catch (err4) {
+          this.onError(err4);
         }
       }
       onError(error) {
@@ -13700,8 +13700,8 @@ var require_dispatcher_base = __commonJS({
       close(callback) {
         if (callback === void 0) {
           return new Promise((resolve, reject) => {
-            this.close((err3, data) => {
-              return err3 ? reject(err3) : resolve(data);
+            this.close((err4, data) => {
+              return err4 ? reject(err4) : resolve(data);
             });
           });
         }
@@ -13733,17 +13733,17 @@ var require_dispatcher_base = __commonJS({
           queueMicrotask(onClosed);
         });
       }
-      destroy(err3, callback) {
-        if (typeof err3 === "function") {
-          callback = err3;
-          err3 = null;
+      destroy(err4, callback) {
+        if (typeof err4 === "function") {
+          callback = err4;
+          err4 = null;
         }
         if (callback === void 0) {
           return new Promise((resolve, reject) => {
-            this.destroy(err3, (err4, data) => {
-              return err4 ? (
+            this.destroy(err4, (err5, data) => {
+              return err5 ? (
                 /* istanbul ignore next: should never error */
-                reject(err4)
+                reject(err5)
               ) : resolve(data);
             });
           });
@@ -13759,8 +13759,8 @@ var require_dispatcher_base = __commonJS({
           }
           return;
         }
-        if (!err3) {
-          err3 = new ClientDestroyedError();
+        if (!err4) {
+          err4 = new ClientDestroyedError();
         }
         this[kDestroyed] = true;
         this[kOnDestroyed] = this[kOnDestroyed] || [];
@@ -13772,7 +13772,7 @@ var require_dispatcher_base = __commonJS({
             callbacks[i2](null, null);
           }
         };
-        this[kDestroy](err3).then(() => {
+        this[kDestroy](err4).then(() => {
           queueMicrotask(onDestroyed);
         });
       }
@@ -13803,11 +13803,11 @@ var require_dispatcher_base = __commonJS({
             throw new ClientClosedError();
           }
           return this[kInterceptedDispatch](opts, handler2);
-        } catch (err3) {
+        } catch (err4) {
           if (typeof handler2.onError !== "function") {
             throw new InvalidArgumentError("invalid onError method");
           }
-          handler2.onError(err3);
+          handler2.onError(err4);
           return false;
         }
       }
@@ -14168,12 +14168,12 @@ var require_connect = __commonJS({
             callback = null;
             cb(null, this);
           }
-        }).on("error", function(err3) {
+        }).on("error", function(err4) {
           queueMicrotask(clearConnectTimeout);
           if (callback) {
             const cb = callback;
             callback = null;
-            cb(err3);
+            cb(err4);
           }
         });
         return socket;
@@ -15223,15 +15223,15 @@ var require_webidl = __commonJS({
     webidl.brandCheck = function(V2, I2, opts) {
       if (opts?.strict !== false) {
         if (!(V2 instanceof I2)) {
-          const err3 = new TypeError("Illegal invocation");
-          err3.code = "ERR_INVALID_THIS";
-          throw err3;
+          const err4 = new TypeError("Illegal invocation");
+          err4.code = "ERR_INVALID_THIS";
+          throw err4;
         }
       } else {
         if (V2?.[Symbol.toStringTag] !== I2.prototype[Symbol.toStringTag]) {
-          const err3 = new TypeError("Illegal invocation");
-          err3.code = "ERR_INVALID_THIS";
-          throw err3;
+          const err4 = new TypeError("Illegal invocation");
+          err4.code = "ERR_INVALID_THIS";
+          throw err4;
         }
       }
     };
@@ -16184,9 +16184,9 @@ var require_util2 = __commonJS({
       try {
         controller.close();
         controller.byobRequest?.respond(0);
-      } catch (err3) {
-        if (!err3.message.includes("Controller is already closed") && !err3.message.includes("ReadableStream is already closed")) {
-          throw err3;
+      } catch (err4) {
+        if (!err4.message.includes("Controller is already closed") && !err4.message.includes("ReadableStream is already closed")) {
+          throw err4;
         }
       }
     }
@@ -16319,7 +16319,7 @@ var require_util2 = __commonJS({
           this._inflateStream = (chunk[0] & 15) === 8 ? zlib2.createInflate(this.#zlibOptions) : zlib2.createInflateRaw(this.#zlibOptions);
           this._inflateStream.on("data", this.push.bind(this));
           this._inflateStream.on("end", () => this.push(null));
-          this._inflateStream.on("error", (err3) => this.destroy(err3));
+          this._inflateStream.on("error", (err4) => this.destroy(err4));
         }
         this._inflateStream.write(chunk, encoding, callback);
       }
@@ -17487,8 +17487,8 @@ var require_client_h1 = __commonJS({
             currentBufferRef = data;
             currentParser = this;
             ret = llhttp.llhttp_execute(this.ptr, currentBufferPtr, data.length);
-          } catch (err3) {
-            throw err3;
+          } catch (err4) {
+            throw err4;
           } finally {
             currentParser = null;
             currentBufferRef = null;
@@ -17505,8 +17505,8 @@ var require_client_h1 = __commonJS({
               throw this.createError(ret, body);
             }
           }
-        } catch (err3) {
-          util.destroy(socket, err3);
+        } catch (err4) {
+          util.destroy(socket, err4);
         }
       }
       finish() {
@@ -17823,9 +17823,9 @@ var require_client_h1 = __commonJS({
       socket[kIdleSocketValidationTimeout] = null;
       socket[kSocketUsed] = false;
       socket[kParser] = new Parser(client, socket, llhttpInstance);
-      addListener(socket, "error", function(err3) {
+      addListener(socket, "error", function(err4) {
         const parser = this[kParser];
-        if (err3.code === "ECONNRESET" && parser.statusCode && !parser.shouldKeepAlive) {
+        if (err4.code === "ECONNRESET" && parser.statusCode && !parser.shouldKeepAlive) {
           const parserErr = parser.finish();
           if (parserErr) {
             this[kError] = parserErr;
@@ -17833,8 +17833,8 @@ var require_client_h1 = __commonJS({
           }
           return;
         }
-        this[kError] = err3;
-        this[kClient][kOnError](err3);
+        this[kError] = err4;
+        this[kClient][kOnError](err4);
       });
       addListener(socket, "readable", function() {
         const parser = this[kParser];
@@ -17864,7 +17864,7 @@ var require_client_h1 = __commonJS({
           this[kParser].destroy();
           this[kParser] = null;
         }
-        const err3 = this[kError] || new SocketError("closed", util.getSocketInfo(this));
+        const err4 = this[kError] || new SocketError("closed", util.getSocketInfo(this));
         client2[kSocket] = null;
         client2[kHTTPContext] = null;
         if (client2.destroyed) {
@@ -17872,16 +17872,16 @@ var require_client_h1 = __commonJS({
           const requests = client2[kQueue].splice(client2[kRunningIdx]);
           for (let i2 = 0; i2 < requests.length; i2++) {
             const request = requests[i2];
-            util.errorRequest(client2, request, err3);
+            util.errorRequest(client2, request, err4);
           }
-        } else if (client2[kRunning] > 0 && err3.code !== "UND_ERR_INFO") {
+        } else if (client2[kRunning] > 0 && err4.code !== "UND_ERR_INFO") {
           const request = client2[kQueue][client2[kRunningIdx]];
           client2[kQueue][client2[kRunningIdx]++] = null;
-          util.errorRequest(client2, request, err3);
+          util.errorRequest(client2, request, err4);
         }
         client2[kPendingIdx] = client2[kRunningIdx];
         assert(client2[kRunning] === 0);
-        client2.emit("disconnect", client2[kUrl], [client2], err3);
+        client2.emit("disconnect", client2[kUrl], [client2], err4);
         client2[kResume]();
       });
       let closed3 = false;
@@ -17897,11 +17897,11 @@ var require_client_h1 = __commonJS({
         resume() {
           resumeH1(client);
         },
-        destroy(err3, callback) {
+        destroy(err4, callback) {
           if (closed3) {
             queueMicrotask(callback);
           } else {
-            socket.destroy(err3).on("close", callback);
+            socket.destroy(err4).on("close", callback);
           }
         },
         get destroyed() {
@@ -18055,8 +18055,8 @@ var require_client_h1 = __commonJS({
       };
       try {
         request.onConnect(abort);
-      } catch (err3) {
-        util.errorRequest(client, request, err3);
+      } catch (err4) {
+        util.errorRequest(client, request, err4);
       }
       if (request.aborted) {
         return false;
@@ -18142,8 +18142,8 @@ upgrade: ${upgrade}\r
           if (!writer.write(chunk) && this.pause) {
             this.pause();
           }
-        } catch (err3) {
-          util.destroy(this, err3);
+        } catch (err4) {
+          util.destroy(this, err4);
         }
       };
       const onDrain = function() {
@@ -18159,11 +18159,11 @@ upgrade: ${upgrade}\r
           body.removeListener("error", onFinished);
         });
         if (!finished) {
-          const err3 = new RequestAbortedError();
-          queueMicrotask(() => onFinished(err3));
+          const err4 = new RequestAbortedError();
+          queueMicrotask(() => onFinished(err4));
         }
       };
-      const onFinished = function(err3) {
+      const onFinished = function(err4) {
         if (finished) {
           return;
         }
@@ -18171,16 +18171,16 @@ upgrade: ${upgrade}\r
         assert(socket.destroyed || socket[kWriting] && client[kRunning] <= 1);
         socket.off("drain", onDrain).off("error", onFinished);
         body.removeListener("data", onData).removeListener("end", onFinished).removeListener("close", onClose);
-        if (!err3) {
+        if (!err4) {
           try {
             writer.end();
           } catch (er) {
-            err3 = er;
+            err4 = er;
           }
         }
-        writer.destroy(err3);
-        if (err3 && (err3.code !== "UND_ERR_INFO" || err3.message !== "reset")) {
-          util.destroy(body, err3);
+        writer.destroy(err4);
+        if (err4 && (err4.code !== "UND_ERR_INFO" || err4.message !== "reset")) {
+          util.destroy(body, err4);
         } else {
           util.destroy(body);
         }
@@ -18226,8 +18226,8 @@ upgrade: ${upgrade}\r
         }
         request.onRequestSent();
         client[kResume]();
-      } catch (err3) {
-        abort(err3);
+      } catch (err4) {
+        abort(err4);
       }
     }
     async function writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload) {
@@ -18249,8 +18249,8 @@ upgrade: ${upgrade}\r
           socket[kReset] = true;
         }
         client[kResume]();
-      } catch (err3) {
-        abort(err3);
+      } catch (err4) {
+        abort(err4);
       }
     }
     async function writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload) {
@@ -18283,8 +18283,8 @@ upgrade: ${upgrade}\r
           }
         }
         writer.end();
-      } catch (err3) {
-        writer.destroy(err3);
+      } catch (err4) {
+        writer.destroy(err4);
       } finally {
         socket.off("close", onDrain).off("drain", onDrain);
       }
@@ -18387,12 +18387,12 @@ ${len.toString(16)}\r
         }
         client[kResume]();
       }
-      destroy(err3) {
+      destroy(err4) {
         const { socket, client, abort } = this;
         socket[kWriting] = false;
-        if (err3) {
+        if (err4) {
           assert(client[kRunning] <= 1, "pipeline should only contain this request");
-          abort(err3);
+          abort(err4);
         }
       }
     };
@@ -18492,36 +18492,36 @@ var require_client_h2 = __commonJS({
       util.addListener(session, "close", function() {
         const { [kClient]: client2 } = this;
         const { [kSocket]: socket2 } = client2;
-        const err3 = this[kSocket][kError] || this[kError] || new SocketError("closed", util.getSocketInfo(socket2));
+        const err4 = this[kSocket][kError] || this[kError] || new SocketError("closed", util.getSocketInfo(socket2));
         client2[kHTTP2Session] = null;
         if (client2.destroyed) {
           assert(client2[kPending] === 0);
           const requests = client2[kQueue].splice(client2[kRunningIdx]);
           for (let i2 = 0; i2 < requests.length; i2++) {
             const request = requests[i2];
-            util.errorRequest(client2, request, err3);
+            util.errorRequest(client2, request, err4);
           }
         }
       });
       session.unref();
       client[kHTTP2Session] = session;
       socket[kHTTP2Session] = session;
-      util.addListener(socket, "error", function(err3) {
-        this[kError] = err3;
-        this[kClient][kOnError](err3);
+      util.addListener(socket, "error", function(err4) {
+        this[kError] = err4;
+        this[kClient][kOnError](err4);
       });
       util.addListener(socket, "end", function() {
         util.destroy(this, new SocketError("other side closed", util.getSocketInfo(this)));
       });
       util.addListener(socket, "close", function() {
-        const err3 = this[kError] || new SocketError("closed", util.getSocketInfo(this));
+        const err4 = this[kError] || new SocketError("closed", util.getSocketInfo(this));
         client[kSocket] = null;
         if (this[kHTTP2Session] != null) {
-          this[kHTTP2Session].destroy(err3);
+          this[kHTTP2Session].destroy(err4);
         }
         client[kPendingIdx] = client[kRunningIdx];
         assert(client[kRunning] === 0);
-        client.emit("disconnect", client[kUrl], [client], err3);
+        client.emit("disconnect", client[kUrl], [client], err4);
         client[kResume]();
       });
       let closed3 = false;
@@ -18537,11 +18537,11 @@ var require_client_h2 = __commonJS({
         resume() {
           resumeH2(client);
         },
-        destroy(err3, callback) {
+        destroy(err4, callback) {
           if (closed3) {
             queueMicrotask(callback);
           } else {
-            socket.destroy(err3).on("close", callback);
+            socket.destroy(err4).on("close", callback);
           }
         },
         get destroyed() {
@@ -18564,40 +18564,40 @@ var require_client_h2 = __commonJS({
         }
       }
     }
-    function onHttp2SessionError(err3) {
-      this[kSocket][kError] = err3;
-      this[kClient][kOnError](err3);
+    function onHttp2SessionError(err4) {
+      this[kSocket][kError] = err4;
+      this[kClient][kOnError](err4);
     }
     function onHttp2FrameError(type, code2, id) {
       if (id === 0) {
-        const err3 = new InformationalError(`HTTP/2: "frameError" received - type ${type}, code ${code2}`);
-        this[kSocket][kError] = err3;
-        this[kClient][kOnError](err3);
+        const err4 = new InformationalError(`HTTP/2: "frameError" received - type ${type}, code ${code2}`);
+        this[kSocket][kError] = err4;
+        this[kClient][kOnError](err4);
       }
     }
     function onHttp2SessionEnd() {
-      const err3 = new SocketError("other side closed", util.getSocketInfo(this[kSocket]));
-      this.destroy(err3);
-      util.destroy(this[kSocket], err3);
+      const err4 = new SocketError("other side closed", util.getSocketInfo(this[kSocket]));
+      this.destroy(err4);
+      util.destroy(this[kSocket], err4);
     }
     function onHTTP2GoAway(code2) {
-      const err3 = this[kError] || new SocketError(`HTTP/2: "GOAWAY" frame received with code ${code2}`, util.getSocketInfo(this));
+      const err4 = this[kError] || new SocketError(`HTTP/2: "GOAWAY" frame received with code ${code2}`, util.getSocketInfo(this));
       const client = this[kClient];
       client[kSocket] = null;
       client[kHTTPContext] = null;
       if (this[kHTTP2Session] != null) {
-        this[kHTTP2Session].destroy(err3);
+        this[kHTTP2Session].destroy(err4);
         this[kHTTP2Session] = null;
       }
-      util.destroy(this[kSocket], err3);
+      util.destroy(this[kSocket], err4);
       if (client[kRunningIdx] < client[kQueue].length) {
         const request = client[kQueue][client[kRunningIdx]];
         client[kQueue][client[kRunningIdx]++] = null;
-        util.errorRequest(client, request, err3);
+        util.errorRequest(client, request, err4);
         client[kPendingIdx] = client[kRunningIdx];
       }
       assert(client[kRunning] === 0);
-      client.emit("disconnect", client[kUrl], [client], err3);
+      client.emit("disconnect", client[kUrl], [client], err4);
       client[kResume]();
     }
     function shouldSendContentLength(method) {
@@ -18652,8 +18652,8 @@ var require_client_h2 = __commonJS({
       };
       try {
         request.onConnect(abort);
-      } catch (err3) {
-        util.errorRequest(client, request, err3);
+      } catch (err4) {
+        util.errorRequest(client, request, err4);
       }
       if (request.aborted) {
         return false;
@@ -18751,9 +18751,9 @@ var require_client_h2 = __commonJS({
         const { [HTTP2_HEADER_STATUS]: statusCode, ...realHeaders } = headers2;
         request.onResponseStarted();
         if (request.aborted) {
-          const err3 = new RequestAbortedError();
-          util.errorRequest(client, request, err3);
-          util.destroy(stream, err3);
+          const err4 = new RequestAbortedError();
+          util.errorRequest(client, request, err4);
+          util.destroy(stream, err4);
           return;
         }
         if (request.onHeaders(Number(statusCode), parseH2Headers(realHeaders), stream.resume.bind(stream), "") === false) {
@@ -18783,8 +18783,8 @@ var require_client_h2 = __commonJS({
           session.unref();
         }
       });
-      stream.once("error", function(err3) {
-        abort(err3);
+      stream.once("error", function(err4) {
+        abort(err4);
       });
       stream.once("frameError", (type, code2) => {
         abort(new InformationalError(`HTTP/2: "frameError" received - type ${type}, code ${code2}`));
@@ -18888,10 +18888,10 @@ var require_client_h2 = __commonJS({
       const pipe = pipeline(
         body,
         h2stream,
-        (err3) => {
-          if (err3) {
-            util.destroy(pipe, err3);
-            abort(err3);
+        (err4) => {
+          if (err4) {
+            util.destroy(pipe, err4);
+            abort(err4);
           } else {
             util.removeAllListeners(pipe);
             request.onRequestSent();
@@ -18924,8 +18924,8 @@ var require_client_h2 = __commonJS({
           socket[kReset] = true;
         }
         client[kResume]();
-      } catch (err3) {
-        abort(err3);
+      } catch (err4) {
+        abort(err4);
       }
     }
     async function writeIterable(abort, h2stream, body, client, request, socket, contentLength, expectsPayload) {
@@ -18964,8 +18964,8 @@ var require_client_h2 = __commonJS({
           socket[kReset] = true;
         }
         client[kResume]();
-      } catch (err3) {
-        abort(err3);
+      } catch (err4) {
+        abort(err4);
       } finally {
         h2stream.off("close", onDrain).off("drain", onDrain);
       }
@@ -19374,7 +19374,7 @@ var require_client = __commonJS({
         this[kRunningIdx] = 0;
         this[kPendingIdx] = 0;
         this[kResume] = (sync) => resume(this, sync);
-        this[kOnError] = (err3) => onError(this, err3);
+        this[kOnError] = (err4) => onError(this, err4);
       }
       get pipelining() {
         return this[kPipelining];
@@ -19430,12 +19430,12 @@ var require_client = __commonJS({
           }
         });
       }
-      async [kDestroy](err3) {
+      async [kDestroy](err4) {
         return new Promise((resolve) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i2 = 0; i2 < requests.length; i2++) {
             const request = requests[i2];
-            util.errorRequest(this, request, err3);
+            util.errorRequest(this, request, err4);
           }
           const callback = () => {
             if (this[kClosedResolve]) {
@@ -19445,7 +19445,7 @@ var require_client = __commonJS({
             resolve(null);
           };
           if (this[kHTTPContext]) {
-            this[kHTTPContext].destroy(err3, callback);
+            this[kHTTPContext].destroy(err4, callback);
             this[kHTTPContext] = null;
           } else {
             queueMicrotask(callback);
@@ -19455,13 +19455,13 @@ var require_client = __commonJS({
       }
     };
     var createRedirectInterceptor = require_redirect_interceptor();
-    function onError(client, err3) {
-      if (client[kRunning] === 0 && err3.code !== "UND_ERR_INFO" && err3.code !== "UND_ERR_SOCKET") {
+    function onError(client, err4) {
+      if (client[kRunning] === 0 && err4.code !== "UND_ERR_INFO" && err4.code !== "UND_ERR_SOCKET") {
         assert(client[kPendingIdx] === client[kRunningIdx]);
         const requests = client[kQueue].splice(client[kRunningIdx]);
         for (let i2 = 0; i2 < requests.length; i2++) {
           const request = requests[i2];
-          util.errorRequest(client, request, err3);
+          util.errorRequest(client, request, err4);
         }
         assert(client[kSize] === 0);
       }
@@ -19501,9 +19501,9 @@ var require_client = __commonJS({
             port,
             servername: client[kServerName],
             localAddress: client[kLocalAddress]
-          }, (err3, socket2) => {
-            if (err3) {
-              reject(err3);
+          }, (err4, socket2) => {
+            if (err4) {
+              reject(err4);
             } else {
               resolve(socket2);
             }
@@ -19516,9 +19516,9 @@ var require_client = __commonJS({
         assert(socket);
         try {
           client[kHTTPContext] = socket.alpnProtocol === "h2" ? await connectH2(client, socket) : await connectH1(client, socket);
-        } catch (err3) {
+        } catch (err4) {
           socket.destroy().on("error", noop);
-          throw err3;
+          throw err4;
         }
         client[kConnecting] = false;
         socket[kCounter] = 0;
@@ -19541,7 +19541,7 @@ var require_client = __commonJS({
           });
         }
         client.emit("connect", client[kUrl], [client]);
-      } catch (err3) {
+      } catch (err4) {
         if (client.destroyed) {
           return;
         }
@@ -19558,19 +19558,19 @@ var require_client = __commonJS({
               localAddress: client[kLocalAddress]
             },
             connector: client[kConnector],
-            error: err3
+            error: err4
           });
         }
-        if (err3.code === "ERR_TLS_CERT_ALTNAME_INVALID") {
+        if (err4.code === "ERR_TLS_CERT_ALTNAME_INVALID") {
           assert(client[kRunning] === 0);
           while (client[kPending] > 0 && client[kQueue][client[kPendingIdx]].servername === client[kServerName]) {
             const request = client[kQueue][client[kPendingIdx]++];
-            util.errorRequest(client, request, err3);
+            util.errorRequest(client, request, err4);
           }
         } else {
-          onError(client, err3);
+          onError(client, err4);
         }
-        client.emit("connectionError", client[kUrl], [client], err3);
+        client.emit("connectionError", client[kUrl], [client], err4);
       }
       client[kResume]();
     }
@@ -19796,11 +19796,11 @@ var require_pool_base = __commonJS({
         this[kOnConnect] = (origin, targets) => {
           pool.emit("connect", origin, [pool, ...targets]);
         };
-        this[kOnDisconnect] = (origin, targets, err3) => {
-          pool.emit("disconnect", origin, [pool, ...targets], err3);
+        this[kOnDisconnect] = (origin, targets, err4) => {
+          pool.emit("disconnect", origin, [pool, ...targets], err4);
         };
-        this[kOnConnectionError] = (origin, targets, err3) => {
-          pool.emit("connectionError", origin, [pool, ...targets], err3);
+        this[kOnConnectionError] = (origin, targets, err4) => {
+          pool.emit("connectionError", origin, [pool, ...targets], err4);
         };
         this[kStats] = new PoolStats(this);
       }
@@ -19846,15 +19846,15 @@ var require_pool_base = __commonJS({
           });
         }
       }
-      async [kDestroy](err3) {
+      async [kDestroy](err4) {
         while (true) {
           const item = this[kQueue].shift();
           if (!item) {
             break;
           }
-          item.handler.onError(err3);
+          item.handler.onError(err4);
         }
-        await Promise.all(this[kClients].map((c) => c.destroy(err3)));
+        await Promise.all(this[kClients].map((c) => c.destroy(err4)));
       }
       [kDispatch](opts, handler2) {
         const dispatcher = this[kGetDispatcher]();
@@ -20067,8 +20067,8 @@ var require_balanced_pool = __commonJS({
           this._updateBalancedPoolStats();
         });
         pool.on("disconnect", (...args) => {
-          const err3 = args[2];
-          if (err3 && err3.code === "UND_ERR_SOCKET") {
+          const err4 = args[2];
+          if (err4 && err4.code === "UND_ERR_SOCKET") {
             pool[kWeight] = Math.max(1, pool[kWeight] - this[kErrorPenalty]);
             this._updateBalancedPoolStats();
           }
@@ -20187,11 +20187,11 @@ var require_agent = __commonJS({
         this[kOnConnect] = (origin, targets) => {
           this.emit("connect", origin, [this, ...targets]);
         };
-        this[kOnDisconnect] = (origin, targets, err3) => {
-          this.emit("disconnect", origin, [this, ...targets], err3);
+        this[kOnDisconnect] = (origin, targets, err4) => {
+          this.emit("disconnect", origin, [this, ...targets], err4);
         };
-        this[kOnConnectionError] = (origin, targets, err3) => {
-          this.emit("connectionError", origin, [this, ...targets], err3);
+        this[kOnConnectionError] = (origin, targets, err4) => {
+          this.emit("connectionError", origin, [this, ...targets], err4);
         };
       }
       get [kRunning]() {
@@ -20223,10 +20223,10 @@ var require_agent = __commonJS({
         this[kClients].clear();
         await Promise.all(closePromises);
       }
-      async [kDestroy](err3) {
+      async [kDestroy](err4) {
         const destroyPromises = [];
         for (const client of this[kClients].values()) {
-          destroyPromises.push(client.destroy(err3));
+          destroyPromises.push(client.destroy(err4));
         }
         this[kClients].clear();
         await Promise.all(destroyPromises);
@@ -20310,8 +20310,8 @@ var require_proxy_agent = __commonJS({
       async [kClose]() {
         return this.#client.close();
       }
-      async [kDestroy](err3) {
-        return this.#client.destroy(err3);
+      async [kDestroy](err4) {
+        return this.#client.destroy(err4);
       }
     };
     var ProxyAgent = class extends DispatcherBase {
@@ -20392,11 +20392,11 @@ var require_proxy_agent = __commonJS({
                 servername = opts2.servername;
               }
               this[kConnectEndpoint]({ ...opts2, servername, httpSocket: socket }, callback);
-            } catch (err3) {
-              if (err3.code === "ERR_TLS_CERT_ALTNAME_INVALID") {
-                callback(new SecureProxyConnectionError(err3));
+            } catch (err4) {
+              if (err4.code === "ERR_TLS_CERT_ALTNAME_INVALID") {
+                callback(new SecureProxyConnectionError(err4));
               } else {
-                callback(err3);
+                callback(err4);
               }
             }
           }
@@ -20515,13 +20515,13 @@ var require_env_http_proxy_agent = __commonJS({
           await this[kHttpsProxyAgent].close();
         }
       }
-      async [kDestroy](err3) {
-        await this[kNoProxyAgent].destroy(err3);
+      async [kDestroy](err4) {
+        await this[kNoProxyAgent].destroy(err4);
         if (!this[kHttpProxyAgent][kDestroyed]) {
-          await this[kHttpProxyAgent].destroy(err3);
+          await this[kHttpProxyAgent].destroy(err4);
         }
         if (!this[kHttpsProxyAgent][kDestroyed]) {
-          await this[kHttpsProxyAgent].destroy(err3);
+          await this[kHttpsProxyAgent].destroy(err4);
         }
       }
       #getProxyAgentForUrl(url) {
@@ -20724,8 +20724,8 @@ var require_retry_handler = __commonJS({
       onBodySent(chunk) {
         if (this.handler.onBodySent) return this.handler.onBodySent(chunk);
       }
-      static [kRetryHandlerDefaultRetry](err3, { state, opts }, cb) {
-        const { statusCode, code: code2, headers } = err3;
+      static [kRetryHandlerDefaultRetry](err4, { state, opts }, cb) {
+        const { statusCode, code: code2, headers } = err4;
         const { method, retryOptions } = opts;
         const {
           maxRetries,
@@ -20738,19 +20738,19 @@ var require_retry_handler = __commonJS({
         } = retryOptions;
         const { counter } = state;
         if (code2 && code2 !== "UND_ERR_REQ_RETRY" && !errorCodes.includes(code2)) {
-          cb(err3);
+          cb(err4);
           return;
         }
         if (Array.isArray(methods) && !methods.includes(method)) {
-          cb(err3);
+          cb(err4);
           return;
         }
         if (statusCode != null && Array.isArray(statusCodes) && !statusCodes.includes(statusCode)) {
-          cb(err3);
+          cb(err4);
           return;
         }
         if (counter > maxRetries) {
-          cb(err3);
+          cb(err4);
           return;
         }
         let retryAfterHeader = headers?.["retry-after"];
@@ -20882,11 +20882,11 @@ var require_retry_handler = __commonJS({
             statusMessage
           );
         }
-        const err3 = new RequestRetryError("Request failed", statusCode, {
+        const err4 = new RequestRetryError("Request failed", statusCode, {
           headers,
           data: { count: this.retryCount }
         });
-        this.abort(err3);
+        this.abort(err4);
         return false;
       }
       onData(chunk) {
@@ -20897,9 +20897,9 @@ var require_retry_handler = __commonJS({
         this.retryCount = 0;
         return this.handler.onComplete(rawTrailers);
       }
-      onError(err3) {
+      onError(err4) {
         if (this.aborted || isDisturbed(this.opts.body) || this.headersSent && this.resume == null) {
-          return this.handler.onError(err3);
+          return this.handler.onError(err4);
         }
         if (this.retryCount - this.retryCountCheckpoint > 0) {
           this.retryCount = this.retryCountCheckpoint + (this.retryCount - this.retryCountCheckpoint);
@@ -20907,16 +20907,16 @@ var require_retry_handler = __commonJS({
           this.retryCount += 1;
         }
         this.retryOpts.retry(
-          err3,
+          err4,
           {
             state: { counter: this.retryCount },
             opts: { retryOptions: this.retryOpts, ...this.opts }
           },
           onRetry.bind(this)
         );
-        function onRetry(err4) {
-          if (err4 != null || this.aborted || isDisturbed(this.opts.body)) {
-            return this.handler.onError(err4);
+        function onRetry(err5) {
+          if (err5 != null || this.aborted || isDisturbed(this.opts.body)) {
+            return this.handler.onError(err5);
           }
           if (this.start !== 0) {
             const headers = { range: `bytes=${this.start}-${this.end ?? ""}` };
@@ -20934,8 +20934,8 @@ var require_retry_handler = __commonJS({
           try {
             this.retryCountCheckpoint = this.retryCount;
             this.dispatch(this.opts, this);
-          } catch (err5) {
-            this.handler.onError(err5);
+          } catch (err6) {
+            this.handler.onError(err6);
           }
         }
       }
@@ -21018,22 +21018,22 @@ var require_readable = __commonJS({
         this[kContentLength] = contentLength;
         this[kReading] = false;
       }
-      destroy(err3) {
-        if (!err3 && !this._readableState.endEmitted) {
-          err3 = new RequestAbortedError();
+      destroy(err4) {
+        if (!err4 && !this._readableState.endEmitted) {
+          err4 = new RequestAbortedError();
         }
-        if (err3) {
+        if (err4) {
           this[kAbort]();
         }
-        return super.destroy(err3);
+        return super.destroy(err4);
       }
-      _destroy(err3, callback) {
+      _destroy(err4, callback) {
         if (!this[kReading]) {
           setImmediate(() => {
-            callback(err3);
+            callback(err4);
           });
         } else {
-          callback(err3);
+          callback(err4);
         }
       }
       on(ev, ...args) {
@@ -21147,8 +21147,8 @@ var require_readable = __commonJS({
         if (isUnusable(stream)) {
           const rState = stream._readableState;
           if (rState.destroyed && rState.closeEmitted === false) {
-            stream.on("error", (err3) => {
-              reject(err3);
+            stream.on("error", (err4) => {
+              reject(err4);
             }).on("close", () => {
               reject(new TypeError("unusable"));
             });
@@ -21165,8 +21165,8 @@ var require_readable = __commonJS({
               length: 0,
               body: []
             };
-            stream.on("error", function(err3) {
-              consumeFinish(this[kConsume], err3);
+            stream.on("error", function(err4) {
+              consumeFinish(this[kConsume], err4);
             }).on("close", function() {
               if (this[kConsume].body !== null) {
                 consumeFinish(this[kConsume], new RequestAbortedError());
@@ -21244,20 +21244,20 @@ var require_readable = __commonJS({
           resolve(chunksConcat(body, length));
         }
         consumeFinish(consume2);
-      } catch (err3) {
-        stream.destroy(err3);
+      } catch (err4) {
+        stream.destroy(err4);
       }
     }
     function consumePush(consume2, chunk) {
       consume2.length += chunk.length;
       consume2.body.push(chunk);
     }
-    function consumeFinish(consume2, err3) {
+    function consumeFinish(consume2, err4) {
       if (consume2.body === null) {
         return;
       }
-      if (err3) {
-        consume2.reject(err3);
+      if (err4) {
+        consume2.reject(err4);
       } else {
         consume2.resolve();
       }
@@ -21366,11 +21366,11 @@ var require_api_request = __commonJS({
             throw new InvalidArgumentError("invalid onInfo callback");
           }
           super("UNDICI_REQUEST");
-        } catch (err3) {
+        } catch (err4) {
           if (util.isStream(body)) {
-            util.destroy(body.on("error", util.nop), err3);
+            util.destroy(body.on("error", util.nop), err4);
           }
-          throw err3;
+          throw err4;
         }
         this.method = method;
         this.responseHeaders = responseHeaders || null;
@@ -21388,8 +21388,8 @@ var require_api_request = __commonJS({
         this.reason = null;
         this.removeAbortListener = null;
         if (util.isStream(body)) {
-          body.on("error", (err3) => {
-            this.onError(err3);
+          body.on("error", (err4) => {
+            this.onError(err4);
           });
         }
         if (this.signal) {
@@ -21471,23 +21471,23 @@ var require_api_request = __commonJS({
         util.parseHeaders(trailers, this.trailers);
         this.res.push(null);
       }
-      onError(err3) {
+      onError(err4) {
         const { res, callback, body, opaque } = this;
         if (callback) {
           this.callback = null;
           queueMicrotask(() => {
-            this.runInAsyncScope(callback, null, err3, { opaque });
+            this.runInAsyncScope(callback, null, err4, { opaque });
           });
         }
         if (res) {
           this.res = null;
           queueMicrotask(() => {
-            util.destroy(res, err3);
+            util.destroy(res, err4);
           });
         }
         if (body) {
           this.body = null;
-          util.destroy(body, err3);
+          util.destroy(body, err4);
         }
         if (this.removeAbortListener) {
           res?.off("close", this.removeAbortListener);
@@ -21499,19 +21499,19 @@ var require_api_request = __commonJS({
     function request(opts, callback) {
       if (callback === void 0) {
         return new Promise((resolve, reject) => {
-          request.call(this, opts, (err3, data) => {
-            return err3 ? reject(err3) : resolve(data);
+          request.call(this, opts, (err4, data) => {
+            return err4 ? reject(err4) : resolve(data);
           });
         });
       }
       try {
         this.dispatch(opts, new RequestHandler(opts, callback));
-      } catch (err3) {
+      } catch (err4) {
         if (typeof callback !== "function") {
-          throw err3;
+          throw err4;
         }
         const opaque = opts?.opaque;
-        queueMicrotask(() => callback(err3, { opaque }));
+        queueMicrotask(() => callback(err4, { opaque }));
       }
     }
     module.exports = request;
@@ -21604,11 +21604,11 @@ var require_api_stream = __commonJS({
             throw new InvalidArgumentError("invalid onInfo callback");
           }
           super("UNDICI_STREAM");
-        } catch (err3) {
+        } catch (err4) {
           if (util.isStream(body)) {
-            util.destroy(body.on("error", util.nop), err3);
+            util.destroy(body.on("error", util.nop), err4);
           }
-          throw err3;
+          throw err4;
         }
         this.responseHeaders = responseHeaders || null;
         this.opaque = opaque || null;
@@ -21622,8 +21622,8 @@ var require_api_stream = __commonJS({
         this.onInfo = onInfo || null;
         this.throwOnError = throwOnError || false;
         if (util.isStream(body)) {
-          body.on("error", (err3) => {
-            this.onError(err3);
+          body.on("error", (err4) => {
+            this.onError(err4);
           });
         }
         addSignal(this, signal);
@@ -21671,15 +21671,15 @@ var require_api_stream = __commonJS({
           if (!res || typeof res.write !== "function" || typeof res.end !== "function" || typeof res.on !== "function") {
             throw new InvalidReturnValueError("expected Writable");
           }
-          finished(res, { readable: false }, (err3) => {
+          finished(res, { readable: false }, (err4) => {
             const { callback: callback2, res: res2, opaque: opaque2, trailers, abort } = this;
             this.res = null;
-            if (err3 || !res2.readable) {
-              util.destroy(res2, err3);
+            if (err4 || !res2.readable) {
+              util.destroy(res2, err4);
             }
             this.callback = null;
-            this.runInAsyncScope(callback2, null, err3 || null, { opaque: opaque2, trailers });
-            if (err3) {
+            this.runInAsyncScope(callback2, null, err4 || null, { opaque: opaque2, trailers });
+            if (err4) {
               abort();
             }
           });
@@ -21702,41 +21702,41 @@ var require_api_stream = __commonJS({
         this.trailers = util.parseHeaders(trailers);
         res.end();
       }
-      onError(err3) {
+      onError(err4) {
         const { res, callback, opaque, body } = this;
         removeSignal(this);
         this.factory = null;
         if (res) {
           this.res = null;
-          util.destroy(res, err3);
+          util.destroy(res, err4);
         } else if (callback) {
           this.callback = null;
           queueMicrotask(() => {
-            this.runInAsyncScope(callback, null, err3, { opaque });
+            this.runInAsyncScope(callback, null, err4, { opaque });
           });
         }
         if (body) {
           this.body = null;
-          util.destroy(body, err3);
+          util.destroy(body, err4);
         }
       }
     };
     function stream(opts, factory, callback) {
       if (callback === void 0) {
         return new Promise((resolve, reject) => {
-          stream.call(this, opts, factory, (err3, data) => {
-            return err3 ? reject(err3) : resolve(data);
+          stream.call(this, opts, factory, (err4, data) => {
+            return err4 ? reject(err4) : resolve(data);
           });
         });
       }
       try {
         this.dispatch(opts, new StreamHandler(opts, factory, callback));
-      } catch (err3) {
+      } catch (err4) {
         if (typeof callback !== "function") {
-          throw err3;
+          throw err4;
         }
         const opaque = opts?.opaque;
-        queueMicrotask(() => callback(err3, { opaque }));
+        queueMicrotask(() => callback(err4, { opaque }));
       }
     }
     module.exports = stream;
@@ -21774,9 +21774,9 @@ var require_api_pipeline = __commonJS({
           resume();
         }
       }
-      _destroy(err3, callback) {
+      _destroy(err4, callback) {
         this._read();
-        callback(err3);
+        callback(err4);
       }
     };
     var PipelineResponse = class extends Readable2 {
@@ -21787,11 +21787,11 @@ var require_api_pipeline = __commonJS({
       _read() {
         this[kResume]();
       }
-      _destroy(err3, callback) {
-        if (!err3 && !this._readableState.endEmitted) {
-          err3 = new RequestAbortedError();
+      _destroy(err4, callback) {
+        if (!err4 && !this._readableState.endEmitted) {
+          err4 = new RequestAbortedError();
         }
-        callback(err3);
+        callback(err4);
       }
     };
     var PipelineHandler = class extends AsyncResource {
@@ -21837,19 +21837,19 @@ var require_api_pipeline = __commonJS({
               req[kResume] = callback;
             }
           },
-          destroy: (err3, callback) => {
+          destroy: (err4, callback) => {
             const { body, req, res, ret, abort } = this;
-            if (!err3 && !ret._readableState.endEmitted) {
-              err3 = new RequestAbortedError();
+            if (!err4 && !ret._readableState.endEmitted) {
+              err4 = new RequestAbortedError();
             }
-            if (abort && err3) {
+            if (abort && err4) {
               abort();
             }
-            util.destroy(body, err3);
-            util.destroy(req, err3);
-            util.destroy(res, err3);
+            util.destroy(body, err4);
+            util.destroy(req, err4);
+            util.destroy(res, err4);
             removeSignal(this);
-            callback(err3);
+            callback(err4);
           }
         }).on("prefinish", () => {
           const { req } = this;
@@ -21890,9 +21890,9 @@ var require_api_pipeline = __commonJS({
             body: this.res,
             context
           });
-        } catch (err3) {
+        } catch (err4) {
           this.res.on("error", util.nop);
-          throw err3;
+          throw err4;
         }
         if (!body || typeof body.on !== "function") {
           throw new InvalidReturnValueError("expected Readable");
@@ -21902,9 +21902,9 @@ var require_api_pipeline = __commonJS({
           if (!ret.push(chunk) && body2.pause) {
             body2.pause();
           }
-        }).on("error", (err3) => {
+        }).on("error", (err4) => {
           const { ret } = this;
-          util.destroy(ret, err3);
+          util.destroy(ret, err4);
         }).on("end", () => {
           const { ret } = this;
           ret.push(null);
@@ -21924,10 +21924,10 @@ var require_api_pipeline = __commonJS({
         const { res } = this;
         res.push(null);
       }
-      onError(err3) {
+      onError(err4) {
         const { ret } = this;
         this.handler = null;
-        util.destroy(ret, err3);
+        util.destroy(ret, err4);
       }
     };
     function pipeline(opts, handler2) {
@@ -21935,8 +21935,8 @@ var require_api_pipeline = __commonJS({
         const pipelineHandler = new PipelineHandler(opts, handler2);
         this.dispatch({ ...opts, body: pipelineHandler.req }, pipelineHandler);
         return pipelineHandler.ret;
-      } catch (err3) {
-        return new PassThrough().destroy(err3);
+      } catch (err4) {
+        return new PassThrough().destroy(err4);
       }
     }
     module.exports = pipeline;
@@ -21997,13 +21997,13 @@ var require_api_upgrade = __commonJS({
           context
         });
       }
-      onError(err3) {
+      onError(err4) {
         const { callback, opaque } = this;
         removeSignal(this);
         if (callback) {
           this.callback = null;
           queueMicrotask(() => {
-            this.runInAsyncScope(callback, null, err3, { opaque });
+            this.runInAsyncScope(callback, null, err4, { opaque });
           });
         }
       }
@@ -22011,8 +22011,8 @@ var require_api_upgrade = __commonJS({
     function upgrade(opts, callback) {
       if (callback === void 0) {
         return new Promise((resolve, reject) => {
-          upgrade.call(this, opts, (err3, data) => {
-            return err3 ? reject(err3) : resolve(data);
+          upgrade.call(this, opts, (err4, data) => {
+            return err4 ? reject(err4) : resolve(data);
           });
         });
       }
@@ -22023,12 +22023,12 @@ var require_api_upgrade = __commonJS({
           method: opts.method || "GET",
           upgrade: opts.protocol || "Websocket"
         }, upgradeHandler);
-      } catch (err3) {
+      } catch (err4) {
         if (typeof callback !== "function") {
-          throw err3;
+          throw err4;
         }
         const opaque = opts?.opaque;
-        queueMicrotask(() => callback(err3, { opaque }));
+        queueMicrotask(() => callback(err4, { opaque }));
       }
     }
     module.exports = upgrade;
@@ -22091,13 +22091,13 @@ var require_api_connect = __commonJS({
           context
         });
       }
-      onError(err3) {
+      onError(err4) {
         const { callback, opaque } = this;
         removeSignal(this);
         if (callback) {
           this.callback = null;
           queueMicrotask(() => {
-            this.runInAsyncScope(callback, null, err3, { opaque });
+            this.runInAsyncScope(callback, null, err4, { opaque });
           });
         }
       }
@@ -22105,20 +22105,20 @@ var require_api_connect = __commonJS({
     function connect(opts, callback) {
       if (callback === void 0) {
         return new Promise((resolve, reject) => {
-          connect.call(this, opts, (err3, data) => {
-            return err3 ? reject(err3) : resolve(data);
+          connect.call(this, opts, (err4, data) => {
+            return err4 ? reject(err4) : resolve(data);
           });
         });
       }
       try {
         const connectHandler = new ConnectHandler(opts, callback);
         this.dispatch({ ...opts, method: "CONNECT" }, connectHandler);
-      } catch (err3) {
+      } catch (err4) {
         if (typeof callback !== "function") {
-          throw err3;
+          throw err4;
         }
         const opaque = opts?.opaque;
-        queueMicrotask(() => callback(err3, { opaque }));
+        queueMicrotask(() => callback(err4, { opaque }));
       }
     }
     module.exports = connect;
@@ -22413,7 +22413,7 @@ var require_mock_utils = __commonJS({
         const responseData = getResponseData(body);
         const responseHeaders = generateKeyValues(headers);
         const responseTrailers = generateKeyValues(trailers);
-        handler2.onConnect?.((err3) => handler2.onError(err3), null);
+        handler2.onConnect?.((err4) => handler2.onError(err4), null);
         handler2.onHeaders?.(statusCode, responseHeaders, resume, getStatusText(statusCode));
         handler2.onData?.(Buffer.from(responseData));
         handler2.onComplete?.(responseTrailers);
@@ -23127,12 +23127,12 @@ var require_dump = __commonJS({
           statusMessage
         );
       }
-      onError(err3) {
+      onError(err4) {
         if (this.#dumped) {
           return;
         }
-        err3 = this.#reason ?? err3;
-        this.#handler.onError(err3);
+        err4 = this.#reason ?? err4;
+        this.#handler.onError(err4);
       }
       onData(chunk) {
         this.#size = this.#size + chunk.length;
@@ -23219,9 +23219,9 @@ var require_dns = __commonJS({
           maxItems: this.#maxItems
         };
         if (ips == null) {
-          this.lookup(origin, newOpts, (err3, addresses) => {
-            if (err3 || addresses == null || addresses.length === 0) {
-              cb(err3 ?? new InformationalError("No DNS entries found"));
+          this.lookup(origin, newOpts, (err4, addresses) => {
+            if (err4 || addresses == null || addresses.length === 0) {
+              cb(err4 ?? new InformationalError("No DNS entries found"));
               return;
             }
             this.setRecords(origin, addresses);
@@ -23277,9 +23277,9 @@ var require_dns = __commonJS({
             family: this.dualStack === false ? this.affinity : 0,
             order: "ipv4first"
           },
-          (err3, addresses) => {
-            if (err3) {
-              return cb(err3);
+          (err4, addresses) => {
+            if (err4) {
+              return cb(err4);
             }
             const results = /* @__PURE__ */ new Map();
             for (const addr of addresses) {
@@ -23364,14 +23364,14 @@ var require_dns = __commonJS({
         this.#state = state;
         this.#dispatch = dispatch;
       }
-      onError(err3) {
-        switch (err3.code) {
+      onError(err4) {
+        switch (err4.code) {
           case "ETIMEDOUT":
           case "ECONNREFUSED": {
             if (this.#state.dualStack) {
-              this.#state.runLookup(this.#origin, this.#opts, (err4, newOrigin) => {
-                if (err4) {
-                  return this.#handler.onError(err4);
+              this.#state.runLookup(this.#origin, this.#opts, (err5, newOrigin) => {
+                if (err5) {
+                  return this.#handler.onError(err5);
                 }
                 const dispatchOpts = {
                   ...this.#opts,
@@ -23381,14 +23381,14 @@ var require_dns = __commonJS({
               });
               return;
             }
-            this.#handler.onError(err3);
+            this.#handler.onError(err4);
             return;
           }
           case "ENOTFOUND":
             this.#state.deleteRecord(this.#origin);
           // eslint-disable-next-line no-fallthrough
           default:
-            this.#handler.onError(err3);
+            this.#handler.onError(err4);
             break;
         }
       }
@@ -23437,9 +23437,9 @@ var require_dns = __commonJS({
           if (isIP(origin.hostname) !== 0) {
             return dispatch(origDispatchOpts, handler2);
           }
-          instance.runLookup(origin, origDispatchOpts, (err3, newOrigin) => {
-            if (err3) {
-              return handler2.onError(err3);
+          instance.runLookup(origin, origDispatchOpts, (err4, newOrigin) => {
+            if (err4) {
+              return handler2.onError(err4);
             }
             let dispatchOpts = null;
             dispatchOpts = {
@@ -23967,8 +23967,8 @@ var require_response = __commonJS({
         let parsedURL;
         try {
           parsedURL = new URL(url, relevantRealm.settingsObject.baseUrl);
-        } catch (err3) {
-          throw new TypeError(`Failed to parse URL from ${url}`, { cause: err3 });
+        } catch (err4) {
+          throw new TypeError(`Failed to parse URL from ${url}`, { cause: err4 });
         }
         if (!redirectStatusSet.has(status)) {
           throw new RangeError(`Invalid status code ${status}`);
@@ -24196,9 +24196,9 @@ var require_response = __commonJS({
         assert(false);
       }
     }
-    function makeAppropriateNetworkError(fetchParams, err3 = null) {
+    function makeAppropriateNetworkError(fetchParams, err4 = null) {
       assert(isCancelled(fetchParams));
-      return isAborted(fetchParams) ? makeNetworkError(Object.assign(new DOMException("The operation was aborted.", "AbortError"), { cause: err3 })) : makeNetworkError(Object.assign(new DOMException("Request was cancelled."), { cause: err3 }));
+      return isAborted(fetchParams) ? makeNetworkError(Object.assign(new DOMException("The operation was aborted.", "AbortError"), { cause: err4 })) : makeNetworkError(Object.assign(new DOMException("Request was cancelled."), { cause: err4 }));
     }
     function initializeResponse(response, init, body) {
       if (init.status !== null && (init.status < 200 || init.status > 599)) {
@@ -24430,8 +24430,8 @@ var require_request2 = __commonJS({
           let parsedURL;
           try {
             parsedURL = new URL(input, baseUrl);
-          } catch (err3) {
-            throw new TypeError("Failed to parse URL from " + input, { cause: err3 });
+          } catch (err4) {
+            throw new TypeError("Failed to parse URL from " + input, { cause: err4 });
           }
           if (parsedURL.username || parsedURL.password) {
             throw new TypeError(
@@ -24521,8 +24521,8 @@ var require_request2 = __commonJS({
             let parsedReferrer;
             try {
               parsedReferrer = new URL(referrer, baseUrl);
-            } catch (err3) {
-              throw new TypeError(`Referrer "${referrer}" is not a valid URL.`, { cause: err3 });
+            } catch (err4) {
+              throw new TypeError(`Referrer "${referrer}" is not a valid URL.`, { cause: err4 });
             }
             if (parsedReferrer.protocol === "about:" && parsedReferrer.hostname === "client" || origin && !sameOrigin(parsedReferrer, environmentSettingsObject.settingsObject.baseUrl)) {
               request.referrer = "client";
@@ -25241,11 +25241,11 @@ var require_fetch = __commonJS({
         p.reject(error);
       }
       if (request.body != null && isReadable(request.body?.stream)) {
-        request.body.stream.cancel(error).catch((err3) => {
-          if (err3.code === "ERR_INVALID_STATE") {
+        request.body.stream.cancel(error).catch((err4) => {
+          if (err4.code === "ERR_INVALID_STATE") {
             return;
           }
-          throw err3;
+          throw err4;
         });
       }
       if (responseObject == null) {
@@ -25253,11 +25253,11 @@ var require_fetch = __commonJS({
       }
       const response = responseObject[kState];
       if (response.body != null && isReadable(response.body?.stream)) {
-        response.body.stream.cancel(error).catch((err3) => {
-          if (err3.code === "ERR_INVALID_STATE") {
+        response.body.stream.cancel(error).catch((err4) => {
+          if (err4.code === "ERR_INVALID_STATE") {
             return;
           }
-          throw err3;
+          throw err4;
         });
       }
     }
@@ -25322,8 +25322,8 @@ var require_fetch = __commonJS({
       }
       if (subresourceSet.has(request.destination)) {
       }
-      mainFetch(fetchParams).catch((err3) => {
-        fetchParams.controller.terminate(err3);
+      mainFetch(fetchParams).catch((err4) => {
+        fetchParams.controller.terminate(err4);
       });
       return fetchParams.controller;
     }
@@ -25508,7 +25508,7 @@ var require_fetch = __commonJS({
         }
         case "http:":
         case "https:": {
-          return httpFetch(fetchParams).catch((err3) => makeNetworkError(err3));
+          return httpFetch(fetchParams).catch((err4) => makeNetworkError(err4));
         }
         default: {
           return Promise.resolve(makeNetworkError("unknown scheme"));
@@ -25633,8 +25633,8 @@ var require_fetch = __commonJS({
         if (locationURL == null) {
           return response;
         }
-      } catch (err3) {
-        return Promise.resolve(makeNetworkError(err3));
+      } catch (err4) {
+        return Promise.resolve(makeNetworkError(err4));
       }
       if (!urlIsHttpHttpsScheme(locationURL)) {
         return Promise.resolve(makeNetworkError("URL scheme must be a HTTP(S) scheme"));
@@ -25805,11 +25805,11 @@ var require_fetch = __commonJS({
       fetchParams.controller.connection = {
         abort: null,
         destroyed: false,
-        destroy(err3, abort = true) {
+        destroy(err4, abort = true) {
           if (!this.destroyed) {
             this.destroyed = true;
             if (abort) {
-              this.abort?.(err3 ?? new DOMException("The operation was aborted.", "AbortError"));
+              this.abort?.(err4 ?? new DOMException("The operation was aborted.", "AbortError"));
             }
           }
         }
@@ -25860,8 +25860,8 @@ var require_fetch = __commonJS({
               yield* processBodyChunk(bytes2);
             }
             processEndOfBody();
-          } catch (err3) {
-            processBodyError(err3);
+          } catch (err4) {
+            processBodyError(err4);
           }
         })();
       }
@@ -25874,12 +25874,12 @@ var require_fetch = __commonJS({
           fetchParams.controller.next = () => iterator.next();
           response = makeResponse({ status, statusText, headersList });
         }
-      } catch (err3) {
-        if (err3.name === "AbortError") {
+      } catch (err4) {
+        if (err4.name === "AbortError") {
           fetchParams.controller.connection.destroy();
-          return makeAppropriateNetworkError(fetchParams, err3);
+          return makeAppropriateNetworkError(fetchParams, err4);
         }
-        return makeNetworkError(err3);
+        return makeNetworkError(err4);
       }
       const pullAlgorithm = async () => {
         await fetchParams.controller.resume();
@@ -25917,11 +25917,11 @@ var require_fetch = __commonJS({
               break;
             }
             bytes2 = done ? void 0 : value;
-          } catch (err3) {
+          } catch (err4) {
             if (fetchParams.controller.ended && !timingInfo.encodedBodySize) {
               bytes2 = void 0;
             } else {
-              bytes2 = err3;
+              bytes2 = err4;
               isFailure = true;
             }
           }
@@ -26049,9 +26049,9 @@ var require_fetch = __commonJS({
                 status,
                 statusText,
                 headersList,
-                body: decoders.length ? pipeline(this.body, ...decoders, (err3) => {
-                  if (err3) {
-                    this.onError(err3);
+                body: decoders.length ? pipeline(this.body, ...decoders, (err4) => {
+                  if (err4) {
+                    this.onError(err4);
                   }
                 }).on("error", onError) : this.body.on("error", onError)
               });
@@ -28919,8 +28919,8 @@ var require_permessage_deflate = __commonJS({
           }
           try {
             this.#inflate = createInflateRaw({ windowBits });
-          } catch (err3) {
-            callback(err3);
+          } catch (err4) {
+            callback(err4);
             return;
           }
           this.#inflate[kBuffer] = [];
@@ -28936,9 +28936,9 @@ var require_permessage_deflate = __commonJS({
             }
             this.#inflate[kBuffer].push(data);
           });
-          this.#inflate.on("error", (err3) => {
+          this.#inflate.on("error", (err4) => {
             this.#inflate = null;
-            callback(err3);
+            callback(err4);
           });
         }
         this.#inflate.write(chunk);
@@ -29303,8 +29303,8 @@ var require_receiver = __commonJS({
             const closeFrame = new WebsocketFrameSend(body2);
             this.ws[kResponse].socket.write(
               closeFrame.createFrame(opcodes.CLOSE),
-              (err3) => {
-                if (!err3) {
+              (err4) => {
+                if (!err4) {
                   this.ws[kSentClose] = sentCloseFrameState.SENT;
                 }
               }
@@ -29796,16 +29796,16 @@ var require_websocket = __commonJS({
     function onParserDrain() {
       this.ws[kResponse].socket.resume();
     }
-    function onParserError(err3) {
+    function onParserError(err4) {
       let message;
       let code2;
-      if (err3 instanceof CloseEvent) {
-        message = err3.reason;
-        code2 = err3.code;
+      if (err4 instanceof CloseEvent) {
+        message = err4.reason;
+        code2 = err4.code;
       } else {
-        message = err3.message;
+        message = err4.message;
       }
-      fireEvent("error", this, () => new ErrorEvent("error", { error: err3, message }));
+      fireEvent("error", this, () => new ErrorEvent("error", { error: err4, message }));
       closeWebSocketConnection(this, code2);
     }
     module.exports = {
@@ -30642,11 +30642,11 @@ var require_undici = __commonJS({
     module.exports.fetch = async function fetch4(init, options = void 0) {
       try {
         return await fetchImpl(init, options);
-      } catch (err3) {
-        if (err3 && typeof err3 === "object") {
-          Error.captureStackTrace(err3);
+      } catch (err4) {
+        if (err4 && typeof err4 === "object") {
+          Error.captureStackTrace(err4);
         }
-        throw err3;
+        throw err4;
       }
     };
     module.exports.Headers = require_headers().Headers;
@@ -32480,8 +32480,8 @@ var init_chunk_XKVPKJPO = __esm({
     DOMException2 = (_a22 = globalThis.DOMException) != null ? _a22 : (() => {
       try {
         atob("~");
-      } catch (err3) {
-        return Object.getPrototypeOf(err3).constructor;
+      } catch (err4) {
+        return Object.getPrototypeOf(err4).constructor;
       }
     })();
     objectToString = Object.prototype.toString;
@@ -33692,11 +33692,22 @@ function applyClamped(balance, requested) {
 }
 var CLUE_SECONDS_DEFAULT = 20;
 var clueSecs = (t) => t.clueSeconds === 12 ? CLUE_SECONDS_DEFAULT : t.clueSeconds;
+function corridorPoints(low, high, answer, points) {
+  const width = Math.max(0, high - low);
+  const hit = low <= answer && answer <= high;
+  if (!hit) return { hit, width, points: 0 };
+  const r2 = width / Math.max(Math.abs(answer), 1);
+  return { hit, width, points: Math.round(points * Math.max(0.1, 1 - r2 / 2)) };
+}
+function twistPoints(points, elapsedMs, seconds) {
+  const f = Math.min(1, Math.max(0, elapsedMs / (seconds * 1e3)));
+  return Math.round(points * (1 - 0.5 * f));
+}
 
 // shared/validate.ts
-var MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "vote", "codebreak"];
+var MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "vote", "codebreak", "bluff", "corridor", "twist"];
 var FINAL_ONLY_MODES = ["vote"];
-var ACTIVE_MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link"];
+var ACTIVE_MODES = ["geo", "rank", "estimate", "glitch", "unique", "match", "link", "bluff", "corridor", "twist"];
 function taskMax(t) {
   if (t.practice) return 0;
   switch (t.mode) {
@@ -33710,6 +33721,8 @@ function taskMax(t) {
       return LINK_POINTS[0];
     case "vote":
       return t.points;
+    case "bluff":
+      return t.points + 2 * t.bluffPoints;
     default:
       return t.points;
   }
@@ -33798,6 +33811,12 @@ function normalizeTaskCore(raw) {
     }
     case "vote":
       return { mode: "vote", prompt: str(r2.prompt, 200), seconds: num(r2.seconds), points: num(r2.points), explain: str(r2.explain, 300), ...str(r2.candidate, 40) ? { candidate: str(r2.candidate, 40) } : {} };
+    case "bluff":
+      return { mode: "bluff", prompt: str(r2.prompt, 240), answer: str(r2.answer, 60), accept: strList(r2.accept, 8, 60), seconds: num(r2.seconds, 45), pickSeconds: num(r2.pickSeconds, 30), points: num(r2.points, 200), bluffPoints: num(r2.bluffPoints, 100), explain: str(r2.explain, 500) };
+    case "corridor":
+      return { mode: "corridor", prompt: str(r2.prompt, 240), unit: str(r2.unit, 30), answer: num(r2.answer), seconds: num(r2.seconds, 45), points: num(r2.points, 300), explain: str(r2.explain, 500) };
+    case "twist":
+      return { mode: "twist", prompt: str(r2.prompt, 200), twisted: str(r2.twisted, 200), answer: str(r2.answer, 80), accept: strList(r2.accept, 12, 80), seconds: num(r2.seconds, 40), points: num(r2.points, 300), explain: str(r2.explain, 500) };
     case "link":
       return {
         mode: "link",
@@ -33866,6 +33885,21 @@ function validateTask(t, sceneExists = () => true) {
     case "vote":
       if (!inRange(t.seconds, 10, 180)) e.push("Zeitlimit 10\u2013180 Sekunden");
       if (!inRange(t.points, 50, 1e3)) e.push("Punkte 50\u20131000");
+      break;
+    case "bluff":
+      if (!t.answer) e.push("Richtige Antwort fehlt");
+      if (!inRange(t.seconds, 10, 120) || !inRange(t.pickSeconds, 10, 90)) e.push("Zeiten: Schreiben 10\u2013120 s, Raten 10\u201390 s");
+      if (!inRange(t.bluffPoints, 0, 1e3)) e.push("Punkte f\xFCrs T\xE4uschen 0\u20131000");
+      break;
+    case "corridor":
+      if (!Number.isFinite(t.answer)) e.push("L\xF6sung (Zahl) fehlt");
+      if (!t.unit) e.push("Einheit fehlt (z. B. \u201EMeter\u201C)");
+      if (!inRange(t.seconds, 10, 180)) e.push("Zeitlimit 10\u2013180 Sekunden");
+      break;
+    case "twist":
+      if (!t.twisted) e.push("Der verdrehte Text fehlt");
+      if (!t.answer) e.push("Originalantwort fehlt");
+      if (!inRange(t.seconds, 10, 120)) e.push("Zeitlimit 10\u2013120 Sekunden");
       break;
     case "link":
       if (t.clues.length !== 4 || t.clues.some((c) => !c)) e.push("Genau vier Hinweise eintragen");
@@ -34054,6 +34088,12 @@ function taskSeconds(t, m = "expected") {
       return { play: t.seconds * a, reveal: rv2(40) };
     case "link":
       return { play: t.clues.length * clueSecs(t) * (m === "max" ? 1 : 0.8) + (m === "max" ? 40 : 15), reveal: rv2(45) };
+    case "bluff":
+      return { play: (t.seconds + t.pickSeconds) * a, reveal: rv2(60) };
+    case "corridor":
+      return { play: t.seconds * a, reveal: rv2(45) };
+    case "twist":
+      return { play: t.seconds * a, reveal: rv2(40) };
     case "unique":
       return { play: t.seconds * a + (m === "max" ? 60 : 30), reveal: rv2(50) };
   }
@@ -34705,7 +34745,7 @@ var ContentService = class _ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
-  static KEEP_PACKS = ["show-4z", "show-5", "show-3", "show-after"];
+  static KEEP_PACKS = ["show-4z", "show-5", "show-3", "show-after", "show-new"];
   static REFRESH_PACKS = ["show-4z", "show-5", "show-after"];
   static MAIN_PACK = "show-4z";
   seedShow(id) {
@@ -34739,7 +34779,8 @@ var ContentService = class _ContentService {
     const update = rows.filter((r2) => r2.needsUpdate).map((r2) => r2.id);
     const rename3 = rows.filter((r2) => r2.needsRename).map((r2) => r2.id);
     const missing = _ContentService.KEEP_PACKS.filter((id) => !packs.some((p) => p.id === id));
-    return { rows, archive, update, rename: rename3, missing, clean: !archive.length && !update.length && !rename3.length, main: _ContentService.MAIN_PACK };
+    const install = !this.seedStatus().installed;
+    return { rows, archive, update, rename: rename3, missing, install, clean: !archive.length && !update.length && !rename3.length && !install, main: _ContentService.MAIN_PACK };
   }
   static BACKUP_NAME = "Reus 65 Mio (Backup, alt)";
   /** Veröffentlicht den aktuellen Inhaltsstand (Fragen, Ablauf, Regeln) eines mitgelieferten Pakets als NEUE Version desselben Pakets. */
@@ -34765,6 +34806,7 @@ var ContentService = class _ContentService {
     const plan = this.cleanupPlan();
     const archived = [], updated = [], renamed = [];
     this.tx(() => {
+      if (plan.install) this.installSeed();
       for (const id of plan.archive) {
         this.setPackStatus(id, "archived");
         archived.push(id);
@@ -35048,6 +35090,205 @@ var AVATAR_LIMITS = {
   acc: 7,
   bg: 8
 };
+
+// shared/brand.ts
+var BRAND = { first: "JANI", second: "QUIZITION", tagline: "Die Quiz-Inquisition" };
+var BRAND_NAME = BRAND.first + BRAND.second;
+
+// server/newmodes.ts
+var err2 = (e) => ({ ok: false, err: e });
+var OK = { ok: true };
+var shuffle = (a) => {
+  const x3 = a.slice();
+  for (let i2 = x3.length - 1; i2 > 0; i2--) {
+    const j2 = Math.floor(Math.random() * (i2 + 1));
+    [x3[i2], x3[j2]] = [x3[j2], x3[i2]];
+  }
+  return x3;
+};
+var bluffOptions = (c) => c.round.m?.options ?? [];
+function buildBluffOptions(c) {
+  const t = c.task;
+  const byNorm = /* @__PURE__ */ new Map();
+  for (const p of c.players) {
+    const lie = c.round.pm[p.id]?.lie;
+    if (!lie) continue;
+    const k2 = normText(lie);
+    const o = byNorm.get(k2);
+    if (o) o.authors.push(p.id);
+    else byNorm.set(k2, { id: "", text: lie, truth: false, authors: [p.id] });
+  }
+  const all = shuffle([{ id: "", text: t.answer, truth: true, authors: [] }, ...byNorm.values()]);
+  all.forEach((o, i2) => {
+    o.id = "o" + (i2 + 1);
+  });
+  c.round.m = { ...c.round.m ?? {}, options: all };
+}
+var bluff = {
+  maxPoints: (t) => t.points + 2 * t.bluffPoints,
+  begin(c) {
+    c.round.m = {};
+    c.setStage("open", c.task.seconds);
+  },
+  advance(c) {
+    const t = c.task;
+    if (c.round.stage === "open") {
+      buildBluffOptions(c);
+      if (bluffOptions(c).length < 2) c.setStage("locked", null);
+      else c.setStage("bet", t.pickSeconds);
+    } else c.setStage("locked", null);
+  },
+  submit(c, pid, payload) {
+    const t = c.task;
+    const pm = c.round.pm[pid] ??= {};
+    if (c.round.stage === "open") {
+      const lie = String(payload?.lie ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+      if (!lie) return err2("invalid");
+      const n = normText(lie);
+      if ([t.answer, ...t.accept].some((a) => normText(a) === n)) return err2("is_truth");
+      if (pm.lie) return pm.lie === lie ? { ok: true, dup: true } : err2("already_submitted");
+      pm.lie = lie;
+      return OK;
+    }
+    if (c.round.stage === "bet") {
+      const opt = bluffOptions(c).find((o) => o.id === String(payload?.option ?? ""));
+      if (!opt) return err2("invalid_option");
+      if (opt.authors.includes(pid)) return err2("own_lie");
+      if (pm.pick) return pm.pick === opt.id ? { ok: true, dup: true } : err2("already_submitted");
+      pm.pick = opt.id;
+      return OK;
+    }
+    return err2("closed");
+  },
+  answered: (c, pid) => (c.round.stage === "bet" || c.round.stage === "locked" || c.round.stage === "reveal") && c.round.m?.options ? !!c.round.pm[pid]?.pick : !!c.round.pm[pid]?.lie,
+  complete(c) {
+    if (c.round.stage === "open") return c.players.length > 0 && c.players.every((p) => !!c.round.pm[p.id]?.lie);
+    if (c.round.stage === "bet") return c.players.every((p) => !!c.round.pm[p.id]?.pick);
+    return false;
+  },
+  score(c) {
+    const t = c.task;
+    const opts = bluffOptions(c);
+    const pickers = (id) => c.players.filter((p) => c.round.pm[p.id]?.pick === id).map((p) => p.id);
+    const entries = [];
+    const rows = c.players.map((p) => {
+      const pm = c.round.pm[p.id] ?? {};
+      const picked = opts.find((o) => o.id === pm.pick);
+      const correct = !!picked?.truth;
+      const fooled = opts.filter((o) => o.authors.includes(p.id)).reduce((n, o) => n + pickers(o.id).length, 0);
+      const pts = (correct ? t.points : 0) + fooled * t.bluffPoints;
+      if (correct) entries.push({ pid: p.id, delta: t.points, label: "Wahrheit erkannt" });
+      if (fooled) entries.push({ pid: p.id, delta: fooled * t.bluffPoints, label: `${fooled} Spieler get\xE4uscht` });
+      return { pid: p.id, lie: pm.lie ?? null, pick: pm.pick ?? null, correct, fooled, points: pts };
+    });
+    return { entries, reveal: {
+      answer: t.answer,
+      explain: t.explain,
+      points: t.points,
+      bluffPoints: t.bluffPoints,
+      rows,
+      options: opts.map((o) => ({ id: o.id, text: o.text, truth: o.truth, authors: o.authors, pickers: pickers(o.id) }))
+    } };
+  },
+  view(c, a) {
+    const t = c.task;
+    const st = c.round.stage;
+    const opts = bluffOptions(c);
+    const base = { prompt: t.prompt, points: t.points, bluffPoints: t.bluffPoints, writtenCount: c.players.filter((p) => !!c.round.pm[p.id]?.lie).length, pickedCount: c.players.filter((p) => !!c.round.pm[p.id]?.pick).length, playerCount: c.players.length };
+    if (opts.length) base.options = opts.map((o) => ({ id: o.id, text: o.text, ...a.role === "host" ? { truth: o.truth } : {} }));
+    if (a.role === "player" && a.pid) {
+      const pm = c.round.pm[a.pid] ?? {};
+      base.mine = { lie: pm.lie ?? null, pick: pm.pick ?? null };
+      base.ownOptions = opts.filter((o) => o.authors.includes(a.pid)).map((o) => o.id);
+    }
+    if (a.role === "host") {
+      base.solution = t.answer;
+      if (st === "open") base.live = c.players.filter((p) => c.round.pm[p.id]?.lie).map((p) => ({ pid: p.id, lie: c.round.pm[p.id].lie }));
+    }
+    return base;
+  }
+};
+var corridor = {
+  maxPoints: (t) => t.points,
+  begin(c) {
+    c.setStage("open", c.task.seconds);
+  },
+  advance(c) {
+    c.setStage("locked", null);
+  },
+  submit(c, pid, payload) {
+    if (c.round.stage !== "open") return err2("closed");
+    const low = parseNumber(payload?.low), high = parseNumber(payload?.high);
+    if (low === null || high === null || Math.abs(low) > 1e15 || Math.abs(high) > 1e15) return err2("invalid");
+    if (low > high) return err2("low_gt_high");
+    const cur = c.round.pm[pid];
+    if (cur) return cur.low === low && cur.high === high ? { ok: true, dup: true } : err2("already_submitted");
+    c.round.pm[pid] = { low, high };
+    return OK;
+  },
+  answered: (c, pid) => c.round.pm[pid]?.low !== void 0,
+  complete: (c) => c.round.stage === "open" && c.players.length > 0 && c.players.every((p) => c.round.pm[p.id]?.low !== void 0),
+  score(c) {
+    const t = c.task;
+    const rows = c.players.map((p) => {
+      const pm = c.round.pm[p.id];
+      if (!pm) return { pid: p.id, low: null, high: null, hit: false, width: null, points: 0 };
+      const r2 = corridorPoints(pm.low, pm.high, t.answer, t.points);
+      return { pid: p.id, low: pm.low, high: pm.high, hit: r2.hit, width: r2.width, points: r2.points };
+    });
+    return {
+      entries: rows.filter((r2) => r2.low !== null).map((r2) => ({ pid: r2.pid, delta: r2.points, label: r2.hit ? `Treffer im Korridor (Breite ${r2.width})` : "L\xF6sung nicht im Korridor" })),
+      reveal: { answer: t.answer, unit: t.unit, explain: t.explain, points: t.points, rows: rows.slice().sort((a, b2) => b2.points - a.points) }
+    };
+  },
+  view(c, a) {
+    const t = c.task;
+    const base = { prompt: t.prompt, unit: t.unit, points: t.points, answeredCount: c.players.filter((p) => c.round.pm[p.id]?.low !== void 0).length, playerCount: c.players.length };
+    if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid] ?? null;
+    if (a.role === "host") base.solution = `${t.answer} ${t.unit}`;
+    return base;
+  }
+};
+var twist = {
+  maxPoints: (t) => t.points,
+  begin(c) {
+    c.round.m = {};
+    c.setStage("open", c.task.seconds);
+  },
+  advance(c) {
+    c.setStage("locked", null);
+  },
+  submit(c, pid, payload) {
+    const t = c.task;
+    if (c.round.stage !== "open") return err2("closed");
+    const answer = String(payload?.answer ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
+    if (!answer) return err2("invalid");
+    const cur = c.round.pm[pid];
+    if (cur) return cur.answer === answer ? { ok: true, dup: true } : err2("already_submitted");
+    const ok = linkMatch(answer, t.answer, t.accept) !== "none";
+    c.round.pm[pid] = { answer, ok, ms: c.now - c.round.stageStartedAt };
+    return OK;
+  },
+  answered: (c, pid) => !!c.round.pm[pid]?.answer,
+  complete: (c) => c.round.stage === "open" && c.players.length > 0 && c.players.every((p) => !!c.round.pm[p.id]?.answer),
+  score(c) {
+    const t = c.task;
+    const rows = c.players.map((p) => {
+      const pm = c.round.pm[p.id];
+      const pts = pm?.ok ? twistPoints(t.points, pm.ms, t.seconds) : 0;
+      return { pid: p.id, answer: pm?.answer ?? null, correct: !!pm?.ok, points: pts };
+    });
+    return { entries: rows.filter((r2) => r2.answer).map((r2) => ({ pid: r2.pid, delta: r2.points, label: r2.correct ? "Original erkannt" : "falsch" })), reveal: { answer: t.answer, twisted: t.twisted, explain: t.explain, points: t.points, rows: rows.slice().sort((a, b2) => b2.points - a.points) } };
+  },
+  view(c, a) {
+    const t = c.task;
+    const base = { prompt: t.prompt, twisted: t.twisted, points: t.points, answeredCount: c.players.filter((p) => !!c.round.pm[p.id]?.answer).length, playerCount: c.players.length };
+    if (a.role === "player" && a.pid) base.mine = c.round.pm[a.pid] ? { answer: c.round.pm[a.pid].answer } : null;
+    if (a.role === "host") base.solution = t.answer;
+    return base;
+  }
+};
+var NEW_MODES = { bluff, corridor, twist };
 
 // shared/scenes.ts
 function bbox(it) {
@@ -35437,8 +35678,8 @@ reg((() => {
 })());
 
 // server/modes.ts
-var err2 = (e) => ({ ok: false, err: e });
-var OK = { ok: true };
+var err3 = (e) => ({ ok: false, err: e });
+var OK2 = { ok: true };
 var sameJson = (a, b2) => JSON.stringify(a) === JSON.stringify(b2);
 var nm = (c, pid) => c.players.find((p) => p.id === pid)?.name ?? "?";
 var balanceOf = (c, pid) => c.room.players.find((p) => p.id === pid)?.score ?? 0;
@@ -35453,14 +35694,14 @@ var geo = {
     c.setStage("locked", null);
   },
   submit(c, pid, payload) {
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const lat = Number(payload?.lat), lon = Number(payload?.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return err2("invalid");
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return err3("invalid");
     const cur = c.round.pm[pid];
     const val = { lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5 };
-    if (cur) return sameJson(cur, val) ? { ok: true, dup: true } : err2("already_submitted");
+    if (cur) return sameJson(cur, val) ? { ok: true, dup: true } : err3("already_submitted");
     c.round.pm[pid] = val;
-    return OK;
+    return OK2;
   },
   answered: (c, pid) => !!c.round.pm[pid],
   score(c) {
@@ -35518,29 +35759,29 @@ var rank = {
   submit(c, pid, payload) {
     const t = c.task;
     if (c.round.m.sort) {
-      if (c.round.stage !== "open") return err2("closed");
+      if (c.round.stage !== "open") return err3("closed");
       const ord = payload?.order;
-      if (!Array.isArray(ord) || ord.length !== t.items.length) return err2("invalid");
+      if (!Array.isArray(ord) || ord.length !== t.items.length) return err3("invalid");
       const nums = ord.map(Number);
-      if (nums.some((x3) => !Number.isInteger(x3) || x3 < 0 || x3 >= t.items.length) || new Set(nums).size !== t.items.length) return err2("invalid");
+      if (nums.some((x3) => !Number.isInteger(x3) || x3 < 0 || x3 >= t.items.length) || new Set(nums).size !== t.items.length) return err3("invalid");
       const cur = c.round.pm[pid];
-      if (cur) return sameJson(cur.slots, nums) ? { ok: true, dup: true } : err2("already_submitted");
+      if (cur) return sameJson(cur.slots, nums) ? { ok: true, dup: true } : err3("already_submitted");
       c.round.pm[pid] = { slots: nums };
-      return OK;
+      return OK2;
     }
     const step = Number(payload?.step), slot = Number(payload?.slot);
-    if (!Number.isInteger(step) || !Number.isInteger(slot) || slot < 0 || slot >= t.items.length) return err2("invalid");
+    if (!Number.isInteger(step) || !Number.isInteger(slot) || slot < 0 || slot >= t.items.length) return err3("invalid");
     const pm = c.round.pm[pid] ??= { slots: new Array(t.items.length).fill(-1) };
     const item = t.order[step];
     if (step < c.round.m.step || c.round.stage !== "open") {
       if (step <= c.round.m.step && pm.slots[slot] === item) return { ok: true, dup: true };
-      return err2("closed");
+      return err3("closed");
     }
-    if (step !== c.round.m.step) return err2("wrong_step");
-    if (pm.slots.includes(item)) return pm.slots[slot] === item ? { ok: true, dup: true } : err2("already_submitted");
-    if (pm.slots[slot] !== -1) return err2("slot_taken");
+    if (step !== c.round.m.step) return err3("wrong_step");
+    if (pm.slots.includes(item)) return pm.slots[slot] === item ? { ok: true, dup: true } : err3("already_submitted");
+    if (pm.slots[slot] !== -1) return err3("slot_taken");
     pm.slots[slot] = item;
-    return OK;
+    return OK2;
   },
   answered(c, pid) {
     const t = c.task;
@@ -35617,25 +35858,25 @@ var estimate = {
     const pm = c.round.pm[pid] ??= {};
     if (c.round.stage === "open") {
       const v2 = parseNumber(payload?.value);
-      if (v2 === null || Math.abs(v2) > 1e15) return err2("invalid");
-      if (pm.guess !== void 0) return pm.guess === v2 ? { ok: true, dup: true } : err2("already_submitted");
+      if (v2 === null || Math.abs(v2) > 1e15) return err3("invalid");
+      if (pm.guess !== void 0) return pm.guess === v2 ? { ok: true, dup: true } : err3("already_submitted");
       pm.guess = v2;
-      return OK;
+      return OK2;
     }
     if (c.round.stage === "bet") {
       const amount = Number(payload?.amount);
       const target = String(payload?.target ?? "");
-      if (!Number.isInteger(amount) || amount < 0) return err2("invalid_bet");
+      if (!Number.isInteger(amount) || amount < 0) return err3("invalid_bet");
       if (amount > 0) {
-        if (amount > maxBetOf(balanceOf(c, pid))) return err2("not_enough_points");
-        if (c.round.pm[target]?.guess === void 0) return err2("invalid_target");
+        if (amount > maxBetOf(balanceOf(c, pid))) return err3("not_enough_points");
+        if (c.round.pm[target]?.guess === void 0) return err3("invalid_target");
       }
       const val = { amount, target: amount > 0 ? target : null };
-      if (pm.bet) return sameJson(pm.bet, val) ? { ok: true, dup: true } : err2("already_submitted");
+      if (pm.bet) return sameJson(pm.bet, val) ? { ok: true, dup: true } : err3("already_submitted");
       pm.bet = val;
-      return OK;
+      return OK2;
     }
-    return err2("closed");
+    return err3("closed");
   },
   answered(c, pid) {
     const pm = c.round.pm[pid];
@@ -35718,14 +35959,14 @@ var glitch = {
     else c.setStage("locked", null);
   },
   submit(c, pid, payload) {
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const x3 = Number(payload?.x), y2 = Number(payload?.y);
-    if (!Number.isFinite(x3) || !Number.isFinite(y2) || x3 < 0 || x3 > 1e3 || y2 < 0 || y2 > 600) return err2("invalid");
+    if (!Number.isFinite(x3) || !Number.isFinite(y2) || x3 < 0 || x3 > 1e3 || y2 < 0 || y2 > 600) return err3("invalid");
     const val = { x: Math.round(x3), y: Math.round(y2) };
     const cur = c.round.pm[pid];
-    if (cur) return sameJson(cur, val) ? { ok: true, dup: true } : err2("already_submitted");
+    if (cur) return sameJson(cur, val) ? { ok: true, dup: true } : err3("already_submitted");
     c.round.pm[pid] = val;
-    return OK;
+    return OK2;
   },
   answered: (c, pid) => !!c.round.pm[pid],
   complete(c) {
@@ -35777,13 +36018,13 @@ var code = {
   },
   submit(c, pid, payload) {
     const t = c.task;
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const answer = String(payload?.answer ?? "").trim().slice(0, 80);
-    if (!answer) return err2("invalid");
+    if (!answer) return err3("invalid");
     const pm = c.round.pm[pid] ??= { hints: 0, attempts: 0, solved: false, wrong: [] };
     if (pm.solved) return { ok: true, dup: true };
     if (pm.wrong.includes(answer)) return { ok: true, dup: true, info: { correct: false, left: MAX_ATTEMPTS - pm.attempts } };
-    if (pm.attempts >= MAX_ATTEMPTS) return err2("no_attempts_left");
+    if (pm.attempts >= MAX_ATTEMPTS) return err3("no_attempts_left");
     if (codeMatches(answer, t.answers)) {
       pm.solved = true;
       pm.answer = answer;
@@ -35795,10 +36036,10 @@ var code = {
   },
   hint(c, pid) {
     const t = c.task;
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const pm = c.round.pm[pid] ??= { hints: 0, attempts: 0, solved: false, wrong: [] };
-    if (pm.solved) return err2("already_solved");
-    if (pm.hints >= Math.min(3, t.hints.length)) return err2("no_more_hints");
+    if (pm.solved) return err3("already_solved");
+    if (pm.hints >= Math.min(3, t.hints.length)) return err3("no_more_hints");
     pm.hints++;
     return { ok: true, info: { hints: pm.hints } };
   },
@@ -35846,13 +36087,13 @@ var unique = {
     else c.setStage("locked", null);
   },
   submit(c, pid, payload) {
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const answer = String(payload?.answer ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
-    if (!answer) return err2("invalid");
+    if (!answer) return err3("invalid");
     const cur = c.round.pm[pid];
-    if (cur) return cur.answer === answer ? { ok: true, dup: true } : err2("already_submitted");
+    if (cur) return cur.answer === answer ? { ok: true, dup: true } : err3("already_submitted");
     c.round.pm[pid] = { answer };
-    return OK;
+    return OK2;
   },
   answered: (c, pid) => !!c.round.pm[pid]?.answer,
   complete(c) {
@@ -35897,16 +36138,16 @@ var match = {
     c.setStage("locked", null);
   },
   submit(c, pid, payload) {
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const pairs = payload?.pairs;
-    if (!validMatching(pairs)) return err2("invalid");
+    if (!validMatching(pairs)) return err3("invalid");
     const fin = payload?.final === true;
     const pm = c.round.pm[pid] ??= { pairs: blankPairs(), final: false };
-    if (pm.final) return fin && sameJson(pm.pairs, pairs) ? { ok: true, dup: true } : err2("already_submitted");
+    if (pm.final) return fin && sameJson(pm.pairs, pairs) ? { ok: true, dup: true } : err3("already_submitted");
     if (!fin && sameJson(pm.pairs, pairs)) return { ok: true, dup: true };
     pm.pairs = pairs.slice();
     if (fin) pm.final = true;
-    return OK;
+    return OK2;
   },
   answered: (c, pid) => !!c.round.pm[pid]?.final,
   complete(c) {
@@ -35990,15 +36231,15 @@ var link = {
     c.setStage(needs ? "review" : "locked", null);
   },
   submit(c, pid, payload) {
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const lvl = linkLevel(c);
-    if (lvl === null) return err2("closed");
+    if (lvl === null) return err3("closed");
     const answer = String(payload?.answer ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
-    if (!normText(answer)) return err2("invalid");
+    if (!normText(answer)) return err3("invalid");
     const cur = c.round.pm[pid];
-    if (cur) return cur.answer === answer ? { ok: true, dup: true } : err2("already_submitted");
+    if (cur) return cur.answer === answer ? { ok: true, dup: true } : err3("already_submitted");
     c.round.pm[pid] = { answer, level: lvl, at: c.now };
-    return OK;
+    return OK2;
   },
   answered: (c, pid) => !!c.round.pm[pid]?.answer,
   complete(c) {
@@ -36054,13 +36295,13 @@ var vote = {
     c.setStage("locked", null);
   },
   submit(c, pid, payload) {
-    if (c.round.stage !== "open") return err2("closed");
+    if (c.round.stage !== "open") return err3("closed");
     const target = String(payload?.target ?? "");
-    if (!validTarget(c, target)) return err2("invalid_target");
+    if (!validTarget(c, target)) return err3("invalid_target");
     const cur = c.round.pm[pid];
-    if (cur) return cur.target === target ? { ok: true, dup: true } : err2("already_submitted");
+    if (cur) return cur.target === target ? { ok: true, dup: true } : err3("already_submitted");
     c.round.pm[pid] = { target };
-    return OK;
+    return OK2;
   },
   answered: (c, pid) => !!c.round.pm[pid]?.target,
   complete(c) {
@@ -36099,7 +36340,7 @@ var vote = {
     return base;
   }
 };
-var MODES2 = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote };
+var MODES2 = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote, ...NEW_MODES };
 
 // server/engine.ts
 var ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -36278,29 +36519,29 @@ var Engine = class _Engine {
     return t && room.round ? t.tasks[room.round.taskIndex] ?? null : null;
   }
   ctx(room, now) {
-    const round = room.round, task = this.curTask(room);
-    if (!round || !task) return null;
+    const round2 = room.round, task = this.curTask(room);
+    if (!round2 || !task) return null;
     return {
       room,
-      round,
+      round: round2,
       task,
       now,
       players: this.active(room),
       scenes: this.bk(room).scenes ?? SCENES,
       rules: this.bk(room).rules,
       setStage: (stage, seconds) => {
-        round.stage = stage;
-        round.stageStartedAt = now;
-        round.stageSeconds = seconds;
+        round2.stage = stage;
+        round2.stageStartedAt = now;
+        round2.stageSeconds = seconds;
         if (seconds == null) {
-          round.deadline = null;
-          round.pausedLeft = null;
+          round2.deadline = null;
+          round2.pausedLeft = null;
         } else if (room.frozen) {
-          round.deadline = null;
-          round.pausedLeft = seconds * 1e3;
+          round2.deadline = null;
+          round2.pausedLeft = seconds * 1e3;
         } else {
-          round.deadline = now + seconds * 1e3;
-          round.pausedLeft = null;
+          round2.deadline = now + seconds * 1e3;
+          round2.pausedLeft = null;
         }
       }
     };
@@ -36833,7 +37074,7 @@ var Engine = class _Engine {
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === "show" ? room.plan.filter((x3) => x3.startsWith("tile:")).length : room.plan.filter((s) => s === "wall").length + 2 },
         flow: room.flow ?? "classic",
         boardName: this.boardName(room),
-        brand: { title: this.bk(room).rules?.showTitle || "OUTPLAY", winner: this.bk(room).rules?.winnerTitle || "OUTPLAY-Champion", tagline: this.bk(room).rules?.tagline || void 0, winnerLine: this.bk(room).rules?.winnerLine || void 0 },
+        brand: { title: this.bk(room).rules?.showTitle || BRAND_NAME, winner: this.bk(room).rules?.winnerTitle || BRAND_NAME + "-Champion", tagline: this.bk(room).rules?.tagline || void 0, winnerLine: this.bk(room).rules?.winnerLine || void 0 },
         liveRank: room.liveRank ?? true,
         music: room.music ?? { on: false, vol: 25 },
         ...room.flow === "show" ? { agenda: this.agenda(room) } : {}
@@ -37037,6 +37278,9 @@ var FORMULAS = {
   match: "50 Punkte je richtig verbundenem Paar, h\xF6chstens 300. Keine Minuspunkte, kein Zeitbonus \u2013 nur die Richtigkeit z\xE4hlt. Die Zuordnung z\xE4hlt, wie sie bei Ablauf der Zeit (oder bei der endg\xFCltigen Abgabe) steht.",
   link: "Eine endg\xFCltige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.",
   vote: "KICKBASE-KONSENS: Jeder w\xE4hlt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte \u2013 bei Gleichstand alle h\xE4ufigsten Wahlen. Man darf auch sich selbst w\xE4hlen.",
+  bluff: "Richtige Antwort erkannt = Punkte (z. B. 200); f\xFCr jeden Mitspieler, der auf deine erfundene Antwort hereinf\xE4llt, gibt es T\xE4uschungspunkte (z. B. 100). Gleiche L\xFCgen werden zusammengefasst. Die eigene L\xFCge ist nicht w\xE4hlbar. Keine Minuspunkte.",
+  corridor: "Nur Treffer z\xE4hlen (L\xF6sung liegt im Korridor): Punkte = Maximalpunkte \xD7 (1 \u2212 Breite \xF7 (2 \xD7 |L\xF6sung|)), mindestens 10 %. Schmal = viel, sehr breit = wenig, daneben = 0. Keine Minuspunkte.",
+  twist: "Richtiges Original = Punkte; Schnelligkeit z\xE4hlt: sofort 100 %, kurz vor Ablauf 50 %. Falsch = 0, ein Versuch. Tippfehler werden bei l\xE4ngeren Begriffen toleriert.",
   unique: "Nur eine g\xFCltige, einmalige Antwort bringt Punkte. Mehrfach genannte g\xFCltige Antworten und ung\xFCltige Antworten = 0. Bei \u201Evollst\xE4ndiger Antwortliste\u201C wird Unbekanntes automatisch ung\xFCltig, sonst pr\xFCft der Showmaster."
 };
 function buildPreview(rawTask, scenes, meta = {}) {
@@ -37157,6 +37401,43 @@ function buildPreview(rawTask, scenes, meta = {}) {
       P3(0, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map(posOf), final: true } });
       P3(1, { k: "submit", payload: { pairs: [0, 1, 2, 3, 4, 5].map((i2, k2) => k2 < 3 ? posOf(i2) : posOf((i2 + 1) % 6)), final: true } });
       P3(2, { k: "submit", payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
+      snap("Antworten abgegeben");
+      H3({ k: "h.lock" });
+      snap("Gesperrt");
+      break;
+    }
+    case "bluff": {
+      snap("L\xFCgen schreiben");
+      P3(0, { k: "submit", payload: { lie: "Eine erfundene Antwort von Anna" } });
+      P3(1, { k: "submit", payload: { lie: "Eine andere Erfindung von Ben" } });
+      P3(2, { k: "submit", payload: { lie: "Cems Bluff" } });
+      P3(3, { k: "submit", payload: { lie: "Danas Bluff" } });
+      H3({ k: "h.lock" });
+      snap("Wahrheit suchen");
+      const opts = eng.buildView(room, { role: "host" }, now).round?.data.options ?? [];
+      const truth = opts.find((o) => o.truth), lie = opts.find((o) => !o.truth);
+      P3(0, { k: "submit", payload: { option: truth.id } });
+      P3(1, { k: "submit", payload: { option: lie.id } });
+      P3(2, { k: "submit", payload: { option: truth.id } });
+      snap("Wahl abgegeben");
+      H3({ k: "h.lock" });
+      snap("Gesperrt");
+      break;
+    }
+    case "corridor": {
+      snap("Aufgabe l\xE4uft");
+      P3(0, { k: "submit", payload: { low: t.answer * 0.9, high: t.answer * 1.1 } });
+      P3(1, { k: "submit", payload: { low: t.answer * 0.2, high: t.answer * 3 } });
+      P3(2, { k: "submit", payload: { low: t.answer * 1.5, high: t.answer * 2 } });
+      snap("Korridore abgegeben");
+      H3({ k: "h.lock" });
+      snap("Gesperrt");
+      break;
+    }
+    case "twist": {
+      snap("Aufgabe l\xE4uft");
+      P3(0, { k: "submit", payload: { answer: t.answer } });
+      P3(1, { k: "submit", payload: { answer: "Irgendwas Falsches" } });
       snap("Antworten abgegeben");
       H3({ k: "h.lock" });
       snap("Gesperrt");
@@ -39459,9 +39740,40 @@ var SEED_SHOW_AFTER = {
   steps: AFTERSHOW_STEPS
 };
 
+// content/newgames.ts
+var bluff2 = (id, prompt, answer, accept, explain) => ({ id, topic: "L\xFCgen & Wahrheit", task: { mode: "bluff", prompt, answer, accept, seconds: 45, pickSeconds: 30, points: 200, bluffPoints: 100, explain } });
+var corridor2 = (id, prompt, unit, answer, explain) => ({ id, topic: "Sch\xE4tzen", task: { mode: "corridor", prompt, unit, answer, seconds: 45, points: 300, explain } });
+var twist2 = (id, twisted, answer, accept, explain) => ({ id, topic: "Filmtitel", task: { mode: "twist", prompt: "Welcher bekannte Filmtitel wurde hier ins Gegenteil verdreht?", twisted, answer, accept, seconds: 40, points: 300, explain } });
+var NEWGAMES_POOL = [
+  bluff2("ng-bluff-1", "Wie nennt man das @-Zeichen im Italienischen umgangssprachlich?", "Schnecke", ["chiocciola", "Die Schnecke"], "Im Italienischen hei\xDFt das @ \u201Echiocciola\u201C \u2013 die Schnecke."),
+  bluff2("ng-bluff-2", "Welches Land hat als einziges der Welt eine Nationalflagge, die weder ein Rechteck noch ein Quadrat ist?", "Nepal", [], "Die Flagge Nepals besteht aus zwei \xFCbereinanderliegenden Dreiecken."),
+  bluff2("ng-bluff-3", "Wie viele Herzen hat ein Oktopus?", "Drei", ["3"], "Zwei Kiemenherzen und ein K\xF6rperherz \u2013 zusammen drei."),
+  corridor2("ng-corr-1", "Wie hoch ist der Mount Everest laut offizieller Vermessung (Gipfelh\xF6he \xFCber dem Meeresspiegel)?", "Meter", 8849, "Die offizielle H\xF6he wurde 2020 mit 8.848,86 m festgelegt."),
+  corridor2("ng-corr-2", "Wie lang ist der Rhein vom Ursprung bis zur M\xFCndung?", "Kilometer", 1233, "Der Rhein ist rund 1.233 Kilometer lang."),
+  corridor2("ng-corr-3", "Wie hoch ist das Burj Khalifa in Dubai, das h\xF6chste Geb\xE4ude der Welt?", "Meter", 828, "Das Burj Khalifa ist 828 Meter hoch."),
+  twist2("ng-twist-1", "Langsame und Neugierige", "Fast & Furious", ["Fast and Furious", "The Fast and the Furious", "Fast Furious", "Fast & Furious"], "Verdreht: schnell \u2192 langsam, w\xFCtend \u2192 neugierig."),
+  twist2("ng-twist-2", "H\xE4sslicher Mann", "Pretty Woman", [], "Verdreht: h\xFCbsch \u2192 h\xE4sslich, Frau \u2192 Mann."),
+  twist2("ng-twist-3", "Lebe schnell", "Stirb langsam", ["Die Hard"], "Verdreht: stirb \u2192 lebe, langsam \u2192 schnell."),
+  twist2("ng-twist-4", "Vorw\xE4rts in die Vergangenheit", "Zur\xFCck in die Zukunft", ["Back to the Future"], "Verdreht: zur\xFCck \u2192 vorw\xE4rts, Zukunft \u2192 Vergangenheit."),
+  twist2("ng-twist-5", "Das Gebr\xFCll der W\xF6lfe", "Das Schweigen der L\xE4mmer", ["Schweigen der L\xE4mmer", "The Silence of the Lambs"], "Verdreht: Schweigen \u2192 Gebr\xFCll, L\xE4mmer \u2192 W\xF6lfe.")
+];
+var round = (id, title, icon, color, blurb, taskIds) => ({ id, title, topic: title, icon, color, kind: "tile", football: false, blurb, taskIds });
+var NEWGAMES_ROUNDS = [
+  round("ng-r1", "L\xDCGEN HABEN KURZE BEINE", "\u{1F608}", COLORS.PK, "Erfinde glaubw\xFCrdige falsche Antworten und finde die echte. Wer auf deine L\xFCge hereinf\xE4llt, bringt dir Punkte.", ["ng-bluff-1", "ng-bluff-2", "ng-bluff-3"]),
+  round("ng-r2", "SCH\xC4TZKORRIDOR", "\u2194\uFE0F", COLORS.TE, "Gib einen Bereich an, in dem die L\xF6sung liegt \u2013 je enger, desto mehr Punkte. Daneben gibt es 0.", ["ng-corr-1", "ng-corr-2", "ng-corr-3"]),
+  round("ng-r3", "VERDREHTE WELT", "\u{1F504}", COLORS.PU, "Bekannte Filmtitel wurden ins Gegenteil verdreht. Tippe das Original \u2013 je schneller, desto mehr Punkte.", ["ng-twist-1", "ng-twist-2", "ng-twist-3", "ng-twist-4", "ng-twist-5"])
+];
+var STEPS2 = [{ k: "round", cat: "ng-r1" }, { k: "board" }, { k: "round", cat: "ng-r2" }, { k: "board" }, { k: "round", cat: "ng-r3" }, { k: "board" }, { k: "final", cat: "b44-final-kk" }];
+var SEED_SHOW_NEWGAMES = {
+  pack: { id: "show-new", name: "Neue Spiele \u2013 Testlabor", description: "Zum Ausprobieren: L\xDCGEN HABEN KURZE BEINE, SCH\xC4TZKORRIDOR und VERDREHTE WELT, dann KICKBASE-KONSENS. Beispielfragen \u2013 im Admin frei erweiterbar.", rules: { ...SEED_SHOW_B44K.pack.rules, tasksPerMode: 6 } },
+  pool: NEWGAMES_POOL,
+  rounds: NEWGAMES_ROUNDS,
+  steps: STEPS2
+};
+
 // content/index.ts
 var SEED_SHOW = { pack: SHOW_PACK, pool: POOL, rounds: SHOW_ROUNDS, steps: SHOW_STEPS };
-var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K, SEED_SHOW_AFTER];
+var EXTRA_SHOWS = [SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, SEED_SHOW_B42, SEED_SHOW_B42K, SEED_SHOW_B44, SEED_SHOW_B44K, SEED_SHOW_AFTER, SEED_SHOW_NEWGAMES];
 
 // server/vercel.ts
 var ConflictError = class extends Error {

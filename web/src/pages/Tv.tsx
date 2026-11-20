@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { BRAND_NAME } from '../../../shared/brand';
+import { Brand } from '../ui/Brand';
 import { useGame } from '../net';
 import { Avatar } from '../ui/Avatar';
 import { AnswerRow, Countdown, Leaderboard, QR, useBaseUrl } from '../ui/widgets';
@@ -11,7 +13,7 @@ import { estimateNetLine } from '../../../shared/util';
 /** Sichtbarer Modusname: SORTIER’S! (Karten sortieren); nur die klassische Nacheinander-Variante heißt weiter BLIND RANK. */
 export const modeName = (r: { mode: string; data?: any }) => (r.mode === 'rank' && r.data?.variant === 'sequence' ? 'BLIND RANK' : MODE_NAME[r.mode]);
 export const MODE_NAME: Record<string, string> = {
-  geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S!', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', vote: 'KICKBASE-KONSENS',
+  geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S!', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', bluff: 'LÜGEN HABEN KURZE BEINE', corridor: 'SCHÄTZKORRIDOR', twist: 'VERDREHTE WELT', vote: 'KICKBASE-KONSENS',
 };
 const MODE_RULES: Record<string, string[]> = {
   geo: ['Setze auf deinem Handy einen Pin auf die Karte.', 'Du kannst ihn bis zum Absenden verschieben.', 'Je näher dein Pin, desto mehr Punkte – egal, wie die anderen tippen.'],
@@ -22,6 +24,9 @@ const MODE_RULES: Record<string, string[]> = {
   unique: ['Nenne eine gültige Antwort.', 'Nur eine Antwort, die kein anderer nennt, bringt Punkte.', 'Doppelte und ungültige Antworten zählen 0.'],
   match: ['Sechs Begriffe links, sechs Partner rechts.', 'Verbinde auf dem Handy, was zusammengehört.', '50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.'],
   vote: ['Fünf Fragen – wähle geheim eine Person – auch dich selbst.', 'Meiste Stimmen = Konsens: Wer richtig tippt, bekommt +100.', 'Maximal 500 Punkte · keine Minuspunkte · Einzelstimmen zählen nicht.'],
+  bluff: ['Erfinde eine glaubwürdige falsche Antwort.', 'Dann suchst du die echte unter allen Antworten.', 'Echte erkannt = Punkte · wer auf deine Lüge hereinfällt, bringt dir Punkte.'],
+  corridor: ['Gib einen Bereich an, in dem die Lösung liegt.', 'Je enger der Bereich, desto mehr Punkte.', 'Liegt die Lösung daneben: 0 Punkte.'],
+  twist: ['Ein bekannter Titel wurde ins Gegenteil verdreht.', 'Tippe das Original auf dem Handy ein.', 'Je schneller richtig, desto mehr Punkte – nur ein Versuch.'],
   link: ['Vier Hinweise erscheinen nacheinander.', 'Je früher du die Lösung nennst, desto mehr Punkte.', 'Nur ein Versuch – die Antwort bleibt geheim.'],
 };
 
@@ -39,8 +44,8 @@ export function Tv({ code }: { code: string }) {
   return (
     <div className={`tv ${view?.room.reduced ? 'reduced' : ''}`} ref={rootRef}>
       <div className="tvbg" />
-      {!started && <div className="startgate" onClick={start}><div className="logo huge">OUT<span>PLAY</span></div><button className="btn primary huge">▶ Bildschirm starten</button><p>Einmal klicken: aktiviert Ton &amp; Vollbild</p></div>}
-      {!view ? <div className="tvcenter"><div className="logo huge">OUT<span>PLAY</span></div><p className="pulse">{conn === 'denied' ? 'Raum nicht gefunden' : 'Verbinde …'}</p></div> : <Screen view={view} serverNow={serverNow} code={code} />}
+      {!started && <div className="startgate" onClick={start}><div className="logo huge"><Brand /></div><button className="btn primary huge">▶ Bildschirm starten</button><p>Einmal klicken: aktiviert Ton &amp; Vollbild</p></div>}
+      {!view ? <div className="tvcenter"><div className="logo huge"><Brand /></div><p className="pulse">{conn === 'denied' ? 'Raum nicht gefunden' : 'Verbinde …'}</p></div> : <Screen view={view} serverNow={serverNow} code={code} />}
       {conn !== 'online' && view && <div className="tvconn">Verbinde neu …</div>}
       {view?.room.showPaused && <div className="pauseveil"><div>⏸ SHOW PAUSIERT</div></div>}
     </div>
@@ -78,7 +83,7 @@ function Screen({ view, serverNow, code }: { view: View; serverNow: () => number
 }
 
 export function Header({ view, right }: { view: View; right?: React.ReactNode }) {
-  return <div className="tvhead"><div className="logo tiny">OUT<span>PLAY</span></div><div className="act">{view.room.act}</div><div className="right">{right}</div></div>;
+  return <div className="tvhead"><div className="logo tiny"><Brand /></div><div className="act">{view.room.act}</div><div className="right">{right}</div></div>;
 }
 
 // ---------------------------------------------------------------- Lobby
@@ -89,7 +94,7 @@ function LobbyTv({ view, code }: { view: View; code: string }) {
   return (
     <div className="lobbytv">
       <div className="left">
-        <div className="logo huge">OUT<span>PLAY</span></div>
+        <div className="logo huge"><Brand /></div>
         <div className="tagline">Die interaktive Gameshow</div>
         <div className="players">
           {view.players.length === 0 && <p className="pulse waiting">Warte auf Kandidaten …</p>}
@@ -117,7 +122,7 @@ function LobbyTv({ view, code }: { view: View; code: string }) {
 function IntroTv({ view }: { view: View }) {
   return (
     <div className="introtv calm">
-      <div className="showtitle">{view.room.brand?.title ?? 'OUTPLAY'}</div>
+      <div className="showtitle">{view.room.brand?.title ?? BRAND_NAME}</div>
       {view.room.brand?.tagline && <div className="tagline2">{view.room.brand.tagline}</div>}
       <h1 className="introtitle">Heute im Studio</h1>
       <div className="introgrid">
@@ -188,6 +193,9 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
           round.mode === 'match' ? <MatchTv view={view} round={round} /> :
           round.mode === 'link' ? <LinkTv view={view} round={round} /> :
           round.mode === 'vote' ? <VoteTv view={view} round={round} /> :
+          round.mode === 'bluff' ? <BluffTv view={view} round={round} /> :
+          round.mode === 'corridor' ? <CorridorTv view={view} round={round} /> :
+          round.mode === 'twist' ? <TwistTv view={view} round={round} /> :
           <UniqueTv view={view} round={round} />}
       </div>
     </div>
@@ -471,6 +479,66 @@ function VoteTv({ view, round }: { view: View; round: RoundView }) {
       <Explain text={rev.explain} />
     </div>
   );
+}
+
+// ---- LÜGEN HABEN KURZE BEINE
+function BluffTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal;
+  if (rev) return (
+    <div className="bluffTv reveal"><div className="bigq small">{d.prompt}</div>
+      <div className="bluffopts">{rev.options.map((o: any, i: number) => (
+        <div key={o.id} className={`bopt ${o.truth ? 'truth' : ''}`} style={{ animationDelay: `${0.3 + i * 0.5}s` }}>
+          <b className="bl">{String.fromCharCode(65 + i)}</b><span className="bt">{o.text}{o.truth ? ' ✅ DIE WAHRHEIT' : ''}</span>
+          <span className="bwho">{o.truth ? 'gewählt von ' : o.authors.length ? `erfunden von ${o.authors.map((a: string) => pl(view, a)?.name).join(', ')} · gewählt von ` : 'gewählt von '}{o.pickers.length ? o.pickers.map((a: string) => pl(view, a)?.name).join(', ') : 'niemandem'}</span>
+        </div>))}</div>
+      <p className="rankhow">Wahrheit erkannt: <b>+{rev.points}</b> · pro Hereingefallenem auf deine Lüge: <b>+{rev.bluffPoints}</b></p>
+      <Explain text={rev.explain} />
+    </div>);
+  return (
+    <div className="bluffTv"><div className="bigq">{d.prompt}</div>
+      {round.stage === 'open' && <p className="hint big">✍️ Alle erfinden jetzt eine glaubwürdige falsche Antwort … {d.writtenCount} von {d.playerCount} fertig.</p>}
+      {round.stage === 'bet' && d.options && <>
+        <div className="bluffopts">{d.options.map((o: any, i: number) => <div key={o.id} className="bopt"><b className="bl">{String.fromCharCode(65 + i)}</b><span className="bt">{o.text}</span></div>)}</div>
+        <p className="hint big">🔍 Welche Antwort ist die echte? {d.pickedCount} von {d.playerCount} haben gewählt.</p></>}
+      {round.stage !== 'open' && round.stage !== 'bet' && <p className="hint big">Alle Stimmen sind drin!</p>}
+      <AnswerRow players={view.players} />
+    </div>);
+}
+
+// ---- SCHÄTZKORRIDOR
+function CorridorTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal;
+  if (!rev) return <div className="corrTv"><div className="bigq">{d.prompt}</div><p className="hint big">Gib einen Bereich in {d.unit} an – {d.answeredCount} von {d.playerCount} haben abgegeben.</p><AnswerRow players={view.players} /></div>;
+  const rows = rev.rows.filter((r: any) => r.low !== null);
+  const vals = [rev.answer, ...rows.flatMap((r: any) => [r.low, r.high])]; const mn = Math.min(...vals), mx = Math.max(...vals), span = Math.max(mx - mn, 1e-9);
+  const pos = (v: number) => `${4 + ((v - mn) / span) * 92}%`;
+  return (
+    <div className="corrTv reveal"><div className="bigq small">{d.prompt}</div>
+      <div className="corraxis">
+        <div className="corrans" style={{ left: `calc(16vw + 10px + (100% - 22vw - 20px) * ${(0.04 + 0.92 * ((rev.answer - mn) / span)).toFixed(4)})` }}><span>{rev.answer.toLocaleString('de-DE')} {rev.unit}</span></div>
+        {rows.map((r: any, i: number) => { const p = pl(view, r.pid)!; return (
+          <div key={r.pid} className={`corrbar ${r.hit ? 'hit' : 'miss'}`} style={{ animationDelay: `${0.3 + i * 0.4}s` }}>
+            <span className="cwho"><Avatar a={p.avatar} size={34} /> {p.name}</span>
+            <div className="ctrack"><div className="cfill" style={{ left: pos(r.low), width: `calc(${pos(r.high)} - ${pos(r.low)} + 6px)` }} /></div>
+            <strong>{r.hit ? `+${r.points}` : '0'}</strong>
+          </div>); })}
+      </div>
+      <p className="rankhow">Treffer zählen – je enger der Bereich, desto mehr Punkte (bis {rev.points}).</p>
+      <Explain text={rev.explain} />
+    </div>);
+}
+
+// ---- VERDREHTE WELT
+function TwistTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal;
+  return (
+    <div className="twistTv"><div className="bigq small">{d.prompt}</div>
+      <div className="twistedbig">{d.twisted}</div>
+      {!rev && <><p className="hint big">{d.answeredCount} von {d.playerCount} haben getippt.</p><AnswerRow players={view.players} /></>}
+      {rev && <div className="lreveal"><div className="lanswer">Das Original: <b>{rev.answer}</b></div>
+        <table className="linktable"><tbody>{rev.rows.map((r: any) => { const p = pl(view, r.pid)!; return <tr key={r.pid} className={r.answer ? (r.correct ? 'ok' : 'bad') : 'none'}><td><Avatar a={p.avatar} size={40} /> <b>{p.name}</b></td><td>{r.answer ? `„${r.answer}“` : 'keine Abgabe'}</td><td>{r.correct ? `+${r.points}` : '0'}</td></tr>; })}</tbody></table>
+        <Explain text={rev.explain} /></div>}
+    </div>);
 }
 
 // ---- DIE VERBINDUNG

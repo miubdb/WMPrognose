@@ -25,6 +25,9 @@ export function taskSeconds(t: TaskDef, m: TimeMode = 'expected'): { play: numbe
     case 'match': return { play: t.seconds * (m === 'max' ? 1 : 0.9), reveal: rv(45) };
     case 'vote': return { play: t.seconds * a, reveal: rv(40) };
     case 'link': return { play: t.clues.length * clueSecs(t) * (m === 'max' ? 1 : 0.8) + (m === 'max' ? 40 : 15) /* Host-Prüfung unklarer Antworten */, reveal: rv(45) };
+    case 'bluff': return { play: (t.seconds + t.pickSeconds) * a, reveal: rv(60) };
+    case 'corridor': return { play: t.seconds * a, reveal: rv(45) };
+    case 'twist': return { play: t.seconds * a, reveal: rv(40) };
     case 'unique': return { play: t.seconds * a + (m === 'max' ? 60 : 30) /* Host-Prüfung */, reveal: rv(50) };
   }
 }

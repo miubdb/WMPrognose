@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Brand } from '../ui/Brand';
 import { useGame, useWakeLock, store, api, type ConnState } from '../net';
 import { Avatar, DEFAULT_AVATAR, randomAvatar } from '../ui/Avatar';
 import { AvatarEditor } from './Editor';
@@ -37,7 +38,7 @@ function JoinFlow({ code, onJoined }: { code: string; onJoined: (s: Stored) => v
   const canJoin = info.joinOpen && info.phase === 'lobby';
   return (
     <div className="phone join">
-      <div className="logo small">OUT<span>PLAY</span></div>
+      <div className="logo small"><Brand /></div>
       <div className="roomtag">Raum <b>{code}</b></div>
       <div className="tabs wide">
         <button className={mode === 'new' ? 'on' : ''} onClick={() => setMode('new')}>Neu beitreten</button>

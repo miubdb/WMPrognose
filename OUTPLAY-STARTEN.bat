@@ -2,9 +2,9 @@
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
-title OUTPLAY
+title JANIQUIZITION
 echo.
-echo  OUTPLAY wird gestartet ...
+echo  JANIQUIZITION wird gestartet ...
 echo.
 
 where node >nul 2>nul
@@ -30,5 +30,5 @@ if not exist node_modules (
 
 node --import tsx scripts\start-local.ts
 echo.
-echo  OUTPLAY wurde beendet. Zum Weiterspielen diese Datei erneut starten.
+echo  JANIQUIZITION wurde beendet. Zum Weiterspielen diese Datei erneut starten.
 pause

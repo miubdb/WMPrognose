@@ -1,4 +1,5 @@
 import { normText } from '../../../shared/util';
+import { Brand } from '../ui/Brand';
 import { useEffect, useState } from 'react';
 import { api, store, useGame } from '../net';
 import { Avatar } from '../ui/Avatar';
@@ -40,7 +41,7 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
   };
   return (
     <div className="hostlogin">
-      <div className="logo">OUT<span>PLAY</span></div>
+      <div className="logo"><Brand /></div>
       <h2>Showmaster</h2>
       <div className="card">
         <h3>Neue Show erstellen</h3>
@@ -87,7 +88,7 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
   return (
     <div className="host">
       <div className="hosttop">
-        <div className="logo tiny">OUT<span>PLAY</span></div>
+        <div className="logo tiny"><Brand /></div>
         <div className="roomtag">Raum <b>{sess.code}</b></div>
         <ConnBadge conn={conn} pending={pendingCount} />
         <span className="act">{view.room.act}</span>

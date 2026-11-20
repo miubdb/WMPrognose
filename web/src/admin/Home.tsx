@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { GAMES, INACTIVE_GAMES } from '../../../shared/games';
+import { GAMES, INACTIVE_GAMES, PLANNED_GAMES } from '../../../shared/games';
 import { adm, download, errText } from './api';
 
 export type AdminTab = 'home' | 'questions' | 'packs' | 'io' | 'advanced';
@@ -11,7 +11,7 @@ export function CleanupCard({ bump, onlyIfNeeded }: { bump: () => void; onlyIfNe
   useEffect(load, [load]);
   if (!cl || (onlyIfNeeded && cl.clean)) return null;
   const run = async () => {
-    const lines = [...cl.archive.map((i: string) => '• archivieren: ' + i), ...cl.update.map((i: string) => '• neue Version mit aktuellem Inhalt: ' + i), ...(cl.rename ?? []).map((i: string) => '• umbenennen: ' + i)].join('\n');
+    const lines = [...(cl.install ? ['• neue Spiele und Fragen ergänzen (nichts Vorhandenes wird verändert)'] : []), ...cl.archive.map((i: string) => '• archivieren: ' + i), ...cl.update.map((i: string) => '• neue Version mit aktuellem Inhalt: ' + i), ...(cl.rename ?? []).map((i: string) => '• umbenennen: ' + i)].join('\n');
     if (!confirm('Jetzt aktualisieren?\n\n' + lines + '\n\nVorher wird automatisch eine Datenbanksicherung angelegt. Nichts wird gelöscht; laufende und beendete Räume behalten ihren Stand.')) return;
     const r = await adm('POST', '/cleanup', {});
     if (r.ok) { setMsg(`Fertig ✓${r.data.backupFile ? ' · Sicherung: ' + r.data.backupFile : ''}`); bump(); load(); } else setMsg(errText(r));
@@ -23,7 +23,7 @@ export function CleanupCard({ bump, onlyIfNeeded }: { bump: () => void; onlyIfNe
         ? <p className="muted small">Aktiv: Hauptshow (KICKBASE-KONSENS), Alternative (FINAL LOCK) und das alte Backup-Paket. Nichts zu tun.</p>
         : <>
           <p className="small">Das Update bringt die neuesten Fragen und Regeln in eure Pakete – als <b>neue Version</b>. Nichts wird gelöscht, laufende Räume bleiben unverändert, vorher gibt es automatisch eine Sicherung.</p>
-          <ul className="small">{cl.rows.filter((r: any) => r.action === 'archive' || r.needsUpdate || r.needsRename).map((r: any) => <li key={r.id}><b>{r.name}</b> – {r.action === 'archive' ? 'wird archiviert' : r.needsUpdate ? 'bekommt neue Version' : 'wird umbenannt'}</li>)}</ul>
+          <ul className="small">{cl.install && <li><b>Neue Spiele und Fragen</b> – werden ergänzt</li>}{cl.rows.filter((r: any) => r.action === 'archive' || r.needsUpdate || r.needsRename).map((r: any) => <li key={r.id}><b>{r.name}</b> – {r.action === 'archive' ? 'wird archiviert' : r.needsUpdate ? 'bekommt neue Version' : 'wird umbenannt'}</li>)}</ul>
           <button className="btn primary" onClick={run}>Jetzt sicher aktualisieren</button>
         </>}
       {msg && <p className="small">{msg}</p>}
@@ -66,6 +66,8 @@ export function Home({ go, online, bump }: { go: (t: AdminTab) => void; online: 
         <p className="muted small">Alle getestet (automatische Tests + Browser-Test mit mehreren Handys).</p>
         <div className="tablescroll"><table className="scoretab gametab"><thead><tr><th></th><th>Spiel</th><th>So geht’s</th><th>Punkte</th></tr></thead>
           <tbody>{GAMES.map(g => <tr key={g.mode}><td>{g.icon}</td><td><b>{g.name}</b>{g.kind === 'Finale' && <small className="muted"> Finale</small>}</td><td>{g.short}</td><td className="nowrap">{g.points}</td></tr>)}</tbody></table></div>
+        <details className="more"><summary>Geplant (noch nicht gebaut)</summary>
+          <ul className="small">{PLANNED_GAMES.map(g => <li key={g.name}><b>{g.name}</b> – {g.note}</li>)}</ul></details>
         <details className="more"><summary>Nicht mehr aktiv</summary>
           <ul className="small">{INACTIVE_GAMES.map(g => <li key={g.name}><b>{g.name}</b> – {g.note}</li>)}</ul></details>
       </div>

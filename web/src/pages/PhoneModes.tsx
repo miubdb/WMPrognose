@@ -15,6 +15,7 @@ const ERR: Record<string, string> = {
   closed: 'Die Zeit ist abgelaufen – keine Abgabe mehr möglich.', already_submitted: 'Du hast bereits abgegeben.', invalid: 'Ungültige Eingabe.', paused: 'Die Show ist pausiert.',
   not_enough_points: 'Dafür hast du nicht genug Punkte.', wrong_step: 'Dieser Begriff ist schon vorbei.', slot_taken: 'Dieser Platz ist schon belegt.', no_attempts_left: 'Keine Versuche mehr.',
   session_replaced: 'Dieses Gerät wurde abgemeldet.', review_needed: 'Bitte zuerst die unklaren Antworten prüfen.', invalid_target: 'Diese Schätzung kann man nicht wählen.', invalid_bet: 'Ungültiger Einsatz.',
+  is_truth: 'Das ist zu nah an der Wahrheit – erfinde etwas anderes!', own_lie: 'Das ist deine eigene Erfindung.', invalid_option: 'Diese Antwort gibt es nicht.', low_gt_high: 'Der untere Wert muss kleiner sein als der obere.',
 };
 export const errText = (e?: string) => (e && ERR[e]) || (e ? `Fehler: ${e}` : 'Fehler');
 
@@ -71,6 +72,9 @@ const MODE_TXT: Record<string, string> = {
   unique: 'Nenne eine gültige Antwort – aber bloß keine, die auch andere nennen!',
   match: 'Verbinde links und rechts, was zusammengehört. 6 Paare, 50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.',
   link: 'Vier Hinweise erscheinen nacheinander. Je früher du die gemeinsame Lösung nennst, desto mehr Punkte – aber du hast nur einen Versuch!',
+  bluff: 'Erfinde eine glaubwürdige falsche Antwort. Danach suchst du unter allen Antworten die echte – und jeder, der auf deine Lüge hereinfällt, bringt dir Punkte.',
+  corridor: 'Gib einen Bereich an (von … bis …), in dem deiner Meinung nach die Lösung liegt. Je enger der Bereich, desto mehr Punkte – aber daneben ist 0.',
+  twist: 'Ein bekannter Titel wurde ins Gegenteil verdreht. Tippe das Original ein – je schneller, desto mehr Punkte.',
 };
 function PhoneIntro({ round }: { round: RoundView }) {
   return (
@@ -96,6 +100,9 @@ function PhoneBody(p: Props & { me?: PlayerPublic }) {
     case 'match': return <MatchPhone {...p} d={d} />;
     case 'link': return <LinkPhone {...p} d={d} />;
     case 'vote': return <VotePhone {...p} d={d} />;
+    case 'bluff': return <BluffPhone {...p} d={d} />;
+    case 'corridor': return <CorridorPhone {...p} d={d} />;
+    case 'twist': return <TwistPhone {...p} d={d} />;
   }
 }
 
@@ -493,6 +500,75 @@ function LinkPhone({ round, act, room, d }: Props & { d: any }) {
   );
 }
 
+// ---------------------------------------------------------------- LÜGEN HABEN KURZE BEINE
+function BluffPhone({ round, act, room, d }: Props & { d: any }) {
+  const snd = useSender(act);
+  const mine = d.mine ?? {}; const [draft, setDraft] = useDraft<string>(`${room}.${round.rid}.bluff`, ''); const [sel, setSel] = useState<string | null>(null);
+  if (round.stage === 'open') return (
+    <div className="bluff">
+      <div className="question">{d.prompt}</div>
+      {!mine.lie ? <>
+        <p className="muted center small">Erfinde eine Antwort, die echt klingen könnte. Wer darauf hereinfällt, bringt dir je {d.bluffPoints} Punkte.</p>
+        <div className="inputrow"><input autoComplete="off" placeholder="Deine Erfindung" value={draft} maxLength={60} onChange={e => setDraft(e.target.value)} /></div>
+        <Status sent={false} draft={!!draft} sending={snd.state === 'sending'} msg={snd.msg} />
+        <button className="btn primary wide" disabled={!draft.trim() || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { lie: draft } })}>Lüge abgeben</button>
+      </> : <><Status sent draft={false} /><div className="bignum">{mine.lie}</div><p className="muted center">Warte auf die anderen … ({d.writtenCount} von {d.playerCount})</p></>}
+    </div>
+  );
+  if (round.stage === 'bet' && d.options) {
+    if (mine.pick) return <div className="bluff"><div className="question small">{d.prompt}</div><Status sent draft={false} /><p className="center">Du hast gewählt: <b>{d.options.find((o: any) => o.id === mine.pick)?.text}</b></p><p className="muted center">Warte auf die anderen … ({d.pickedCount} von {d.playerCount})</p></div>;
+    return (
+      <div className="bluff">
+        <div className="question small">{d.prompt}</div>
+        <p className="muted center small">Welche Antwort ist die echte? Richtig = {d.points} Punkte.</p>
+        <div className="optlist">{d.options.map((o: any, i: number) => { const own = (d.ownOptions ?? []).includes(o.id); return (
+          <button type="button" key={o.id} disabled={own} className={`optcard ${sel === o.id ? 'sel' : ''}`} onClick={() => setSel(o.id)}><b>{String.fromCharCode(65 + i)}</b><span>{o.text}{own ? ' (deine Erfindung)' : ''}</span></button>); })}</div>
+        <Status sent={false} draft={!!sel} sending={snd.state === 'sending'} msg={snd.msg} />
+        <button className="btn primary wide" disabled={!sel || snd.state === 'sending'} onClick={() => sel && snd.send({ k: 'submit', payload: { option: sel } })}>Diese Antwort wählen</button>
+      </div>
+    );
+  }
+  return <Waiting text="Zeit abgelaufen" sub="Gleich kommt die Auflösung." />;
+}
+
+// ---------------------------------------------------------------- SCHÄTZKORRIDOR
+function CorridorPhone({ round, act, room, d }: Props & { d: any }) {
+  const snd = useSender(act); const mine = d.mine;
+  const [lo, setLo] = useDraft<string>(`${room}.${round.rid}.lo`, ''); const [hi, setHi] = useDraft<string>(`${room}.${round.rid}.hi`, '');
+  if (round.stage !== 'open') return <Waiting text={mine ? 'Korridor abgegeben' : 'Zeit abgelaufen'} sub="Gleich kommt die Auflösung." />;
+  if (mine) return <div className="corr"><div className="question small">{d.prompt}</div><Status sent draft={false} /><div className="bignum">{mine.low.toLocaleString('de-DE')} – {mine.high.toLocaleString('de-DE')} {d.unit}</div><p className="muted center">Warte auf die anderen …</p></div>;
+  const l = Number(lo.replace(',', '.')), h = Number(hi.replace(',', '.')); const ok = lo.trim() !== '' && hi.trim() !== '' && Number.isFinite(l) && Number.isFinite(h) && l <= h;
+  return (
+    <div className="corr">
+      <div className="question">{d.prompt}</div>
+      <p className="muted center small">Die Lösung muss in deinem Bereich liegen. Je enger, desto mehr Punkte (bis {d.points}) – daneben = 0.</p>
+      <div className="form2"><label className="field"><span>von ({d.unit})</span><input inputMode="decimal" value={lo} onChange={e => setLo(e.target.value)} /></label>
+        <label className="field"><span>bis ({d.unit})</span><input inputMode="decimal" value={hi} onChange={e => setHi(e.target.value)} /></label></div>
+      {lo && hi && !ok && <div className="status bad">Der untere Wert muss kleiner sein als der obere.</div>}
+      <Status sent={false} draft={ok} sending={snd.state === 'sending'} msg={snd.msg} />
+      <button className="btn primary wide" disabled={!ok || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { low: lo, high: hi } })}>Korridor abgeben</button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- VERDREHTE WELT
+function TwistPhone({ round, act, room, d }: Props & { d: any }) {
+  const snd = useSender(act); const mine = d.mine; const [draft, setDraft] = useDraft<string>(`${room}.${round.rid}.twist`, '');
+  if (round.stage !== 'open') return <Waiting text={mine ? 'Antwort abgegeben' : 'Zeit abgelaufen'} sub="Gleich kommt die Auflösung." />;
+  return (
+    <div className="twist">
+      <div className="question small">{d.prompt}</div>
+      <div className="twisted">{d.twisted}</div>
+      {!mine ? <>
+        <div className="inputrow"><input autoComplete="off" autoCapitalize="words" placeholder="Wie heißt das Original?" value={draft} maxLength={80} onChange={e => setDraft(e.target.value)} /></div>
+        <Status sent={false} draft={!!draft} sending={snd.state === 'sending'} msg={snd.msg} />
+        <button className="btn primary wide" disabled={!draft.trim() || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { answer: draft } })}>Antwort abgeben</button>
+        <p className="muted center small">Ein Versuch – je schneller, desto mehr Punkte.</p>
+      </> : <><Status sent draft={false} /><div className="bignum">{mine.answer}</div></>}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Auflösung
 function PhoneReveal({ round, view, pid }: Props) {
   const rev = round.reveal;
@@ -533,6 +609,9 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
     case 'match': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.submitted ? { points: r.points, title: 'MATCHMAKER', text: `${r.correct} von 6 Paaren richtig` } : none; }
     case 'vote': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.target ? { points: r.points, title: r.correct ? 'Konsens getroffen! 🤝' : 'Kein Konsens', text: `Du hast ${view.players.find(p => p.id === r.target)?.name ?? rev.candidate ?? '?'} gewählt.` } : none; }
     case 'link': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? `Richtig nach Hinweis ${r.level + 1}!` : 'Leider falsch', text: `Deine Antwort: ${r.answer}` } : none; }
+    case 'bluff': { const r = rev.rows.find((x: any) => x.pid === pid); return r && (r.lie || r.pick) ? { points: r.points, title: r.correct ? 'Wahrheit erkannt! 🔍' : 'Reingefallen', text: [r.correct ? '' : `Richtig war: ${rev.answer}`, r.fooled ? `${r.fooled} Mitspieler hast du getäuscht 😈` : ''].filter(Boolean).join(' · ') || 'Niemand hat deine Lüge geglaubt.' } : none; }
+    case 'corridor': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.low !== null ? { points: r.points, title: `Lösung: ${rev.answer.toLocaleString('de-DE')} ${rev.unit}`, text: r.hit ? `Treffer! Dein Bereich war ${r.width.toLocaleString('de-DE')} ${rev.unit} breit.` : 'Die Lösung lag nicht in deinem Bereich.' } : none; }
+    case 'twist': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? 'Original erkannt! 🎬' : 'Leider falsch', text: r.correct ? `Richtig: ${rev.answer}` : `Gesucht war: ${rev.answer}` } : none; }
     case 'unique': { const r = rev.results[pid]; return r ? { points: r.points, title: r.kind === 'unique' ? 'EINZIGARTIG! ✨' : r.kind === 'shared' ? 'Mehrfach genannt' : 'Ungültig', text: rev.groups.find((g: any) => g.members.includes(pid))?.label ?? '' } : none; }
   }
   void view;
