@@ -253,6 +253,11 @@ export class App {
     const now = this.clock();
     const parts = path.split('/').filter(Boolean); // api, rooms, CODE, action
     if (path.startsWith('/api/maptiles/')) { await handleMapTiles(this.tiles, req, res, path); return; }
+    if (parts[1] === 'media' && parts.length === 5 && req.method === 'GET') {        // /api/media/RAUM/SCHLÜSSEL/NAME (Bild-Stufen, Audio)
+      const room = this.rooms.get(String(parts[2]).toUpperCase()); const m = room ? this.engine.mediaFor(room, parts[3], parts[4]) : null;
+      if (!m) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': m.mime, 'cache-control': 'private, max-age=60', 'content-length': m.data.length }); res.end(m.data); return;
+    }
     if (path === '/api/health') return this.json(res, 200, { ok: true, mode: 'local', rooms: this.rooms.size, now, backup: this.lastBackup ? { at: this.lastBackup.at } : null });
     if (parts[1] === 'admin') return handleAdmin(this.adminCtx, req, res, parts, _url, limit => this.body(req, limit));
     if (path === '/api/netinfo') return this.json(res, 200, netInfo((this.http.address() as any)?.port ?? 8080, this.opts.publicHost));
@@ -328,7 +333,7 @@ export class App {
     let file = join(root, rel);
     if (!file.startsWith(root)) { res.writeHead(403); res.end(); return; }
     if (!existsSync(file) || statSync(file).isDirectory()) file = join(root, 'index.html'); // SPA-Fallback
-    if (!existsSync(file)) { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); res.end('OUTPLAY: Frontend nicht gebaut. Bitte "npm run build" ausführen.'); return; }
+    if (!existsSync(file)) { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); res.end('JANIQUIZITION: Frontend nicht gebaut. Bitte "npm run build" ausführen.'); return; }
     const ext = extname(file);
     const immutable = file.includes('/assets/');
     res.writeHead(200, { 'content-type': MIME[ext] ?? 'application/octet-stream', 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache' });

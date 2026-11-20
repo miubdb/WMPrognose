@@ -1,7 +1,7 @@
 JANIQUIZITION – SCHNELLSTART (Windows)
 ================================
 
-1. Doppelklick auf  OUTPLAY-STARTEN.bat
+1. Doppelklick auf  JANIQUIZITION-STARTEN.bat
    (beim allerersten Mal einmalig Internet nötig, dauert ca. 1 Minute)
 
 2. Im schwarzen Fenster stehen zwei Adressen:
@@ -14,7 +14,7 @@ JANIQUIZITION – SCHNELLSTART (Windows)
 Beenden: Fenster schließen. Die Show geht beim nächsten Start weiter.
 
 Weitere Dateien (nur bei Bedarf):
-  OUTPLAY-KARTE-LADEN.bat       Karte (offline) einmalig laden
-  OUTPLAY-WIEDERHERSTELLEN.bat  Sicherung zurückspielen
+  JANIQUIZITION-KARTE-LADEN.bat       Karte (offline) einmalig laden
+  JANIQUIZITION-WIEDERHERSTELLEN.bat  Sicherung zurückspielen
 
 Welche Spiele gibt es?  ->  docs\SPIELE.md  (oder im Admin auf der Start-Seite)

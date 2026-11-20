@@ -81,7 +81,7 @@ function Shell({ onOut, online }: { onOut: () => void; online?: boolean }) {
       {tab === 'packs' && <Packs rev={rev} bump={bump} />}
       {tab === 'questions' && <Library rev={rev} bump={bump} />}
       {tab === 'advanced' && <>
-        <p className="muted small">Für Fortgeschrittene: Kategorien bündeln Fragen zu Runden, Szenen sind die Bilder für GLITCH. Für den normalen Abend nicht nötig.</p>
+        <p className="muted small">Kategorien = Runden aus Fragen · Szenen = Bilder für GLITCH</p>
         <div className="chipsrow"><button className={`chip ${adv === 'categories' ? 'on' : ''}`} onClick={() => setAdv('categories')}>🧱 Kategorien</button><button className={`chip ${adv === 'scenes' ? 'on' : ''}`} onClick={() => setAdv('scenes')}>🖼️ Szenen</button></div>
         {adv === 'categories' ? <Categories rev={rev} bump={bump} /> : <Scenes rev={rev} bump={bump} />}</>}
       {tab === 'io' && <IO bump={bump} online={!!online} />}
@@ -247,7 +247,6 @@ function Packs({ rev, bump }: { rev: number; bump: () => void }) {
   return (
     <div>
       <div className="row between"><h2>Pakete</h2><button className="btn primary" onClick={() => setNeu(true)}>＋ Neues Paket</button></div>
-      <p className="muted small">Aktive Pakete sind grün. Ein neues Paket startet als Kopie eines bestehenden – du tauschst dann nur noch Fragen aus.</p>
       <div className="catgrid">{data.map((p: any) => (
         <div key={p.id} className="catcard" style={{ ['--c' as any]: p.status === 'published' ? '#22c55e' : p.status === 'archived' ? '#6b7280' : '#f5b82e' }}>
           <button className="catmain" aria-label="Öffnen" onClick={() => setEdit(p)}>
@@ -255,7 +254,7 @@ function Packs({ rev, bump }: { rev: number; bump: () => void }) {
             <span className="cattext"><b>{p.name}</b>
               <span className="qmeta"><span className={`badge ${p.status === 'published' ? 'ok' : ''}`}>{p.status === 'published' ? `Veröffentlicht · v${p.currentVersion}` : p.status === 'archived' ? 'Archiviert' : 'Entwurf'}</span> {p.show?.length ? <span className="badge">🎬 Show · {p.show.filter((x: any) => x.k !== 'board').length} Runden</span> : null}{p.categoryIds.length ? <span>{p.categoryIds.length} Kategorien</span> : null}</span></span>
           </button>
-          <button className="btn small gold" title="Spieleabend exportieren" onClick={async () => { const r = await adm('GET', `/export?scope=pack:${p.id}`); if (r.ok) download(`OUTPLAY-Spieleabend-${p.id}.json`, r.data); else t.show(errText(r)); }}>📤</button>
+          <button className="btn small gold" title="Spieleabend exportieren" onClick={async () => { const r = await adm('GET', `/export?scope=pack:${p.id}`); if (r.ok) download(`JANIQUIZITION-Spieleabend-${p.id}.json`, r.data); else t.show(errText(r)); }}>📤</button>
           <RowMenu>
             <button onClick={() => act(() => adm('POST', `/packs/${p.id}/duplicate`), 'Dupliziert ✓')}>⧉ Duplizieren</button>
             {p.status === 'archived' ? <button onClick={() => act(() => adm('POST', `/packs/${p.id}/status`, { status: 'published' }))}>↩ Wieder aktivieren</button>
@@ -290,7 +289,6 @@ function NewPack({ packs, onClose, onCreated }: { packs: any[]; onClose: () => v
       <label className="field"><span>Startpunkt: Kopie von</span><select value={from} onChange={e => setFrom(e.target.value)}>{packs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
       <label className="field"><span>Länge</span><select value={len} onChange={e => setLen(Number(e.target.value))}><option value={0}>wie die Vorlage</option><option value={4}>Kompakt (4 Fragen je Spiel)</option><option value={5}>Mittel (5 Fragen je Spiel)</option><option value={6}>Lang (6 Fragen je Spiel)</option></select></label>
       {err && <div className="status bad">{err}</div>}
-      <p className="muted small">Das neue Paket ist zunächst ein Entwurf. Danach tauschst du Fragen aus und klickst auf „Veröffentlichen“.</p>
       <div className="actionbar"><span className="spacer" /><button className="btn primary" disabled={busy} onClick={go}>Paket anlegen</button></div>
     </div></div>
   );
@@ -465,8 +463,8 @@ function PackEditor({ pack, onClose }: { pack: any; onClose: () => void }) {
             <label className="field"><span>SORTIER’S! / BLIND RANK – Bedienung</span><select value={p.rules.rankVariant ?? 'task'} onChange={e => set('rules', { ...p.rules, rankVariant: e.target.value })}><option value="task">je Frage festgelegt (Standard: nacheinander)</option><option value="sequence">immer nacheinander (klassisch)</option><option value="sort">immer: SORTIER’S! (fünf Karten auf Plätze ziehen)</option></select></label>
           </div>
           <div className="form2">
-            <label className="field"><span>Showtitel (TV-Eröffnung)</span><input value={p.rules.showTitle ?? ''} maxLength={40} placeholder="OUTPLAY" onChange={e => set('rules', { ...p.rules, showTitle: e.target.value })} /></label>
-            <label className="field"><span>Gewinnerbezeichnung (Siegerehrung)</span><input value={p.rules.winnerTitle ?? ''} maxLength={40} placeholder="OUTPLAY-Champion" onChange={e => set('rules', { ...p.rules, winnerTitle: e.target.value })} /></label>
+            <label className="field"><span>Showtitel (TV-Eröffnung)</span><input value={p.rules.showTitle ?? ''} maxLength={40} placeholder="JANIQUIZITION" onChange={e => set('rules', { ...p.rules, showTitle: e.target.value })} /></label>
+            <label className="field"><span>Gewinnerbezeichnung (Siegerehrung)</span><input value={p.rules.winnerTitle ?? ''} maxLength={40} placeholder="JANIQUIZITION-Champion" onChange={e => set('rules', { ...p.rules, winnerTitle: e.target.value })} /></label>
           </div>
           <div className="form2">
             <label className="field"><span>SETZ AUF MICH – (veraltet, wird nicht mehr verwendet: Einsatz = bis 50 % des Punktestands)</span><input value={(p.rules.estimateBets ?? []).join(', ')} placeholder="0, 50, 100" onChange={e => set('rules', { ...p.rules, estimateBets: e.target.value.split(/[ ,;]+/).filter(Boolean).map(Number).filter(n => Number.isFinite(n)) })} /></label>
@@ -555,7 +553,7 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
   const backup = async () => {
     setErr(''); try {
       const r = await fetch('/api/admin/backup', { credentials: 'same-origin' }); if (!r.ok) { setErr('Backup fehlgeschlagen (' + r.status + ')'); return; }
-      const cd = r.headers.get('content-disposition') ?? ''; const name = /filename="([^"]+)"/.exec(cd)?.[1] ?? 'OUTPLAY-VOLLBACKUP-VERTRAULICH.db';
+      const cd = r.headers.get('content-disposition') ?? ''; const name = /filename="([^"]+)"/.exec(cd)?.[1] ?? 'JANIQUIZITION-VOLLBACKUP-VERTRAULICH.db';
       const url = URL.createObjectURL(await r.blob()); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 3000);
     } catch { setErr('Backup fehlgeschlagen.'); }
   };
@@ -584,7 +582,7 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
         <h3>📤 Spieleabend exportieren</h3>
         <div className="row wrap">
           <label className="field inline"><span>Paket</span><select value={pack} onChange={e => setPack(e.target.value)}>{packs.map((p: any) => <option key={p.id} value={p.id}>{p.name}{p.versions ? ` (v${p.currentVersion})` : ' (Entwurf)'}</option>)}</select></label>
-          <button className="btn gold big" disabled={!pack} onClick={() => exp('pack:' + pack, `OUTPLAY-Spieleabend-${pack}.json`)}>📤 Spieleabend exportieren</button>
+          <button className="btn gold big" disabled={!pack} onClick={() => exp('pack:' + pack, `JANIQUIZITION-Spieleabend-${pack}.json`)}>📤 Spieleabend exportieren</button>
         </div>
         {pub.length === 0 && <p className="small muted">Tipp: Das Paket vorher unter „Pakete“ veröffentlichen.</p>}
         <hr />
@@ -603,8 +601,8 @@ function IO({ bump, online }: { bump: () => void; online: boolean }) {
       </div>
       <details className="card more backups"><summary>Sicherungen</summary>
         <h4>Inhalte als JSON</h4>
-        <div className="row wrap"><button className="btn primary" onClick={() => exp('all', 'OUTPLAY-Inhalte-komplett.json')}>Alles</button><button className="btn" onClick={() => exp('questions', 'OUTPLAY-Fragen.json')}>Nur Fragen</button>
-          {packs.map((p: any) => <button key={p.id} className="btn ghost" onClick={() => exp('pack:' + p.id, `OUTPLAY-Paket-${p.id}.json`)}>{p.name}</button>)}</div>
+        <div className="row wrap"><button className="btn primary" onClick={() => exp('all', 'JANIQUIZITION-Inhalte-komplett.json')}>Alles</button><button className="btn" onClick={() => exp('questions', 'JANIQUIZITION-Fragen.json')}>Nur Fragen</button>
+          {packs.map((p: any) => <button key={p.id} className="btn ghost" onClick={() => exp('pack:' + p.id, `JANIQUIZITION-Paket-${p.id}.json`)}>{p.name}</button>)}</div>
         <h4>Komplette Datenbank <span className="badge bad">vertraulich</span></h4>
         <p className="small muted">Enthält auch Zugangsdaten{online ? '' : ', Räume und Spielstände'} – nicht weitergeben.{!online && <> Automatische Sicherung alle 10 Minuten nach <code>data/backups</code>.</>}</p>
         <button className="btn warn" onClick={backup}>🔒 Voll-Backup (.db)</button>

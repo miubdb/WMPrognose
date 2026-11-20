@@ -95,12 +95,13 @@ function Panel({ sess, onLeave }: { sess: HostSession; onLeave: () => void }) {
         <div className="spacer" />
         <button className={`btn small ${view.room.sound ? '' : 'ghost'}`} onClick={() => run({ k: 'h.sound', on: !view.room.sound })}>{view.room.sound ? '🔊 Ton an' : '🔇 Ton aus'}</button>
         <button className={`btn small ${view.room.liveRank ? '' : 'ghost'}`} title="Kleines Ranking am TV-Rand (im FINAL LOCK immer verborgen)" onClick={() => run({ k: 'h.liveRank', on: !view.room.liveRank })}>{view.room.liveRank ? '📊 Live-Ranking an' : '📊 Live-Ranking aus'}</button>
+        <button className="btn small ghost" title="Spielt einen kurzen Testton auf dem Fernseher (Lautstärke prüfen)" onClick={() => run({ k: 'h.soundTest' })}>🔊 Ton testen</button>
         <button className={`btn small ${view.room.music?.on ? '' : 'ghost'}`} title="Leise Hintergrundmusik (selbst erzeugt, offline) – nur auf dem TV" onClick={() => run({ k: 'h.music', on: !view.room.music?.on })}>{view.room.music?.on ? '🎵 Musik an' : '🎵 Musik aus'}</button>
         <input type="range" aria-label="Musiklautstärke" title="Musiklautstärke" min={0} max={100} step={5} value={view.room.music?.vol ?? 25} style={{ width: 90 }} onChange={e => run({ k: 'h.music', vol: Number(e.target.value) })} />
         <button className={`btn small ${view.room.reduced ? '' : 'ghost'}`} onClick={() => run({ k: 'h.reduced', on: !view.room.reduced })}>{view.room.reduced ? '✨ Animationen reduziert' : '✨ Animationen voll'}</button>
         <button className={`btn small ${view.room.showPaused ? 'warn' : 'ghost'}`} onClick={() => run({ k: 'h.showPause', paused: !view.room.showPaused })}>{view.room.showPaused ? '▶ Show fortsetzen' : '⏸ Show pausieren'}</button>
       </div>
-      {nb.loopback && (!nb.base || nb.ambiguous) && <div className="card warnbox small">{!nb.base ? '⚠ Es wurde keine Netzwerkadresse gefunden – ohne WLAN/LAN können Handys nicht beitreten.' : <>⚠ Mehrere Netzwerkadapter gefunden. Verwendet wird <b>{nb.base}</b>. Verbinden sich die Handys nicht, <code>OUTPLAY-STARTEN.bat</code> neu starten und den richtigen Adapter wählen. Alle: {nb.candidates.map(c => `${c.name} ${c.url}${c.virtual ? ' (virtuell)' : ''}`).join(' · ')}</>}</div>}
+      {nb.loopback && (!nb.base || nb.ambiguous) && <div className="card warnbox small">{!nb.base ? '⚠ Es wurde keine Netzwerkadresse gefunden – ohne WLAN/LAN können Handys nicht beitreten.' : <>⚠ Mehrere Netzwerkadapter gefunden. Verwendet wird <b>{nb.base}</b>. Verbinden sich die Handys nicht, <code>JANIQUIZITION-STARTEN.bat</code> neu starten und den richtigen Adapter wählen. Alle: {nb.candidates.map(c => `${c.name} ${c.url}${c.virtual ? ' (virtuell)' : ''}`).join(' · ')}</>}</div>}
       {toast && <div className="toast">{toast}</div>}
       <div className="hostgrid">
         <div className="hostmain">
@@ -199,6 +200,7 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
         {timed && <Countdown round={round} serverNow={serverNow} size={96} />}
       </div>
 
+      {st === 'intro' && round.assign && <AssignBox view={view} assign={round.assign} rid={round.rid} run={run} />}
       {st === 'intro' && <div><p>Regelkarte läuft auf dem TV. Wenn alle bereit sind:</p><button className="btn primary huge" disabled={busy} onClick={() => run({ k: 'h.begin' })}>{round.practice ? '▶ Proberunde starten' : `▶ Aufgabe ${round.scoredIndex} starten`}</button>{round.practice && <button className="btn ghost" disabled={busy} title="Probe überspringen – direkt zur ersten gewerteten Aufgabe" onClick={() => run({ k: 'h.skipTask' })}>⏭ Probe überspringen</button>}</div>}
 
       {st !== 'intro' && d?.solution && <div className="solution">🔑 Lösung (nur Host): <b>{Array.isArray(d.solution) ? d.solution.join(' › ') : d.solution}</b></div>}
@@ -241,6 +243,19 @@ function RoundHost({ view, round, run, busy, serverNow }: { view: View; round: R
         </div>
       </details>
     </div>
+  );
+}
+
+const ASSIGN_LABEL: Record<string, string> = { duel: 'Duellanten', defuser: 'Entschärfer', impostor: 'Hochstapler' };
+/** Sonderrollen vor dem Start: Vorschlag (faire Rotation) übernehmen oder andere Spieler wählen. */
+function AssignBox({ view, assign, rid, run }: { view: View; assign: { kind: string; need: number; pids: string[] }; rid: string; run: Run }) {
+  const [sel, setSel] = useState<string[]>(assign.pids); useEffect(() => setSel(assign.pids), [rid]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const need = Math.min(assign.need, view.players.length);
+  const toggle = (id: string) => setSel(sel.includes(id) ? sel.filter(x => x !== id) : sel.length >= need ? [...sel.slice(1), id] : [...sel, id]);
+  return (
+    <div className="card small"><b>{ASSIGN_LABEL[assign.kind] ?? 'Rollen'} ({need})</b> <span className="muted">– Vorschlag nach fairer Rotation, antippen zum Ändern</span>
+      <div className="chipsrow">{view.players.map(p => <button key={p.id} type="button" className={`chip ${sel.includes(p.id) ? 'on' : ''}`} onClick={() => toggle(p.id)}>{p.name}</button>)}</div>
+      <button className="btn small" disabled={sel.length !== need} onClick={() => run({ k: 'h.assign', pids: sel })}>Festlegen</button></div>
   );
 }
 

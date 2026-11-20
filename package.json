@@ -1,8 +1,8 @@
 {
-  "name": "outplay",
+  "name": "janiquizition",
   "version": "1.0.0",
   "private": true,
-  "description": "OUTPLAY – interaktive Multiplayer-Gameshow",
+  "description": "JANIQUIZITION – interaktive Multiplayer-Gameshow",
   "type": "module",
   "engines": {
     "node": ">=22.13"

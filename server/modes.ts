@@ -7,6 +7,7 @@ import {
 } from '../shared/scoring';
 import { normText } from '../shared/util';
 import { NEW_MODES } from './newmodes';
+import { NEW_MODES2 } from './newmodes2';
 import { SCENES, diffZones, variantItems, type Scene } from '../shared/scenes';
 import { parseNumber } from '../shared/util';
 
@@ -35,6 +36,8 @@ export interface ModeImpl {
   view(c: Ctx, a: Audience): any;
   /** Budget der Aufgabe (Maximalpunkte) */
   maxPoints(t: TaskDef): number;
+  /** Vorschlag für Sonderrollen (Duellanten, Entschärfer, Hochstapler) – der Showmaster kann ihn vor dem Start ändern */
+  propose?(c: Ctx): { kind: string; need: number; pids: string[] } | null;
   /** wird auf allen Spielern erwartet, damit "alle fertig" gilt */
   complete?(c: Ctx): boolean;
   /** true = Auflösung noch nicht erlaubt (z. B. unklare Antworten warten auf die Host-Prüfung) */
@@ -651,5 +654,5 @@ const vote: ModeImpl = {
   },
 };
 
-export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote, ...NEW_MODES };
+export const MODES: Record<TaskDef['mode'], ModeImpl> = { geo, rank, estimate, glitch, codebreak: code, unique, match, link, vote, ...NEW_MODES, ...NEW_MODES2 };
 export { rankPairs };

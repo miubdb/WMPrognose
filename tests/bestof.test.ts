@@ -9,7 +9,7 @@ import { Store } from '../server/store';
 import { SCENES, diffZones, variantItems } from '../shared/scenes';
 import { scoreGlitch, groupUnique, scoreRankExact } from '../shared/scoring';
 import { analyzeShow } from '../shared/analysis';
-import { TILES, SEED_PACK, SEED_SHOW, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, EXTRA_SHOWS, SEED_SHOW_B43, SEED_SHOW_B43K, SEED_SHOW_B44, SEED_SHOW_B44K, SEED_SHOW_NEWGAMES } from '../content';
+import { TILES, SEED_PACK, SEED_SHOW, SEED_SHOW2, SEED_SHOW3, SEED_SHOW4, EXTRA_SHOWS, SEED_SHOW_B43, SEED_SHOW_B43K, SEED_SHOW_B44, SEED_SHOW_B44K, SEED_SHOW_NEWGAMES, SEED_SHOW_SPIELMODI } from '../content';
 import { BESTOF_PLAN, BESTOF_NEW, BESTOF_KK } from '../content/bestof';
 import { BESTOF2_NEW, BESTOF2_PLAN } from '../content/bestof2';
 import { shuffledPool } from '../server/modes';
@@ -19,7 +19,7 @@ import type { Action, Book, TaskDef, View } from '../shared/types';
 const fresh = () => new ContentService(new Store(join(mkdtempSync(join(tmpdir(), 'outplay-b42-')), 'c.db')), { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: EXTRA_SHOWS });
 const CS = fresh();
 /** Stand Praxistest 3 (show-5 / show-4z in der alten Fassung) – für die Regressionstests der damaligen Änderungen */
-const freshP3 = () => new ContentService(new Store(join(mkdtempSync(join(tmpdir(), 'outplay-p3-')), 'c.db')), { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: [...EXTRA_SHOWS.filter(x => x !== SEED_SHOW_B44 && x !== SEED_SHOW_B44K && x !== SEED_SHOW_NEWGAMES), SEED_SHOW_B43, SEED_SHOW_B43K] });
+const freshP3 = () => new ContentService(new Store(join(mkdtempSync(join(tmpdir(), 'outplay-p3-')), 'c.db')), { tiles: TILES, scenes: SCENES, pack: SEED_PACK, show: SEED_SHOW, extraShows: [...EXTRA_SHOWS.filter(x => x !== SEED_SHOW_B44 && x !== SEED_SHOW_B44K && x !== SEED_SHOW_NEWGAMES && x !== SEED_SHOW_SPIELMODI), SEED_SHOW_B43, SEED_SHOW_B43K] });
 const CS3 = freshP3();
 const B42: Book = CS.resolveBook('show-4@1'), B42K: Book = CS.resolveBook('show-3z@1');
 const MODES = ['geo', 'match', 'rank', 'glitch', 'estimate', 'link', 'unique'] as const;
@@ -196,7 +196,7 @@ test('Installation auf bestehender DB: alte Inhalte/Pakete/Versionen byte-identi
   assert.equal(JSON.stringify(after.v.filter((x: any) => before.v.some((y: any) => y[0] === x[0]))), hashOld, 'bestehende Paketversionen unverändert');
   for (const [id, task] of before.q) assert.deepEqual(after.q.find((x: any) => x[0] === id)[1], task, 'Frage ' + id);
   for (const [id, ids, title] of before.c) assert.deepEqual(after.c.find((x: any) => x[0] === id).slice(1), [ids, title], 'Kategorie ' + id);
-  assert.deepEqual(after.v.map((x: any) => x[0]).sort(), ['show-1@1', 'show-2@1', 'show-2k@1', 'show-3@1', 'show-3z@1', 'show-4@1', 'show-4z@1', 'show-5@1', 'show-after@1', 'show-new@1', 'standard-2@1']);
+  assert.deepEqual(after.v.map((x: any) => x[0]).sort(), ['show-1@1', 'show-2@1', 'show-2k@1', 'show-3@1', 'show-3z@1', 'show-4@1', 'show-4z@1', 'show-5@1', 'show-after@1', 'show-modes@1', 'show-new@1', 'standard-2@1']);
   const rep2 = cur.installSeed({ archiveOlder: true }); assert.deepEqual(rep2.created, { scenes: 0, questions: 0, categories: 0, packs: 0 }, 'Wiederholung legt nichts doppelt an');
   assert.equal(cur.seedStatus().installed, true);
 });

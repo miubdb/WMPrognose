@@ -2,9 +2,9 @@
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
-title OUTPLAY Karte laden
+title JANIQUIZITION Karte laden
 echo.
-echo  OUTPLAY: Offline-Karte (OpenStreetMap) wird erzeugt.
+echo  JANIQUIZITION: Offline-Karte (OpenStreetMap) wird erzeugt.
 echo  Einmalig mit Internet, dauert je nach Verbindung ca. 15-40 Minuten, ca. 500 MB.
 echo  Abbrechen ist erlaubt - ein erneuter Start setzt fort.
 echo.
@@ -26,5 +26,5 @@ if errorlevel 1 (
   exit /b 1
 )
 echo.
-echo  Fertig. Die Karte liegt in data\maps\outplay-karte.mbtiles - OUTPLAY-STARTEN.bat nutzt sie automatisch.
+echo  Fertig. Die Karte liegt in data\maps\outplay-karte.mbtiles - JANIQUIZITION-STARTEN.bat nutzt sie automatisch.
 pause

@@ -22,7 +22,7 @@ if (app.auth.initialPassword) {
   writeFileSync(f, app.auth.initialPassword + '\n');
   console.log(`\n=== ADMIN-PASSWORT (nur beim ersten Start erzeugt): ${app.auth.initialPassword}\n    gespeichert in ${f} – bitte notieren und die Datei danach löschen. Alternativ ADMIN_PASSWORD setzen. ===\n`);
 }
-app.listen(port).then(p => !process.env.OUTPLAY_QUIET && console.log(`OUTPLAY läuft auf Port ${p} (Daten: ${dataDir}, Räume geladen: ${app.rooms.size})`));
+app.listen(port).then(p => !process.env.OUTPLAY_QUIET && console.log(`JANIQUIZITION läuft auf Port ${p} (Daten: ${dataDir}, Räume geladen: ${app.rooms.size})`));
 const stop = () => { app.close().finally(() => process.exit(0)); };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);

@@ -9,7 +9,7 @@ const fail = (m) => { console.error('\n✗ ' + m + '\n'); process.exit(1); };
 if (!src) fail('Bitte die Backup-Datei angeben: node scripts/restore-backup.mjs <backup.db> [datenverzeichnis]');
 if (!existsSync(src)) fail(`Datei nicht gefunden: ${src}`);
 const dataDir = resolve(dirArg ?? process.env.DATA_DIR ?? './data');
-if (readFileSync(src).subarray(0, 15).toString() !== 'SQLite format 3') fail('Das ist keine SQLite-Datei (kein OUTPLAY-Backup).');
+if (readFileSync(src).subarray(0, 15).toString() !== 'SQLite format 3') fail('Das ist keine SQLite-Datei (kein JANIQUIZITION-Backup).');
 
 // 1) Backup prüfen
 let counts;
@@ -19,7 +19,7 @@ try {
   if (chk !== 'ok') fail('Das Backup ist beschädigt (integrity_check: ' + chk + ').');
   const n = (t) => { try { return db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n; } catch { return null; } };
   counts = { fragen: n('questions'), kategorien: n('categories'), pakete: n('packs'), paketversionen: n('pack_versions'), raeume: n('rooms') };
-  if (counts.fragen === null || counts.raeume === null) fail('Das ist kein OUTPLAY-Backup (Tabellen fehlen).');
+  if (counts.fragen === null || counts.raeume === null) fail('Das ist kein JANIQUIZITION-Backup (Tabellen fehlen).');
   db.close();
 } catch (e) { fail('Backup konnte nicht gelesen werden: ' + e.message); }
 
@@ -35,7 +35,7 @@ if (existsSync(target)) {
     cur.prepare('SELECT COUNT(*) FROM sqlite_master').get();
     cur.close();
   } catch (e) {
-    try { cur?.close(); } catch { /* */ } fail('Die Datenbank ist in Benutzung – bitte zuerst den OUTPLAY-Server beenden (Fenster schließen) und erneut versuchen.\n  (' + e.message + ')'); }
+    try { cur?.close(); } catch { /* */ } fail('Die Datenbank ist in Benutzung – bitte zuerst den JANIQUIZITION-Server beenden (Fenster schließen) und erneut versuchen.\n  (' + e.message + ')'); }
 }
 
 // 3) Alte Datenbank sichern, Backup einspielen
@@ -47,4 +47,4 @@ if (existsSync(target)) {
 copyFileSync(src, target);
 console.log('✓ Backup eingespielt:', target);
 console.log('  Inhalt:', JSON.stringify(counts));
-console.log('  Jetzt den OUTPLAY-Server wieder starten. Laufende Shows werden aus der Datenbank fortgesetzt (Spieler verbinden sich automatisch neu).');
+console.log('  Jetzt den JANIQUIZITION-Server wieder starten. Laufende Shows werden aus der Datenbank fortgesetzt (Spieler verbinden sich automatisch neu).');

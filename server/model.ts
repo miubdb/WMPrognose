@@ -76,4 +76,8 @@ export interface Room {
   processed: Record<string, any>;
   processedOrder: string[];
   seed: number;
+  /** Rotation für Sonderrollen je Spiel (Duellanten, Entschärfer, Hochstapler) */
+  rot?: Record<string, Record<string, number>>;
+  /** Zähler für den Ton-Test des Showmasters */
+  soundTest?: number;
 }

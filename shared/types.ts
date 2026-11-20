@@ -1,7 +1,7 @@
 // Gemeinsame Typen für Server, Inhalte und Client.
 
 /** 'codebreak' ist ein Altmodus: wird nicht mehr angeboten, bestehende Inhalte/Pakete bleiben aber les- und spielbar. */
-export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique' | 'match' | 'link' | 'vote' | 'bluff' | 'corridor' | 'twist';
+export type Mode = 'geo' | 'rank' | 'estimate' | 'glitch' | 'codebreak' | 'unique' | 'match' | 'link' | 'vote' | 'bluff' | 'corridor' | 'twist' | 'pixel' | 'duel' | 'arena' | 'sound' | 'timeline' | 'panic' | 'impostor';
 export type MapKind = 'world' | 'europe' | 'germany';
 
 // ---------- Avatar ----------
@@ -128,11 +128,26 @@ export interface BluffTask { mode: 'bluff'; prompt: string; answer: string; acce
 export interface CorridorTask { mode: 'corridor'; prompt: string; unit: string; answer: number; seconds: number; points: number; explain: string }
 /** VERDREHTE WELT: Ein bekannter Titel/Begriff wurde ins Gegenteil verdreht – wie lautet das Original? */
 export interface TwistTask { mode: 'twist'; prompt: string; twisted: string; answer: string; accept: string[]; seconds: number; points: number; explain: string }
+/** PIXELPANIK: Ein Bild wird stufenweise schärfer (Stufen vorab erzeugt, Originalstufe nur auf dem TV). */
+export interface PixelTask { mode: 'pixel'; prompt: string; answer: string; accept: string[]; levels: string[]; levelSeconds: number; points: number; explain: string }
+export interface McQuestion { q: string; options: string[]; correct: number }
+/** DUELL DER DEPPEN: Zwei Spieler duellieren sich in drei Multiple-Choice-Fragen, die anderen tippen auf den Sieger. */
+export interface DuelTask { mode: 'duel'; prompt: string; questions: McQuestion[]; seconds: number; points: number; explain: string }
+/** DIE ARENA: Alle beantworten dieselben (steigend schweren) Fragen, wer falsch liegt, scheidet aus. */
+export interface ArenaTask { mode: 'arena'; prompt: string; questions: McQuestion[]; seconds: number; points: number; explain: string }
+/** TONSPUR: Ein Geräusch erkennen (erstes Abspielen, zweites Abspielen, Hinweis). */
+export interface SoundTask { mode: 'sound'; prompt: string; answer: string; accept: string[]; audio: string; audio2?: string; hint: string; playSeconds: number; points: number; explain: string }
+/** ZEITSPRUNG: Ein Ereignis zwischen vier feste Ankerereignisse einordnen. */
+export interface TimelineTask { mode: 'timeline'; prompt: string; anchors: { year: number; label: string }[]; answerYear: number; answerLabel: string; seconds: number; points: number; explain: string }
+/** PANIK / HOT WIRE: Kooperativ einen Code entschärfen – jeder Spieler kennt nur einen Teil der Hinweise. */
+export interface PanicTask { mode: 'panic'; prompt: string; code: string; clues: string[]; seconds: number; points: number; explain: string }
+/** HOCHSTAPLER: Alle kennen ein geheimes Wort – bis auf einen. Hinweise geben, den Hochstapler enttarnen. */
+export interface ImpostorTask { mode: 'impostor'; prompt: string; word: string; accept: string[]; seconds: number; voteSeconds: number; points: number; explain: string }
 /** Proberunde: interaktive Beispielaufgabe ohne Wertung (Punkte werden nie vergeben). */
 export interface TaskBase { practice?: boolean; /** Redaktionshinweis: offene Prüfpflicht / Vorbehalt – erscheint als Warnung bei der Paketprüfung */ review?: string }
 /** KICKBASE-KONSENS (nur Finale): alle beantworten dieselbe Gruppenfrage, indem sie geheim einen Mitspieler wählen; Punkte für die Wahl(en) mit den meisten Stimmen. */
 export interface VoteTask { mode: 'vote'; prompt: string; seconds: number; points: number; explain: string; /** zusätzlicher wählbarer Kandidat ohne Spielerkonto (z. B. „Michael (Showmaster)“) */ candidate?: string }
-export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask | VoteTask | BluffTask | CorridorTask | TwistTask) & TaskBase;
+export type TaskDef = (GeoTask | RankTask | EstimateTask | GlitchTask | CodeTask | UniqueTask | MatchTask | LinkTask | VoteTask | BluffTask | CorridorTask | TwistTask | PixelTask | DuelTask | ArenaTask | SoundTask | TimelineTask | PanicTask | ImpostorTask) & TaskBase;
 
 /** Regeln eines Spielepakets (fairere Verteilung bei freier Kategorienwahl, Startguthaben). */
 export interface PackRules {
@@ -235,6 +250,8 @@ export interface RoundView {
   points: number; // Budget dieser Aufgabe
   /** modusspezifische Daten (rollenabhängig gefiltert) */
   data: any;
+  /** nur Showmaster, nur vor dem Start: Vorschlag für Sonderrollen (Duellanten, Entschärfer, Hochstapler) */
+  assign?: { kind: string; need: number; pids: string[] };
   /** Auflösung (nur im Stage 'reveal') */
   reveal: any | null;
 }
@@ -268,6 +285,8 @@ export interface View {
     liveRank?: boolean;
     /** Hintergrundmusik (Showmaster): an/aus und Lautstärke 0–100 */
     music?: { on: boolean; vol: number };
+    /** Zähler: der TV spielt bei jeder Änderung kurz einen Testton (Showmaster: „Ton testen“) */
+    soundTest?: number;
     agenda?: { k: 'round' | 'surprise' | 'final' | 'board'; title: string; icon?: string; mode?: Mode; tasks?: number; state: 'done' | 'now' | 'todo' }[];
     progress: { tilesPlayed: number; tilesTotal: number };
   };
@@ -321,6 +340,8 @@ export type Action =
   | { k: 'h.restartTask' }
   | { k: 'h.skipTask' }
   | { k: 'h.skipTile' }
+  | { k: 'h.assign'; pids: string[] }
+  | { k: 'h.soundTest' }
   | { k: 'h.review'; groupKey: string; decision: 'valid' | 'invalid' | 'auto' | { mapTo: string } | { sameAs: string } }
   | { k: 'h.adjust'; pid: string; delta: number; note: string }
   | { k: 'h.release'; pid: string }

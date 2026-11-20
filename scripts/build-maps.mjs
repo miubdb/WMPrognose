@@ -118,7 +118,7 @@ for (let z = 0; z <= MAXZ; z++) {
   db.exec('BEGIN'); await Promise.all(Array.from({ length: conc }, worker)); db.exec('COMMIT');
 }
 const total = db.prepare('SELECT COUNT(*) c, SUM(LENGTH(tile_data)) b FROM tiles').get();
-setMeta('name', 'OUTPLAY Karte'); setMeta('format', 'pbf'); setMeta('minzoom', 0); setMeta('maxzoom', MAXZ); setMeta('bounds', '-180,-85,180,85');
+setMeta('name', 'JANIQUIZITION Karte'); setMeta('format', 'pbf'); setMeta('minzoom', 0); setMeta('maxzoom', MAXZ); setMeta('bounds', '-180,-85,180,85');
 setMeta('attribution', '© OpenStreetMap-Mitwirkende (ODbL), Protomaps'); setMeta('source', SRC);
 setMeta('json', JSON.stringify({ vector_layers: (meta.vector_layers ?? []).filter(l => !DROP_LAYERS.has(l.id)) }));
 db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); db.close();

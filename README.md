@@ -1,4 +1,4 @@
-# OUTPLAY – die interaktive Multiplayer-Gameshow
+# JANIQUIZITION – die interaktive Multiplayer-Gameshow
 
 Showmaster + TV + 6–8 Handys. Die Show läuft **lokal** (Node-Server + SQLite) – ohne Internet. Fragen und Pakete bereitet man bequem im **Admin** vor (auch online).
 
@@ -7,14 +7,14 @@ Showmaster + TV + 6–8 Handys. Die Show läuft **lokal** (Node-Server + SQLite)
 |---|---|---|---|
 | **Online-Admin** | Nur der Admin-Bereich `/admin` (Fragen, Kategorien, Pakete, Szenen, Vorschau, Export/Import) | Vercel (kostenlos), per Handy erreichbar | Serverseitig, dauerhaft: **privater Vercel-Blob-Speicher** (eine SQLite-Datei) |
 | **Online-Testversion** | Gibt es **nicht**: Host/TV/Spieler brauchen WebSockets und laufen online bewusst nicht | – | – |
-| **Lokal spielbare Windows-Version** | Die komplette Show (`OUTPLAY-STARTEN.bat`) inkl. lokalem Admin | Laptop, WLAN, ohne Internet | `data/outplay.db` (SQLite) |
+| **Lokal spielbare Windows-Version** | Die komplette Show (`JANIQUIZITION-STARTEN.bat`) inkl. lokalem Admin | Laptop, WLAN, ohne Internet | `data/outplay.db` (SQLite) |
 | **Inhalts-Export** (JSON) | Fragen, Kategorien, Pakete, Szenen – zum Übertragen/Sichern. **Keine** Räume, Spieler oder Passwörter | Admin → Import/Export | Datei, die du speicherst |
 | **Vollständiges Server-Backup** (.db) | Konsistente Kopie der ganzen Datenbank inkl. Räume, Spieler, Punkte, Spielstände. **Vertraulich** (enthält Passwort-Hashes, Host-PINs, Wiederherstellungscodes) | Admin → Import/Export, automatisch lokal alle 10 min | `.db`-Datei / `data/backups` |
 
 ## Ablauf Donnerstag/Freitag → Samstag
 1. **Online** (`/admin` auf dem Handy): Fragen prüfen/ergänzen, Kategorien ändern, Glitch-Szenen bauen, Paket zusammenstellen → **Prüfen & veröffentlichen**.
 2. **📤 Spieleabend exportieren** (Import/Export oder Paketkarte) → JSON-Datei auf dem Handy; per Mail/Cloud/USB zum Laptop.
-3. **Samstag am Laptop**: `OUTPLAY-STARTEN.bat` starten → `/admin` → Import/Export → Datei wählen → Prüfbericht ansehen → **✅ Importieren & veröffentlichen** (Bestätigung: „Inhalt stimmt mit dem Export überein“).
+3. **Samstag am Laptop**: `JANIQUIZITION-STARTEN.bat` starten → `/admin` → Import/Export → Datei wählen → Prüfbericht ansehen → **✅ Importieren & veröffentlichen** (Bestätigung: „Inhalt stimmt mit dem Export überein“).
 4. `/host` → Spielepaket wählen → Spielraum erstellen. Details: **docs/WINDOWS.md**.
 
 ## Starten (Entwicklung / andere Systeme)
@@ -23,7 +23,7 @@ npm install
 npm run build                       # Frontend nach dist/
 PORT=8080 DATA_DIR=./data npm start # http://localhost:8080
 ```
-Windows: `OUTPLAY-STARTEN.bat` (prüft Node, installiert/baut bei Bedarf, wählt die WLAN-Adresse, zeigt alle Links).
+Windows: `JANIQUIZITION-STARTEN.bat` (prüft Node, installiert/baut bei Bedarf, wählt die WLAN-Adresse, zeigt alle Links).
 
 ## Umgebungsvariablen
 `PORT` (8080) · `DATA_DIR` (./data) · `ADMIN_PASSWORD` (Admin; ohne Angabe wird lokal beim ersten Start ein Zufallspasswort erzeugt → Konsole + `data/admin-passwort.txt`) · `HOST_PASSWORD` (optional, schützt das Erstellen von Räumen) · `OUTPLAY_HOST` / `PUBLIC_URL` (feste Adresse für QR-Codes, z. B. `http://192.168.0.23:8080`). Online zusätzlich: `BLOB_READ_WRITE_TOKEN` (setzt Vercel automatisch beim Verbinden des Blob-Speichers) und `ADMIN_PASSWORD` (Pflicht).
@@ -52,7 +52,7 @@ Serverseitig geprüfte Anmeldung (Passwort nur als Hash bzw. Konstantzeit-Vergle
 ## Backups
 - **A) Inhalts-Backup (JSON):** Admin → Import/Export → „Alles (Inhalte)“ / Paket / Fragen. Prüfsumme in der Datei.
 - **B) Voll-Backup (.db):** Admin → „Voll-Backup herunterladen“ (SQLite `VACUUM INTO`, auch im WAL-Betrieb konsistent). Lokal zusätzlich automatisch alle 10 Minuten nach `data/backups` (letzte 30). **Eine laufende `outplay.db` einfach zu kopieren ist NICHT zuverlässig** (ungesicherte Daten in der `-wal`-Datei können fehlen).
-- **Wiederherstellen:** Server beenden → Backup-Datei auf `OUTPLAY-WIEDERHERSTELLEN.bat` ziehen (oder `npm run restore -- backup.db`). Das Skript prüft die Datei, verweigert bei laufendem Server und sichert die alte Datenbank als `outplay.db.vor-restore-…`.
+- **Wiederherstellen:** Server beenden → Backup-Datei auf `JANIQUIZITION-WIEDERHERSTELLEN.bat` ziehen (oder `npm run restore -- backup.db`). Das Skript prüft die Datei, verweigert bei laufendem Server und sichert die alte Datenbank als `outplay.db.vor-restore-…`.
 
 ## Kosten & Hosting
 Lokal: keine. Online-Admin: Vercel Hobby (kostenlos) + Vercel Blob (im Hobby-Tarif enthaltenes Kontingent). Details und Einrichtung: **docs/ONLINE-SETUP.md**. Es gibt keine kostenpflichtige Konfiguration im Repository (die frühere `render.yaml` mit bezahltem Tarif wurde entfernt; das `Dockerfile` ist optional und kostenlos nutzbar). Cloudflare-Alternative: `docs/cloudflare.md`.
@@ -61,7 +61,7 @@ Lokal: keine. Online-Admin: Vercel Hobby (kostenlos) + Vercel Blob (im Hobby-Tar
 `npm test` (Wertungen, Multiplayer über echte WebSockets, komplette Show mit Bots, Admin-API, Online-Adapter, Transfer, Backup, Netzwerk). Browser-E2E (Playwright; Server vorher starten bzw. Skript startet selbst): `tests/e2e/play.mjs`, `modes.mjs`, `admin.mjs`, `transfer.mjs` und für die komplette Show `node --import tsx tests/e2e/show.mjs` (startet den Server selbst). Ehrlicher Stand: siehe `docs/TESTBERICHT.md`.
 
 ## Karte
-Vektorkarte auf OpenStreetMap-Basis, offline-fähig: siehe [docs/KARTE.md](docs/KARTE.md). Vorbereitung einmalig mit `OUTPLAY-KARTE-LADEN.bat`. Ohne diese Datei läuft eine einfache SVG-Karte (Natural Earth, gemeinfrei; GeoNames CC BY 4.0).
+Vektorkarte auf OpenStreetMap-Basis, offline-fähig: siehe [docs/KARTE.md](docs/KARTE.md). Vorbereitung einmalig mit `JANIQUIZITION-KARTE-LADEN.bat`. Ohne diese Datei läuft eine einfache SVG-Karte (Natural Earth, gemeinfrei; GeoNames CC BY 4.0).
 
 ## Spielmodi (aktiv) und Altbestand
 Aktiv sind sieben Modi: WO ZUR HÖLLE?, BLIND RANK, SETZ AUF MICH, GLITCH, EINZIGARTIG, MATCHMAKER, DIE VERBINDUNG. **CODEBREAK wird nicht mehr angeboten.** Bereits gespeicherte CODEBREAK-Fragen, ältere Pakete und Backups bleiben erhalten (lesbar, in alten Paketversionen spielbar), lassen sich aber nicht neu anlegen oder in neu veröffentlichte Pakete übernehmen.

@@ -74,7 +74,7 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
           if (b) return json(200, C.getQuestion(b));
           return json(200, C.listQuestions({ q: q.get('q') ?? undefined, mode: q.get('mode') ?? undefined, topic: q.get('topic') ?? undefined, archived: q.has('archived') ? q.get('archived') === '1' : undefined }));
         }
-        const body = await readBody(256 * 1024);
+        const body = await readBody(4 * 1024 * 1024);
         if (method === 'POST' && !b) return json(201, C.createQuestion(body));
         if (method === 'POST' && c === 'duplicate') return json(201, C.duplicateQuestion(b));
         if (method === 'PUT' && b) return json(200, C.updateQuestion(b, body));
@@ -109,7 +109,7 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
       }
       case 'preview': {
         if (method !== 'POST') break;
-        const body = await readBody(256 * 1024);
+        const body = await readBody(4 * 1024 * 1024);
         return json(200, buildPreview(body.task, C.sceneMap(), body.meta ?? {}));
       }
       case 'standard': {   // mitgeliefertes Standardpaket: Status / sicher installieren (nicht-destruktiv, mit Archivierung des Vorgängers)
@@ -130,7 +130,7 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
         if (method !== 'GET') break;
         const buf = app.backup();
         const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16);
-        res.writeHead(200, { 'content-type': 'application/octet-stream', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="OUTPLAY-VOLLBACKUP-VERTRAULICH-${stamp}.db"` });
+        res.writeHead(200, { 'content-type': 'application/octet-stream', 'cache-control': 'no-store', 'content-disposition': `attachment; filename="JANIQUIZITION-VOLLBACKUP-VERTRAULICH-${stamp}.db"` });
         return void res.end(buf);
       }
       case 'export': {

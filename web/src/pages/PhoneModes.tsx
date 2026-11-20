@@ -15,6 +15,7 @@ const ERR: Record<string, string> = {
   closed: 'Die Zeit ist abgelaufen – keine Abgabe mehr möglich.', already_submitted: 'Du hast bereits abgegeben.', invalid: 'Ungültige Eingabe.', paused: 'Die Show ist pausiert.',
   not_enough_points: 'Dafür hast du nicht genug Punkte.', wrong_step: 'Dieser Begriff ist schon vorbei.', slot_taken: 'Dieser Platz ist schon belegt.', no_attempts_left: 'Keine Versuche mehr.',
   session_replaced: 'Dieses Gerät wurde abgemeldet.', review_needed: 'Bitte zuerst die unklaren Antworten prüfen.', invalid_target: 'Diese Schätzung kann man nicht wählen.', invalid_bet: 'Ungültiger Einsatz.',
+  not_defuser: 'Nur der Entschärfer gibt den Code ein.', eliminated: 'Du bist in dieser Arena ausgeschieden.', duelist: 'Duellanten tippen nicht mit.', spectator: 'Du schaust dem Duell zu.', is_word: 'Das geheime Wort selbst ist kein Hinweis!', not_impostor: 'Nur der Hochstapler rät das Wort.',
   is_truth: 'Das ist zu nah an der Wahrheit – erfinde etwas anderes!', own_lie: 'Das ist deine eigene Erfindung.', invalid_option: 'Diese Antwort gibt es nicht.', low_gt_high: 'Der untere Wert muss kleiner sein als der obere.',
 };
 export const errText = (e?: string) => (e && ERR[e]) || (e ? `Fehler: ${e}` : 'Fehler');
@@ -72,6 +73,13 @@ const MODE_TXT: Record<string, string> = {
   unique: 'Nenne eine gültige Antwort – aber bloß keine, die auch andere nennen!',
   match: 'Verbinde links und rechts, was zusammengehört. 6 Paare, 50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.',
   link: 'Vier Hinweise erscheinen nacheinander. Je früher du die gemeinsame Lösung nennst, desto mehr Punkte – aber du hast nur einen Versuch!',
+  pixel: 'Ein Bild wird auf dem Fernseher Stufe für Stufe schärfer. Tippe ein, was du erkennst – je früher richtig, desto mehr Punkte. Nur ein Versuch!',
+  duel: 'Zwei Spieler duellieren sich in drei Fragen. Alle anderen tippen vorher, wer gewinnt.',
+  arena: 'Alle beantworten dieselben Fragen. Wer falsch liegt, scheidet aus – wer alles überlebt, bekommt einen Bonus.',
+  sound: 'Hör auf den Fernseher und tippe ein, was du hörst. Je früher richtig, desto mehr Punkte.',
+  timeline: 'Auf dem Fernseher steht eine Zeitleiste mit vier festen Ereignissen. Ordne das gesuchte Ereignis zwischen die richtigen ein.',
+  panic: 'Teamspiel! Jeder hat nur einen Teil der Hinweise. Sprecht euch ab – der Entschärfer gibt den Code ein.',
+  impostor: 'Alle kennen ein geheimes Wort – bis auf einen. Gib einen Hinweis, ohne das Wort zu verraten, und enttarne den Hochstapler.',
   bluff: 'Erfinde eine glaubwürdige falsche Antwort. Danach suchst du unter allen Antworten die echte – und jeder, der auf deine Lüge hereinfällt, bringt dir Punkte.',
   corridor: 'Gib einen Bereich an (von … bis …), in dem deiner Meinung nach die Lösung liegt. Je enger der Bereich, desto mehr Punkte – aber daneben ist 0.',
   twist: 'Ein bekannter Titel wurde ins Gegenteil verdreht. Tippe das Original ein – je schneller, desto mehr Punkte.',
@@ -101,6 +109,13 @@ function PhoneBody(p: Props & { me?: PlayerPublic }) {
     case 'link': return <LinkPhone {...p} d={d} />;
     case 'vote': return <VotePhone {...p} d={d} />;
     case 'bluff': return <BluffPhone {...p} d={d} />;
+    case 'pixel': return <TextRacePhone {...p} d={d} kind="pixel" />;
+    case 'sound': return <TextRacePhone {...p} d={d} kind="sound" />;
+    case 'duel': return <DuelPhone {...p} d={d} />;
+    case 'arena': return <ArenaPhone {...p} d={d} />;
+    case 'timeline': return <TimelinePhone {...p} d={d} />;
+    case 'panic': return <PanicPhone {...p} d={d} />;
+    case 'impostor': return <ImpostorPhone {...p} d={d} />;
     case 'corridor': return <CorridorPhone {...p} d={d} />;
     case 'twist': return <TwistPhone {...p} d={d} />;
   }
@@ -569,6 +584,139 @@ function TwistPhone({ round, act, room, d }: Props & { d: any }) {
   );
 }
 
+// ---------------------------------------------------------------- PIXELPANIK / TONSPUR (Eintippen, je früher desto mehr Punkte)
+function TextRacePhone({ round, act, room, d, kind }: Props & { d: any; kind: 'pixel' | 'sound' }) {
+  const snd = useSender(act); const mine = d.mine; const [draft, setDraft] = useDraft<string>(`${room}.${round.rid}.${kind}`, '');
+  const lvl = kind === 'pixel' ? d.level : d.phase; const now = d.points[lvl];
+  if (round.stage !== 'open') return <Waiting text={mine ? 'Antwort abgegeben' : 'Zeit abgelaufen'} sub="Gleich kommt die Auflösung." />;
+  return (
+    <div className="twist">
+      <div className="question small">{d.prompt}</div>
+      <div className="twisted">{kind === 'pixel' ? `🟪 Stufe ${d.level + 1} von ${d.levels}` : `🎧 ${['Erstes Hören', 'Zweites Hören', 'Mit Hinweis'][d.phase]}`} · jetzt richtig = {now} Punkte</div>
+      {kind === 'sound' && d.hint && <div className="status warn">💡 Hinweis: {d.hint}</div>}
+      {!mine ? <>
+        <div className="inputrow"><input autoComplete="off" autoCapitalize="words" placeholder={kind === 'pixel' ? 'Was erkennst du?' : 'Was hörst du?'} value={draft} maxLength={80} onChange={e => setDraft(e.target.value)} /></div>
+        <Status sent={false} draft={!!draft} sending={snd.state === 'sending'} msg={snd.msg} />
+        <button className="btn primary wide" disabled={!draft.trim() || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { answer: draft } })}>Antwort abgeben</button>
+        <p className="muted center small">Nur ein Versuch – sofort abgeben lohnt sich.</p>
+      </> : <><Status sent draft={false} /><div className="bignum">{mine.answer}</div></>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Multiple-Choice-Knöpfe (Duell, Arena)
+function McButtons({ options, disabled, chosen, onPick }: { options: string[]; disabled?: boolean; chosen: number | null; onPick: (i: number) => void }) {
+  return <div className="optlist">{options.map((o, i) => <button type="button" key={i} disabled={disabled} className={`optcard ${chosen === i ? 'sel' : ''}`} onClick={() => onPick(i)}><b>{String.fromCharCode(65 + i)}</b><span>{o}</span></button>)}</div>;
+}
+function DuelPhone({ round, act, view, pid, d }: Props & { d: any }) {
+  const snd = useSender(act); const [sel, setSel] = useState<number | null>(null); const [pick, setPick] = useState<string | null>(null);
+  const names = (ids: string[]) => ids.map(id => view.players.find(p => p.id === id));
+  const [a, b] = names(d.duelists);
+  const head = <div className="duelhead"><span>{a?.name}</span><b>⚔️</b><span>{b?.name}</span></div>;
+  if (round.stage === 'open') {
+    if (d.role === 'duelist') return <div className="duel">{head}<Waiting text="Du bist Duellant!" sub={`Die anderen tippen gerade auf den Sieger (${d.predictedCount} fertig) – gleich geht es los.`} /></div>;
+    if (d.mine?.pick) return <div className="duel">{head}<Status sent draft={false} /><p className="center">Dein Tipp: <b>{view.players.find(p => p.id === d.mine.pick)?.name}</b></p><p className="muted center">Warte auf die anderen …</p></div>;
+    return (
+      <div className="duel">{head}<p className="center">Wer gewinnt das Duell? Richtig = {d.predict} Punkte.</p>
+        <div className="votegrid">{[a, b].map(p => p && <button type="button" key={p.id} className={`votecard ${pick === p.id ? 'sel' : ''}`} onClick={() => setPick(p.id)}><Avatar a={p.avatar} size={80} /><b>{p.name}</b></button>)}</div>
+        <Status sent={false} draft={!!pick} sending={snd.state === 'sending'} msg={snd.msg} />
+        <button className="btn primary wide" disabled={!pick || snd.state === 'sending'} onClick={() => pick && snd.send({ k: 'submit', payload: { winner: pick } })}>Tipp abgeben</button>
+      </div>);
+  }
+  if (round.stage === 'bet' && d.question) {
+    const done = d.mine?.ans?.[d.q] !== undefined && d.mine?.ans?.[d.q] !== null;
+    if (d.role === 'duelist') return (
+      <div className="duel">{head}<div className="question small">Frage {d.q + 1} von 3: {d.question.q}</div>
+        <McButtons options={d.question.options} disabled={done} chosen={done ? d.mine.ans[d.q] : sel} onPick={setSel} />
+        {done ? <Status sent draft={false} /> : <><Status sent={false} draft={sel !== null} sending={snd.state === 'sending'} msg={snd.msg} /><button className="btn primary wide" disabled={sel === null || snd.state === 'sending'} onClick={async () => { await snd.send({ k: 'submit', payload: { answer: sel } }); setSel(null); }}>Antwort abgeben</button></>}
+      </div>);
+    return <div className="duel">{head}<Waiting text={`Frage ${d.q + 1} von 3`} sub="Du schaust zu – die Antworten bleiben geheim." /></div>;
+  }
+  return <Waiting text="Duell beendet" sub="Gleich kommt die Auflösung." />;
+}
+function ArenaPhone({ round, act, d }: Props & { d: any }) {
+  const snd = useSender(act); const [sel, setSel] = useState<number | null>(null); const m = d.mine ?? {};
+  useEffect(() => { setSel(null); }, [d.q]);
+  if (round.stage === 'open' && d.question) {
+    if (!m.alive) return <div className="duel"><div className="question small">Herausforderung {d.q + 1}: {d.question.q}</div><Waiting text="Du bist ausgeschieden" sub="Schau auf den Fernseher – die Überlebenden kämpfen weiter." /></div>;
+    const done = m.ans !== null && m.ans !== undefined;
+    return (
+      <div className="duel"><div className="muted center small">Herausforderung {d.q + 1} von 3 · noch {d.aliveCount} im Rennen</div><div className="question small">{d.question.q}</div>
+        <McButtons options={d.question.options} disabled={done} chosen={done ? m.ans : sel} onPick={setSel} />
+        {done ? <Status sent draft={false} /> : <><Status sent={false} draft={sel !== null} sending={snd.state === 'sending'} msg={snd.msg} /><button className="btn primary wide" disabled={sel === null || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { answer: sel } })}>Antwort abgeben</button></>}
+      </div>);
+  }
+  if (round.stage === 'bet') { const r = d.results?.[d.q]; const alive = (d.alive as string[]).length ? m.alive : false; void alive; const out = r?.eliminated?.length ? 'Falsche Antworten sind raus!' : 'Alle richtig!'; return <Waiting text={m.alive ? '✅ Überlebt!' : m.survived || r ? '💀 Ausgeschieden' : 'Ausgeschieden'} sub={`${out} Gleich geht es weiter.`} />; }
+  return <Waiting text={m.alive ? 'Arena überlebt!' : 'Arena beendet'} sub="Gleich kommt die Auflösung." />;
+}
+
+// ---------------------------------------------------------------- ZEITSPRUNG
+function TimelinePhone({ round, act, d }: Props & { d: any }) {
+  const snd = useSender(act); const [sel, setSel] = useState<number | null>(null); const mine = d.mine;
+  if (round.stage !== 'open') return <Waiting text={mine ? 'Position abgegeben' : 'Zeit abgelaufen'} sub="Gleich kommt die Auflösung." />;
+  const A = d.anchors as { year: number; label: string }[];
+  const slotText = (i: number) => i === 0 ? `Vor ${A[0].year}` : i === 4 ? `Nach ${A[3].year}` : `${A[i - 1].year} – ${A[i].year}`;
+  const chosen = mine ? mine.slot : sel;
+  return (
+    <div className="timeline">
+      <div className="question">{d.prompt}</div>
+      <p className="muted center small">Wo gehört das Ereignis hin?</p>
+      <div className="tlist">{[0, 1, 2, 3, 4].map(i => (
+        <div key={i}>
+          <button type="button" disabled={!!mine} className={`tslot ${chosen === i ? 'sel' : ''}`} onClick={() => setSel(i)}>{slotText(i)}</button>
+          {i < 4 && <div className="tanchor"><b>{A[i].year}</b> {A[i].label}</div>}
+        </div>))}</div>
+      {mine ? <Status sent draft={false} /> : <><Status sent={false} draft={sel !== null} sending={snd.state === 'sending'} msg={snd.msg} /><button className="btn primary wide" disabled={sel === null || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { slot: sel } })}>Position abgeben</button></>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- PANIK / HOT WIRE
+function PanicPhone({ round, act, d }: Props & { d: any }) {
+  const snd = useSender(act); const [code, setCode] = useState(''); const [fb, setFb] = useState('');
+  if (round.stage !== 'open') return <Waiting text={d.solved ? 'ENTSCHÄRFT!' : 'Vorbei'} sub="Gleich kommt die Auflösung." />;
+  if (d.role === 'defuser') return (
+    <div className="panic"><div className="question small">{d.prompt}</div>
+      <div className="status warn">💣 Du bist der ENTSCHÄRFER! Frag die anderen nach ihren Hinweisen und gib den dreistelligen Code ein.</div>
+      <div className="inputrow"><input inputMode="numeric" autoComplete="off" maxLength={3} placeholder="Code (3 Ziffern)" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 3))} style={{ fontSize: '2rem', letterSpacing: '.4em', textAlign: 'center' }} /></div>
+      <p className="center muted small">Versuche übrig: {d.maxAttempts - d.attempts}{d.wrong?.length ? ` · schon falsch: ${d.wrong.join(', ')}` : ''}</p>
+      {fb && <div className="status bad">{fb}</div>}
+      <button className="btn primary wide" disabled={code.length !== 3 || snd.state === 'sending'} onClick={async () => { const a: any = await snd.send({ k: 'submit', payload: { code } }); if (a.ok && a.info && a.info.correct === false) { setFb(`Falsch – noch ${a.info.left} Versuch(e)!`); setCode(''); } }}>Code eingeben</button>
+    </div>);
+  return (
+    <div className="panic"><div className="question small">{d.prompt}</div>
+      <div className="status warn">🤫 Das sind DEINE geheimen Hinweise. Sag sie dem Entschärfer – aber zeig sie nicht herum!</div>
+      <div className="clues">{d.myClues.map((c: any) => <div key={c.no} className="clue new"><b>{c.no}</b><span>{c.text}</span></div>)}{!d.myClues.length && <p className="muted center">Du hast diesmal keinen Hinweis – hilf beim Zusammensetzen!</p>}</div>
+    </div>);
+}
+
+// ---------------------------------------------------------------- HOCHSTAPLER
+function ImpostorPhone({ round, act, view, pid, d, room }: Props & { d: any }) {
+  const snd = useSender(act); const mine = d.mine ?? {}; const [clue, setClue] = useDraft<string>(`${room}.${round.rid}.imp`, ''); const [vote, setVote] = useState<string | null>(null); const [guess, setGuess] = useState('');
+  const imp = d.role === 'impostor';
+  const who = imp ? <div className="status bad">🕵️ DU BIST DER HOCHSTAPLER! Thema: <b>{d.topic}</b> – das geheime Wort kennst du nicht. Fall nicht auf!</div> : <div className="status ok">Thema: <b>{d.topic}</b> · Geheimes Wort: <b>{d.word}</b></div>;
+  if (round.stage === 'open') return (
+    <div className="panic">{who}
+      {!mine.clue ? <>
+        <p className="muted center small">Schreibe EIN Wort als Hinweis – nicht das geheime Wort selbst!</p>
+        <div className="inputrow"><input autoComplete="off" maxLength={24} placeholder="Dein Hinweiswort" value={clue} onChange={e => setClue(e.target.value)} /></div>
+        <Status sent={false} draft={!!clue} sending={snd.state === 'sending'} msg={snd.msg} />
+        <button className="btn primary wide" disabled={!clue.trim() || snd.state === 'sending'} onClick={() => snd.send({ k: 'submit', payload: { clue } })}>Hinweis abgeben</button>
+      </> : <><Status sent draft={false} /><div className="bignum">{mine.clue}</div><p className="muted center">Warte auf die anderen … ({d.clueCount} von {d.playerCount})</p></>}
+    </div>);
+  if (round.stage === 'bet') return (
+    <div className="panic">{who}
+      <div className="clues">{(d.clues ?? []).map((c: any) => { const p = view.players.find(x => x.id === c.pid); return <div key={c.pid} className="clue"><b>{p?.name}</b><span>{c.clue}</span></div>; })}</div>
+      {mine.vote ? <><Status sent draft={false} /><p className="center">Dein Verdacht: <b>{view.players.find(p => p.id === mine.vote)?.name}</b></p></> : <>
+        <p className="center">Wer ist der Hochstapler?</p>
+        <div className="votegrid">{view.players.filter(p => p.id !== pid).map(p => <button type="button" key={p.id} className={`votecard ${vote === p.id ? 'sel' : ''}`} onClick={() => setVote(p.id)}><Avatar a={p.avatar} size={64} /><b>{p.name}</b></button>)}</div>
+        {imp && <div className="inputrow"><input autoComplete="off" maxLength={40} placeholder="Optional: Rate das geheime Wort" value={guess} onChange={e => setGuess(e.target.value)} /></div>}
+        <Status sent={false} draft={!!vote} sending={snd.state === 'sending'} msg={snd.msg} />
+        <button className="btn primary wide" disabled={!vote || snd.state === 'sending'} onClick={async () => { if (imp && guess.trim()) await snd.send({ k: 'submit', payload: { guess } }); await snd.send({ k: 'submit', payload: { vote } }); }}>Verdacht abgeben</button></>}
+    </div>);
+  return <Waiting text="Abstimmung beendet" sub="Gleich kommt die Auflösung." />;
+}
+
 // ---------------------------------------------------------------- Auflösung
 function PhoneReveal({ round, view, pid }: Props) {
   const rev = round.reveal;
@@ -612,6 +760,13 @@ function ownResult(mode: string, rev: any, pid: string, view: View): { points: n
     case 'bluff': { const r = rev.rows.find((x: any) => x.pid === pid); return r && (r.lie || r.pick) ? { points: r.points, title: r.correct ? 'Wahrheit erkannt! 🔍' : 'Reingefallen', text: [r.correct ? '' : `Richtig war: ${rev.answer}`, r.fooled ? `${r.fooled} Mitspieler hast du getäuscht 😈` : ''].filter(Boolean).join(' · ') || 'Niemand hat deine Lüge geglaubt.' } : none; }
     case 'corridor': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.low !== null ? { points: r.points, title: `Lösung: ${rev.answer.toLocaleString('de-DE')} ${rev.unit}`, text: r.hit ? `Treffer! Dein Bereich war ${r.width.toLocaleString('de-DE')} ${rev.unit} breit.` : 'Die Lösung lag nicht in deinem Bereich.' } : none; }
     case 'twist': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? 'Original erkannt! 🎬' : 'Leider falsch', text: r.correct ? `Richtig: ${rev.answer}` : `Gesucht war: ${rev.answer}` } : none; }
+    case 'pixel': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? `Erkannt auf Stufe ${r.level + 1}! 🟪` : 'Leider falsch', text: `Gesucht war: ${rev.answer}` } : none; }
+    case 'sound': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.answer ? { points: r.points, title: r.correct ? 'Richtig gehört! 🎧' : 'Leider falsch', text: `Gesucht war: ${rev.answer}` } : none; }
+    case 'duel': { const me = rev.duelists.includes(pid); if (me) { const w = rev.winner; return { points: w === null ? rev.draw : w === pid ? rev.win : 0, title: w === null ? 'Unentschieden' : w === pid ? 'Duell gewonnen! ⚔️' : 'Duell verloren', text: `${rev.scores[pid]} von 3 richtig` }; } const r = rev.picks.find((x: any) => x.pid === pid); return r && r.pick ? { points: r.correct ? rev.predict : 0, title: r.correct ? 'Richtig getippt!' : rev.winner === null ? 'Unentschieden – kein Verlust' : 'Falsch getippt', text: `Du hast auf ${view.players.find(p => p.id === r.pick)?.name} gesetzt.` } : none; }
+    case 'arena': { const r = rev.rows.find((x: any) => x.pid === pid); return r ? { points: r.points, title: r.survived === 3 ? 'Arena komplett überlebt! 🏟️' : `${r.survived} von 3 überlebt`, text: r.survived === 3 ? `Bonus +${rev.bonus}` : 'Ausgeschieden – beim nächsten Mal!' } : none; }
+    case 'timeline': { const r = rev.rows.find((x: any) => x.pid === pid); return r && r.slot !== null ? { points: r.points, title: r.slot === rev.correct ? 'Richtiges Zeitfeld! ⏳' : r.points ? 'Direkt daneben' : 'Falsches Zeitfeld', text: `${rev.answerLabel || 'Das Ereignis'}: ${rev.answerYear}` } : none; }
+    case 'panic': { const p = rev.perPlayer; return { points: p, title: rev.solved ? (rev.fast ? 'ENTSCHÄRFT – blitzschnell! 💥' : 'ENTSCHÄRFT! 🎉') : 'Nicht geschafft', text: `Der Code war ${rev.code}` }; }
+    case 'impostor': { const imp = rev.impostor === pid; const mine = view.players.find(p => p.id === pid); void mine; const voted = (rev.votes[rev.impostor] ?? []).includes(pid); const pts = imp ? (rev.caught ? (rev.guessed ? rev.guessPts : 0) : rev.survive) : voted ? rev.catchPts : 0; return { points: pts, title: imp ? (rev.caught ? 'Enttarnt!' : 'Nicht enttarnt! 🕵️') : voted ? 'Hochstapler erkannt!' : 'Falscher Verdacht', text: `Das Wort war „${rev.word}“.` }; }
     case 'unique': { const r = rev.results[pid]; return r ? { points: r.points, title: r.kind === 'unique' ? 'EINZIGARTIG! ✨' : r.kind === 'shared' ? 'Mehrfach genannt' : 'Ungültig', text: rev.groups.find((g: any) => g.members.includes(pid))?.label ?? '' } : none; }
   }
   void view;

@@ -26,7 +26,7 @@ export function bookHash(book: Book): string {
 const J = <T>(s: string) => JSON.parse(s) as T;
 
 export interface PackData { name: string; description: string; categoryIds: string[]; surprise: string; final: string; rules: Required<PackRules>; /** fester Showablauf (optional) */ show?: ShowStep[] }
-export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'OUTPLAY', winnerTitle: 'OUTPLAY-Champion', tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: '', winnerLine: '', boardTitle: '', uniquePoints: 0, boardEveryRound: false };
+export const DEFAULT_RULES: Required<PackRules> = { startCredit: 200, maxFootball: 2, maxPerMode: 2, rankVariant: 'task', showTitle: 'JANIQUIZITION', winnerTitle: 'JANIQUIZITION-Champion', tasksPerMode: 4, estimateBets: [], estimateBonus: 0, tagline: '', winnerLine: '', boardTitle: '', uniquePoints: 0, boardEveryRound: false };
 
 export function normalizePack(raw: any): PackData {
   const r = raw ?? {};
@@ -413,7 +413,7 @@ export class ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
-  static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3', 'show-after', 'show-new'];
+  static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3', 'show-after', 'show-new', 'show-modes'];
   static readonly REFRESH_PACKS = ['show-4z', 'show-5', 'show-after'];
   static readonly MAIN_PACK = 'show-4z';
   private seedShow(id: string) { return (this.seed.extraShows ?? []).find(x => x.pack.id === id); }
@@ -487,7 +487,7 @@ export class ContentService {
   wasSeeded = false;
 
   export(scope: 'all' | 'questions' | { pack: string }) {
-    const out: any = { format: 'outplay-content', version: 2, app: 'OUTPLAY', exportedAt: new Date(this.now()).toISOString() };
+    const out: any = { format: 'outplay-content', version: 2, app: 'JANIQUIZITION', exportedAt: new Date(this.now()).toISOString() };
     const wantScenes = (qs: { task: TaskDef }[]) => {
       const ids = new Set(qs.filter(q => q.task.mode === 'glitch').map(q => (q.task as any).scene));
       return this.listScenes().filter(s => ids.has(s.id) || (!s.builtin && scope !== 'all' && scope === 'questions')).map(s => ({ id: s.id, title: s.title, builtin: !!s.builtin, template: s.template ?? null, data: { id: s.id, title: s.title, bg: s.bg, items: s.items, changes: s.changes } }));
@@ -521,7 +521,7 @@ export class ContentService {
    * dryRun: nichts wird gespeichert (Trockenlauf); publish: Pakete prüfen und lokal veröffentlichen (mit Inhaltsvergleich).
    */
   import(data: any, onConflict: 'rename' | 'skip' | 'overwrite' = 'rename', opts: { dryRun?: boolean; publish?: boolean } = {}) {
-    if (!data || data.format !== 'outplay-content' || ![1, 2].includes(data.version)) throw new ApiError(422, 'Keine gültige OUTPLAY-Exportdatei (format/version)');
+    if (!data || data.format !== 'outplay-content' || ![1, 2].includes(data.version)) throw new ApiError(422, 'Keine gültige JANIQUIZITION-Exportdatei (format/version)');
     type St = { created: number; identical: number; renamed: number; overwritten: number; skipped: number };
     const mk = (): St => ({ created: 0, identical: 0, renamed: 0, overwritten: 0, skipped: 0 });
     const res: any = { dryRun: !!opts.dryRun, onConflict, scenes: mk(), questions: mk(), categories: mk(), packs: mk(), errors: [] as string[], warnings: [] as string[], packResults: [] as any[], idMap: {} as Record<string, Record<string, string>> };

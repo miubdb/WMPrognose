@@ -335,3 +335,15 @@ export function twistPoints(points: number, elapsedMs: number, seconds: number):
   const f = Math.min(1, Math.max(0, elapsedMs / (seconds * 1000)));
   return Math.round(points * (1 - 0.5 * f));
 }
+
+// ---------- Neue Spiele (Punktetabellen, eine Quelle für Server, Anzeige und Tests)
+export const PIXEL_POINTS = [300, 240, 180, 120, 60];
+export const SOUND_POINTS = [300, 200, 100];
+export const DUEL_WIN = 250, DUEL_DRAW = 75, DUEL_PREDICT = 100;
+export const ARENA_STEP = 50, ARENA_BONUS = 150;
+export const TIMELINE_EXACT = 250, TIMELINE_NEAR = 100;
+export const PANIC_PER_PLAYER = 200, PANIC_FAST_BONUS = 50;
+export const IMPOSTOR_SURVIVE = 300, IMPOSTOR_GUESS = 150, IMPOSTOR_CATCH = 100;
+/** ZEITSPRUNG: Feld 0..4 (vor dem ersten Anker … nach dem letzten), in das das Jahr gehört. */
+export function timelineSlot(anchorYears: number[], year: number): number { return anchorYears.filter(y => y < year).length; }
+export function timelinePoints(slot: number, correct: number): number { return slot === correct ? TIMELINE_EXACT : Math.abs(slot - correct) === 1 ? TIMELINE_NEAR : 0; }

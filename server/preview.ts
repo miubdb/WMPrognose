@@ -1,6 +1,7 @@
 // Vorschau: spielt eine einzelne Aufgabe mit der ECHTEN Engine in einem flüchtigen Raum (nie gespeichert, nie mit echten Räumen verbunden).
 import type { Avatar, TaskDef, TileDef, View } from '../shared/types';
 import { clueSecs } from '../shared/scoring';
+import { timelineSlot } from '../shared/scoring';
 import { normalizeTask, validateTask } from '../shared/validate';
 import type { Scene } from '../shared/scenes';
 import { Engine } from './engine';
@@ -18,6 +19,13 @@ export const FORMULAS: Record<string, string> = {
   match: '50 Punkte je richtig verbundenem Paar, höchstens 300. Keine Minuspunkte, kein Zeitbonus – nur die Richtigkeit zählt. Die Zuordnung zählt, wie sie bei Ablauf der Zeit (oder bei der endgültigen Abgabe) steht.',
   link: 'Eine endgültige Antwort. Richtig nach Hinweis 1/2/3/4 = 300/225/150/75 Punkte, falsch oder keine Antwort = 0. Die Hinweisstufe bestimmt der Server beim Eingang der Antwort.',
   vote: 'KICKBASE-KONSENS: Jeder wählt geheim einen Mitspieler. Die Wahl(en) mit den meisten Stimmen erhalten Punkte – bei Gleichstand alle häufigsten Wahlen. Man darf auch sich selbst wählen.',
+  pixel: 'Erkannt auf Stufe 1/2/3/4/5 = 300/240/180/120/60 Punkte, falsch = 0. Ein Versuch; die Stufe bestimmt der Server beim Eingang der Antwort.',
+  duel: 'Duellsieger 250, Verlierer 0, Unentschieden je 75. Richtige Siegerprognose der Zuschauer 100 (bei Unentschieden kein Verlust). Nur das Wissen zählt, nicht die Schnelligkeit.',
+  arena: 'Je überlebter Frage 50 Punkte, alle drei überlebt: zusätzlich 150 (max. 300). Wer falsch oder gar nicht antwortet, scheidet aus. Keine Minuspunkte.',
+  sound: 'Richtig nach erstem Hören 300, nach zweitem Hören 200, mit Hinweis 100, falsch 0. Ein Versuch.',
+  timeline: 'Richtiges Zeitfeld 250 Punkte, direkt benachbartes Feld 100, sonst 0.',
+  panic: 'Kooperativ: Gelöst = 200 Punkte für jeden Spieler, blitzschnell (mehr als die halbe Zeit übrig) zusätzlich 50. Drei Versuche für den Entschärfer, sonst 0.',
+  impostor: 'Hochstapler nicht enttarnt 300; enttarnt, aber Wort erraten 150; jeder, der den Hochstapler richtig verdächtigt, 100.',
   bluff: 'Richtige Antwort erkannt = Punkte (z. B. 200); für jeden Mitspieler, der auf deine erfundene Antwort hereinfällt, gibt es Täuschungspunkte (z. B. 100). Gleiche Lügen werden zusammengefasst. Die eigene Lüge ist nicht wählbar. Keine Minuspunkte.',
   corridor: 'Nur Treffer zählen (Lösung liegt im Korridor): Punkte = Maximalpunkte × (1 − Breite ÷ (2 × |Lösung|)), mindestens 10 %. Schmal = viel, sehr breit = wenig, daneben = 0. Keine Minuspunkte.',
   twist: 'Richtiges Original = Punkte; Schnelligkeit zählt: sofort 100 %, kurz vor Ablauf 50 %. Falsch = 0, ein Versuch. Tippfehler werden bei längeren Begriffen toleriert.',
@@ -102,6 +110,42 @@ export function buildPreview(rawTask: unknown, scenes: Record<string, Scene>, me
       P(1, { k: 'submit', payload: { pairs: [0, 1, 2, 3, 4, 5].map((i, k) => (k < 3 ? posOf(i) : posOf((i + 1) % 6))), final: true } });
       P(2, { k: 'submit', payload: { pairs: [posOf(1), posOf(0), -1, -1, -1, -1], final: false } });
       snap('Antworten abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'pixel': {
+      snap('Stufe 1 (stark verpixelt)'); P(0, { k: 'submit', payload: { answer: t.answer } });
+      now += (t.levelSeconds + 1) * 1000; eng.tick(room, now); now += (t.levelSeconds + 1) * 1000; eng.tick(room, now); snap('Stufe 3');
+      P(1, { k: 'submit', payload: { answer: t.answer } }); P(2, { k: 'submit', payload: { answer: 'Irgendwas' } });
+      H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'duel': {
+      snap('Siegerprognose'); const d = (eng.buildView(room, { role: 'host' }, now).round?.data.duelists ?? []) as string[]; const spect = ids.filter(i => !d.includes(i));
+      spect.forEach(i => P(ids.indexOf(i), { k: 'submit', payload: { winner: d[0] } })); H({ k: 'h.lock' }); snap('Duell: Frage 1');
+      for (let q = 0; q < 3; q++) { P(ids.indexOf(d[0]), { k: 'submit', payload: { answer: t.questions[q].correct } }); P(ids.indexOf(d[1]), { k: 'submit', payload: { answer: (t.questions[q].correct + 1) % 4 } }); if (q === 0) snap('Frage 2'); }
+      snap('Duell beendet'); break;
+    }
+    case 'arena': {
+      snap('Herausforderung 1');
+      for (let q = 0; q < 3; q++) { const alive = (eng.buildView(room, { role: 'host' }, now).round?.data.alive ?? []) as string[]; alive.forEach((id, k) => P(ids.indexOf(id), { k: 'submit', payload: { answer: k === 0 && q === 2 ? (t.questions[q].correct + 1) % 4 : t.questions[q].correct } })); if (q === 0) snap('Auswertung Frage 1'); if (room.round!.stage === 'bet') H({ k: 'h.lock' }); }
+      break;
+    }
+    case 'sound': {
+      snap('Erstes Hören'); P(0, { k: 'submit', payload: { answer: t.answer } });
+      now += (t.playSeconds + 1) * 1000; eng.tick(room, now); snap('Zweites Hören'); P(1, { k: 'submit', payload: { answer: t.answer } });
+      now += (t.playSeconds + 1) * 1000; eng.tick(room, now); snap('Mit Hinweis'); P(2, { k: 'submit', payload: { answer: 'Irgendwas' } }); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'timeline': {
+      snap('Aufgabe läuft'); const c = timelineSlot(t.anchors.map(x => x.year), t.answerYear);
+      P(0, { k: 'submit', payload: { slot: c } }); P(1, { k: 'submit', payload: { slot: Math.min(4, c + 1) } }); P(2, { k: 'submit', payload: { slot: c === 0 ? 3 : 0 } });
+      snap('Positionen abgegeben'); H({ k: 'h.lock' }); snap('Gesperrt'); break;
+    }
+    case 'panic': {
+      snap('Hinweise verteilt (Entschärfer-Ansicht in „Handy“ je nach Spieler)'); const df = eng.buildView(room, { role: 'host' }, now).round?.data.defuser as string;
+      P(ids.indexOf(df), { k: 'submit', payload: { code: t.code === '000' ? '111' : '000' } }); snap('Falscher Code'); P(ids.indexOf(df), { k: 'submit', payload: { code: t.code } }); snap('Entschärft'); break;
+    }
+    case 'impostor': {
+      snap('Hinweise schreiben'); ids.forEach((id, i) => P(i, { k: 'submit', payload: { clue: 'Hinweis' + (i + 1) } })); snap('Abstimmung');
+      const imp = eng.buildView(room, { role: 'host' }, now).round?.data.impostor as string; ids.forEach((id, i) => { if (id !== imp) P(i, { k: 'submit', payload: { vote: imp } }); });
+      P(ids.indexOf(imp), { k: 'submit', payload: { vote: ids.find(x => x !== imp) } }); snap('Stimmen abgegeben'); H({ k: 'h.lock' }); break;
     }
     case 'bluff': {
       snap('Lügen schreiben');

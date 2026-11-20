@@ -1,6 +1,6 @@
-# Machbarkeit: OUTPLAY auf Cloudflare Workers + Durable Objects (kostenlos)
+# Machbarkeit: JANIQUIZITION auf Cloudflare Workers + Durable Objects (kostenlos)
 
-**Kurzfassung:** Machbar, mit überschaubarem Umbau. Nicht jetzt durchgeführt; für Samstag läuft OUTPLAY weiter lokal (Node + SQLite).
+**Kurzfassung:** Machbar, mit überschaubarem Umbau. Nicht jetzt durchgeführt; für Samstag läuft JANIQUIZITION weiter lokal (Node + SQLite).
 
 ## Warum es gut passt
 - Ein Raum = ein **Durable Object** (DO): eine einzige, serialisierte Instanz hält den Spielzustand → exakt das „zentrale autoritative State-Machine“-Modell der Engine. Gleichzeitige Eingaben werden automatisch nacheinander verarbeitet.

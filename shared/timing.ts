@@ -28,6 +28,13 @@ export function taskSeconds(t: TaskDef, m: TimeMode = 'expected'): { play: numbe
     case 'bluff': return { play: (t.seconds + t.pickSeconds) * a, reveal: rv(60) };
     case 'corridor': return { play: t.seconds * a, reveal: rv(45) };
     case 'twist': return { play: t.seconds * a, reveal: rv(40) };
+    case 'pixel': return { play: 5 * t.levelSeconds * (m === 'max' ? 1 : 0.7) + 8, reveal: rv(35) };
+    case 'duel': return { play: 20 + 3 * t.seconds * a + 15, reveal: rv(45) };
+    case 'arena': return { play: 3 * (t.seconds * a + 7), reveal: rv(45) };
+    case 'sound': return { play: 3 * t.playSeconds * (m === 'max' ? 1 : 0.7), reveal: rv(40) };
+    case 'timeline': return { play: t.seconds * a, reveal: rv(40) };
+    case 'panic': return { play: t.seconds * a + 20, reveal: rv(40) };
+    case 'impostor': return { play: (t.seconds + t.voteSeconds) * a, reveal: rv(60) };
     case 'unique': return { play: t.seconds * a + (m === 'max' ? 60 : 30) /* Host-Prüfung */, reveal: rv(50) };
   }
 }

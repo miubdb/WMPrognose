@@ -9,5 +9,5 @@
 **Nur simuliert bzw. nicht getestet:**
 - Der **echte Vercel-Blob-Speicher** ist nicht angebunden (fehlende Berechtigung meiner Vercel-Anbindung; Einrichtung durch dich nötig). Der Blob-Adapter wurde mit einem dateibasierten Ersatz getestet (gleiche Logik, inkl. ETag-Konflikt und Speicherfehler); der Aufruf der echten `@vercel/blob`-SDK ist **ungetestet**.
 - Anmelden/Schreiben auf der Online-URL konnte ich nicht ausführen (kein POST-Zugriff, kein Passwort).
-- Windows: `OUTPLAY-STARTEN.bat`/`start-local.ts` wurden hier unter Linux nicht ausgeführt (nur die Netzwerk-Auswahl und das Wiederherstellungsskript sind getestet); die `.bat`-Dateien selbst sind ungetestet.
+- Windows: `JANIQUIZITION-STARTEN.bat`/`start-local.ts` wurden hier unter Linux nicht ausgeführt (nur die Netzwerk-Auswahl und das Wiederherstellungsskript sind getestet); die `.bat`-Dateien selbst sind ungetestet.
 - Keine echten Smartphones/Fernseher, kein echtes WLAN, keine Firewall-Prüfung.

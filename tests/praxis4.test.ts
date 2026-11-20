@@ -39,7 +39,7 @@ test('Aufgabenzähler: MATCHMAKER und EINZIGARTIG je 5, die fünf anderen Modi j
 });
 
 test('Paketnamen ohne feste Zahl, eindeutig; show-4z ist Standard im Showmaster-Angebot, keine archivierten Pakete', () => {
-  const c = fresh(); c.cleanupApply(); const l = c.listPublished(); assert.deepEqual(l.map(p => p.id).sort(), ['show-3', 'show-4z', 'show-5', 'show-after', 'show-new']); for (const p of l) assert.ok(!/42/.test(p.name), p.name);
+  const c = fresh(); c.cleanupApply(); const l = c.listPublished(); assert.deepEqual(l.map(p => p.id).sort(), ['show-3', 'show-4z', 'show-5', 'show-after', 'show-modes', 'show-new']); for (const p of l) assert.ok(!/42/.test(p.name), p.name);
   assert.match(l.find(p => p.id === 'show-4z')!.name, /KICKBASE-KONSENS/); assert.match(l.find(p => p.id === 'show-5')!.name, /FINAL LOCK/);
   assert.match(c.defaultRef(), /^show-4z@/);
 });
@@ -222,7 +222,7 @@ import { GAMES } from '../shared/games';
 import { ACTIVE_MODES } from '../shared/validate';
 test('Spieleliste (Admin-Startseite/docs/SPIELE.md) deckt genau die aktiven Modi plus beide Finals ab', () => {
   const modes = GAMES.map(g => g.mode); for (const m of ACTIVE_MODES) assert.ok(modes.includes(m), m); assert.ok(modes.includes('vote') && modes.includes('final-lock'));
-  assert.equal(GAMES.length, ACTIVE_MODES.length + 2);  // aktive Modi + KICKBASE-KONSENS + FINAL LOCK assert.ok(!modes.includes('codebreak'));
+  assert.equal(GAMES.length, ACTIVE_MODES.length + 2);
 });
 
 test('SORTIER’S! Ablösesummen (Transfermarkt): Sancho ca. 7,8 Mio. € – Reihenfolge Kagawa < Sancho < Haaland < Bellingham < Hummels, aufsteigend', () => {

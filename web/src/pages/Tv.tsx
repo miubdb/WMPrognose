@@ -6,14 +6,14 @@ import { Avatar } from '../ui/Avatar';
 import { AnswerRow, Countdown, Leaderboard, QR, useBaseUrl } from '../ui/widgets';
 import { MapView } from '../ui/MapView';
 import { SceneView } from '../ui/SceneView';
-import { initAudio, play, setMusic, setSoundEnabled } from '../ui/audio';
+import { initAudio, play, setMusic, setSoundEnabled, testTone } from '../ui/audio';
 import type { PlayerPublic, RoundView, View } from '../../../shared/types';
 import { estimateNetLine } from '../../../shared/util';
 
 /** Sichtbarer Modusname: SORTIER’S! (Karten sortieren); nur die klassische Nacheinander-Variante heißt weiter BLIND RANK. */
 export const modeName = (r: { mode: string; data?: any }) => (r.mode === 'rank' && r.data?.variant === 'sequence' ? 'BLIND RANK' : MODE_NAME[r.mode]);
 export const MODE_NAME: Record<string, string> = {
-  geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S!', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', bluff: 'LÜGEN HABEN KURZE BEINE', corridor: 'SCHÄTZKORRIDOR', twist: 'VERDREHTE WELT', vote: 'KICKBASE-KONSENS',
+  geo: 'WO ZUR HÖLLE?', rank: 'SORTIER’S!', estimate: 'SETZ AUF MICH', glitch: 'GLITCH', codebreak: 'CODEBREAK', unique: 'EINZIGARTIG', match: 'MATCHMAKER', link: 'DIE VERBINDUNG', pixel: 'PIXELPANIK', duel: 'DUELL DER DEPPEN', arena: 'DIE ARENA', sound: 'TONSPUR', timeline: 'ZEITSPRUNG', panic: 'PANIK', impostor: 'HOCHSTAPLER', bluff: 'LÜGEN HABEN KURZE BEINE', corridor: 'SCHÄTZKORRIDOR', twist: 'VERDREHTE WELT', vote: 'KICKBASE-KONSENS',
 };
 const MODE_RULES: Record<string, string[]> = {
   geo: ['Setze auf deinem Handy einen Pin auf die Karte.', 'Du kannst ihn bis zum Absenden verschieben.', 'Je näher dein Pin, desto mehr Punkte – egal, wie die anderen tippen.'],
@@ -24,6 +24,13 @@ const MODE_RULES: Record<string, string[]> = {
   unique: ['Nenne eine gültige Antwort.', 'Nur eine Antwort, die kein anderer nennt, bringt Punkte.', 'Doppelte und ungültige Antworten zählen 0.'],
   match: ['Sechs Begriffe links, sechs Partner rechts.', 'Verbinde auf dem Handy, was zusammengehört.', '50 Punkte je richtigem Paar – ändern geht bis zur Abgabe.'],
   vote: ['Fünf Fragen – wähle geheim eine Person – auch dich selbst.', 'Meiste Stimmen = Konsens: Wer richtig tippt, bekommt +100.', 'Maximal 500 Punkte · keine Minuspunkte · Einzelstimmen zählen nicht.'],
+  pixel: ['Ein Bild wird Stufe für Stufe schärfer.', 'Tippe auf dem Handy ein, was du erkennst.', 'Je früher richtig, desto mehr Punkte – nur ein Versuch.'],
+  duel: ['Zwei Spieler treten in drei Fragen gegeneinander an.', 'Alle anderen tippen vorher auf den Sieger.', 'Sieg: 250 · richtiger Tipp: 100 · Unentschieden: 75 je Duellant.'],
+  arena: ['Alle beantworten dieselbe Frage – geheim.', 'Wer falsch liegt, scheidet aus.', 'Jede überlebte Frage 50 Punkte – alle drei: +150 Bonus.'],
+  sound: ['Hört genau auf den Fernseher.', 'Tippe ein, was du hörst.', 'Erstes Hören 300 · zweites 200 · mit Hinweis 100.'],
+  timeline: ['Vier Ereignisse stehen fest auf der Zeitleiste.', 'Ordne das gesuchte Ereignis auf dem Handy ein.', 'Richtiges Feld 250 · direkt daneben 100.'],
+  panic: ['Teamspiel: Jeder hat nur einen Teil der Hinweise.', 'Sprecht euch laut ab – der Entschärfer gibt den Code ein.', 'Gelöst: 200 Punkte für alle · blitzschnell +50.'],
+  impostor: ['Einer von euch kennt das geheime Wort nicht.', 'Gebt reihum einen Hinweis und enttarnt den Hochstapler.', 'Nicht enttarnt: 300 · Hochstapler erkannt: 100.'],
   bluff: ['Erfinde eine glaubwürdige falsche Antwort.', 'Dann suchst du die echte unter allen Antworten.', 'Echte erkannt = Punkte · wer auf deine Lüge hereinfällt, bringt dir Punkte.'],
   corridor: ['Gib einen Bereich an, in dem die Lösung liegt.', 'Je enger der Bereich, desto mehr Punkte.', 'Liegt die Lösung daneben: 0 Punkte.'],
   twist: ['Ein bekannter Titel wurde ins Gegenteil verdreht.', 'Tippe das Original auf dem Handy ein.', 'Je schneller richtig, desto mehr Punkte – nur ein Versuch.'],
@@ -39,6 +46,8 @@ export function Tv({ code }: { code: string }) {
     try { void rootRef.current?.requestFullscreen?.(); } catch { /* */ }
   };
   useEffect(() => { if (view) setSoundEnabled(view.room.sound); }, [view?.room.sound]);
+  const lastTest = useRef<number | null>(null);
+  useEffect(() => { const v = view?.room.soundTest; if (v === undefined) return; if (lastTest.current === null) { lastTest.current = v; return; } if (v !== lastTest.current) { lastTest.current = v; testTone(); } }, [view?.room.soundTest]);
   useEffect(() => { setMusic(!!view?.room.music?.on && started && !view?.room.showPaused, view?.room.music?.vol ?? 25); }, [view?.room.music?.on, view?.room.music?.vol, view?.room.sound, view?.room.showPaused, started]);
   useSounds(view, started);
   return (
@@ -194,6 +203,13 @@ export function RoundTv({ view, round, serverNow }: { view: View; round: RoundVi
           round.mode === 'link' ? <LinkTv view={view} round={round} /> :
           round.mode === 'vote' ? <VoteTv view={view} round={round} /> :
           round.mode === 'bluff' ? <BluffTv view={view} round={round} /> :
+          round.mode === 'pixel' ? <PixelTv view={view} round={round} /> :
+          round.mode === 'duel' ? <DuelTv view={view} round={round} /> :
+          round.mode === 'arena' ? <ArenaTv view={view} round={round} /> :
+          round.mode === 'sound' ? <SoundTv view={view} round={round} /> :
+          round.mode === 'timeline' ? <TimelineTv view={view} round={round} /> :
+          round.mode === 'panic' ? <PanicTv view={view} round={round} /> :
+          round.mode === 'impostor' ? <ImpostorTv view={view} round={round} /> :
           round.mode === 'corridor' ? <CorridorTv view={view} round={round} /> :
           round.mode === 'twist' ? <TwistTv view={view} round={round} /> :
           <UniqueTv view={view} round={round} />}
@@ -481,6 +497,97 @@ function VoteTv({ view, round }: { view: View; round: RoundView }) {
   );
 }
 
+// ---- Neue Spiele: PIXELPANIK, DUELL, ARENA, TONSPUR, ZEITSPRUNG, PANIK, HOCHSTAPLER
+const media = (view: View, token: string, name: string) => `/api/media/${view.room.code}/${token}/${name}`;
+function PixelTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal; const token = rev ? rev.media : d.media;
+  return (
+    <div className="pixelTv"><div className="bigq small">{d.prompt}</div>
+      <div className="pixelframe"><img key={rev ? 'clear' : d.level} className={rev ? 'clear' : 'pix'} src={media(view, token, `l${rev ? 4 : d.level}`)} alt="" /></div>
+      {!rev && <><div className="pixlevels">{Array.from({ length: d.levels }).map((_, i) => <span key={i} className={i <= d.level ? 'on' : ''}>{d.points[i]}</span>)}</div>
+        <p className="hint big">Stufe {d.level + 1} von {d.levels} · jetzt richtig = <b>{d.points[d.level]} Punkte</b> · {d.answeredCount} von {d.playerCount} haben getippt</p><AnswerRow players={view.players} /></>}
+      {rev && <div className="lreveal"><div className="lanswer">Gesucht war: <b>{rev.answer}</b></div>
+        <table className="linktable"><tbody>{rev.rows.map((r: any) => { const p = pl(view, r.pid)!; return <tr key={r.pid} className={r.answer ? (r.correct ? 'ok' : 'bad') : 'none'}><td><Avatar a={p.avatar} size={40} /> <b>{p.name}</b></td><td>{r.answer ? `„${r.answer}“` : 'keine Abgabe'}</td><td>{r.answer ? `Stufe ${r.level + 1}` : ''}</td><td>{r.correct ? `+${r.points}` : '0'}</td></tr>; })}</tbody></table><Explain text={rev.explain} /></div>}
+    </div>);
+}
+function DuelTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal; const [a, b] = d.duelists.map((id: string) => pl(view, id)) as (PlayerPublic | undefined)[];
+  const side = (p: PlayerPublic | undefined, score?: number, win?: boolean) => p && <div className={`duelist ${win ? 'win' : ''}`}><Avatar a={p.avatar} size={190} /><b>{p.name}</b>{score !== undefined && <span className="dscore">{score} / 3</span>}{d.answeredNow?.includes(p.id) && !rev && <span className="dtick">✓ geantwortet</span>}</div>;
+  return (
+    <div className="duelTv"><div className="bigq small">{d.prompt}</div>
+      <div className="duelstage">{side(a, rev?.scores[a?.id ?? ''], rev && rev.winner === a?.id)}<div className="vs">VS</div>{side(b, rev?.scores[b?.id ?? ''], rev && rev.winner === b?.id)}</div>
+      {!rev && round.stage === 'open' && <p className="hint big">Wer gewinnt? {d.predictedCount} von {d.playerCount - 2} haben getippt – {d.predict} Punkte für den richtigen Tipp.</p>}
+      {!rev && round.stage === 'bet' && d.question && <><div className="bigq small">Frage {d.q + 1} von 3: {d.question.q}</div><div className="bluffopts">{d.question.options.map((o: string, i: number) => <div key={i} className="bopt"><b className="bl">{String.fromCharCode(65 + i)}</b><span className="bt">{o}</span></div>)}</div></>}
+      {rev && <><p className="hint big">{rev.winner ? <>🏆 <b>{pl(view, rev.winner)?.name}</b> gewinnt das Duell!</> : <b>Unentschieden!</b>}</p>
+        <div className="lreveal"><table className="linktable"><tbody>{rev.questions.map((q: any, i: number) => <tr key={i}><td>{q.q}</td><td>✅ {q.options[q.correct]}</td>{rev.duelists.map((id: string) => <td key={id} className={q.answers[id] === q.correct ? 'ok' : 'bad'}>{pl(view, id)?.name}: {q.answers[id] === null ? '–' : q.options[q.answers[id]]}</td>)}</tr>)}</tbody></table>
+          {rev.picks.length > 0 && <p className="rankhow">Richtig getippt: {rev.picks.filter((p: any) => p.correct).map((p: any) => pl(view, p.pid)?.name).join(', ') || 'niemand'}{rev.winner === null ? ' (Unentschieden – kein Verlust)' : ''}</p>}<Explain text={rev.explain} /></div></>}
+    </div>);
+}
+function ArenaTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal; const res = d.results?.[d.q];
+  const out = (id: string) => !(d.alive as string[]).includes(id);
+  return (
+    <div className="arenaTv"><div className="bigq small">Herausforderung {Math.min(d.q + 1, d.qCount)} von {d.qCount}</div>
+      <div className="arenagrid">{view.players.map(p => <div key={p.id} className={`arenap ${out(p.id) ? 'out' : ''} ${res?.eliminated?.includes(p.id) && round.stage === 'bet' ? 'just' : ''}`}><Avatar a={p.avatar} size={64} /><b>{p.name}</b>{out(p.id) && <span>💀</span>}{!out(p.id) && round.stage === 'open' && p.answered && <span>✓</span>}</div>)}</div>
+      {!rev && d.question && <><div className="bigq">{d.question.q}</div><div className="bluffopts">{d.question.options.map((o: string, i: number) => <div key={i} className={`bopt ${round.stage === 'bet' && res && res.correct === i ? 'truth' : ''}`}><b className="bl">{String.fromCharCode(65 + i)}</b><span className="bt">{o}</span></div>)}</div></>}
+      {!rev && round.stage === 'open' && <p className="hint big">{d.answeredCount} von {d.aliveCount} Überlebenden haben geantwortet.</p>}
+      {!rev && round.stage === 'bet' && res && <p className="hint big">{res.eliminated.length ? `💀 Ausgeschieden: ${res.eliminated.map((id: string) => pl(view, id)?.name).join(', ')}` : 'Alle haben überlebt!'}{res.survivors.length === 0 ? ' – die Arena ist leer!' : ''}</p>}
+      {rev && <div className="lreveal"><table className="linktable"><tbody>{rev.rows.slice().sort((a: any, b: any) => b.points - a.points).map((r: any) => { const p = pl(view, r.pid)!; return <tr key={r.pid} className={r.survived === 3 ? 'ok' : r.survived ? '' : 'bad'}><td><Avatar a={p.avatar} size={40} /> <b>{p.name}</b></td><td>{r.survived} von 3 überlebt{r.survived === 3 ? ` · Bonus +${rev.bonus}` : ''}</td><td>+{r.points}</td></tr>; })}</tbody></table><Explain text={rev.explain} /></div>}
+    </div>);
+}
+function SoundTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal; const token = rev ? rev.media : d.media; const last = useRef('');
+  useEffect(() => {
+    if (!token) return; const key = rev ? 'reveal' : `${d.plays}`; if (last.current === key) return; last.current = key;
+    const name = rev ? 'a1' : d.plays >= 2 ? 'a2' : 'a1'; const au = new Audio(media(view, token, name)); au.play().catch(() => { /* Autoplay gesperrt: Bildschirm-Start-Klick fehlt */ });
+    return () => { au.pause(); };
+  }, [token, d.plays, !!rev]);          // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="soundTv"><div className="bigq small">{d.prompt}</div>
+      <div className={`wave ${rev ? '' : 'live'}`}>{Array.from({ length: 28 }).map((_, i) => <i key={i} style={{ animationDelay: `${(i % 7) * 0.09}s`, height: `${20 + ((i * 37) % 60)}%` }} />)}</div>
+      {!rev && <><p className="hint big">🎧 {['Erstes Hören', 'Zweites Hören', 'Mit Hinweis'][d.phase]} · jetzt richtig = <b>{d.points[d.phase]} Punkte</b></p>{d.hint && <div className="explain">💡 Hinweis: {d.hint}</div>}<p className="muted">{d.answeredCount} von {d.playerCount} haben getippt</p><AnswerRow players={view.players} /></>}
+      {rev && <div className="lreveal"><div className="lanswer">Das war: <b>{rev.answer}</b></div><table className="linktable"><tbody>{rev.rows.map((r: any) => { const p = pl(view, r.pid)!; return <tr key={r.pid} className={r.answer ? (r.correct ? 'ok' : 'bad') : 'none'}><td><Avatar a={p.avatar} size={40} /> <b>{p.name}</b></td><td>{r.answer ? `„${r.answer}“` : 'keine Abgabe'}</td><td>{r.correct ? `+${r.points}` : '0'}</td></tr>; })}</tbody></table><Explain text={rev.explain} /></div>}
+    </div>);
+}
+function TimelineTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal; const A = (rev ? rev.anchors : d.anchors) as { year: number; label: string }[];
+  const label = (i: number) => (i === 0 ? `vor ${A[0].year}` : i === 4 ? `nach ${A[3].year}` : `${A[i - 1].year}–${A[i].year}`);
+  return (
+    <div className="timelineTv"><div className="bigq">{d.prompt}</div>
+      <div className="tlaxis">{[0, 1, 2, 3, 4].map(i => (
+        <div className="tlcol" key={i}>
+          <div className={`tlgap ${rev && rev.correct === i ? 'hit' : ''}`}><small>{label(i)}</small>
+            {rev && <div className="tlwho">{rev.rows.filter((r: any) => r.slot === i).map((r: any) => <Avatar key={r.pid} a={pl(view, r.pid)!.avatar} size={44} />)}{rev.correct === i && <b className="tlyear">{rev.answerYear}</b>}</div>}</div>
+          {i < 4 && <div className="tlanchor"><b>{A[i].year}</b><span>{A[i].label}</span></div>}
+        </div>))}</div>
+      {!rev && <><p className="hint big">{d.answeredCount} von {d.playerCount} haben sich entschieden.</p><AnswerRow players={view.players} /></>}
+      {rev && <><p className="hint big">{rev.answerLabel || 'Gesucht'}: <b>{rev.answerYear}</b></p><p className="rankhow">Richtiges Feld +250 · direkt daneben +100</p><Explain text={rev.explain} /></>}
+    </div>);
+}
+function PanicTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal; const def = pl(view, d.defuser);
+  return (
+    <div className={`panicTv ${rev ? (rev.solved ? 'won' : 'lost') : ''}`}><div className="bigq small">{d.prompt}</div>
+      <div className="codeslots">{[0, 1, 2].map(i => <span key={i} className="slot">{rev ? rev.code[i] : '?'}</span>)}</div>
+      <p className="hint big">💣 Entschärfer: <b>{def?.name}</b> · Hinweise verteilt: {d.clueCount} · Versuche: {'🔴'.repeat(d.attempts)}{'⚪'.repeat(Math.max(0, d.maxAttempts - d.attempts))}</p>
+      {!rev && <p className="muted">Sprecht euch laut ab! Nur der Entschärfer gibt den Code ein.</p>}
+      {rev && <div className="lreveal"><div className="lanswer">{rev.solved ? (rev.fast ? '💥 ENTSCHÄRFT – blitzschnell!' : '✅ ENTSCHÄRFT!') : '⏰ Nicht geschafft'} · Code: <b>{rev.code}</b> · {rev.perPlayer} Punkte für alle</div>
+        <table className="linktable"><tbody>{rev.clues.map((c: any, i: number) => <tr key={i}><td><b>{i + 1}</b></td><td>{c.text}</td><td>{c.holder ? pl(view, c.holder)?.name : ''}</td></tr>)}</tbody></table><Explain text={rev.explain} /></div>}
+    </div>);
+}
+function ImpostorTv({ view, round }: { view: View; round: RoundView }) {
+  const d = round.data; const rev = round.reveal;
+  const clues: { pid: string; clue: string }[] = rev ? rev.clues : d.clues ?? [];
+  return (
+    <div className="impTv"><div className="bigq small">🕵️ Thema: {rev ? rev.topic : d.topic}</div>
+      {!rev && round.stage === 'open' && <p className="hint big">Alle schreiben ein Hinweiswort … {d.clueCount} von {d.playerCount} fertig. Einer von euch kennt das Wort NICHT!</p>}
+      {(rev || round.stage !== 'open') && <div className="cluecards">{clues.map(c => { const p = pl(view, c.pid)!; return <div key={c.pid} className={`cluecard ${rev && rev.impostor === c.pid ? 'imp' : ''}`}><Avatar a={p.avatar} size={56} /><b>{p.name}</b><span>{c.clue ?? '–'}</span>{rev && <em>{(rev.votes[c.pid] ?? []).length > 0 ? `${rev.votes[c.pid].length} Stimme(n)` : ''}</em>}</div>; })}</div>}
+      {!rev && round.stage === 'bet' && <p className="hint big">Wer ist der Hochstapler? {d.voteCount} von {d.playerCount} haben abgestimmt.</p>}
+      {!rev && round.stage === 'bet' && <AnswerRow players={view.players} />}
+      {rev && <div className="lreveal"><div className="lanswer">Das Wort war: <b>{rev.word}</b> · Hochstapler: <b>{pl(view, rev.impostor)?.name}</b> {rev.caught ? '– enttarnt!' : '– unentdeckt!'}</div>{rev.guess && <p className="hint big">Sein Tipp: „{rev.guess}“ {rev.guessed ? '✅' : '❌'}</p>}<Explain text={rev.explain} /></div>}
+    </div>);
+}
+
 // ---- LÜGEN HABEN KURZE BEINE
 function BluffTv({ view, round }: { view: View; round: RoundView }) {
   const d = round.data; const rev = round.reveal;
@@ -620,7 +727,7 @@ function CeremonyTv({ view }: { view: View }) {
           </div>); })}
       </div>
       {winner && <div className="confetti">{Array.from({ length: 60 }, (_, i) => <i key={i} style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 12) * 0.25}s`, background: ['#f5b82e', '#8b5cf6', '#14d9c0', '#3b82f6', '#ec4899'][i % 5] }} />)}</div>}
-      {winner && <div className="winnerbanner"><small>Der {view.room.brand?.winner ?? 'OUTPLAY-Champion'}</small><b>{winner.name}</b><span className="trophy">🏆</span>{view.room.brand?.winnerLine && <em className="wline">{view.room.brand.winnerLine}</em>}</div>}
+      {winner && <div className="winnerbanner"><small>Der {view.room.brand?.winner ?? 'JANIQUIZITION-Champion'}</small><b>{winner.name}</b><span className="trophy">🏆</span>{view.room.brand?.winnerLine && <em className="wline">{view.room.brand.winnerLine}</em>}</div>}
     </div>
   );
 }

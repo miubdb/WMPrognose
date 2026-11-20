@@ -5,10 +5,11 @@ import { diffZones, type Scene } from '../../../shared/scenes';
 import { MapView } from '../ui/MapView';
 import { adm, errText } from './api';
 import { Preview } from './Preview';
+import { GAMES } from '../../../shared/games';
 import { SceneBuilder, ScenePair } from './SceneBuilder';
 import { SceneView, sceneVariant } from '../ui/SceneView';
 
-export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨', match: '🧲', link: '🔗', vote: '🤝', bluff: '😈', corridor: '↔️', twist: '🔄' };
+export const MODE_ICON: Record<string, string> = { geo: '🧭', rank: '↕️', estimate: '🎯', glitch: '👁️', codebreak: '🧩', unique: '✨', match: '🧲', link: '🔗', vote: '🤝', bluff: '😈', corridor: '↔️', twist: '🔄', pixel: '🟪', duel: '⚔️', arena: '🏟️', sound: '🎧', timeline: '⏳', panic: '🚨', impostor: '🕵️' };
 export const MODE_HELP: Record<string, string> = {
   geo: 'Spieler setzen einen Pin auf der Karte. Gewertet wird die Platzierung nach Entfernung.',
   rank: 'Fünf Begriffe erscheinen nacheinander; jeder muss sofort auf einen Rangplatz. Gewertet werden richtig angeordnete Paare.',
@@ -17,6 +18,13 @@ export const MODE_HELP: Record<string, string> = {
   codebreak: 'Ein Rätsel mit eindeutiger Lösung. Hinweise kosten Punkte, drei Versuche.',
   unique: 'Alle nennen eine gültige Antwort – nur einzigartige Antworten bringen volle Punkte.',
   match: 'Sechs Paare verbinden: je richtigem Paar 50 Punkte, höchstens 300. Keine Minuspunkte.',
+  pixel: 'Ein Bild wird stufenweise schärfer – je früher erkannt, desto mehr Punkte.',
+  duel: 'Zwei Spieler duellieren sich in drei Fragen, die anderen tippen auf den Sieger.',
+  arena: 'Alle beantworten dieselben drei Fragen – wer falsch liegt, scheidet aus.',
+  sound: 'Ein Geräusch erkennen: erstes Hören, zweites Hören, Hinweis.',
+  timeline: 'Ein Ereignis zwischen vier feste Ankerereignisse einordnen.',
+  panic: 'Teamspiel: verteilte Hinweise ergeben gemeinsam einen Code.',
+  impostor: 'Alle kennen ein geheimes Wort – bis auf einen Hochstapler.',
   bluff: 'Alle erfinden eine falsche Antwort, dann wird die echte gesucht. Punkte fürs Erkennen und fürs Täuschen.',
   corridor: 'Einen Zahlenbereich (von … bis …) angeben: Treffer zählt, je enger desto mehr Punkte.',
   twist: 'Ein bekannter Titel wurde ins Gegenteil verdreht – das Original eintippen, je schneller desto mehr Punkte.',
@@ -32,6 +40,13 @@ export function newTask(mode: Mode): any {
     case 'codebreak': return { mode, prompt: '', display: '', input: 'number', answers: [], hints: ['', '', ''], seconds: 90, points: 300, explain: '' };
     case 'match': return { mode, prompt: '', pairs: [0, 1, 2, 3, 4, 5].map(() => ({ left: '', right: '' })), order: [2, 4, 0, 5, 1, 3], seconds: 60, points: 300, explain: '' };
     case 'vote': return { mode, prompt: '', seconds: 45, points: 600, explain: '' };
+    case 'pixel': return { mode, prompt: 'Was ist auf dem Bild zu sehen?', answer: '', accept: [], levels: [], levelSeconds: 6, explain: '' };
+    case 'duel': return { mode, prompt: 'WER KENNT SICH BESSER AUS? – Thema', questions: [0, 1, 2].map(() => ({ q: '', options: ['', '', '', ''], correct: 0 })), seconds: 20, explain: '' };
+    case 'arena': return { mode, prompt: 'DIE ARENA – Thema', questions: [0, 1, 2].map(() => ({ q: '', options: ['', '', '', ''], correct: 0 })), seconds: 20, explain: '' };
+    case 'sound': return { mode, prompt: 'Was hörst du?', answer: '', accept: [], audio: '', audio2: '', hint: '', playSeconds: 15, explain: '' };
+    case 'timeline': return { mode, prompt: '', anchors: [0, 1, 2, 3].map(() => ({ year: '', label: '' })), answerYear: '', answerLabel: '', seconds: 40, explain: '' };
+    case 'panic': return { mode, prompt: '', code: '', clues: ['', '', '', ''], seconds: 90, explain: '' };
+    case 'impostor': return { mode, prompt: '', word: '', accept: [], seconds: 40, voteSeconds: 45, explain: '' };
     case 'bluff': return { mode, prompt: '', answer: '', accept: [], seconds: 45, pickSeconds: 30, points: 200, bluffPoints: 100, explain: '' };
     case 'corridor': return { mode, prompt: '', unit: '', answer: '', seconds: 45, points: 300, explain: '' };
     case 'twist': return { mode, prompt: 'Welcher bekannte Titel steckt dahinter?', twisted: '', answer: '', accept: [], seconds: 40, points: 300, explain: '' };
@@ -39,6 +54,15 @@ export function newTask(mode: Mode): any {
     case 'unique': return { mode, prompt: '', closed: false, placeholder: '', valid: [0, 1, 2].map(() => ({ name: '', variants: [] })), seconds: 45, pointsUnique: 500, pointsShared: 150, explain: '' };
   }
 }
+
+/** Bild verkleinern und in fünf Verpixelungsstufen umrechnen (im Browser – kein Server nötig). */
+async function makePixelLevels(file: File): Promise<string[]> {
+  const url = URL.createObjectURL(file); const img = new Image(); await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+  const S = 480, src = document.createElement('canvas'); src.width = S; src.height = S; const c = src.getContext('2d')!; c.fillStyle = '#1a1f3a'; c.fillRect(0, 0, S, S);
+  const k = Math.min(S / img.width, S / img.height); c.drawImage(img, (S - img.width * k) / 2, (S - img.height * k) / 2, img.width * k, img.height * k); URL.revokeObjectURL(url);
+  return [6, 10, 18, 40, 0].map(n => { const o = document.createElement('canvas'); o.width = S; o.height = S; const oc = o.getContext('2d')!; if (!n) { oc.drawImage(src, 0, 0); return o.toDataURL('image/jpeg', 0.85); } const t = document.createElement('canvas'); t.width = n; t.height = n; t.getContext('2d')!.drawImage(src, 0, 0, n, n); oc.imageSmoothingEnabled = false; oc.drawImage(t, 0, 0, S, S); return o.toDataURL('image/png'); });
+}
+const readDataUri = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f); });
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return <label className="field"><span>{label}</span>{children}{hint && <small className="muted">{hint}</small>}</label>;
@@ -81,7 +105,9 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
       <div className="modalbox wide editor" onClick={e => e.stopPropagation()}>
         <div className="row between sticky-top"><h2>{MODE_ICON[m]} {id ? 'Frage bearbeiten' : 'Neue Frage'} <span className="muted modename">{MODE_LABEL[m]}</span></h2><button className="btn small ghost" onClick={onClose}>Schließen ✕</button></div>
 
-        {m !== 'glitch' && <Field label={m === 'link' ? 'Überschrift' : 'Fragetext'}><textarea rows={2} value={task.prompt} maxLength={300} placeholder={m === 'link' ? 'z. B. Wer oder was wird gesucht?' : m === 'match' ? 'z. B. Was haben diese Unternehmen ursprünglich hergestellt?' : 'Was soll gefragt werden?'} onChange={e => set('prompt', e.target.value)} /></Field>}
+        {(() => { const g = GAMES.find(x => x.mode === m); return g ? <div className="gameinfo"><b>{g.icon} {g.name}</b> – {g.short}<br /><span className="muted">Du legst an: {g.ask}</span></div> : null; })()}
+
+        {m !== 'glitch' && <Field label={m === 'link' ? 'Überschrift' : m === 'impostor' ? 'Thema' : m === 'timeline' ? 'Frage (Ereignis)' : m === 'duel' || m === 'arena' ? 'Titel auf dem TV' : m === 'panic' ? 'Titel des Rätsels' : 'Fragetext'}><textarea rows={2} value={task.prompt} maxLength={300} placeholder={m === 'link' ? 'z. B. Wer oder was wird gesucht?' : m === 'match' ? 'z. B. Was haben diese Unternehmen ursprünglich hergestellt?' : 'Was soll gefragt werden?'} onChange={e => set('prompt', e.target.value)} /></Field>}
 
         {m === 'geo' && <>
           <Field label="Ortsname (für die Auflösung)"><input value={task.answer.label} maxLength={80} placeholder="z. B. Timbuktu, Mali" onChange={e => set('answer', { ...task.answer, label: e.target.value })} /></Field>
@@ -149,6 +175,47 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
           </div>
         </>}
 
+        {m === 'pixel' && <>
+          <div className="form2">
+            <Field label="Lösung"><input value={task.answer} maxLength={80} onChange={e => set('answer', e.target.value)} /></Field>
+            <Field label="Weitere gültige Schreibweisen (eine pro Zeile)"><textarea rows={2} value={(task.accept ?? []).join('\n')} onChange={e => set('accept', e.target.value.split('\n'))} /></Field>
+          </div>
+          <Field label="Bild" hint="Nur Bilder, die ihr nutzen dürft (eigene Fotos, lizenzfrei). Die fünf Stufen entstehen automatisch."><input type="file" accept="image/*" onChange={async e => { const f = e.target.files?.[0]; if (!f) return; try { set('levels', await makePixelLevels(f)); } catch { setMsg('Bild konnte nicht gelesen werden.'); } }} /></Field>
+          {task.levels?.length === 5 && task.levels[0] && <div className="pixthumbs">{task.levels.map((l: string, i: number) => <img key={i} src={l} alt={`Stufe ${i + 1}`} />)}</div>}
+        </>}
+        {(m === 'duel' || m === 'arena') && <>
+          {task.questions.map((q: any, i: number) => (
+            <div className="card small" key={i}><b>Frage {i + 1}</b>{m === 'arena' && <span className="muted"> {i === 0 ? '(leicht)' : i === 1 ? '(mittel)' : '(schwer)'}</span>}
+              <input value={q.q} maxLength={200} placeholder="Fragetext" onChange={e => set('questions', task.questions.map((x: any, j: number) => j === i ? { ...x, q: e.target.value } : x))} />
+              {q.options.map((o: string, k: number) => <div className="row" key={k}><input type="radio" name={`c${i}`} aria-label={`Antwort ${String.fromCharCode(65 + k)} ist richtig`} checked={Number(q.correct) === k} onChange={() => set('questions', task.questions.map((x: any, j: number) => j === i ? { ...x, correct: k } : x))} /><input value={o} maxLength={60} placeholder={`Antwort ${String.fromCharCode(65 + k)}${Number(q.correct) === k ? ' (richtig)' : ''}`} onChange={e => set('questions', task.questions.map((x: any, j: number) => j === i ? { ...x, options: x.options.map((y: string, l: number) => l === k ? e.target.value : y) } : x))} /></div>)}
+            </div>))}
+        </>}
+        {m === 'sound' && <>
+          <div className="form2">
+            <Field label="Lösung"><input value={task.answer} maxLength={80} onChange={e => set('answer', e.target.value)} /></Field>
+            <Field label="Weitere gültige Schreibweisen (eine pro Zeile)"><textarea rows={2} value={(task.accept ?? []).join('\n')} onChange={e => set('accept', e.target.value.split('\n'))} /></Field>
+          </div>
+          <Field label="Hinweis (erscheint nach dem zweiten Hören)"><input value={task.hint} maxLength={160} onChange={e => set('hint', e.target.value)} /></Field>
+          {(['audio', 'audio2'] as const).map(k => <Field key={k} label={k === 'audio' ? 'Audio – erstes Hören (WAV/MP3, max. 1,5 MB)' : 'Audio – zweites Hören, z. B. deutlicher (optional)'} hint="Nur Töne, die ihr nutzen dürft (selbst aufgenommen, lizenzfrei).">
+            <div className="row"><input type="file" accept="audio/*" onChange={async e => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 1_500_000) { setMsg('Datei zu groß (max. 1,5 MB).'); return; } set(k, await readDataUri(f)); }} />{task[k] && <audio controls src={task[k]} />}{task[k] && <button type="button" className="btn tiny ghost" onClick={() => set(k, '')}>✕</button>}</div></Field>)}
+        </>}
+        {m === 'timeline' && <>
+          <b>Vier Ankerereignisse (aufsteigend nach Jahr)</b>
+          {task.anchors.map((a: any, i: number) => <div className="row" key={i}><input style={{ maxWidth: 110 }} inputMode="numeric" placeholder="Jahr" value={a.year} onChange={e => set('anchors', task.anchors.map((x: any, j: number) => j === i ? { ...x, year: e.target.value } : x))} /><input placeholder="Ereignis" value={a.label} maxLength={60} onChange={e => set('anchors', task.anchors.map((x: any, j: number) => j === i ? { ...x, label: e.target.value } : x))} /></div>)}
+          <div className="form2"><Field label="Gesuchtes Jahr" hint="Darf nicht gleich einem Ankerjahr sein."><input inputMode="numeric" value={task.answerYear} onChange={e => set('answerYear', e.target.value)} /></Field>
+            <Field label="Bezeichnung (für die Auflösung)"><input value={task.answerLabel} maxLength={80} placeholder="z. B. YouTube gegründet" onChange={e => set('answerLabel', e.target.value)} /></Field></div>
+        </>}
+        {m === 'panic' && <>
+          <Field label="Code (3 Ziffern)"><input inputMode="numeric" maxLength={3} value={task.code} onChange={e => set('code', e.target.value.replace(/\D/g, '').slice(0, 3))} /></Field>
+          <b>Hinweise (werden auf die Handys verteilt – nur alle zusammen ergeben den Code)</b>
+          {task.clues.map((c: string, i: number) => <div className="row" key={i}><input value={c} maxLength={200} placeholder={`Hinweis ${i + 1}`} onChange={e => set('clues', task.clues.map((x: string, j: number) => j === i ? e.target.value : x))} />{task.clues.length > 3 && <button type="button" className="btn tiny ghost" onClick={() => set('clues', task.clues.filter((_: string, j: number) => j !== i))}>✕</button>}</div>)}
+          {task.clues.length < 8 && <button type="button" className="btn small ghost" onClick={() => set('clues', [...task.clues, ''])}>＋ Hinweis</button>}
+        </>}
+        {m === 'impostor' && <div className="form2">
+          <Field label="Geheimes Wort"><input value={task.word} maxLength={40} onChange={e => set('word', e.target.value)} /></Field>
+          <Field label="Weitere Schreibweisen (eine pro Zeile)"><textarea rows={2} value={(task.accept ?? []).join('\n')} onChange={e => set('accept', e.target.value.split('\n'))} /></Field>
+        </div>}
+
         {m === 'unique' && <>
           <b>Gültige Antworten</b>
           {task.valid.map((v: any, i: number) => (
@@ -179,6 +246,12 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
               {sec('Betrachtungszeit (Sek.)', 'viewSeconds')}{sec('Suchzeit (Sek.)', 'seconds')}{sec('Punkte', 'points')}</>}
             {m === 'match' && <>{sec('Zeit (Sek.)', 'seconds')}<p className="small muted">Fest: 50 Punkte je richtigem Paar (max. 300), keine Minuspunkte.</p></>}
             {m === 'vote' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Punkte je richtiger Wahl', 'points')}<Field label="Zusätzlicher Kandidat (optional, z. B. Showmaster)"><input value={task.candidate ?? ''} maxLength={40} onChange={e => set('candidate', e.target.value)} /></Field><p className="small muted">Nur im Finale einsetzbar. Jeder wählt geheim eine Person; Punkte für alle, die die Wahl mit den meisten Stimmen getroffen haben (mind. 2 Stimmen; bei Gleichstand zählen alle Spitzenwahlen). Der Zusatzkandidat bekommt keine Punkte.</p></>}
+            {m === 'pixel' && <>{sec('Sekunden je Stufe', 'levelSeconds')}</>}
+            {(m === 'duel' || m === 'arena') && <>{sec('Sekunden je Frage', 'seconds')}</>}
+            {m === 'sound' && <>{sec('Sekunden je Hör-Stufe', 'playSeconds')}</>}
+            {m === 'timeline' && <>{sec('Zeit (Sek.)', 'seconds')}</>}
+            {m === 'panic' && <>{sec('Zeit (Sek.)', 'seconds')}</>}
+            {m === 'impostor' && <>{sec('Sekunden für Hinweise', 'seconds')}{sec('Sekunden für die Abstimmung', 'voteSeconds')}</>}
             {m === 'bluff' && <>{sec('Zeit zum Erfinden (Sek.)', 'seconds')}{sec('Zeit zum Raten (Sek.)', 'pickSeconds')}{sec('Punkte fürs Erkennen', 'points')}{sec('Punkte je Hereingefallenem', 'bluffPoints')}</>}
             {m === 'corridor' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Maximalpunkte', 'points')}<p className="small muted">Nur Treffer zählen; Punkte sinken mit der Breite des Bereichs (mind. 10 %).</p></>}
             {m === 'twist' && <>{sec('Zeit (Sek.)', 'seconds')}{sec('Maximalpunkte', 'points')}<p className="small muted">Schnelligkeit zählt: sofort 100 %, am Ende 50 %.</p></>}

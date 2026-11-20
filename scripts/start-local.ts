@@ -24,7 +24,7 @@ if (!existsSync(dist) || statSync(dist).mtimeMs < srcTime) {
 }
 
 // Port frei?
-await new Promise<void>(res => { const t = createServer(); t.once('error', () => die(`Port ${PORT} ist belegt – läuft OUTPLAY bereits in einem anderen Fenster? Sonst mit "set PORT=8081" einen anderen Port wählen.`)); t.once('listening', () => t.close(() => res())); t.listen(PORT, '0.0.0.0'); });
+await new Promise<void>(res => { const t = createServer(); t.once('error', () => die(`Port ${PORT} ist belegt – läuft JANIQUIZITION bereits in einem anderen Fenster? Sonst mit "set PORT=8081" einen anderen Port wählen.`)); t.once('listening', () => t.close(() => res())); t.listen(PORT, '0.0.0.0'); });
 
 // Netzwerkadresse
 let host = process.env.OUTPLAY_HOST || process.env.PUBLIC_URL || '';

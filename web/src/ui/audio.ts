@@ -111,3 +111,12 @@ export function setMusic(on: boolean, vol: number) {
     }
   } catch { /* Audio darf die Show nie gefährden */ }
 }
+
+/** Kurzer Testton (Showmaster „Ton testen“): zwei Töne, damit man die Lautstärke am Fernseher prüfen kann. */
+export function testTone() {
+  try {
+    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext; const ac = new Ctx(); const t0 = ac.currentTime;
+    [440, 660].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0.0001, t0 + i * 0.5); g.gain.exponentialRampToValueAtTime(0.3, t0 + i * 0.5 + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.5 + 0.45); o.connect(g); g.connect(ac.destination); o.start(t0 + i * 0.5); o.stop(t0 + i * 0.5 + 0.5); });
+    setTimeout(() => ac.close(), 1500);
+  } catch { /* kein Audio verfügbar */ }
+}

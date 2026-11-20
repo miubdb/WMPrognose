@@ -3,9 +3,9 @@
 **Technik:** MapLibre GL (Vektorkarte) mit OpenStreetMap-Daten. Gleiche Karte im Admin, auf den Handys und auf dem Fernseher. Pin-Koordinaten und Entfernungen sind unverändert (Breite/Länge, Haversine auf dem Server).
 
 ## Einmalig vorbereiten (mit Internet, am besten vor Samstag zu Hause)
-`OUTPLAY-KARTE-LADEN.bat` doppelklicken (oder `node scripts/build-maps.mjs`). Es entsteht `data/maps/outplay-karte.mbtiles`.
+`JANIQUIZITION-KARTE-LADEN.bat` doppelklicken (oder `node scripts/build-maps.mjs`). Es entsteht `data/maps/outplay-karte.mbtiles`.
 - Dauer ca. 5–40 Minuten (je nach Leitung), Abbruch erlaubt, erneuter Start setzt fort.
-- Danach läuft alles **ohne Internet**: der OUTPLAY-Server liefert die Kacheln aus dieser Datei über das lokale WLAN.
+- Danach läuft alles **ohne Internet**: der JANIQUIZITION-Server liefert die Kacheln aus dieser Datei über das lokale WLAN.
 - Datei fehlt oder WebGL fehlt am Gerät → automatisch die einfache SVG-Karte (Notbetrieb, Spiel läuft weiter).
 
 ## Inhalt und Größe (gemessen)

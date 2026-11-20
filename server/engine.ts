@@ -6,6 +6,7 @@ import type {
 import { AVATAR_LIMITS } from '../shared/types';
 import { applyClamped } from '../shared/scoring';
 import { BRAND_NAME } from '../shared/brand';
+import { mediaToken } from './newmodes2';
 import { expandShowSteps, hashSeed, rng, shuffled } from '../shared/util';
 import type { PlanStep, PlayerRec, Room, RoundState } from './model';
 import { MODES, type Audience, type Ctx } from './modes';
@@ -445,6 +446,7 @@ export class Engine {
       }
       case 'h.sound': room.sound = !!a.on; return ok;
       case 'h.liveRank': room.liveRank = !!a.on; return ok;
+      case 'h.soundTest': room.soundTest = (room.soundTest ?? 0) + 1; return ok;
       case 'h.music': { const cur = room.music ?? { on: false, vol: 25 }; room.music = { on: a.on ?? cur.on, vol: Math.max(0, Math.min(100, Math.round(a.vol ?? cur.vol))) }; return ok; }
       case 'h.reduced': room.reduced = !!a.on; return ok;
       case 'h.showPause': {
@@ -523,6 +525,13 @@ export class Engine {
     const mode = MODES[c.task.mode];
     const r = c.round;
     switch (a.k) {
+      case 'h.assign': {
+        if (r.stage !== 'intro') return bad('wrong_phase');
+        const need = mode.propose?.(c)?.need; if (!need) return bad('not_allowed');
+        const pids = [...new Set((a.pids ?? []).map(String))];
+        if (pids.length !== Math.min(need, c.players.length) || !pids.every(id => c.players.some(p => p.id === id))) return bad('invalid');
+        r.m = { ...(r.m ?? {}), assigned: pids }; return ok;
+      }
       case 'h.begin': {
         if (r.stage !== 'intro') return { ok: true, dup: true };
         mode.begin(c); this.log(room, now, `Aufgabe ${r.taskIndex + 1} gestartet`); return ok;
@@ -608,7 +617,7 @@ export class Engine {
         progress: { tilesPlayed: room.tilesPlayed, tilesTotal: room.flow === 'show' ? room.plan.filter(x => x.startsWith('tile:')).length : room.plan.filter(s => s === 'wall').length + 2 },
         flow: room.flow ?? 'classic', boardName: this.boardName(room),
         brand: { title: this.bk(room).rules?.showTitle || BRAND_NAME, winner: this.bk(room).rules?.winnerTitle || BRAND_NAME + '-Champion', tagline: this.bk(room).rules?.tagline || undefined, winnerLine: this.bk(room).rules?.winnerLine || undefined },
-        liveRank: room.liveRank ?? true, music: room.music ?? { on: false, vol: 25 },
+        liveRank: room.liveRank ?? true, music: room.music ?? { on: false, vol: 25 }, soundTest: room.soundTest ?? 0,
         ...(room.flow === 'show' ? { agenda: this.agenda(room) } : {}),
       },
       players, wall: null, round: null, scoreboard: null, ceremony: null,
@@ -733,7 +742,18 @@ export class Engine {
       scoredIndex: c.task.practice ? 0 : tile.tasks.slice(0, r.taskIndex + 1).filter(x => !x.practice).length, scoredCount: tile.tasks.filter(x => !x.practice).length, stage: r.stage,
       deadline: r.deadline, pausedLeft: r.pausedLeft, stageSeconds: r.stageSeconds,
       points: c.task.mode === 'unique' && c.rules?.uniquePoints ? c.rules.uniquePoints : mode.maxPoints(c.task), data, reveal,
+      ...(aud.role === 'host' && r.stage === 'intro' && mode.propose ? { assign: mode.propose(c) ?? undefined } : {}),
     };
+  }
+  /** Medien (Bild-Stufen, Audio) – nur mit dem rundenspezifischen Schlüssel aus der TV-/Showmaster-Ansicht, Bildstufen nie weiter als bereits gezeigt. */
+  mediaFor(room: Room, token: string, name: string): { mime: string; data: Buffer } | null {
+    const c = this.ctx(room, Date.now()); if (!c || room.phase !== 'round' || mediaToken(room, c.round) !== token) return null;
+    const t: any = c.task; const done = c.round.stage === 'reveal' || c.round.stage === 'locked';
+    let uri: string | undefined;
+    if (t.mode === 'pixel') { const m = /^l([0-4])$/.exec(name); if (m && (done || Number(m[1]) <= (c.round.m?.level ?? 0))) uri = t.levels[Number(m[1])]; }
+    else if (t.mode === 'sound') { if (name === 'a1' && c.round.stage !== 'intro') uri = t.audio; else if (name === 'a2' && c.round.stage !== 'intro' && ((c.round.m?.phase ?? 0) >= 1 || done)) uri = t.audio2 ?? t.audio; }
+    const mm = uri ? /^data:([a-z0-9.+\/-]+);base64,(.+)$/i.exec(uri) : null;
+    return mm ? { mime: mm[1], data: Buffer.from(mm[2], 'base64') } : null;
   }
   private revealView(rev: any, _aud: Audience) { return rev ?? null; }
 }

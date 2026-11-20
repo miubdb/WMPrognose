@@ -6,15 +6,15 @@ Show: **Proberunden** (ungewertet), **Zwischenstände nach Runde 1, nach Runde 3
 
 ## So aktualisierst du den Windows-Laptop, ohne die Datenbank zu verlieren
 Die Datenbank liegt in `data\outplay.db` (außerhalb des Programmcodes, in `.gitignore`). Ein Update ersetzt nur Programmdateien.
-1. **Server beenden** (Fenster von `OUTPLAY-STARTEN.bat` schließen).
+1. **Server beenden** (Fenster von `JANIQUIZITION-STARTEN.bat` schließen).
 2. **Sicherung von Hand:** den ganzen Ordner `data` kopieren (z. B. nach `data-sicherung-vor-update`). Zusätzlich liegen automatische Sicherungen in `data\backups`.
 3. **Neuen Stand holen** (mit Internet): im Projektordner `git pull origin claude/upbeat-galileo-4el50u` (oder ZIP der Branch entpacken – dann **den Ordner `data` nicht überschreiben/löschen** und die Karte `data\maps\outplay-karte.mbtiles` behalten).
-4. **`OUTPLAY-STARTEN.bat`** starten: installiert Abhängigkeiten, baut die Oberfläche neu, startet den Server. Bestehende Räume, Spieler, Punkte und Pakete bleiben erhalten (keine automatische Migration, nichts wird überschrieben). Laufende Räume spielen mit ihrer alten Paketversion weiter; **neue Spielregeln** (Entfernungswertung, Glitch-Ablauf, 20 s …) gelten sofort für alle Räume, weil sie im Server stecken – Fragen und Pakete ändern sich dadurch nicht.
+4. **`JANIQUIZITION-STARTEN.bat`** starten: installiert Abhängigkeiten, baut die Oberfläche neu, startet den Server. Bestehende Räume, Spieler, Punkte und Pakete bleiben erhalten (keine automatische Migration, nichts wird überschrieben). Laufende Räume spielen mit ihrer alten Paketversion weiter; **neue Spielregeln** (Entfernungswertung, Glitch-Ablauf, 20 s …) gelten sofort für alle Räume, weil sie im Server stecken – Fragen und Pakete ändern sich dadurch nicht.
 5. **Neues Showpaket bewusst aktivieren:** `/admin` → **Daten** → Karte „Neues Showpaket & Fragenpool verfügbar“ → **Installieren**. Der Server legt davor automatisch eine Voll-Sicherung `data\backups\outplay-vor-installation-….db` an (wird nie rotiert) und ergänzt nur Fehlendes (neue Fragen, Kategorien, Paket **„Reus 65 Mio“**). Vorhandene Fragen, Szenen, Kategorien und die Pakete `standard-2` / `show-1` werden **nicht** verändert.
 6. **Branding / Länge einstellen:** `/admin` → Pakete → „Reus 65 Mio“ → Spielregeln: Länge der Show (4 oder 5 Aufgaben), BLIND-RANK-Bedienung, Showtitel, Gewinnerbezeichnung → **Prüfen & Veröffentlichen** (erzeugt eine neue Paketversion; laufende Räume bleiben unverändert).
 7. Showmaster: `/host` wählt automatisch das neueste Showpaket („Reus 65 Mio“); der Klassische Modus bleibt als Fallback wählbar.
 
-**Zurück zum alten Stand:** Server beenden, Ordner `data` aus der Sicherung zurückkopieren (oder `OUTPLAY-WIEDERHERSTELLEN.bat` mit einer Sicherung aus `data\backups`).
+**Zurück zum alten Stand:** Server beenden, Ordner `data` aus der Sicherung zurückkopieren (oder `JANIQUIZITION-WIEDERHERSTELLEN.bat` mit einer Sicherung aus `data\backups`).
 
 ## Karte Europa/Welt: Machbarkeit (nicht ausgeführt)
 Bisher: Welt Zoom 0–5, Europa 6–7, Deutschland 8–12 (≈ 312 MB). Das Skript `scripts/build-maps.mjs` kennt jetzt zwei **ergänzende** Optionen:
@@ -66,7 +66,7 @@ Die vorhandene Hintergrundmusik ist im Browser getestet: startet nicht von selbs
 ---
 
 # Best of 42 installieren (ohne Datenverlust)
-1. Server beenden, Ordner `data` kopieren (Sicherung). `git pull origin claude/upbeat-galileo-4el50u`, `OUTPLAY-STARTEN.bat` – nichts wird dabei verändert oder automatisch installiert (per Test auf einer bestehenden DB nachgewiesen).
+1. Server beenden, Ordner `data` kopieren (Sicherung). `git pull origin claude/upbeat-galileo-4el50u`, `JANIQUIZITION-STARTEN.bat` – nichts wird dabei verändert oder automatisch installiert (per Test auf einer bestehenden DB nachgewiesen).
 2. `/admin` → **Daten** → Karte „Neues Showpaket & Fragenpool verfügbar“ → **Installieren**. Der Server legt zuerst `data\backups\outplay-vor-installation-….db` an und ergänzt dann nur Fehlendes: 30 neue Fragen, 4 neue GLITCH-Szenen, 8 Kategorien und die Pakete **`show-4` „Reus 65 Mio – Best of 42“** und **`show-3z`** (Finale KICKBASE-KONSENS). Bestehende Fragen, Szenen, Kategorien und alle Paketversionen (`show-1`, `show-2`, `show-3`, `show-2k`, `standard-2`) bleiben byte-identisch.
 3. Admin → Pakete → „Best of 42“ → **Prüfen**: Die Warnungen zeigen die offenen Redaktionspunkte (siehe `docs/BESTOF42-REDAKTION.md`). Nicht freigegebene Aufgaben (v. a. C09 BVB-Ablösen, T05 Debütalter) bitte klären oder ersetzen.
 4. `/host` wählt automatisch das neueste Paket (Best of 42). **Sicherer Fallback:** `show-3` „Reus 65 Mio“ (31 Aufgaben, FINAL LOCK) bzw. `show-2k` – jederzeit im Paket-Dropdown wählbar.
@@ -86,7 +86,7 @@ Die vorhandene Hintergrundmusik ist im Browser getestet: startet nicht von selbs
 Gegenüber `show-4`: **CL-Finale 2028** („In welchem Stadion wird das Champions-League-Finale 2028 stattfinden?“ → Allianz Arena, München; Reveal: bereits 2012 und 2025, UEFA-Entscheidung vom 15.09.2026), **Käserennen auf der Weltkarte**, **MATCHMAKER: Spielfiguren ↔ Videospiele** (`s3-match-spiele`) statt Produktursprünge, **SORTIER’S! mit Youssoufa Moukoko** (Moukoko 16 J. 1 T. · Güther 3 T. · Wanner 15 T. · Lemke 214 T. · Bischof 264 T. laut Bundesliga.com; Iličević-Gleichstand im Reveal). Alle anderen Fragen unverändert; `show-4`, `show-3`, `show-2k` bleiben unberührt (neue IDs `show-5`, `show-4z`, `b43-*`).
 
 ## Aktualisierung auf dem Windows-Laptop (ohne Datenverlust)
-1. Server beenden, Ordner `data` kopieren. 2. `git pull origin claude/upbeat-galileo-4el50u`, `OUTPLAY-STARTEN.bat`. (Geo-Kurve, SORTIER’S!-Bedienung und Musik gelten sofort; laufende Räume behalten ihre Paketversion.) 3. `/admin` → Daten → **Installieren** (automatische Vor-Sicherung in `data\backups`). 4. `/host` wählt automatisch `show-5`; `show-4` bleibt als Fallback wählbar (im Admin archivierbar). Datenbank und `outplay-karte.mbtiles` werden nie überschrieben.
+1. Server beenden, Ordner `data` kopieren. 2. `git pull origin claude/upbeat-galileo-4el50u`, `JANIQUIZITION-STARTEN.bat`. (Geo-Kurve, SORTIER’S!-Bedienung und Musik gelten sofort; laufende Räume behalten ihre Paketversion.) 3. `/admin` → Daten → **Installieren** (automatische Vor-Sicherung in `data\backups`). 4. `/host` wählt automatisch `show-5`; `show-4` bleibt als Fallback wählbar (im Admin archivierbar). Datenbank und `outplay-karte.mbtiles` werden nie überschrieben.
 
 ## Paketbereinigung & Marktwert-Update (nach jeder Runde)
 
@@ -96,7 +96,7 @@ Gegenüber `show-4`: **CL-Finale 2028** („In welchem Stadion wird das Champion
 
 ## Praxistest 4 – KICKBASE-KONSENS als Hauptfinale (Update auf dem Windows-Laptop)
 
-1. Neuen Stand holen (`git pull`) bzw. Update-Paket einspielen und OUTPLAY neu starten.
+1. Neuen Stand holen (`git pull`) bzw. Update-Paket einspielen und JANIQUIZITION neu starten.
 2. Admin → Tab *Daten* → Karte „Pakete aufräumen & aktualisieren“ → **Sicher aktualisieren**. Vorher wird automatisch eine Datenbanksicherung nach `data\backups` geschrieben. Die Karte listet vorab genau, was passiert.
 3. Ergebnis: `show-4z` (Hauptshow, KICKBASE-KONSENS, vorausgewählt) und `show-5` (FINAL LOCK) erhalten den neuen Stand als **neue Version** (keine neuen Paket-IDs). `show-3` bleibt Backup, alles andere archiviert. Alte Versionen, bestehende Räume, Fragen und die Karte bleiben unverändert; archivierte Pakete werden nicht reaktiviert. Der Vorgang ist wiederholbar.
 
