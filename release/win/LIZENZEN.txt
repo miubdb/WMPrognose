@@ -1,0 +1,9 @@
+JANIQUIZITION – Drittanbieter-Hinweise
+======================================
+Programm: privates Freundesprojekt, nicht zur Weiterverbreitung an Dritte vorgesehen.
+Node.js (runtime\node.exe): MIT-Lizenz, © OpenJS Foundation und Mitwirkende – siehe runtime\LICENSE-node.txt.
+React, MapLibre GL, ws, d3-geo, qrcode, u. a.: MIT bzw. BSD-Lizenzen der jeweiligen Projekte.
+Emoji-Grafiken: Noto Color Emoji (Google), Apache-2.0.
+Schriften der Karte: Noto Sans, SIL Open Font License 1.1.
+Kartendaten (optional geladen): © OpenStreetMap-Mitwirkende (ODbL), aufbereitet von Protomaps.
+Töne: selbst synthetisiert.

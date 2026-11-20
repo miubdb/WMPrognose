@@ -3,47 +3,9 @@ import { adm, download, errText } from './api';
 import { Badge, Dialog, Empty, PageHead, RowMenu, SearchBox, Toast, fmtDate, useConfirm, useList, useToast } from './ui';
 import { PackBuilder } from './PackBuilder';
 
-/** Einmalige Kuratierung: zwei Spieleabende bleiben aktiv, alle anderen Pakete werden archiviert (nie gelöscht). */
-function Curate({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [plan, setPlan] = useState<any>(null); const [sel, setSel] = useState<string>(''); const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null); const [err, setErr] = useState('');
-  const load = async (second?: string) => { const r = await adm('GET', '/curate' + (second ? `?second=${encodeURIComponent(second)}` : '')); if (r.ok) { setPlan(r.data); if (!second && r.data.second) setSel(r.data.second); } else setErr(errText(r)); };
-  useEffect(() => { load(); }, []);       // eslint-disable-line react-hooks/exhaustive-deps
-  const pick = (id: string) => { setSel(id); load(id); };
-  const run = async () => { setBusy(true); const r = await adm('POST', '/curate', { second: sel }); setBusy(false); if (r.ok) { setRes(r.data); onDone(); } else setErr(errText(r)); };
-  const hasUsage = plan?.options?.some((o: any) => o.rooms > 0) || plan?.main?.rooms > 0;
-  const when = (t: number | null) => (t ? new Date(t).toLocaleDateString('de-DE') : '–');
-  if (res) return (
-    <Dialog title="Fertig" onClose={onClose} actions={<button className="btn primary" onClick={onClose}>Schließen</button>}>
-      <p><Badge kind="ok">Erledigt</Badge> Die Paketübersicht ist aufgeräumt.</p>
-      <ul className="small"><li><b>{res.names.main}</b> (Hauptversion)</li><li><b>{res.names.second}</b> (Zweite Version)</li><li>{res.archived.length} Pakete archiviert – nichts gelöscht.</li>{res.backupFile && <li>Sicherung: {res.backupFile}</li>}</ul>
-      <p className="small muted">{res.env === 'online' ? 'Gilt nur für die Online-Datenbank. Die lokale Datenbank auf dem Laptop ist getrennt und muss dort einzeln aufgeräumt werden.' : 'Gilt nur für die lokale Datenbank. Die Online-Version hat eine eigene Datenbank und wurde NICHT verändert.'}</p>
-    </Dialog>);
-  return (
-    <Dialog title="Paketübersicht aufräumen" wide onClose={onClose} actions={<><button className="btn ghost" onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={busy || !plan?.mainOk || !sel} onClick={run}>Archivieren &amp; umbenennen</button></>}>
-      {!plan && !err && <p className="muted">Lade …</p>}
-      {err && <div className="status bad">{err}</div>}
-      {plan && <>
-        <p className="muted small">Zwei Spieleabende bleiben aktiv, alle anderen Pakete werden <b>archiviert</b> (nicht gelöscht, später wieder aktivierbar). Fragen, veröffentlichte Versionen und Räume bleiben unverändert.</p>
-        <div className="curatecols">
-          <div className="bigpack"><h4>Hauptversion</h4>{plan.main ? <><b>{plan.names.main}</b><p className="small muted" style={{ margin: '4px 0 0' }}>bisher „{plan.main.name}“ · v{plan.main.version} · {plan.main.rounds} Runden{plan.main.rooms ? ` · ${plan.main.rooms} Räume gespielt` : ''}. Fragen und Ablauf bleiben unverändert.</p></> : <p className="small">Das Paket show-4z wurde nicht gefunden.</p>}</div>
-          <div className="bigpack second"><h4>Zweite Version</h4>{sel ? (() => { const o = plan.options.find((x: any) => x.id === sel); return <><b>{plan.names.second}</b><p className="small muted" style={{ margin: '4px 0 0' }}>bisher „{o?.name}“ · v{o?.version} · {o?.rounds} Runden{o?.rooms ? ` · ${o.rooms} Räume gespielt, zuletzt ${when(o.last)}` : ' · in dieser Datenbank nie gespielt'}.</p></>; })() : <p className="small">Bitte unten das Paket wählen, das ihr tatsächlich als zweiten Abend gespielt habt.</p>}</div>
-        </div>
-        <h4>{plan.autoDetected ? 'Zweites Paket (aus der Raumhistorie erkannt) – bei Bedarf ändern' : 'Welches Paket war euer zweiter Spieleabend?'}</h4>
-        {!hasUsage && <div className="banner"><span>In dieser Datenbank gibt es keine Raumhistorie, aus der sich das ableiten ließe{plan.env === 'online' ? ' (online gibt es keine Räume)' : ''}. Bitte selbst wählen.</span></div>}
-        <div className="picklist">{plan.options.map((o: any) => (
-          <label key={o.id} className={`pickrow2 ${sel === o.id ? 'sel' : ''}`}><input type="radio" name="second" checked={sel === o.id} onChange={() => pick(o.id)} />
-            <span><b>{o.name}</b> {o.candidate && <Badge kind="info">Kandidat</Badge>}<small className="muted" style={{ display: 'block' }}>{o.id} · v{o.version} · {o.rounds} Runden · {o.rooms ? `${o.rooms} Räume (${o.finished} beendet), zuletzt ${when(o.last)}` : 'nie gespielt'}</small></span><span /></label>))}</div>
-        <h4>Das passiert mit den übrigen Paketen ({plan.archive.length})</h4>
-        <details className="more" open><summary>Wird archiviert (nicht gelöscht)</summary><ul className="small">{plan.archive.map((o: any) => <li key={o.id}>{o.name} <span className="muted">· v{o.version}{o.rooms ? ` · ${o.rooms} Räume` : ''}</span></li>)}{!plan.archive.length && <li>Keine.</li>}</ul></details>
-        <ul className="small checklist"><li><b>Sicherung:</b> vor dem Archivieren wird automatisch eine Datenbanksicherung erstellt.</li><li><b>Spätere Updates</b> aktivieren die alten Pakete nicht wieder; neue mitgelieferte Pakete landen im Archiv.</li><li><b>{plan.env === 'online' ? 'Nur online:' : 'Nur lokal:'}</b> {plan.env === 'online' ? 'Die lokale Datenbank auf dem Laptop ist getrennt und bleibt unverändert.' : 'Die Online-Version hat eine eigene Datenbank und bleibt unverändert.'}</li></ul>
-      </>}
-    </Dialog>
-  );
-}
-
 export function Packs({ rev, bump, openId, onOpened }: { rev: number; bump: () => void; openId?: string; onOpened?: () => void }) {
   const { data, loading } = useList<any>('/packs', rev);
-  const [edit, setEdit] = useState<any>(null); const [neu, setNeu] = useState(false); const [q, setQ] = useState(''); const [cur, setCur] = useState<any>(null); const [curate, setCurate] = useState(false);
+  const [edit, setEdit] = useState<any>(null); const [neu, setNeu] = useState(false); const [q, setQ] = useState(''); const [cur, setCur] = useState<any>(null);
   const t = useToast(); const { ask, node } = useConfirm();
   const act = async (fn: () => Promise<any>, ok = '') => { const r = await fn(); if (!r.ok) t.show(errText(r)); else { bump(); if (ok) t.show(ok); } };
   useEffect(() => { if (openId && data.length) { const p = data.find((x: any) => x.id === openId); if (p) { setEdit(p); onOpened?.(); } } }, [openId, data]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -54,16 +16,13 @@ export function Packs({ rev, bump, openId, onOpened }: { rev: number; bump: () =
   const curated = cur?.done as { main: string; second: string } | null;
   const featured = curated ? [data.find((p: any) => p.id === curated.main), data.find((p: any) => p.id === curated.second)].filter(Boolean).filter(match) : [];
   const published = sorted.filter((p: any) => p.status === 'published' && !(curated && [curated.main, curated.second].includes(p.id)));
-  const drafts = sorted.filter((p: any) => p.status === 'draft'); const archived = sorted.filter((p: any) => p.status === 'archived');
-  const activeCount = data.filter((p: any) => p.status === 'published').length;
-  const rounds = (p: any) => (p.show?.length ? p.show.filter((x: any) => x.k !== 'board').length : p.categoryIds?.length ?? 0);
+  const drafts = sorted.filter((p: any) => p.status === 'draft');
+    const rounds = (p: any) => (p.show?.length ? p.show.filter((x: any) => x.k !== 'board').length : p.categoryIds?.length ?? 0);
   const menu = (p: any) => (
     <RowMenu>
       <button onClick={() => act(() => adm('POST', `/packs/${p.id}/duplicate`), 'Als Entwurf dupliziert ✓')}>⧉ Duplizieren</button>
       <button onClick={async () => { const r = await adm('GET', `/export?scope=pack:${p.id}`); if (r.ok) download(`JANIQUIZITION-Spieleabend-${p.id}.json`, r.data); else t.show(errText(r)); }}>📤 Exportieren</button>
-      {p.status === 'archived'
-        ? <button onClick={() => act(() => adm('POST', `/packs/${p.id}/status`, { status: 'published' }), 'Wieder aktiviert ✓')}>↩ Wieder aktivieren</button>
-        : p.versions > 0 && <button onClick={async () => { if (await ask({ title: `„${p.name}“ archivieren?`, text: 'Das Paket bleibt mit allen Versionen gespeichert, ist aber für neue Shows nicht mehr wählbar. Laufende Räume sind nicht betroffen. Du kannst es jederzeit wieder aktivieren.', confirmLabel: 'Archivieren' })) act(() => adm('POST', `/packs/${p.id}/status`, { status: 'archived' }), 'Archiviert ✓'); }}>🗄 Archivieren</button>}
+      {p.versions > 0 && <button onClick={async () => { if (await ask({ title: `„${p.name}“ aus der Liste entfernen?`, text: 'Das Paket verschwindet aus der Übersicht und aus dem Showmaster-Pult. Laufende Räume sind nicht betroffen. Unter „Sicherung & Update“ lässt es sich wiederherstellen.', confirmLabel: 'Entfernen' })) act(() => adm('POST', `/packs/${p.id}/status`, { status: 'archived' }), 'Entfernt ✓'); }}>🗄 Archivieren</button>}
       {p.versions === 0 && <button className="danger" onClick={async () => { if (await ask({ title: 'Entwurf löschen?', text: 'Dieser Entwurf wurde nie veröffentlicht und wird endgültig gelöscht.', confirmLabel: 'Löschen', danger: true })) act(() => adm('DELETE', '/packs/' + p.id), 'Gelöscht'); }}>🗑 Löschen</button>}
     </RowMenu>);
   const card = (p: any) => (
@@ -80,21 +39,16 @@ export function Packs({ rev, bump, openId, onOpened }: { rev: number; bump: () =
     </div>);
   return (
     <div>
-      <PageHead title="Spielepakete" sub="Ein Spielepaket legt fest, welche Runden und Fragen an einem Spieleabend vorkommen.">
+      <PageHead title="Spielepakete" sub="Die Zusammenstellung für einen Spieleabend.">
         <button className="btn primary" onClick={() => setNeu(true)}>＋ Neues Paket erstellen</button>
       </PageHead>
-      {!curated && activeCount > 2 && cur?.mainOk && <div className="banner" style={{ marginBottom: 10 }}><span><b>{activeCount} Pakete sind aktiv.</b> Die Übersicht lässt sich auf eure zwei Spieleabende reduzieren – alte Pakete werden archiviert, nicht gelöscht.</span><button className="btn small primary" onClick={() => setCurate(true)}>Übersicht aufräumen</button></div>}
-      <div className="qrow"><SearchBox value={q} onChange={setQ} placeholder="Paket suchen …" /></div>
+      {data.length > 6 && <div className="qrow"><SearchBox value={q} onChange={setQ} placeholder="Paket suchen …" /></div>}
       {!loading && !data.length && <Empty icon="📦" title="Noch keine Pakete" text="Ein Paket ist die Zusammenstellung für einen Abend."><button className="btn primary" onClick={() => setNeu(true)}>＋ Neues Paket erstellen</button></Empty>}
       {!loading && data.length > 0 && !sorted.length && !featured.length && <Empty icon="🔎" title="Kein Paket gefunden" text="Andere Suche probieren." />}
-      {featured.length > 0 && <section className="packgroup"><h3>Deine Spieleabende</h3><div className="curatecols">{featured.map((p: any) => big(p, p.id === curated!.second))}</div></section>}
-      {(published.length > 0 || (!curated && !loading)) && <section className="packgroup"><h3>{curated ? 'Weitere aktive Pakete' : 'Aktuelle Pakete'} <Badge>{published.length}</Badge></h3><p className="muted small" style={{ margin: '0 0 8px' }}>Veröffentlicht – im Showmaster-Pult wählbar.</p><div className="packgrid">{published.map(card)}</div></section>}
-      {drafts.length > 0 && <section className="packgroup"><h3>Entwürfe <Badge>{drafts.length}</Badge></h3><p className="muted small" style={{ margin: '0 0 8px' }}>Noch nicht veröffentlicht.</p><div className="packgrid">{drafts.map(card)}</div></section>}
-      {archived.length > 0 && <details className="packgroup"><summary><b>Alte Pakete verwalten</b> <Badge>{archived.length}</Badge> <span className="muted small">– archiviert, bleiben gespeichert und lassen sich wieder aktivieren</span></summary><div className="packgrid" style={{ marginTop: 8 }}>{archived.map(card)}</div></details>}
-      {curated && <p className="muted small">Übersicht aufgeräumt am {fmtDate(cur?.done?.at)}. Spätere Updates aktivieren alte Pakete nicht wieder.</p>}
-      <details className="more"><summary>Was bedeuten Entwurf und Version?</summary><p className="small">Ein <b>Entwurf</b> ist in Arbeit und wird laufend gespeichert. Mit <b>Veröffentlichen</b> entsteht eine feste <b>Version</b>, die im Showmaster-Pult gewählt werden kann. Spätere Änderungen werden erst mit einer neuen Version wirksam; bereits gestartete Räume und ältere Versionen bleiben unverändert.</p></details>
+      {featured.length > 0 && <section className="packgroup"><h3>Meine Spieleabende</h3><div className="curatecols">{featured.map((p: any) => big(p, p.id === curated!.second))}</div></section>}
+      {published.length > 0 && <section className="packgroup">{(curated || drafts.length > 0) && <h3>Eigene Pakete</h3>}<div className="packgrid">{published.map(card)}</div></section>}
+      {drafts.length > 0 && <section className="packgroup"><h3>Entwürfe</h3><div className="packgrid">{drafts.map(card)}</div></section>}
       {neu && <NewPack packs={data.filter((p: any) => p.show?.length && p.status !== 'archived')} onClose={() => setNeu(false)} onCreated={p => { setNeu(false); bump(); setEdit(p); }} />}
-      {curate && <Curate onClose={() => setCurate(false)} onDone={bump} />}
       {node}<Toast msg={t.msg} />
     </div>
   );

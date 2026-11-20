@@ -47,7 +47,9 @@ const lat2y = (lat, z) => { const r = Math.max(-85.05, Math.min(85.05, lat)) * M
 const x2lon = (x, z) => x / 2 ** z * 360 - 180;
 const y2lat = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
 
-const detail = JSON.parse((await import('node:fs')).readFileSync('web/src/mapdata/detail.json', 'utf8'));
+const { readFileSync: rf, existsSync: ex } = await import('node:fs');
+const detailFile = ['web/src/mapdata/detail.json', 'app/mapdata/detail.json'].find(p => ex(p)); if (!detailFile) { console.error('Kartenvorlage (detail.json) nicht gefunden.'); process.exit(1); }
+const detail = JSON.parse(rf(detailFile, 'utf8'));
 const deu = merge(detail, detail.objects.neighbors.geometries.filter(g => g.properties.a === 'DEU'));
 const rings = (deu.type === 'Polygon' ? [deu.coordinates] : deu.coordinates).flatMap(p => p.map(r => r));
 const inRing = (pt, ring) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c; } return c; };

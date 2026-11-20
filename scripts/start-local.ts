@@ -2,7 +2,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { createServer } from 'node:net';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, copyFileSync, accessSync, constants } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { netInfo } from '../server/net';
 
@@ -11,17 +11,31 @@ const dataDir = resolve(process.env.DATA_DIR ?? './data');
 const line = (s = '') => console.log(s);
 const die = (m: string): never => { console.error('\n✗ ' + m + '\n'); process.exit(1); };
 
+/** Release-Paket (Windows-ZIP): fertig gebündelte Anwendung samt Node-Laufzeit – kein npm, kein Build. Entwicklung: Quellcode im Repository. */
+const RELEASE = existsSync(join('app', 'server.mjs'));
+const version = existsSync('VERSION') ? readFileSync('VERSION', 'utf8').trim() : 'dev';
 const [maj, min] = process.versions.node.split('.').map(Number);
-if (maj < 24) die(`Node.js ${process.versions.node} ist zu alt. Benötigt wird Node 24 oder neuer (LTS) – https://nodejs.org`);
+if (!RELEASE && maj < 24) die(`Node.js ${process.versions.node} ist zu alt. Benötigt wird Node 24 oder neuer (LTS) – https://nodejs.org`);
 
 const newest = (dir: string): number => { let m = 0; if (!existsSync(dir)) return 0; for (const f of readdirSync(dir)) { const p = join(dir, f); const s = statSync(p); m = Math.max(m, s.isDirectory() ? newest(p) : s.mtimeMs); } return m; };
 const dist = join('dist', 'index.html');
-const srcTime = Math.max(newest('web'), newest('shared'), newest('content'), statSync('package.json').mtimeMs);
-if (!existsSync(dist) || statSync(dist).mtimeMs < srcTime) {
+if (RELEASE) {
+  if (!existsSync(dist)) die('Programmdateien unvollständig (dist\\index.html fehlt). Bitte das ZIP erneut vollständig entpacken – nicht direkt aus dem ZIP starten.');
+} else if (!existsSync(dist) || statSync(dist).mtimeMs < Math.max(newest('web'), newest('shared'), newest('content'), statSync('package.json').mtimeMs)) {
   line('• Frontend wird gebaut (einmalig, dauert ca. 20 Sekunden) …');
   const r = spawnSync('npm', ['run', 'build'], { stdio: 'inherit', shell: true });
   if (r.status !== 0) die('Der Frontend-Build ist fehlgeschlagen (siehe Meldungen oben).');
 }
+
+// Datenordner: beschreibbar? (z. B. nicht direkt aus dem ZIP oder aus einem schreibgeschützten Ordner starten)
+try { mkdirSync(dataDir, { recursive: true }); accessSync(dataDir, constants.W_OK); } catch { die(`Der Datenordner „${dataDir}“ ist nicht beschreibbar. Bitte den Ordner JANIQUIZITION an einen normalen Ort verschieben (z. B. Dokumente oder Desktop) und dort starten.`); }
+const firstStart = !existsSync(join(dataDir, 'outplay.db'));
+// Update-Schutz: bei neuer Programmversion vorher eine Sicherheitskopie der Datenbank anlegen (nichts wird überschrieben)
+try {
+  const vf = join(dataDir, 'version.txt'); const last = existsSync(vf) ? readFileSync(vf, 'utf8').trim() : '';
+  if (!firstStart && last !== version) { mkdirSync(join(dataDir, 'backups'), { recursive: true }); copyFileSync(join(dataDir, 'outplay.db'), join(dataDir, 'backups', `vor-update-auf-${version}-${Date.now()}.db`)); line(`• Neue Version ${version}: Sicherheitskopie deiner Daten angelegt (data\\backups).`); }
+  writeFileSync(vf, version + '\n');
+} catch { /* Sicherung ist Zusatz – Start nicht blockieren */ }
 
 // Port frei?
 await new Promise<void>(res => { const t = createServer(); t.once('error', () => die(`Port ${PORT} ist belegt – läuft JANIQUIZITION bereits in einem anderen Fenster? Sonst mit "set PORT=8081" einen anderen Port wählen.`)); t.once('listening', () => t.close(() => res())); t.listen(PORT, '0.0.0.0'); });
@@ -55,13 +69,15 @@ line('  2. Fernseher: dieselbe Adresse mit /tv/ + Raumcode');
 line('     (der Raumcode steht im Showmaster-Pult)');
 line('  3. Handys: QR-Code auf dem Fernseher scannen');
 line();
-line(`  Verwaltung (Fragen & Pakete):  ${url}/admin`);
-if (existsSync(join(dataDir, 'admin-passwort.txt'))) line(`  Admin-Passwort: Datei ${join(dataDir, 'admin-passwort.txt')}`);
-if (!existsSync(join(dataDir, 'outplay.db'))) line('  Erster Start: Windows fragt nach der Firewall – „Private Netzwerke“ erlauben.');
+line(`  Verwaltung (Fragen & Pakete):  http://localhost:${PORT}/admin `);
+if (firstStart) { line('  ERSTER START: Im Browser öffnet sich gleich die Einrichtung –'); line('  dort legst du dein eigenes Admin-Passwort fest.'); line('  Windows fragt eventuell nach der Firewall: „Private Netzwerke“ erlauben,'); line('  damit Handys und Fernseher sich verbinden können.'); }
 line('  Beenden: Fenster schließen');
 line('══════════════════════════════════════════════════');
 line();
 
-const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { stdio: 'inherit', env: { ...process.env, PORT: String(PORT), OUTPLAY_HOST: base || '', OUTPLAY_QUIET: '1' } });
-child.on('exit', code => process.exit(code ?? 0));
+const serverArgs = ['--disable-warning=ExperimentalWarning', ...(RELEASE ? [join('app', 'server.mjs')] : ['--import', 'tsx', 'server/index.ts'])];
+const child = spawn(process.execPath, serverArgs, { stdio: 'inherit', env: { ...process.env, PORT: String(PORT), OUTPLAY_HOST: base || '', OUTPLAY_QUIET: '1' } });
+child.on('exit', code => { if (code) console.error(`\n✗ JANIQUIZITION wurde unerwartet beendet (Code ${code}). Bitte das Fenster nicht schließen und den Text oben (Fehlermeldung) notieren oder fotografieren.\n`); process.exit(code ?? 0); });
+// Beim allerersten Start: Einrichtung automatisch im Browser öffnen (nur Windows/macOS/Linux-Standardbefehle, Fehler sind unkritisch)
+if (firstStart && RELEASE && !process.env.JANIQ_NO_BROWSER) setTimeout(() => { try { const target = `http://localhost:${PORT}/admin`; if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', target], { stdio: 'ignore', detached: true }).unref(); else if (process.platform === 'darwin') spawn('open', [target], { stdio: 'ignore', detached: true }).unref(); else spawn('xdg-open', [target], { stdio: 'ignore', detached: true }).unref(); } catch { /* */ } }, 2500);
 for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => child.kill(sig));

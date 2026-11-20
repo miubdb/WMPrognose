@@ -1,0 +1,45 @@
+JANIQUIZITION – SO GEHT'S (Windows)
+==================================
+
+1. STARTEN
+   Doppelklick auf  JANIQUIZITION-STARTEN.bat
+   (Windows zeigt evtl. "Der Computer wurde durch Windows geschützt":
+    "Weitere Informationen" -> "Trotzdem ausführen". Das ist bei privaten
+    Programmen normal.)
+   Es öffnet sich ein schwarzes Fenster. Es muss offen bleiben, solange gespielt wird.
+
+2. ERSTER START: EIGENES ADMIN-PASSWORT
+   Der Browser öffnet sich automatisch. Dort ein eigenes Passwort wählen
+   (mindestens 12 Zeichen, am besten ein Satz) und speichern.
+   Windows fragt evtl. nach der Firewall: "Private Netzwerke" erlauben.
+
+3. SPIELEABEND
+   - Showmaster-Pult öffnen (Adresse steht im schwarzen Fenster, endet auf /host)
+   - Eines der beiden Pakete wählen, "Spielraum erstellen"
+   - Fernseher: im TV-Browser die TV-Adresse öffnen (steht im Pult)
+   - Mitspieler: QR-Code auf dem Fernseher scannen oder Raumcode eingeben.
+     Alle müssen im selben WLAN sein. Ein Passwort brauchen Mitspieler nicht.
+   - "Show starten"
+
+4. EIGENE FRAGEN UND PAKETE
+   Adresse: http://localhost:8080/admin  (Passwort von Schritt 2)
+   Dort: Fragen anlegen, Pakete zusammenstellen, "Hilfe" oben rechts.
+
+5. WO SIND MEINE DATEN?
+   Im Ordner "data" neben diesem Programm. Nur auf diesem Computer.
+   Automatische Sicherungen: data\backups
+
+6. UPDATE
+   Neue ZIP-Datei herunterladen und in DENSELBEN Ordner entpacken
+   (Dateien ersetzen). Der Ordner "data" bleibt unberührt, vor dem ersten
+   Start der neuen Version wird zusätzlich eine Sicherheitskopie angelegt.
+
+7. PASSWORT VERGESSEN
+   JANIQUIZITION beenden, dann JANIQUIZITION-PASSWORT-ZURUECKSETZEN.bat starten.
+   Danach beim nächsten Start im Browser neues Passwort festlegen.
+
+8. SICHERUNG EINSPIELEN
+   JANIQUIZITION beenden, .db-Sicherung auf JANIQUIZITION-WIEDERHERSTELLEN.bat ziehen.
+
+OPTIONAL: JANIQUIZITION-KARTE-LADEN.bat lädt eine detaillierte Offline-Karte.
+Ohne sie läuft alles weiter (einfachere Karte).

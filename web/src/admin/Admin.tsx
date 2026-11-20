@@ -8,6 +8,7 @@ import { MoreContent } from './More';
 import { Data } from './Data';
 import { useUpdate } from './Update';
 import { guard } from './ui';
+import { Help } from './Help';
 
 const TABS: { id: AdminTab; label: string }[] = [{ id: 'home', label: '🏠 Start' }, { id: 'questions', label: '❓ Fragen' }, { id: 'packs', label: '📦 Pakete' }, { id: 'io', label: '💾 Sicherung & Update' }, { id: 'more', label: '🧱 Weitere Inhalte' }];
 
@@ -91,15 +92,18 @@ function Shell({ onOut, online }: { onOut: () => void; online?: boolean }) {
   const bump = () => setRev(x => x + 1);
   const go = (t: AdminTab) => { if (guard.dirty && t !== tab && !window.confirm('Im Paket gibt es noch ungespeicherte Änderungen. Trotzdem wechseln? Sie bleiben als Wiederherstellung in diesem Browser erhalten.')) return; setTab(t); sessionStorage.setItem('admtab', t); window.scrollTo({ top: 0 }); };
   const u = useUpdate(bump);                 // ein gemeinsamer Update-Status für Start und Sicherung
+  const [help, setHelp] = useState(() => { try { if (localStorage.getItem('adm.welcome') === '1') { localStorage.removeItem('adm.welcome'); return true; } } catch { /* */ } return false; });
   return (
     <div className="adm">
       <div className="admtop">
         <div className="logo tiny"><Brand /> <small>Admin</small></div>
         <span className={`envchip ${online ? 'online' : 'local'}`} title={online ? 'Online-Verwaltung: Inhalte vorbereiten' : 'Lokale Version auf diesem Rechner'}>{online ? '☁️ Online' : '💻 Lokal'}</span>
         <div className="spacer" />{!online && <a className="btn small ghost" href="/host">🎤 Zur Show</a>}
+        <button className="btn small ghost" onClick={() => setHelp(true)}>❔ Hilfe</button>
         <button className="btn small ghost" onClick={async () => { await adm('POST', '/logout'); onOut(); }}>Abmelden</button>
         <nav aria-label="Hauptnavigation">{TABS.map(t => <button key={t.id} aria-current={tab === t.id ? 'page' : undefined} className={tab === t.id ? 'on' : ''} onClick={() => go(t.id)}>{t.label}</button>)}</nav>
       </div>
+      {help && <Help online={!!online} onClose={() => setHelp(false)} />}
       {tab === 'home' && <Home go={go} online={!!online} u={u} bump={bump} openPack={id => { setOpenId(id); go('packs'); }} />}
       {tab === 'packs' && <Packs rev={rev} bump={bump} openId={openId} onOpened={() => setOpenId(undefined)} />}
       {tab === 'questions' && <Library rev={rev} bump={bump} />}

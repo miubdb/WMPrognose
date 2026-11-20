@@ -404,3 +404,4 @@ details summary { cursor: pointer; font-weight: 700; }
 
 .builder{grid-template-columns:minmax(0,1fr)}.builder>*,.round,.round .rhead,.round .rbody,.qitem{min-width:0;max-width:100%}.sortable{min-width:0}.bmeta{max-width:100%;min-width:0}.bmeta .sbadge{white-space:normal}.bmeta>*{max-width:100%}
 @media(max-width:560px){.bhead .bname{flex-basis:100%}.round .rhead{gap:6px;padding:8px 6px}.round .rmain .meta{font-size:.75rem}}
+.steps{padding-left:1.2em;display:grid;gap:8px}.steps li{line-height:1.45}

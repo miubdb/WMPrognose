@@ -71,8 +71,8 @@ test('Admin-Passwort: kein Standardpasswort, Einrichtung mit mindestens 12 Zeich
   void now;
 });
 
-const http = (port: number, path: string, method: string, body?: unknown, headers: Record<string, string> = {}) => new Promise<{ status: number; json: any; cookie?: string }>((res, rej) => {
-  const r = request({ host: '127.0.0.1', port, path, method, headers: { 'content-type': 'application/json', ...headers } }, resp => { let s = ''; resp.on('data', d => (s += d)); resp.on('end', () => res({ status: resp.statusCode ?? 0, json: s ? JSON.parse(s) : {}, cookie: String(resp.headers['set-cookie'] ?? '') })); });
+const http = (port: number, path: string, method: string, body?: unknown, headers: Record<string, string> = {}) => new Promise<{ status: number; json: any; cookie: string }>((res, rej) => {
+  const r = request({ host: '127.0.0.1', port, path, method, headers: { 'content-type': 'application/json', ...headers } }, resp => { let s = ''; resp.on('data', d => (s += d)); resp.on('end', () => res({ status: resp.statusCode ?? 0, json: s ? JSON.parse(s) : {}, cookie: String(resp.headers['set-cookie'] ?? '') as string })); });
   r.on('error', rej); if (body) r.write(JSON.stringify(body)); r.end();
 });
 

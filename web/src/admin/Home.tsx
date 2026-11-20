@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { GAMES, INACTIVE_GAMES } from '../../../shared/games';
+import { GAMES } from '../../../shared/games';
 import { adm } from './api';
 import { Badge, fmtDate } from './ui';
 import { UpdateBar, UpdateDetails, type useUpdate } from './Update';
@@ -20,7 +20,7 @@ export function Home({ go, online, u, openPack }: { go: (t: AdminTab) => void; o
   return (
     <div className="dash">
       <section className="hero">
-        <div><h2>JANIQUIZITION – Verwaltung</h2><p className="muted" style={{ margin: 0 }}>Bereit für den nächsten Spieleabend?</p></div>
+        <div><h2>JANIQUIZITION</h2><p className="muted" style={{ margin: 0 }}>Bereit für den nächsten Spieleabend?</p></div>
         <div className="statchips" aria-label="Status">
           <Badge kind={online ? 'info' : 'ok'}>{online ? '☁️ Online' : '💻 Lokal'}</Badge>
           <Badge>{packs ? active.length : '…'} aktive Pakete</Badge>
@@ -42,21 +42,10 @@ export function Home({ go, online, u, openPack }: { go: (t: AdminTab) => void; o
         </div>
       </section>
 
-      <section className="softcard">
-        <div className="row between" style={{ marginBottom: 8 }}><h3 style={{ margin: 0 }}>Spielepakete</h3><button className="btn small quiet" onClick={() => go('packs')}>Alle Pakete ansehen</button></div>
-        {packs && !shown.length && <p className="muted">Noch kein Paket vorhanden.</p>}
-        <div className="minipacks">{shown.map(p => (
-          <div key={p.id} className="minipack">
-            <div><b>{p.name}</b><span className="muted small">{p.status === 'published' ? `Veröffentlicht · v${p.currentVersion}` : 'Entwurf'} · {rounds(p)} Runden · {fmtDate(p.updated)}</span></div>
-            <span className="pageact">{p === main && <Badge kind="ok">Hauptshow</Badge>}<button className="btn small quiet" onClick={() => openPack(p.id)}>Öffnen</button></span>
-          </div>))}</div>
-      </section>
-
       <details className="softcard more">
-        <summary><b>{games.length} Spielmodi + Finalspiele entdecken</b></summary>
+        <summary><b>Alle Spielmodi ansehen</b></summary>
         <div className="tablescroll"><table className="scoretab gametab"><thead><tr><th></th><th>Spiel</th><th>So geht’s</th><th>Punkte</th></tr></thead>
           <tbody>{GAMES.map(g => <tr key={g.mode}><td>{g.icon}</td><td><b>{g.name}</b>{g.kind === 'Finale' && <small className="muted"> Finale</small>}</td><td>{g.short}</td><td className="nowrap">{g.points}</td></tr>)}</tbody></table></div>
-        <details className="more"><summary>Nicht mehr aktiv</summary><ul className="small">{INACTIVE_GAMES.map(g => <li key={g.name}><b>{g.name}</b> – {g.note}</li>)}</ul></details>
       </details>
     </div>
   );
