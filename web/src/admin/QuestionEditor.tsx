@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import type { Mode } from '../../../shared/types';
 import { MODE_LABEL, normalizeTask, taskMax, validateTask } from '../../../shared/validate';
 import { diffZones, type Scene } from '../../../shared/scenes';
@@ -74,6 +74,8 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
   id?: string; mode?: Mode; initial?: { task: any; topic: string; updated?: number }; scenes: Scene[]; onClose: () => void; onSaved: (q: any) => void; meta?: any;
 }) {
   const [task, setTask] = useState<any>(initial?.task ?? newTask(mode ?? 'geo'));
+  const startJson = useRef(JSON.stringify(initial?.task ?? newTask(mode ?? 'geo'))); const isDirty = () => JSON.stringify(task) !== startJson.current;
+  const tryClose = () => { if (isDirty() && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return; onClose(); };
   const [topic, setTopic] = useState(initial?.topic ?? '');
   const [msg, setMsg] = useState('');
   const [prev, setPrev] = useState(false);
@@ -101,9 +103,9 @@ export function QuestionEditor({ id, mode, initial, scenes, onClose, onSaved, me
       <div className="actionbar"><span className="spacer" /><button className="btn" onClick={onClose}>Schließen</button></div></div></div>
   );
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal">
       <div className="modalbox wide editor" onClick={e => e.stopPropagation()}>
-        <div className="row between sticky-top"><h2>{MODE_ICON[m]} {id ? 'Frage bearbeiten' : 'Neue Frage'} <span className="muted modename">{MODE_LABEL[m]}</span></h2><button className="btn small ghost" onClick={onClose}>Schließen ✕</button></div>
+        <div className="row between sticky-top"><h2>{MODE_ICON[m]} {id ? 'Frage bearbeiten' : 'Neue Frage'} <span className="muted modename">{MODE_LABEL[m]}</span></h2><button className="btn small ghost" onClick={tryClose}>Schließen ✕</button></div>
 
         <h4 className="step"><i>1</i> Frage &amp; Inhalt</h4>
         {(() => { const g = GAMES.find(x => x.mode === m); return g ? <div className="gameinfo"><b>{g.icon} {g.name}</b> – {g.short}<br /><span className="muted">Du legst an: {g.ask}</span></div> : null; })()}

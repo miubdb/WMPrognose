@@ -34458,6 +34458,7 @@ var ContentService = class _ContentService {
         const pub = this.publish(pk.id, "Mitgeliefertes Standardpaket (aus content/tiles.ts)");
         report.created.packs = 1;
         report.ref = pub.ref;
+        if (this.curation()) this.setPackStatus(pk.id, "archived");
         if (opts.archiveOlder) {
           for (const old of this.listPacks()) if (old.id !== pk.id && /^standard-\d+$/.test(old.id) && old.status !== "archived") {
             this.setPackStatus(old.id, "archived");
@@ -34484,6 +34485,7 @@ var ContentService = class _ContentService {
           report.created.packs++;
           report.showCreated = true;
           if (sh.revision) this.setSetting("rev:" + sh.pack.id, String(sh.revision));
+          if (this.curation()) this.setPackStatus(sh.pack.id, "archived");
           if (sh === this.seed.show) report.showRef = ref;
           else report.extraRefs.push(ref);
         } else {
@@ -34623,7 +34625,7 @@ var ContentService = class _ContentService {
   listCategories() {
     const qs = new Map(this.listQuestions().map((q2) => [q2.id, q2]));
     const packs = this.listPacks();
-    return this.listCategoriesRaw().map((c) => ({ ...this.catView(c, qs), usedInPacks: packs.filter((p) => p.data.categoryIds.includes(c.id) || p.data.surprise === c.id || p.data.final === c.id).map((p) => ({ id: p.id, name: p.data.name })) }));
+    return this.listCategoriesRaw().map((c) => ({ ...this.catView(c, qs), usedInPacks: packs.filter((p) => p.data.categoryIds.includes(c.id) || p.data.surprise === c.id || p.data.final === c.id || (p.data.show ?? []).some((x3) => x3.k !== "board" && x3.cat === c.id)).map((p) => ({ id: p.id, name: p.data.name })) }));
   }
   getCategory(id) {
     const c = this.listCategories().find((x3) => x3.id === id);
@@ -34838,6 +34840,61 @@ var ContentService = class _ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
+  // ------------------------------------------------------------- Kuratierung: genau zwei Spieleabende bleiben in der Übersicht
+  static CURATED_MAIN = "show-4z";
+  static CURATED_CANDIDATES = ["show-after", "show-5"];
+  static NAME_MAIN = "Kickbase-Abend bei MJ \u2013 Hauptversion";
+  static NAME_SECOND = "Kickbase-Abend bei MJ \u2013 Zweite Version";
+  curation() {
+    try {
+      return JSON.parse(this.setting("curated") ?? "null");
+    } catch {
+      return null;
+    }
+  }
+  /** Vorschau der Kuratierung. `usage` = wie oft ein Paket in Räumen dieser Datenbank gespielt wurde (Paket-ID → Zähler). */
+  curationPlan(usage = {}, choice) {
+    const packs = this.listPacksView();
+    const active = packs.filter((p) => p.status !== "archived");
+    const rounds = (p) => p.show?.length ? p.show.filter((x3) => x3.k !== "board").length : p.categoryIds.length;
+    const info = (p) => ({ id: p.id, name: p.name, status: p.status, version: p.currentVersion, rounds: rounds(p), updated: p.updated, rooms: usage[p.id]?.rooms ?? 0, finished: usage[p.id]?.finished ?? 0, last: usage[p.id]?.last ?? null });
+    const main = packs.find((p) => p.id === _ContentService.CURATED_MAIN);
+    const used = _ContentService.CURATED_CANDIDATES.filter((id) => active.some((p) => p.id === id && p.status === "published") && (usage[id]?.rooms ?? 0) > 0);
+    const validChoice = choice && choice !== _ContentService.CURATED_MAIN && active.some((p) => p.id === choice && p.status === "published") ? choice : null;
+    const second = validChoice ?? (used.length === 1 ? used[0] : null);
+    const keep = /* @__PURE__ */ new Set([_ContentService.CURATED_MAIN, second ?? ""]);
+    return {
+      done: this.curation(),
+      mainOk: !!main && main.status === "published",
+      main: main ? info(main) : null,
+      second,
+      autoDetected: !validChoice && used.length === 1,
+      evidence: used,
+      needsChoice: !second,
+      options: active.filter((p) => p.id !== _ContentService.CURATED_MAIN && p.status === "published").map((p) => ({ ...info(p), candidate: _ContentService.CURATED_CANDIDATES.includes(p.id) })),
+      archive: active.filter((p) => !keep.has(p.id)).map(info),
+      names: { main: _ContentService.NAME_MAIN, second: _ContentService.NAME_SECOND }
+    };
+  }
+  /** Archiviert alle anderen Pakete (nie löschen), benennt die beiden Abende um und merkt sich die Auswahl dauerhaft. Versionen/Räume/Fragen bleiben unverändert. */
+  curationApply(usage, second) {
+    const plan = this.curationPlan(usage, second);
+    if (!plan.mainOk) throw new ApiError(409, "Die Hauptversion (show-4z) ist nicht ver\xF6ffentlicht.");
+    if (!plan.second || plan.second !== second) throw new ApiError(422, "Bitte ein g\xFCltiges zweites Paket w\xE4hlen.");
+    const archived = [];
+    this.tx(() => {
+      for (const p of plan.archive) {
+        this.setPackStatus(p.id, "archived");
+        archived.push(p.id);
+      }
+      for (const [id, name] of [[_ContentService.CURATED_MAIN, _ContentService.NAME_MAIN], [second, _ContentService.NAME_SECOND]]) {
+        const cur = this.getPack(id);
+        this.updatePack(id, { ...cur, name, ifUpdated: void 0 });
+      }
+      this.setSetting("curated", JSON.stringify({ main: _ContentService.CURATED_MAIN, second, at: this.now() }));
+    });
+    return { archived, main: _ContentService.CURATED_MAIN, second, names: plan.names };
+  }
   static KEEP_PACKS = ["show-4z", "show-5", "show-3", "show-after", "show-new", "show-modes"];
   static REFRESH_PACKS = ["show-4z", "show-5", "show-after"];
   static MAIN_PACK = "show-4z";
@@ -34849,9 +34906,10 @@ var ContentService = class _ContentService {
   }
   cleanupPlan() {
     const packs = this.listPacks();
+    const cur = this.curation();
     const rows = packs.map((p) => {
-      const keep = _ContentService.KEEP_PACKS.includes(p.id);
-      const action = keep ? p.status === "archived" ? "keep-archived" : "keep" : p.status === "archived" ? "archived" : "archive";
+      const keep = cur ? [cur.main, cur.second].includes(p.id) : _ContentService.KEEP_PACKS.includes(p.id);
+      const action = cur ? p.status === "archived" ? "archived" : "keep" : keep ? p.status === "archived" ? "keep-archived" : "keep" : p.status === "archived" ? "archived" : "archive";
       let needsUpdate = false;
       if (keep && p.status !== "archived" && _ContentService.REFRESH_PACKS.includes(p.id)) {
         const sh2 = this.seedShow(p.id);
@@ -34865,7 +34923,7 @@ var ContentService = class _ContentService {
         needsUpdate = !boards || !!sh2?.revision && this.revisionOf(p.id) < sh2.revision;
       }
       const sh = this.seedShow(p.id);
-      const needsRename = keep && p.status !== "archived" && p.id === "show-3" && p.data.name !== _ContentService.BACKUP_NAME;
+      const needsRename = !cur && keep && p.status !== "archived" && p.id === "show-3" && p.data.name !== _ContentService.BACKUP_NAME;
       return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate, needsRename, revision: sh?.revision ?? null };
     });
     const archive = rows.filter((r2) => r2.action === "archive").map((r2) => r2.id);
@@ -34883,8 +34941,8 @@ var ContentService = class _ContentService {
     this.installSeed();
     const p = this.getPack(id);
     this.updatePack(id, {
-      name: sh.pack.name,
-      description: sh.pack.description,
+      name: this.curation() ? p.name : sh.pack.name,
+      description: this.curation() ? p.description : sh.pack.description,
       categoryIds: [],
       surprise: "",
       final: "",
@@ -38365,6 +38423,16 @@ async function handleAdmin(app, req, res, parts, url, readBody) {
         if (method === "POST") {
           const backupFile = app.preInstallBackup?.() ?? null;
           return json(200, { ...C2.installSeed({ archiveOlder: true }), backupFile });
+        }
+        break;
+      }
+      case "curate": {
+        const usage = app.roomUsage?.() ?? {};
+        if (method === "GET") return json(200, { ...C2.curationPlan(usage, url.searchParams.get("second") ?? void 0), env: app.mode });
+        if (method === "POST") {
+          const body = await readBody(4096);
+          const backupFile = app.preInstallBackup?.() ?? null;
+          return json(200, { ...C2.curationApply(usage, String(body.second ?? "")), backupFile, env: app.mode });
         }
         break;
       }

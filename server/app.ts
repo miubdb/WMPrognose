@@ -75,6 +75,15 @@ export class App {
     try { const f = pjoin(dir, 'backup.db'); this.store.backupTo(f); return rf(f); } finally { rmSync(dir, { recursive: true, force: true }); }
   }
   /** Vor jeder Installation mitgelieferter Inhalte: eigene Voll-Sicherung (wird nie rotiert/gelöscht). */
+  roomUsage(): Record<string, { rooms: number; finished: number; last: number | null }> {
+    const out: Record<string, { rooms: number; finished: number; last: number | null }> = {};
+    for (const r of this.rooms.values()) {
+      if (!r.bookId || !r.players.length) continue;                    // leere Räume (nie gespielt) zählen nicht
+      const id = r.bookId.split('@')[0]; const u = (out[id] ??= { rooms: 0, finished: 0, last: null });
+      u.rooms++; if (r.phase === 'ceremony' || r.phase === 'ended') u.finished++; u.last = Math.max(u.last ?? 0, r.createdAt);
+    }
+    return out;
+  }
   preInstallBackup(): string | null {
     const dir = this.opts?.backupDir; if (!dir) return null;
     try { mkdirSync(dir, { recursive: true }); const f = pjoin(dir, `outplay-vor-installation-${new Date(this.clock()).toISOString().replace(/[:T]/g, '-').slice(0, 19)}.db`); this.store.backupTo(f); return f; } catch { return null; }
@@ -96,7 +105,7 @@ export class App {
     this.store = new Store(opts.dbFile);
     this.content = new ContentService(this.store, { tiles: opts.book.tiles, scenes: SCENES, pack: opts.seedPack, show: opts.seedShow, extraShows: opts.extraShows }, this.clock);
     this.auth = new AdminAuth(this.store, opts.adminPassword, this.clock);
-    this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer(), preInstallBackup: () => this.preInstallBackup() };
+    this.adminCtx = { auth: this.auth, content: this.content, roomCount: () => this.rooms.size, mode: 'local', backup: () => this.backupBuffer(), preInstallBackup: () => this.preInstallBackup(), roomUsage: () => this.roomUsage() };
     this.engine = new Engine((id: string) => this.content.resolveBook(id));
     for (const r of this.store.loadAll()) this.rooms.set(r.code, r);
     this.store.deleteOlderThan(this.clock() - 14 * 24 * 3600 * 1000);

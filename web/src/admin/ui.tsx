@@ -56,3 +56,6 @@ export function useConfirm() {
   return { ask, node };
 }
 export const fmtDate = (t?: number) => (t ? new Date(t).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–');
+
+/** Globaler Schutz: solange der Show-Builder ungespeicherte Änderungen hat, fragt die Navigation nach. */
+export const guard = { dirty: false };

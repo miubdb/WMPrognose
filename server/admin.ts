@@ -15,6 +15,8 @@ export interface AdminCtx {
   backup(): Buffer;
   /** optional: Voll-Sicherung unmittelbar vor einer Installation (lokal: Datei im Backup-Ordner) */
   preInstallBackup?(): string | null;
+  /** Wie oft wurde ein Paket in Räumen DIESER Datenbank gespielt (nur lokal; online gibt es keine Räume) */
+  roomUsage?(): Record<string, { rooms: number; finished: number; last: number | null }>;
   /** Meldet nach einer Admin-Anfrage, ob geschrieben wurde (Online: dann wird nach Blob gespeichert) */
   setupProblem?(): { err: string; setup: string } | null;
 }
@@ -115,6 +117,15 @@ export async function handleAdmin(app: AdminCtx, req: IncomingMessage, res: Serv
       case 'standard': {   // mitgeliefertes Standardpaket: Status / sicher installieren (nicht-destruktiv, mit Archivierung des Vorgängers)
         if (method === 'GET') return json(200, C.seedStatus());
         if (method === 'POST') { const backupFile = app.preInstallBackup?.() ?? null; return json(200, { ...C.installSeed({ archiveOlder: true }), backupFile }); }
+        break;
+      }
+      case 'curate': {   // Kuratierung: GET = Vorschau (?second=ID), POST = ausführen (mit automatischer Sicherung)
+        const usage = app.roomUsage?.() ?? {};
+        if (method === 'GET') return json(200, { ...C.curationPlan(usage, url.searchParams.get('second') ?? undefined), env: app.mode });
+        if (method === 'POST') {
+          const body = await readBody(4096); const backupFile = app.preInstallBackup?.() ?? null;
+          return json(200, { ...C.curationApply(usage, String(body.second ?? '')), backupFile, env: app.mode });
+        }
         break;
       }
       case 'cleanup': {   // Paketbereinigung: GET = Vorschau (ändert nichts), POST = ausführen (mit automatischer Sicherung)

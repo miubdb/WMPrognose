@@ -101,7 +101,7 @@ export class ContentService {
         const pack: PackData = { name: pk.name, description: pk.description, categoryIds: ids, surprise, final, rules: { ...DEFAULT_RULES } };
         this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(pk.id, JSON.stringify(pack), t, t);
         const pub = this.publish(pk.id, 'Mitgeliefertes Standardpaket (aus content/tiles.ts)');
-        report.created.packs = 1; report.ref = pub.ref;
+        report.created.packs = 1; report.ref = pub.ref; if (this.curation()) this.setPackStatus(pk.id, 'archived');
         if (opts.archiveOlder) {
           for (const old of this.listPacks()) if (old.id !== pk.id && /^standard-\d+$/.test(old.id) && old.status !== 'archived') { this.setPackStatus(old.id, 'archived'); report.archived.push(old.id); }
         }
@@ -119,6 +119,7 @@ export class ContentService {
           const pack: PackData = { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: '', final: '', rules: { ...DEFAULT_RULES, ...(sh.pack.rules ?? {}) } as Required<PackRules>, show: sh.steps };
           this.db.prepare("INSERT INTO packs(id,data,status,current_version,created,updated) VALUES(?,?,'draft',NULL,?,?)").run(sh.pack.id, JSON.stringify(pack), t, t);
           const ref = this.publish(sh.pack.id, 'Mitgeliefertes Showpaket (fester Ablauf)').ref; report.created.packs++; report.showCreated = true; if (sh.revision) this.setSetting('rev:' + sh.pack.id, String(sh.revision));
+          if (this.curation()) this.setPackStatus(sh.pack.id, 'archived');   // nach der Kuratierung kommen neue mitgelieferte Pakete nur ins Archiv
           if (sh === this.seed.show) report.showRef = ref; else report.extraRefs.push(ref);
         } else { const row = this.listPacks().find(p => p.id === sh.pack.id); const ref = row?.currentVersion ? `${sh.pack.id}@${row.currentVersion}` : ''; if (sh === this.seed.show) report.showRef = ref; }
       }
@@ -236,7 +237,7 @@ export class ContentService {
   listCategories() {
     const qs = new Map(this.listQuestions().map(q => [q.id, q]));
     const packs = this.listPacks();
-    return this.listCategoriesRaw().map(c => ({ ...this.catView(c, qs), usedInPacks: packs.filter(p => p.data.categoryIds.includes(c.id) || p.data.surprise === c.id || p.data.final === c.id).map(p => ({ id: p.id, name: p.data.name })) }));
+    return this.listCategoriesRaw().map(c => ({ ...this.catView(c, qs), usedInPacks: packs.filter(p => p.data.categoryIds.includes(c.id) || p.data.surprise === c.id || p.data.final === c.id || (p.data.show ?? []).some(x => x.k !== 'board' && x.cat === c.id)).map(p => ({ id: p.id, name: p.data.name })) }));
   }
   getCategory(id: string) { const c = this.listCategories().find(x => x.id === id); if (!c) throw new ApiError(404, 'Kategorie nicht gefunden'); return c; }
   createCategory(raw: any, id?: string) {
@@ -413,16 +414,54 @@ export class ContentService {
    * Die Best-of-Pakete bekommen – falls nötig – eine NEUE Version mit „Marktwert-Update nach jeder Runde“;
    * laufende/beendete Räume behalten ihren bisherigen Stand.
    */
+  // ------------------------------------------------------------- Kuratierung: genau zwei Spieleabende bleiben in der Übersicht
+  static readonly CURATED_MAIN = 'show-4z';
+  static readonly CURATED_CANDIDATES = ['show-after', 'show-5'];
+  static readonly NAME_MAIN = 'Kickbase-Abend bei MJ – Hauptversion';
+  static readonly NAME_SECOND = 'Kickbase-Abend bei MJ – Zweite Version';
+  curation(): { main: string; second: string; at: number } | null { try { return JSON.parse(this.setting('curated') ?? 'null'); } catch { return null; } }
+  /** Vorschau der Kuratierung. `usage` = wie oft ein Paket in Räumen dieser Datenbank gespielt wurde (Paket-ID → Zähler). */
+  curationPlan(usage: Record<string, { rooms: number; finished: number; last: number | null }> = {}, choice?: string) {
+    const packs = this.listPacksView(); const active = packs.filter(p => p.status !== 'archived');
+    const rounds = (p: any) => (p.show?.length ? p.show.filter((x: any) => x.k !== 'board').length : p.categoryIds.length);
+    const info = (p: any) => ({ id: p.id, name: p.name, status: p.status, version: p.currentVersion, rounds: rounds(p), updated: p.updated, rooms: usage[p.id]?.rooms ?? 0, finished: usage[p.id]?.finished ?? 0, last: usage[p.id]?.last ?? null });
+    const main = packs.find(p => p.id === ContentService.CURATED_MAIN);
+    const used = ContentService.CURATED_CANDIDATES.filter(id => active.some(p => p.id === id && p.status === 'published') && (usage[id]?.rooms ?? 0) > 0);
+    const validChoice = choice && choice !== ContentService.CURATED_MAIN && active.some(p => p.id === choice && p.status === 'published') ? choice : null;
+    const second = validChoice ?? (used.length === 1 ? used[0] : null);
+    const keep = new Set([ContentService.CURATED_MAIN, second ?? '']);
+    return {
+      done: this.curation(), mainOk: !!main && main.status === 'published', main: main ? info(main) : null,
+      second, autoDetected: !validChoice && used.length === 1, evidence: used, needsChoice: !second,
+      options: active.filter(p => p.id !== ContentService.CURATED_MAIN && p.status === 'published').map(p => ({ ...info(p), candidate: ContentService.CURATED_CANDIDATES.includes(p.id) })),
+      archive: active.filter(p => !keep.has(p.id)).map(info),
+      names: { main: ContentService.NAME_MAIN, second: ContentService.NAME_SECOND },
+    };
+  }
+  /** Archiviert alle anderen Pakete (nie löschen), benennt die beiden Abende um und merkt sich die Auswahl dauerhaft. Versionen/Räume/Fragen bleiben unverändert. */
+  curationApply(usage: Record<string, { rooms: number; finished: number; last: number | null }>, second: string) {
+    const plan = this.curationPlan(usage, second);
+    if (!plan.mainOk) throw new ApiError(409, 'Die Hauptversion (show-4z) ist nicht veröffentlicht.');
+    if (!plan.second || plan.second !== second) throw new ApiError(422, 'Bitte ein gültiges zweites Paket wählen.');
+    const archived: string[] = [];
+    this.tx(() => {
+      for (const p of plan.archive) { this.setPackStatus(p.id, 'archived'); archived.push(p.id); }
+      for (const [id, name] of [[ContentService.CURATED_MAIN, ContentService.NAME_MAIN], [second, ContentService.NAME_SECOND]] as const) { const cur = this.getPack(id); this.updatePack(id, { ...cur, name, ifUpdated: undefined }); }
+      this.setSetting('curated', JSON.stringify({ main: ContentService.CURATED_MAIN, second, at: this.now() }));
+    });
+    return { archived, main: ContentService.CURATED_MAIN, second, names: plan.names };
+  }
+
   static readonly KEEP_PACKS = ['show-4z', 'show-5', 'show-3', 'show-after', 'show-new', 'show-modes'];
   static readonly REFRESH_PACKS = ['show-4z', 'show-5', 'show-after'];
   static readonly MAIN_PACK = 'show-4z';
   private seedShow(id: string) { return (this.seed.extraShows ?? []).find(x => x.pack.id === id); }
   private revisionOf(id: string) { return Number(this.setting('rev:' + id) ?? 0); }
   cleanupPlan() {
-    const packs = this.listPacks();
+    const packs = this.listPacks(); const cur = this.curation();
     const rows = packs.map(p => {
-      const keep = ContentService.KEEP_PACKS.includes(p.id);
-      const action: 'archive' | 'keep' | 'archived' | 'keep-archived' = keep ? (p.status === 'archived' ? 'keep-archived' : 'keep') : (p.status === 'archived' ? 'archived' : 'archive');
+      const keep = cur ? [cur.main, cur.second].includes(p.id) : ContentService.KEEP_PACKS.includes(p.id);
+      const action: 'archive' | 'keep' | 'archived' | 'keep-archived' = cur ? (p.status === 'archived' ? 'archived' : 'keep') : keep ? (p.status === 'archived' ? 'keep-archived' : 'keep') : (p.status === 'archived' ? 'archived' : 'archive');
       let needsUpdate = false;
       if (keep && p.status !== 'archived' && ContentService.REFRESH_PACKS.includes(p.id)) {
         const sh = this.seedShow(p.id);
@@ -431,7 +470,7 @@ export class ContentService {
         needsUpdate = !boards || (!!sh?.revision && this.revisionOf(p.id) < sh.revision);
       }
       const sh = this.seedShow(p.id);
-      const needsRename = keep && p.status !== 'archived' && p.id === 'show-3' && p.data.name !== ContentService.BACKUP_NAME;
+      const needsRename = !cur && keep && p.status !== 'archived' && p.id === 'show-3' && p.data.name !== ContentService.BACKUP_NAME;
       return { id: p.id, name: p.data.name, status: p.status, version: p.currentVersion, action, needsUpdate, needsRename, revision: sh?.revision ?? null };
     });
     const archive = rows.filter(r => r.action === 'archive').map(r => r.id);
@@ -447,7 +486,7 @@ export class ContentService {
     const sh = this.seedShow(id); if (!sh) throw new ApiError(404, 'Kein mitgeliefertes Paket: ' + id);
     this.installSeed();   // ergänzt nur fehlende Fragen/Kategorien (INSERT OR IGNORE), verändert nichts Vorhandenes
     const p = this.getPack(id);
-    this.updatePack(id, { name: sh.pack.name, description: sh.pack.description, categoryIds: [], surprise: '', final: '', show: sh.steps,
+    this.updatePack(id, { name: this.curation() ? p.name : sh.pack.name, description: this.curation() ? p.description : sh.pack.description, categoryIds: [], surprise: '', final: '', show: sh.steps,
       rules: { ...DEFAULT_RULES, ...(sh.pack.rules ?? {}), tasksPerMode: p.rules.tasksPerMode, boardEveryRound: true } });
     const r = this.publish(id, note);
     if (sh.revision) this.setSetting('rev:' + id, String(sh.revision));

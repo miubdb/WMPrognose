@@ -127,13 +127,13 @@ await page.screenshot({ path: `${SHOTS}/11-categories.png` });
 await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.pcard');
 await page.locator('.packgroup details summary').first().click().catch(() => {});
 const std = page.locator('.pcard', { hasText: 'Standardpaket' }).first(); await std.locator('.rowmenu summary').click(); await std.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(700);
-await page.locator('.pcard', { hasText: '(Kopie)' }).getByRole('button', { name: /^(Öffnen|Bearbeiten)$/ }).click(); await page.waitForSelector('.modalbox details.more .stats', { state: 'attached' }); await page.locator('.modalbox details.more').evaluateAll(els => els.forEach(e => { e.open = true; })); await page.waitForSelector('.stats'); await sleep(500);
+await page.locator('.pcard', { hasText: '(Kopie)' }).getByRole('button', { name: /^(Öffnen|Bearbeiten)$/ }).click(); await page.waitForSelector('.builder'); await sleep(1500);
 await page.screenshot({ path: `${SHOTS}/12-pack-editor.png`, fullPage: false });
-check(await page.locator('.stats > div').count() === 4, 'Paket-Analyse zeigt Spielzeit, Maximalzeit, Fußballanteil, Modusverteilung');
-await page.getByRole('button', { name: '🚀 Veröffentlichen' }).click(); check(/Bereits gestartete Räume bleiben unverändert/.test(await page.locator('.dlg').last().innerText()), 'Veröffentlichen erklärt: laufende Räume bleiben unverändert'); await confirmDlg('Veröffentlichen'); await page.waitForSelector('.status.ok'); await sleep(500);
-check((await page.locator('.status.ok').innerText()).includes('Veröffentlicht'), 'Paketkopie veröffentlicht (Version 1)');
+check(/Runden/.test(await page.locator('.bmeta').first().innerText()) && await page.locator('.savestate').count() === 1, 'Show-Builder öffnet das Paket mit Rundenzahl und Speicherstatus');
+await page.getByRole('button', { name: '🚀 Veröffentlichen' }).click(); await page.waitForSelector('.dlg'); check(/Bereits gestartete Räume bleiben unverändert/.test(await page.locator('.dlg').last().innerText()), 'Veröffentlichen erklärt: laufende Räume bleiben unverändert'); await confirmDlg('Veröffentlichen'); await page.waitForSelector('.toast');
+check((await page.locator('.toast').innerText()).includes('Veröffentlicht'), 'Paketkopie veröffentlicht (Version 1)');
 await page.screenshot({ path: `${SHOTS}/13-pack-published.png` });
-await page.getByRole('button', { name: 'Schließen ✕' }).first().click();
+await page.getByRole('button', { name: /Alle Pakete/ }).first().click(); await page.waitForSelector('.pcard');
 
 // ---- Import/Export
 await page.getByRole('button', { name: '💾 Sicherung' }).click(); await sleep(600);

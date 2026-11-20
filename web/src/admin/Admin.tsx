@@ -7,6 +7,7 @@ import { Packs } from './Packs';
 import { MoreContent } from './More';
 import { Data } from './Data';
 import { useUpdate } from './Update';
+import { guard } from './ui';
 
 const TABS: { id: AdminTab; label: string }[] = [{ id: 'home', label: '🏠 Start' }, { id: 'questions', label: '❓ Fragen' }, { id: 'packs', label: '📦 Pakete' }, { id: 'io', label: '💾 Sicherung & Update' }, { id: 'more', label: '🧱 Weitere Inhalte' }];
 
@@ -65,7 +66,7 @@ function Shell({ onOut, online }: { onOut: () => void; online?: boolean }) {
   const [rev, setRev] = useState(0);            // erzwingt Neuladen der Listen
   const [openId, setOpenId] = useState<string | undefined>();
   const bump = () => setRev(x => x + 1);
-  const go = (t: AdminTab) => { setTab(t); sessionStorage.setItem('admtab', t); window.scrollTo({ top: 0 }); };
+  const go = (t: AdminTab) => { if (guard.dirty && t !== tab && !window.confirm('Im Paket gibt es noch ungespeicherte Änderungen. Trotzdem wechseln? Sie bleiben als Wiederherstellung in diesem Browser erhalten.')) return; setTab(t); sessionStorage.setItem('admtab', t); window.scrollTo({ top: 0 }); };
   const u = useUpdate(bump);                 // ein gemeinsamer Update-Status für Start und Sicherung
   return (
     <div className="adm">
