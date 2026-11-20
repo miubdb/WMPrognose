@@ -42,7 +42,7 @@ const rd = await tv.evaluate(() => window.__outplayMusicRender(24));
 check(rd.bad === 0 && rd.peak > 0.01 && rd.peak < 0.9 && rd.rms > 0.003 && rd.rms < 0.25 && Math.abs(rd.dc) < 0.01 && rd.audibleShare > 0.35, `Offline-Rendering (24 s @ ${rd.bpm} BPM): Spitze ${rd.peak.toFixed(3)}, Effektivwert ${rd.rms.toFixed(4)}, Gleichanteil ${rd.dc.toExponential(1)}, hörbar ${(rd.audibleShare * 100).toFixed(0)} %, keine NaN`);
 
 // ---------- 3) SORTIER'S!: zur Sortier-Aufgabe, Kartenbedienung auf 5 Formaten
-for (let i = 0; i < 30 && !(hv.round?.tileId === 'b44-r3' && hv.room.phase === 'round'); i++) await H({ k: hv.room.phase === 'scoreboard' ? 'h.continue' : 'h.skipTile' });
+for (let i = 0; i < 30 && !(hv.round?.tileId === 'b45-r3' && hv.room.phase === 'round'); i++) await H({ k: hv.room.phase === 'scoreboard' ? 'h.continue' : 'h.skipTile' });
 await H({ k: 'h.skipTask' }); await H({ k: 'h.begin' }); await waitH(v => v.round.stage === 'open'); const sol = hv.round.data.solution;
 check(hv.round.data.variant === 'sort', 'Sortier-Variante aktiv'); const tvTxt = await tv.locator('body').innerText(); check(/SORTIER/i.test(tvTxt), 'TV zeigt den Namen SORTIER’S!');
 const order = [[0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [0, 1, 2, 3, 4], [2, 0, 1, 4, 3], [0, 1, 2, 3, 4]];   // Zielreihenfolge je Gerät (Indizes in sol)

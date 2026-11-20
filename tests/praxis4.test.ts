@@ -63,7 +63,7 @@ test('EINZIGARTIG: Champions-League-Frage vereinfacht (Katalog gleich), Orcheste
 });
 
 test('SORTIER’S!: Moukoko & Iličević teilen eine Karte, Reihenfolge eindeutig, 50 Punkte je Karte, nie in Lösungsreihenfolge gemischt', () => {
-  const t = scored(MAIN, 'b44-r3').find(x => /Bundesliga-Einsatz/.test(x.prompt)); assert.ok(t);
+  const t = scored(MAIN, 'b45-r3').find(x => /Bundesliga-Einsatz/.test(x.prompt)); assert.ok(t);
   assert.equal(t.prompt, 'Sortiere diese fünf Karten nach dem Alter beim ersten Bundesliga-Einsatz – die jüngsten zuerst.');
   assert.deepEqual(t.items.map((i: any) => i.text), ['Youssoufa Moukoko & Niko Iličević', 'Linus Güther', 'Paul Wanner', 'Louis Lemke', 'Tom Bischof']);
   assert.deepEqual(t.items.map((i: any) => i.value), ['jeweils 16 Jahre, 1 Tag', '16 Jahre, 3 Tage', '16 Jahre, 15 Tage', '16 Jahre, 214 Tage', '16 Jahre, 264 Tage']);
@@ -223,4 +223,13 @@ import { ACTIVE_MODES } from '../shared/validate';
 test('Spieleliste (Admin-Startseite/docs/SPIELE.md) deckt genau die aktiven Modi plus beide Finals ab', () => {
   const modes = GAMES.map(g => g.mode); for (const m of ACTIVE_MODES) assert.ok(modes.includes(m), m); assert.ok(modes.includes('vote') && modes.includes('final-lock'));
   assert.equal(GAMES.length, ACTIVE_MODES.length + 2); assert.ok(!modes.includes('codebreak'));
+});
+
+test('SORTIER’S! Ablösesummen (Transfermarkt): Sancho ca. 7,8 Mio. € – Reihenfolge Kagawa < Sancho < Haaland < Bellingham < Hummels, aufsteigend', () => {
+  for (const b of [MAIN, LOCK]) {
+    const t = scored(b, 'b45-r3').find(x => /Ablösesumme/.test(x.prompt)); assert.ok(t);
+    assert.deepEqual(t.items.map((i: any) => i.text.split(' (')[0]), ['Shinji Kagawa', 'Jadon Sancho', 'Erling Haaland', 'Jude Bellingham', 'Mats Hummels']);
+    const v = t.items.map((i: any) => (/ablösefrei/.test(i.value) ? 0 : Number(i.value.replace(' Mio. €', '').replace(',', '.')))); assert.deepEqual(v, [...v].sort((a, c) => a - c)); assert.equal(t.items[1].value, '7,84 Mio. €');
+    assert.ok(shuffledPool(t).some((x, i) => x !== i));
+  }
 });

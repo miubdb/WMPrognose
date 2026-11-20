@@ -26,6 +26,13 @@ export const BESTOF3_NEW: PoolQuestion[] = [
     t.explain = 'Moukoko und Iličević halten den Rekord gemeinsam: Moukoko debütierte 2020 mit 16 Jahren und 1 Tag, der Frankfurter Niko Iličević stellte ihn am 1. November 2026 ein. Danach folgen Güther (3 Tage), Wanner (15 Tage), Lemke (214 Tage) und Bischof (264 Tage).';
   }),   // Quelle: bundesliga.com – „Jüngste Spieler der Bundesliga-Geschichte“ (Moukoko, Iličević)
   derive('b44-unique-p20', 'b42-unique-p20', t => { t.prompt = 'Nenne einen Verein außerhalb von Deutschland, England und Spanien, der schon einmal die Champions League oder den früheren Europapokal gewonnen hat.'; }),   // Antwortkatalog + Erklärung unverändert
+  // Korrektur: Sancho kam 2017 für ca. 7,8 Mio. € (nicht 20,59) – dadurch ändert sich die Reihenfolge (Sancho vor Haaland)
+  derive('b45-rank-c09', 'b42-rank-c09', t => {
+    const byName = (n: string) => t.items.find((i: any) => i.text.startsWith(n));
+    const kag = byName('Shinji Kagawa'), san = { ...byName('Jadon Sancho'), value: '7,84 Mio. €' }, haa = byName('Erling Haaland'), bel = byName('Jude Bellingham'), hum = byName('Mats Hummels');
+    t.items = [kag, san, haa, bel, hum];
+    t.explain = 'Laut Transfermarkt.de war Kagawa der günstigste Zugang, Sancho 2017 für rund 7,8 Mio. €, Haaland für 20,00 Mio. €, Bellingham für 30,15 Mio. € und Hummels (Rückkehr von Bayern 2019) für 30,50 Mio. €.';
+  }),
   derive('b44-link-t11', 'b42-link-t11', t => { t.clues[0] = 'Ein dramatischer Rückschlag und ein historischer Triumph lagen bei mir nur zwei Jahre auseinander.'; }),
 ];
 
@@ -39,14 +46,14 @@ export const BESTOF3_KK: PoolQuestion[] = [
 ];
 
 // Fragenlisten je Runde (Probe zuerst, dann die gewerteten Aufgaben)
-const SWAP: Record<string, string> = { 's4-match-tierrekorde': 'b44-match-tier', 'b42-match-t03': 'b44-match-t03', 'b43-rank-t05': 'b44-rank-t05', 'b42-unique-p20': 'b44-unique-p20', 'b42-link-t11': 'b44-link-t11' };
+const SWAP: Record<string, string> = { 's4-match-tierrekorde': 'b44-match-tier', 'b42-match-t03': 'b44-match-t03', 'b43-rank-t05': 'b44-rank-t05', 'b42-unique-p20': 'b44-unique-p20', 'b42-link-t11': 'b44-link-t11', 'b42-rank-c09': 'b45-rank-c09' };
 const DROP = new Set(['s3-match-spiele', 's3-unique-orchester']);
 const sw = (id: string) => SWAP[id] ?? id;
 const ids = (xs: string[]) => xs.filter(x => !DROP.has(x)).map(sw);
 export const BESTOF3_PLAN: Record<string, { id: string; fb: boolean }[]> = Object.fromEntries(Object.entries(BESTOF2_PLAN).map(([m, l]) => [m, l.filter(x => !DROP.has(x.id)).map(x => ({ id: sw(x.id), fb: x.fb }))]));
 
 const baseOf = (id: string) => [...BESTOF2_ROUNDS, ...BESTOF_ROUNDS].find(r => r.id === id)!;
-const CAT: Record<string, string> = { 'b43-r2': 'b44-r2', 'b43-r3': 'b44-r3', 'b42-sur': 'b44-sur', 'b42-r6': 'b44-r6' };
+const CAT: Record<string, string> = { 'b43-r2': 'b44-r2', 'b43-r3': 'b45-r3', 'b42-sur': 'b44-sur', 'b42-r6': 'b44-r6' };
 export const BESTOF3_ROUNDS: SeedShow['rounds'] = Object.entries(CAT).map(([from, id]) => { const r = baseOf(from); return { ...r, id, taskIds: ids(r.taskIds) }; });
 export const BESTOF3_FINAL: SeedShow['rounds'][number] = {
   id: 'b44-final-kk', title: 'KICKBASE-KONSENS', topic: 'Das große Finale', icon: '🤝', color: C.GR, kind: 'final', football: false,
@@ -57,12 +64,12 @@ const STEPS: ShowStep[] = BESTOF2_STEPS.map(s => (s.k === 'board' || s.k === 'fi
 
 const RULES = { ...SEED_SHOW_B43.pack.rules!, startCredit: 0 };
 export const SEED_SHOW_B44: SeedShow = {
-  revision: 2,
+  revision: 3,
   pack: { id: 'show-5', name: 'Reus 65 Mio – Best of · FINAL LOCK', description: 'Best-of-Show mit je einer Probe pro Modus, Marktwert-Update nach jeder Runde und FINAL LOCK als Finale. Alternative zur Hauptshow mit KICKBASE-KONSENS. Start mit 0 Punkten.', rules: RULES },
   pool: [...BESTOF2_NEW, ...BESTOF3_NEW], rounds: [...BESTOF2_ROUNDS, ...BESTOF3_ROUNDS], steps: STEPS,
 };
 export const SEED_SHOW_B44K: SeedShow = {
-  revision: 2,
+  revision: 3,
   pack: { id: 'show-4z', name: 'Reus 65 Mio – Best of · KICKBASE-KONSENS (Hauptshow)', description: 'Hauptshow: Best-of mit Marktwert-Update nach jeder Runde und dem Finale KICKBASE-KONSENS (5 Fragen, max. 500 Punkte, Michael als Kandidat). Start mit 0 Punkten.', rules: RULES },
   pool: BESTOF3_KK, rounds: [BESTOF3_FINAL], steps: STEPS.map(s => (s.k === 'final' ? { k: 'final' as const, cat: BESTOF3_FINAL.id } : s)),
 };

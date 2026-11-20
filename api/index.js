@@ -39141,6 +39141,13 @@ var BESTOF3_NEW = [
     t.prompt = "Nenne einen Verein au\xDFerhalb von Deutschland, England und Spanien, der schon einmal die Champions League oder den fr\xFCheren Europapokal gewonnen hat.";
   }),
   // Antwortkatalog + Erklärung unverändert
+  // Korrektur: Sancho kam 2017 für ca. 7,8 Mio. € (nicht 20,59) – dadurch ändert sich die Reihenfolge (Sancho vor Haaland)
+  derive("b45-rank-c09", "b42-rank-c09", (t) => {
+    const byName = (n) => t.items.find((i2) => i2.text.startsWith(n));
+    const kag = byName("Shinji Kagawa"), san = { ...byName("Jadon Sancho"), value: "7,84 Mio. \u20AC" }, haa = byName("Erling Haaland"), bel = byName("Jude Bellingham"), hum = byName("Mats Hummels");
+    t.items = [kag, san, haa, bel, hum];
+    t.explain = "Laut Transfermarkt.de war Kagawa der g\xFCnstigste Zugang, Sancho 2017 f\xFCr rund 7,8 Mio. \u20AC, Haaland f\xFCr 20,00 Mio. \u20AC, Bellingham f\xFCr 30,15 Mio. \u20AC und Hummels (R\xFCckkehr von Bayern 2019) f\xFCr 30,50 Mio. \u20AC.";
+  }),
   derive("b44-link-t11", "b42-link-t11", (t) => {
     t.clues[0] = "Ein dramatischer R\xFCckschlag und ein historischer Triumph lagen bei mir nur zwei Jahre auseinander.";
   })
@@ -39153,13 +39160,13 @@ var BESTOF3_KK = [
   vote4(4, "Wer w\xFCrde bei einem gemeinsamen Urlaub am ehesten den Zug oder Flug verpassen?", "Der Konsens zeigt, wer besser fr\xFCher losfahren sollte."),
   vote4(5, "Wer w\xFCrde in einer Quizshow am \xFCberzeugendsten eine komplett falsche Antwort geben?", "Selbstbewusstsein schl\xE4gt Wissen \u2013 zumindest in der Wahrnehmung der Gruppe.")
 ];
-var SWAP2 = { "s4-match-tierrekorde": "b44-match-tier", "b42-match-t03": "b44-match-t03", "b43-rank-t05": "b44-rank-t05", "b42-unique-p20": "b44-unique-p20", "b42-link-t11": "b44-link-t11" };
+var SWAP2 = { "s4-match-tierrekorde": "b44-match-tier", "b42-match-t03": "b44-match-t03", "b43-rank-t05": "b44-rank-t05", "b42-unique-p20": "b44-unique-p20", "b42-link-t11": "b44-link-t11", "b42-rank-c09": "b45-rank-c09" };
 var DROP = /* @__PURE__ */ new Set(["s3-match-spiele", "s3-unique-orchester"]);
 var sw = (id) => SWAP2[id] ?? id;
 var ids = (xs) => xs.filter((x3) => !DROP.has(x3)).map(sw);
 var BESTOF3_PLAN = Object.fromEntries(Object.entries(BESTOF2_PLAN).map(([m, l]) => [m, l.filter((x3) => !DROP.has(x3.id)).map((x3) => ({ id: sw(x3.id), fb: x3.fb }))]));
 var baseOf = (id) => [...BESTOF2_ROUNDS, ...BESTOF_ROUNDS].find((r2) => r2.id === id);
-var CAT = { "b43-r2": "b44-r2", "b43-r3": "b44-r3", "b42-sur": "b44-sur", "b42-r6": "b44-r6" };
+var CAT = { "b43-r2": "b44-r2", "b43-r3": "b45-r3", "b42-sur": "b44-sur", "b42-r6": "b44-r6" };
 var BESTOF3_ROUNDS = Object.entries(CAT).map(([from, id]) => {
   const r2 = baseOf(from);
   return { ...r2, id, taskIds: ids(r2.taskIds) };
@@ -39178,14 +39185,14 @@ var BESTOF3_FINAL = {
 var STEPS = BESTOF2_STEPS.map((s) => s.k === "board" || s.k === "final" ? s : { ...s, cat: CAT[s.cat] ?? s.cat });
 var RULES3 = { ...SEED_SHOW_B43.pack.rules, startCredit: 0 };
 var SEED_SHOW_B44 = {
-  revision: 2,
+  revision: 3,
   pack: { id: "show-5", name: "Reus 65 Mio \u2013 Best of \xB7 FINAL LOCK", description: "Best-of-Show mit je einer Probe pro Modus, Marktwert-Update nach jeder Runde und FINAL LOCK als Finale. Alternative zur Hauptshow mit KICKBASE-KONSENS. Start mit 0 Punkten.", rules: RULES3 },
   pool: [...BESTOF2_NEW, ...BESTOF3_NEW],
   rounds: [...BESTOF2_ROUNDS, ...BESTOF3_ROUNDS],
   steps: STEPS
 };
 var SEED_SHOW_B44K = {
-  revision: 2,
+  revision: 3,
   pack: { id: "show-4z", name: "Reus 65 Mio \u2013 Best of \xB7 KICKBASE-KONSENS (Hauptshow)", description: "Hauptshow: Best-of mit Marktwert-Update nach jeder Runde und dem Finale KICKBASE-KONSENS (5 Fragen, max. 500 Punkte, Michael als Kandidat). Start mit 0 Punkten.", rules: RULES3 },
   pool: BESTOF3_KK,
   rounds: [BESTOF3_FINAL],
