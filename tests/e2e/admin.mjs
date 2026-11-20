@@ -124,7 +124,7 @@ check(await page.locator('.ccard', { hasText: 'Stadt & Land' }).count() === 1, '
 await page.screenshot({ path: `${SHOTS}/11-categories.png` });
 
 // ---- Paket: Analyse + Veröffentlichung (Standardpaket duplizieren)
-await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.pcard');
+await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.bigpack');
 const std = page.locator('.bigpack', { hasText: 'Zweite Version' }).first(); await std.locator('.rowmenu summary').click(); await std.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(700);
 await page.locator('.pcard', { hasText: '(Kopie)' }).getByRole('button', { name: /^(Öffnen|Bearbeiten)$/ }).click(); await page.waitForSelector('.builder'); await sleep(1500);
 await page.screenshot({ path: `${SHOTS}/12-pack-editor.png`, fullPage: false });
@@ -143,7 +143,7 @@ check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Dat
 const host = await (await browser.newContext()).newPage();
 await host.goto(BASE + '/host'); await host.waitForSelector('select'); const opts = await host.locator('select option').allInnerTexts();
 check(opts.length >= 2 && opts.some(o => o.includes('Hauptversion')), `Host sieht veröffentlichte Pakete: ${opts.join(' | ')}`);
-await host.getByRole('button', { name: /Klassisch/ }).click(); await host.locator('select').selectOption({ index: 1 }); await host.getByText('Spielraum erstellen').click(); await host.waitForSelector('.roomtag b'); check(true, 'Raum mit gewähltem Paket erstellt');
+await host.getByText('Spielraum erstellen').click(); await host.waitForSelector('.roomtag b'); check(true, 'Raum mit gewähltem Paket erstellt');
 
 // ---- Mobile Ansicht
 const m = await (await browser.newContext({ ...devices['Pixel 7'] })).newPage(); await m.goto(BASE + '/admin');

@@ -236,14 +236,14 @@ test('Länge der Show 4 / 5 / 6 Aufgaben je Modus (auch EINZIGARTIG): neue Paket
 
 test('C09 / T03 / T05 / C19: redaktionelle Fassung (Transfermarkt-Maßstab, Haaland-Stationen, belegte Debütalter, Wiesn vorläufig)', () => {
   const t = (id: string) => BESTOF_NEW.find(q => q.id === id)!.task as any;
-  const c09 = t('b42-rank-c09'); assert.equal(c09.prompt, 'Sortiere diese fünf BVB-Neuzugänge nach ihrer auf Transfermarkt.de angegebenen Ablösesumme – vom günstigsten zum teuersten.');
-  assert.deepEqual(c09.items.map((i: any) => i.text.split(' (')[0]), ['Shinji Kagawa', 'Erling Haaland', 'Jadon Sancho', 'Jude Bellingham', 'Mats Hummels'], 'Reihenfolge laut Transfermarkt.de');
-  assert.deepEqual(c09.items.map((i: any) => i.value), ['ablösefrei (0 €)', '20,00 Mio. €', '20,59 Mio. €', '30,15 Mio. €', '30,50 Mio. €']);
-  const vals = c09.items.map((i: any) => (/ablösefrei/.test(i.value) ? 0 : Number(i.value.replace(' Mio. €', '').replace(',', '.')))); assert.deepEqual(vals, [0, 20, 20.59, 30.15, 30.5]); assert.deepEqual(vals, [...vals].sort((a, b) => a - b), 'aufsteigend'); assert.equal(c09.review, undefined, 'keine Warnung mehr');
+  const c09 = t('b42-rank-c09'); assert.equal(c09.prompt, 'Sortiere diese fünf BVB-Neuzugänge nach ihrer gemeldeten Ablösesumme – vom günstigsten zum teuersten.');
+  assert.deepEqual(c09.items.map((i: any) => i.text.split(' (')[0]), ['Shinji Kagawa', 'Jadon Sancho', 'Erling Haaland', 'Jude Bellingham', 'Mats Hummels'], 'Reihenfolge laut Transfermarkt.de');
+  assert.deepEqual(c09.items.map((i: any) => i.value), ['0,35 Mio. €', '7,84 Mio. €', '20,00 Mio. €', '30,15 Mio. €', '30,50 Mio. €']);
+  const vals = c09.items.map((i: any) => (/ablösefrei/.test(i.value) ? 0 : Number(i.value.replace(' Mio. €', '').replace(',', '.')))); assert.deepEqual(vals, [0.35, 7.84, 20, 30.15, 30.5]); assert.deepEqual(vals, [...vals].sort((a, b) => a - b), 'aufsteigend'); assert.equal(c09.review, undefined, 'keine Warnung mehr');
   // Sortier-Wertung: perfekt = 250, Haaland/Sancho vertauscht = 150 (3 von 5 auf der richtigen Position)
   const sc = (slots: number[]) => scoreRankExact(slots, c09.points); assert.equal(sc([0, 1, 2, 3, 4]).points, 250); assert.equal(sc([0, 2, 1, 3, 4]).points, 150); assert.equal(sc([4, 3, 2, 1, 0]).points, 50);
   assert.match(t('b42-match-t03').pairs[0].left, /Salzburg → Dortmund/); assert.equal(t('b42-match-t03').pairs[0].right, 'Molde FK');
-  assert.deepEqual(t('b42-rank-t05').items.map((i: any) => i.value), ['16 Jahre, 1 Tag', '16 Jahre, 3 Tage', '16 Jahre, 15 Tage', '16 Jahre, 214 Tage', '16 Jahre, 263 Tage']);
+  assert.deepEqual(t('b42-rank-t05').items.map((i: any) => i.value), ['16 Jahre, 1 Tag', '16 Jahre, 3 Tage', '16 Jahre, 15 Tage', '16 Jahre, 214 Tage', '16 Jahre, 264 Tage']);
   assert.match(t('b42-est-c19').prompt, /vorläufigen Wiesn-Bilanz 2025/); assert.equal(t('b42-est-c19').answer, 6.5);
 });
 
