@@ -45,16 +45,16 @@ export const BESTOF_NEW: PoolQuestion[] = [
     'Allgemein bekannte Markenherkunft (Audi = Übersetzung von „Horch“, LEGO = „leg godt“, HARIBO = Hans Riegel Bonn, IKEA = Ingvar Kamprad Elmtaryd Agunnaryd, Nivea = lat. niveus, Häagen-Dazs = erfunden); Primärquellen je Marke noch zu dokumentieren.'),
 
   // ===== WER WAR ZUERST? / SORTIEREN (alle fünf sichtbar, 50 Punkte je richtiger Position)
-  rv(rank('b42-rank-c09', 'Fußball', 'Sortiere diese fünf BVB-Neuzugänge nach ihrer auf Transfermarkt.de angegebenen Ablösesumme – vom günstigsten zum teuersten.', 'günstigste Ablöse', 'teuerste Ablöse', [
-    ['Shinji Kagawa (2010)', 'ablösefrei (0 €)'], ['Erling Haaland (2020)', '20,00 Mio. €'], ['Jadon Sancho (2017)', '20,59 Mio. €'], ['Jude Bellingham (2020)', '30,15 Mio. €'], ['Mats Hummels (2019)', '30,50 Mio. €'],
-  ], [3, 0, 4, 2, 1], 'Laut Transfermarkt.de lagen Haaland und Sancho nur 0,59 Mio. € auseinander, Bellingham und Hummels sogar nur 0,35 Mio. € – und der günstigste Neuzugang kam ablösefrei.'),
+  rv(rank('b42-rank-c09', 'Fußball', 'Sortiere diese fünf BVB-Neuzugänge nach ihrer gemeldeten Ablösesumme – vom günstigsten zum teuersten.', 'günstigste Ablöse', 'teuerste Ablöse', [
+    ['Shinji Kagawa (2010)', '0,35 Mio. €'], ['Jadon Sancho (2017)', '7,84 Mio. €'], ['Erling Haaland (2020)', '20,00 Mio. €'], ['Jude Bellingham (2020)', '30,15 Mio. €'], ['Mats Hummels (2019)', '30,50 Mio. €'],
+  ], [3, 0, 4, 2, 1], 'Kagawa kam 2010 für nur rund 0,35 Mio. € aus Osaka, Sancho 2017 für rund 7,8 Mio. € von Manchester City, Haaland 2020 für 20,00 Mio. €, Bellingham für 30,15 Mio. € und Hummels (Rückkehr von Bayern 2019) für 30,50 Mio. €. Bellingham und Hummels trennen nur 0,35 Mio. €.'),
     ''),
   rv(rank('b42-rank-c10', 'Andere Themen', 'Sortiere chronologisch, ältestes Ereignis zuerst.', 'am längsten her', 'am jüngsten', [
     ['Bau der Cheops-Pyramide', 'um 2560 v. Chr.'], ['Die letzten Mammuts auf der Wrangelinsel', 'um 2000 v. Chr.'], ['Beginn der Regentschaft Kleopatras', '51 v. Chr.'], ['Beginn des Lehrbetriebs in Oxford', 'ab ca. 1096'], ['Gründung von Tenochtitlan', '1325'],
   ], [2, 4, 0, 3, 1], 'Mammuts lebten nach dem Pyramidenbau; in Oxford wurde schon vor der Gründung der Aztekenhauptstadt gelehrt.'),
     'Jahreswerte antiker Vorgänge sind Näherungen (Abstände sind groß genug, Reihenfolge ist stabil). Mammut-Datum (Wrangelinsel, ca. 4.000 Jahre) aus der Jury-Karte.'),
   rv(rank('b42-rank-t05', 'Fußball', 'Sortiere nach Alter beim ersten Bundesligaspiel, jüngster zuerst.', 'jüngster Debütant', 'ältester Debütant', [
-    ['Niko Iličević', '16 Jahre, 1 Tag'], ['Linus Güther', '16 Jahre, 3 Tage'], ['Paul Wanner', '16 Jahre, 15 Tage'], ['Louis Lemke', '16 Jahre, 214 Tage'], ['Tom Bischof', '16 Jahre, 263 Tage'],
+    ['Niko Iličević', '16 Jahre, 1 Tag'], ['Linus Güther', '16 Jahre, 3 Tage'], ['Paul Wanner', '16 Jahre, 15 Tage'], ['Louis Lemke', '16 Jahre, 214 Tage'], ['Tom Bischof', '16 Jahre, 264 Tage'],
   ], [4, 1, 3, 0, 2], 'Iličević stellte 2026 Moukokos Rekord ein; Moukoko ist bewusst nicht dabei, weil er den Rekord teilt.'),
     'Belegt: Güther 16 J. 3 T. (Bundesliga.com), Wanner 16 J. 15 T., Lemke 16 J. 214 T. (HSV, Debüt 10.5.2026), Bischof 16 J. 263 T. (Hoffenheim, 19.3.2022; die Jury-Karte nannte 264). Offen: Iličević „gleichauf mit Moukoko“ nur über eine Bundesliga.com-Meldung, Debüt-Datum nicht erneut geprüft.'),
 
@@ -67,7 +67,7 @@ export const BESTOF_NEW: PoolQuestion[] = [
   // ===== SETZ AUF MICH (Einsätze/Bonus aus der Paketregel)
   est('b42-est-t09', 'Fußball', 'Wie viele Tore erzielte Youssoufa Moukoko laut BVB-Angabe in seinen insgesamt 88 Einsätzen für die U17 und U19 von Borussia Dortmund?', 'Tore', 141, 'In der Jugend erzielte er etwa 1,6 Treffer pro Spiel.'),
   est('b42-est-c18', 'Fußball', 'Wie viel wiegt der Original-WM-Pokal der Männer laut FIFA, in Gramm?', 'Gramm', 6175, 'Das Original verlässt die FIFA nur zu besonderen Anlässen; die Sieger erhalten nach der Feier eine andere Ausführung.'),
-  rv(est('b42-est-c19', 'Andere Themen', 'Wie viele Millionen Maß Bier wurden laut der vorläufigen Wiesn-Bilanz 2025 (Schätzung der Festwirte) ausgeschenkt? Auf 0,1 Millionen Maß gerundet!', 'Mio. Maß', 6.5, 'Auch die Besucherzahl lag bei rund 6,5 Millionen. (Die spätere städtische Auswertung nennt rund 6,7 Millionen verkaufte Maß.)'),
+  rv(est('b42-est-c19', 'Andere Themen', 'Wie viele Millionen Maß Bier wurden laut der vorläufigen Wiesn-Bilanz 2025 (Schätzung der Festwirte) ausgeschenkt? Auf 0,1 Millionen Maß gerundet!', 'Mio. Maß', 6.5, 'Die Festwirte schätzten rund 6,5 Millionen Maß (2024: etwa 7 Millionen); auch die Besucherzahl lag bei rund 6,5 Millionen.'),
     ''),
   est('b42-est-t10', 'Andere Themen', 'Wie viele Kilometer lang ist der reguläre Linienflug zwischen Westray und Papa Westray in Schottland, laut Guinness World Records? Gib die Entfernung auf zwei Nachkommastellen an.', 'km', 2.74, 'Einmal wurde die Strecke in nur 53 Sekunden geflogen.'),
 

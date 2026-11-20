@@ -23,7 +23,7 @@ await page.getByLabel('Admin-Passwort').fill('falsch'); await page.getByRole('bu
 await page.waitForSelector('.status.bad'); check(true, 'falsches Passwort wird abgewiesen');
 await page.getByLabel('Admin-Passwort').fill(PW); await page.getByRole('button', { name: 'Anmelden' }).click();
 await page.waitForSelector('.admtop'); await page.screenshot({ path: `${SHOTS}/1-packs.png` }); check(true, 'Admin-Login erfolgreich');
-await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.pcard'); check((await page.locator('.pcard').count()) >= 1, 'Pakete sind sichtbar (gruppiert: aktuell/Entwürfe/Archiv)');
+await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.bigpack'); check((await page.locator('.bigpack').count()) === 2, 'Pakete sind sichtbar (gruppiert: aktuell/Entwürfe/Archiv)');
 
 // ---- Fragenbibliothek
 await page.getByRole('button', { name: '❓ Fragen' }).click(); await page.waitForSelector('.qcard2');
@@ -125,8 +125,7 @@ await page.screenshot({ path: `${SHOTS}/11-categories.png` });
 
 // ---- Paket: Analyse + Veröffentlichung (Standardpaket duplizieren)
 await page.getByRole('button', { name: '📦 Pakete' }).click(); await page.waitForSelector('.pcard');
-await page.locator('.packgroup details summary').first().click().catch(() => {});
-const std = page.locator('.pcard', { hasText: 'Standardpaket' }).first(); await std.locator('.rowmenu summary').click(); await std.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(700);
+const std = page.locator('.bigpack', { hasText: 'Zweite Version' }).first(); await std.locator('.rowmenu summary').click(); await std.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(700);
 await page.locator('.pcard', { hasText: '(Kopie)' }).getByRole('button', { name: /^(Öffnen|Bearbeiten)$/ }).click(); await page.waitForSelector('.builder'); await sleep(1500);
 await page.screenshot({ path: `${SHOTS}/12-pack-editor.png`, fullPage: false });
 check(/Runden/.test(await page.locator('.bmeta').first().innerText()) && await page.locator('.savestate').count() === 1, 'Show-Builder öffnet das Paket mit Rundenzahl und Speicherstatus');
@@ -143,7 +142,7 @@ check((await dl.suggestedFilename()).endsWith('.json'), 'Export liefert JSON-Dat
 // ---- Show mit dem Paket starten (Host-Seite zeigt Paketauswahl)
 const host = await (await browser.newContext()).newPage();
 await host.goto(BASE + '/host'); await host.waitForSelector('select'); const opts = await host.locator('select option').allInnerTexts();
-check(opts.length >= 2 && opts.some(o => o.includes('KICKBASE-KONSENS')), `Host sieht veröffentlichte Pakete: ${opts.join(' | ')}`);
+check(opts.length >= 2 && opts.some(o => o.includes('Hauptversion')), `Host sieht veröffentlichte Pakete: ${opts.join(' | ')}`);
 await host.getByRole('button', { name: /Klassisch/ }).click(); await host.locator('select').selectOption({ index: 1 }); await host.getByText('Spielraum erstellen').click(); await host.waitForSelector('.roomtag b'); check(true, 'Raum mit gewähltem Paket erstellt');
 
 // ---- Mobile Ansicht

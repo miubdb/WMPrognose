@@ -406,7 +406,8 @@ export class ContentService {
   }
   /** Veröffentlichte, für neue Räume wählbare Pakete (öffentlich, ohne Lösungen). */
   listPublished() {
-    return this.listPacks().filter(p => p.status === 'published' && p.currentVersion !== null).map(p => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion!, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
+    const cur = this.curation(); const rank = (id: string) => (id === ContentService.MAIN_PACK ? 0 : id === cur?.second ? 1 : 2);   // Hauptversion zuerst, dann Zweite Version, dann eigene Pakete
+    return this.listPacks().filter(p => p.status === 'published' && p.currentVersion !== null).sort((a, b) => rank(a.id) - rank(b.id) || String(a.data.name).localeCompare(String(b.data.name), 'de')).map(p => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion!, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
   }
   /**
    * Paketbereinigung: nur show-5 (Haupt), show-4z (Finale KICKBASE-KONSENS) und show-3 (Backup) bleiben aktiv.

@@ -34875,7 +34875,9 @@ var ContentService = class _ContentService {
   }
   /** Veröffentlichte, für neue Räume wählbare Pakete (öffentlich, ohne Lösungen). */
   listPublished() {
-    return this.listPacks().filter((p) => p.status === "published" && p.currentVersion !== null).map((p) => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
+    const cur = this.curation();
+    const rank3 = (id) => id === _ContentService.MAIN_PACK ? 0 : id === cur?.second ? 1 : 2;
+    return this.listPacks().filter((p) => p.status === "published" && p.currentVersion !== null).sort((a, b2) => rank3(a.id) - rank3(b2.id) || String(a.data.name).localeCompare(String(b2.data.name), "de")).map((p) => ({ id: p.id, name: p.data.name, description: p.data.description, version: p.currentVersion, ref: `${p.id}@${p.currentVersion}`, ...this.flowsOf(`${p.id}@${p.currentVersion}`) }));
   }
   /**
    * Paketbereinigung: nur show-5 (Haupt), show-4z (Finale KICKBASE-KONSENS) und show-3 (Backup) bleiben aktiv.
@@ -39173,7 +39175,7 @@ var TILES = [
         prompt: "Wie viele Tore fielen insgesamt bei der Fu\xDFball-WM 2014 in Brasilien (64 Spiele)?",
         unit: "Tore",
         answer: 171,
-        explain: "171 Tore, im Schnitt 2,67 pro Spiel \u2013 damals WM-Rekord, bis 2022 mit 172 Toren knapp \xFCbertroffen wurde."
+        explain: "171 Tore, im Schnitt 2,67 pro Spiel \u2013 damit gleichauf mit dem WM-Rekord von 1998, bis 2022 mit 172 Toren knapp \xFCbertroffen wurde."
       },
       {
         mode: "estimate",
@@ -39401,7 +39403,7 @@ var POOL = [
     ["Facebook wird gegr\xFCndet", "2004"],
     ["YouTube wird gegr\xFCndet", "2005"],
     ["Das erste iPhone kommt auf den Markt", "2007"]
-  ], [3, 0, 4, 2, 1], "Web (1991), Google (1998), Facebook (2004), YouTube (2005) und iPhone (2007) \u2013 drei der vier j\xFCngeren Meilensteine liegen nur drei Jahre auseinander.", 500, 14),
+  ], [3, 0, 4, 2, 1], "Web (1991), Google (1998), Facebook (2004), YouTube (2005) und iPhone (2007) \u2013 Facebook, YouTube und iPhone liegen nur drei Jahre auseinander.", 500, 14),
   // ---------------------------------------------------------------- Alternativen: WO ZUR HÖLLE?
   geo2("s3-geo-helgoland", "Geografie", "germany", 30, 250, "Deutschlands einzige Hochseeinsel: Wo liegt Helgoland?", 54.1792, 7.8917, "Helgoland, Nordsee", "Helgoland liegt rund 45 km vor der K\xFCste in der Nordsee \u2013 man erreicht die rote Felsinsel nur per Schiff oder Flugzeug."),
   geo2("s3-geo-zugspitze", "Geografie", "germany", 30, 200, "Wo ragt Deutschlands h\xF6chster Berg auf, die Zugspitze?", 47.4211, 10.9853, "Zugspitze, Wetterstein", "Die Zugspitze (2.962 m) steht an der Grenze zu \xD6sterreich im Wettersteingebirge s\xFCdwestlich von Garmisch-Partenkirchen."),
@@ -39537,7 +39539,7 @@ var POOL = [
     ["Uruguay", []],
     ["\xC4quatorialguinea", ["Aequatorialguinea", "Equatorial Guinea"]]
   ], "Spanisch ist Amtssprache in 20 Staaten \u2013 von Spanien \xFCber Mexiko und Argentinien bis nach \xC4quatorialguinea in Afrika."),
-  unique2("s3-unique-fluesse", "Geografie", "Ein deutscher Fluss \u2026", "Nenne einen Fluss, der durch Deutschland flie\xDFt.", [
+  unique2("s3-unique-fluesse", "Geografie", "Ein deutscher Fluss \u2026", "Nenne einen Fluss in Deutschland (Grenzfl\xFCsse wie Oder und Nei\xDFe z\xE4hlen mit).", [
     ["Rhein", []],
     ["Elbe", []],
     ["Donau", []],
@@ -40010,13 +40012,13 @@ var BESTOF_NEW = [
   ),
   // ===== WER WAR ZUERST? / SORTIEREN (alle fünf sichtbar, 50 Punkte je richtiger Position)
   rv(
-    rank2("b42-rank-c09", "Fu\xDFball", "Sortiere diese f\xFCnf BVB-Neuzug\xE4nge nach ihrer auf Transfermarkt.de angegebenen Abl\xF6sesumme \u2013 vom g\xFCnstigsten zum teuersten.", "g\xFCnstigste Abl\xF6se", "teuerste Abl\xF6se", [
-      ["Shinji Kagawa (2010)", "abl\xF6sefrei (0 \u20AC)"],
+    rank2("b42-rank-c09", "Fu\xDFball", "Sortiere diese f\xFCnf BVB-Neuzug\xE4nge nach ihrer gemeldeten Abl\xF6sesumme \u2013 vom g\xFCnstigsten zum teuersten.", "g\xFCnstigste Abl\xF6se", "teuerste Abl\xF6se", [
+      ["Shinji Kagawa (2010)", "0,35 Mio. \u20AC"],
+      ["Jadon Sancho (2017)", "7,84 Mio. \u20AC"],
       ["Erling Haaland (2020)", "20,00 Mio. \u20AC"],
-      ["Jadon Sancho (2017)", "20,59 Mio. \u20AC"],
       ["Jude Bellingham (2020)", "30,15 Mio. \u20AC"],
       ["Mats Hummels (2019)", "30,50 Mio. \u20AC"]
-    ], [3, 0, 4, 2, 1], "Laut Transfermarkt.de lagen Haaland und Sancho nur 0,59 Mio. \u20AC auseinander, Bellingham und Hummels sogar nur 0,35 Mio. \u20AC \u2013 und der g\xFCnstigste Neuzugang kam abl\xF6sefrei."),
+    ], [3, 0, 4, 2, 1], "Kagawa kam 2010 f\xFCr nur rund 0,35 Mio. \u20AC aus Osaka, Sancho 2017 f\xFCr rund 7,8 Mio. \u20AC von Manchester City, Haaland 2020 f\xFCr 20,00 Mio. \u20AC, Bellingham f\xFCr 30,15 Mio. \u20AC und Hummels (R\xFCckkehr von Bayern 2019) f\xFCr 30,50 Mio. \u20AC. Bellingham und Hummels trennen nur 0,35 Mio. \u20AC."),
     ""
   ),
   rv(
@@ -40035,7 +40037,7 @@ var BESTOF_NEW = [
       ["Linus G\xFCther", "16 Jahre, 3 Tage"],
       ["Paul Wanner", "16 Jahre, 15 Tage"],
       ["Louis Lemke", "16 Jahre, 214 Tage"],
-      ["Tom Bischof", "16 Jahre, 263 Tage"]
+      ["Tom Bischof", "16 Jahre, 264 Tage"]
     ], [4, 1, 3, 0, 2], "Ili\u010Devi\u0107 stellte 2026 Moukokos Rekord ein; Moukoko ist bewusst nicht dabei, weil er den Rekord teilt."),
     "Belegt: G\xFCther 16 J. 3 T. (Bundesliga.com), Wanner 16 J. 15 T., Lemke 16 J. 214 T. (HSV, Deb\xFCt 10.5.2026), Bischof 16 J. 263 T. (Hoffenheim, 19.3.2022; die Jury-Karte nannte 264). Offen: Ili\u010Devi\u0107 \u201Egleichauf mit Moukoko\u201C nur \xFCber eine Bundesliga.com-Meldung, Deb\xFCt-Datum nicht erneut gepr\xFCft."
   ),
@@ -40048,7 +40050,7 @@ var BESTOF_NEW = [
   est("b42-est-t09", "Fu\xDFball", "Wie viele Tore erzielte Youssoufa Moukoko laut BVB-Angabe in seinen insgesamt 88 Eins\xE4tzen f\xFCr die U17 und U19 von Borussia Dortmund?", "Tore", 141, "In der Jugend erzielte er etwa 1,6 Treffer pro Spiel."),
   est("b42-est-c18", "Fu\xDFball", "Wie viel wiegt der Original-WM-Pokal der M\xE4nner laut FIFA, in Gramm?", "Gramm", 6175, "Das Original verl\xE4sst die FIFA nur zu besonderen Anl\xE4ssen; die Sieger erhalten nach der Feier eine andere Ausf\xFChrung."),
   rv(
-    est("b42-est-c19", "Andere Themen", "Wie viele Millionen Ma\xDF Bier wurden laut der vorl\xE4ufigen Wiesn-Bilanz 2025 (Sch\xE4tzung der Festwirte) ausgeschenkt? Auf 0,1 Millionen Ma\xDF gerundet!", "Mio. Ma\xDF", 6.5, "Auch die Besucherzahl lag bei rund 6,5 Millionen. (Die sp\xE4tere st\xE4dtische Auswertung nennt rund 6,7 Millionen verkaufte Ma\xDF.)"),
+    est("b42-est-c19", "Andere Themen", "Wie viele Millionen Ma\xDF Bier wurden laut der vorl\xE4ufigen Wiesn-Bilanz 2025 (Sch\xE4tzung der Festwirte) ausgeschenkt? Auf 0,1 Millionen Ma\xDF gerundet!", "Mio. Ma\xDF", 6.5, "Die Festwirte sch\xE4tzten rund 6,5 Millionen Ma\xDF (2024: etwa 7 Millionen); auch die Besucherzahl lag bei rund 6,5 Millionen."),
     ""
   ),
   est("b42-est-t10", "Andere Themen", "Wie viele Kilometer lang ist der regul\xE4re Linienflug zwischen Westray und Papa Westray in Schottland, laut Guinness World Records? Gib die Entfernung auf zwei Nachkommastellen an.", "km", 2.74, "Einmal wurde die Strecke in nur 53 Sekunden geflogen."),
@@ -40321,7 +40323,7 @@ var BESTOF3_NEW = [
     const byName = (n) => t.items.find((i2) => i2.text.startsWith(n));
     const kag = byName("Shinji Kagawa"), san = { ...byName("Jadon Sancho"), value: "7,84 Mio. \u20AC" }, haa = byName("Erling Haaland"), bel = byName("Jude Bellingham"), hum = byName("Mats Hummels");
     t.items = [kag, san, haa, bel, hum];
-    t.explain = "Laut Transfermarkt.de war Kagawa der g\xFCnstigste Zugang, Sancho 2017 f\xFCr rund 7,8 Mio. \u20AC, Haaland f\xFCr 20,00 Mio. \u20AC, Bellingham f\xFCr 30,15 Mio. \u20AC und Hummels (R\xFCckkehr von Bayern 2019) f\xFCr 30,50 Mio. \u20AC.";
+    t.explain = "Kagawa kam 2010 f\xFCr nur rund 0,35 Mio. \u20AC aus Osaka, Sancho 2017 f\xFCr rund 7,8 Mio. \u20AC von Manchester City, Haaland 2020 f\xFCr 20,00 Mio. \u20AC, Bellingham f\xFCr 30,15 Mio. \u20AC und Hummels (R\xFCckkehr von Bayern 2019) f\xFCr 30,50 Mio. \u20AC.";
   }),
   derive("b44-link-t11", "b42-link-t11", (t) => {
     t.clues[0] = "Ein dramatischer R\xFCckschlag und ein historischer Triumph lagen bei mir nur zwei Jahre auseinander.";
@@ -40431,7 +40433,7 @@ var AFTERSHOW_NEW = [
       "Meine Trainerkarriere begann auch damit, dass ich f\xFCr einen englischen Trainer \xFCbersetzte.",
       "Sp\xE4ter gewann ich die Champions League mit zwei unterschiedlichen Vereinen.",
       "Nach meinem Wechsel nach England gab ich mir einen selbstbewussten Spitznamen.",
-      "Ich bin Jos\xE9 Mourinho \u2013 \u201EThe Special One\u201C."
+      "Ich trainierte unter anderem Chelsea, Inter Mailand, Real Madrid und Manchester United."
     ],
     "Jos\xE9 Mourinho",
     ["Mourinho", "Jose Mourinho"],
@@ -40645,7 +40647,7 @@ var NEWGAMES_POOL = [
   corridor2("ng-corr-1", "Wie hoch ist der Mount Everest laut offizieller Vermessung (Gipfelh\xF6he \xFCber dem Meeresspiegel)?", "Meter", 8849, "Die offizielle H\xF6he wurde 2020 mit 8.848,86 m festgelegt."),
   corridor2("ng-corr-2", "Wie lang ist der Rhein vom Ursprung bis zur M\xFCndung?", "Kilometer", 1233, "Der Rhein ist rund 1.233 Kilometer lang."),
   corridor2("ng-corr-3", "Wie hoch ist das Burj Khalifa in Dubai, das h\xF6chste Geb\xE4ude der Welt?", "Meter", 828, "Das Burj Khalifa ist 828 Meter hoch."),
-  twist2("ng-twist-1", "Langsame und Neugierige", "Fast & Furious", ["Fast and Furious", "The Fast and the Furious", "Fast Furious", "Fast & Furious"], "Verdreht: schnell \u2192 langsam, w\xFCtend \u2192 neugierig."),
+  twist2("ng-twist-1", "Langsame und Gelassene", "Fast & Furious", ["Fast and Furious", "The Fast and the Furious", "Fast Furious", "Fast & Furious"], "Verdreht: schnell \u2192 langsam, w\xFCtend \u2192 gelassen."),
   twist2("ng-twist-2", "H\xE4sslicher Mann", "Pretty Woman", [], "Verdreht: h\xFCbsch \u2192 h\xE4sslich, Frau \u2192 Mann."),
   twist2("ng-twist-3", "Lebe schnell", "Stirb langsam", ["Die Hard"], "Verdreht: stirb \u2192 lebe, langsam \u2192 schnell."),
   twist2("ng-twist-4", "Vorw\xE4rts in die Vergangenheit", "Zur\xFCck in die Zukunft", ["Back to the Future"], "Verdreht: zur\xFCck \u2192 vorw\xE4rts, Zukunft \u2192 Vergangenheit."),

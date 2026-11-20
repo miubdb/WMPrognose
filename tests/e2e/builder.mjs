@@ -19,7 +19,7 @@ const waitSaved = async p => { for (let i = 0; i < 40; i++) { if (/Gespeichert/.
 let p = await login(); await gotoPacks(p);
 const catsBefore = (await api(p, '/categories')).map(c => [c.id, JSON.stringify(c.taskIds), c.title]);
 const packsBefore = (await api(p, '/packs')).map(x => [x.id, JSON.stringify(x.show), x.status, x.currentVersion, x.name]);
-const orig = p.locator('.pcard', { hasText: 'KICKBASE-KONSENS (Hauptshow)' }).first(); await orig.locator('.rowmenu summary').click(); await orig.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(900);
+const orig = p.locator('.bigpack', { hasText: 'Hauptversion' }).first(); await orig.locator('.rowmenu summary').click(); await orig.getByRole('button', { name: '⧉ Duplizieren' }).click(); await sleep(900);
 await p.locator('.pcard.draft').first().getByRole('button', { name: 'Bearbeiten' }).click(); await p.waitForSelector('.builder'); await sleep(1500);
 const packId = (await api(p, '/packs')).find(x => x.status === 'draft').id; const baseShow = JSON.stringify((await api(p, '/packs/' + packId)).show.filter(s => s.k !== 'board').map(s => s.cat));
 check((await p.locator('.round').count()) === 8, 'Show-Builder zeigt 8 Runden als Playlist');

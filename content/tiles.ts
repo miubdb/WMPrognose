@@ -187,7 +187,7 @@ export const TILES: TileDef[] = [
     id: 'v2-sport-und-pop', title: 'Sport & Pop', topic: 'Tore, Töne & Tempo', icon: '🎯', color: GO, mode: 'estimate', kind: 'tile', football: false, blurb: EST_BLURB,
     tasks: [
       { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], prompt: 'Wie viele Tore fielen insgesamt bei der Fußball-WM 2014 in Brasilien (64 Spiele)?', unit: 'Tore', answer: 171,
-        explain: '171 Tore, im Schnitt 2,67 pro Spiel – damals WM-Rekord, bis 2022 mit 172 Toren knapp übertroffen wurde.' },
+        explain: '171 Tore, im Schnitt 2,67 pro Spiel – damit gleichauf mit dem WM-Rekord von 1998, bis 2022 mit 172 Toren knapp übertroffen wurde.' },
       { mode: 'estimate', seconds: 45, betSeconds: 35, points: 300, bets: [0, 100, 200], prompt: 'Wie viele Sekunden dauert „Bohemian Rhapsody“ von Queen in der Originalversion?', unit: 'Sekunden', answer: 355,
         explain: '5 Minuten und 55 Sekunden, also 355 Sekunden – für eine Single war das 1975 ungewöhnlich lang.' },
     ],

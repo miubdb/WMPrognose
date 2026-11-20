@@ -31,7 +31,7 @@ export const BESTOF3_NEW: PoolQuestion[] = [
     const byName = (n: string) => t.items.find((i: any) => i.text.startsWith(n));
     const kag = byName('Shinji Kagawa'), san = { ...byName('Jadon Sancho'), value: '7,84 Mio. €' }, haa = byName('Erling Haaland'), bel = byName('Jude Bellingham'), hum = byName('Mats Hummels');
     t.items = [kag, san, haa, bel, hum];
-    t.explain = 'Laut Transfermarkt.de war Kagawa der günstigste Zugang, Sancho 2017 für rund 7,8 Mio. €, Haaland für 20,00 Mio. €, Bellingham für 30,15 Mio. € und Hummels (Rückkehr von Bayern 2019) für 30,50 Mio. €.';
+    t.explain = 'Kagawa kam 2010 für nur rund 0,35 Mio. € aus Osaka, Sancho 2017 für rund 7,8 Mio. € von Manchester City, Haaland 2020 für 20,00 Mio. €, Bellingham für 30,15 Mio. € und Hummels (Rückkehr von Bayern 2019) für 30,50 Mio. €.';
   }),
   derive('b44-link-t11', 'b42-link-t11', t => { t.clues[0] = 'Ein dramatischer Rückschlag und ein historischer Triumph lagen bei mir nur zwei Jahre auseinander.'; }),
 ];

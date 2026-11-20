@@ -1,4 +1,16 @@
-# Sicheres Update (ZIP) auf dem Windows-Laptop
+# Update (Release-Paket `JANIQUIZITION-Windows.zip`)
+
+**Neue ZIP herunterladen und in DENSELBEN Ordner entpacken (Dateien ersetzen).** Der Ordner `data` ist nicht im ZIP und bleibt deshalb unberührt (Datenbank, Backups, Karte, Admin-Passwort, Räume, eigene Fragen und Pakete).
+Beim ersten Start einer neuen Version legt der Starter automatisch eine Sicherheitskopie an (`data\backups\vor-update-auf-<Version>-….db`). Neue Standardinhalte werden nur ergänzt; archivierte/entfernte Pakete werden nicht reaktiviert, eigene Änderungen nicht zurückgesetzt.
+
+- Wer in einem **neuen Ordner** entpackt, muss den Ordner `data` aus dem alten Ordner hineinkopieren.
+- Bestehende Entwickler-Installation (mit `node_modules`): ZIP in denselben Ordner entpacken und künftig wie oben starten; `data` und das Admin-Passwort bleiben gültig.
+- Zurück zur alten Version: `JANIQUIZITION-WIEDERHERSTELLEN.bat` mit einer Sicherung aus `data\backups`.
+
+---
+
+## Ältere Anleitung (Entwickler-Installation mit npm)
+
 
 1. **JANIQUIZITION beenden** (Fenster schließen).
 2. Ordner `data` an einen sicheren Ort **kopieren** (enthält `outplay.db` und die Karte `maps\outplay-karte.mbtiles` – Dateinamen bleiben bewusst unverändert, damit nichts verloren geht).

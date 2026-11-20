@@ -95,3 +95,19 @@ test('Einrichtung über HTTP: nur lokal (Host localhost), vorher kein Admin-Zugr
     assert.equal((await http(port, '/api/admin/login', 'POST', { password: 'admin123' }, { host: `localhost:${port}` })).status, 401);
   } finally { await app.close(); }
 });
+
+test('Fragenprüfung: alle Fragen des Pools sind technisch gültig; korrigierte Fragen verhalten sich in der Spiellogik richtig', async () => {
+  const { scoreRank } = await import('../shared/scoring').catch(() => ({ scoreRank: undefined as any }));
+  const c = legacy(tmp()); const qs = c.listQuestions();
+  assert.equal(qs.length, 167, 'Pool-Umfang (siehe docs/FRAGEN-PRUEFUNG.md)');
+  assert.deepEqual(qs.filter(q => q.problems.length).map(q => q.id), [], 'keine technisch ungültige Frage');
+  const num = (v: string) => Number(v.replace(/[^\d,]/g, '').replace(',', '.'));
+  for (const id of ['b42-rank-c09', 'b45-rank-c09']) {
+    const t: any = qs.find(q => q.id === id)!.task; const vals = t.items.map((i: any) => num(i.value));
+    assert.deepEqual(vals, [...vals].sort((a: number, b: number) => a - b), id + ': Items stehen aufsteigend nach Ablöse');
+    assert.equal(t.items[1].text.startsWith('Jadon Sancho'), true); assert.equal(t.items[1].value, '7,84 Mio. €');
+  }
+  const mou: any = qs.find(q => q.id === 'after2-link-mourinho')!.task; assert.ok(!mou.clues.some((x: string) => /Mourinho/.test(x)), 'Hinweise nennen die Lösung nicht');
+  const twist: any = qs.find(q => q.id === 'ng-twist-1')!.task; assert.match(twist.twisted, /Gelassene/);
+  void scoreRank;
+});

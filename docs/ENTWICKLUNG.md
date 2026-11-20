@@ -1,0 +1,83 @@
+# JANIQUIZITION – Entwickler-Dokumentation
+
+> Für Spieler/Freunde: siehe die [README](../README.md) (Download & Anleitung). Diese Datei ist die technische Doku.
+
+**Fertige Windows-Pakete bauen:** `node scripts/build-release.mjs` → `release-out/JANIQUIZITION-Windows.zip` (Node-Laufzeit eingebettet). Veröffentlichung: Git-Tag `vX.Y.Z` pushen – der Workflow `.github/workflows/release.yml` testet, baut und legt das GitHub-Release an.
+
+**Neue Installation = nur zwei Standardpakete** (`show-4z` Hauptversion, `show-after` Zweite Version, definiert in `content/index.ts` → `STANDARD_SHOWS`). Ältere Pakete (Reus-/Test-/Legacy-Versionen) bleiben im Quellcode für bestehende Datenbanken, werden aber auf frischen Installationen nie angelegt. Das Admin-Passwort wird beim ersten Aufruf von `/admin` am Rechner selbst festgelegt (kein Zufalls-/Standardpasswort); Reset: `JANIQUIZITION-PASSWORT-ZURUECKSETZEN.bat` bzw. `node scripts/reset-admin.mjs`.
+
+Showmaster + TV + 6–8 Handys. Die Show läuft **lokal** (Node-Server + SQLite) – ohne Internet. Fragen und Pakete bereitet man bequem im **Admin** vor (auch online).
+
+## Die fünf Begriffe – bitte nicht verwechseln
+| | Was ist das? | Wo läuft es? | Wo liegen die Daten? |
+|---|---|---|---|
+| **Online-Admin** | Nur der Admin-Bereich `/admin` (Fragen, Kategorien, Pakete, Szenen, Vorschau, Export/Import) | Vercel (kostenlos), per Handy erreichbar | Serverseitig, dauerhaft: **privater Vercel-Blob-Speicher** (eine SQLite-Datei) |
+| **Online-Testversion** | Gibt es **nicht**: Host/TV/Spieler brauchen WebSockets und laufen online bewusst nicht | – | – |
+| **Lokal spielbare Windows-Version** | Die komplette Show (`JANIQUIZITION-STARTEN.bat`) inkl. lokalem Admin | Laptop, WLAN, ohne Internet | `data/outplay.db` (SQLite) |
+| **Inhalts-Export** (JSON) | Fragen, Kategorien, Pakete, Szenen – zum Übertragen/Sichern. **Keine** Räume, Spieler oder Passwörter | Admin → Import/Export | Datei, die du speicherst |
+| **Vollständiges Server-Backup** (.db) | Konsistente Kopie der ganzen Datenbank inkl. Räume, Spieler, Punkte, Spielstände. **Vertraulich** (enthält Passwort-Hashes, Host-PINs, Wiederherstellungscodes) | Admin → Import/Export, automatisch lokal alle 10 min | `.db`-Datei / `data/backups` |
+
+## Ablauf Donnerstag/Freitag → Samstag
+1. **Online** (`/admin` auf dem Handy): Fragen prüfen/ergänzen, Kategorien ändern, Glitch-Szenen bauen, Paket zusammenstellen → **Prüfen & veröffentlichen**.
+2. **📤 Spieleabend exportieren** (Import/Export oder Paketkarte) → JSON-Datei auf dem Handy; per Mail/Cloud/USB zum Laptop.
+3. **Samstag am Laptop**: `JANIQUIZITION-STARTEN.bat` starten → `/admin` → Import/Export → Datei wählen → Prüfbericht ansehen → **✅ Importieren & veröffentlichen** (Bestätigung: „Inhalt stimmt mit dem Export überein“).
+4. `/host` → Spielepaket wählen → Spielraum erstellen. Details: **docs/WINDOWS.md**.
+
+## Starten (Entwicklung / andere Systeme)
+```bash
+npm install
+npm run build                       # Frontend nach dist/
+PORT=8080 DATA_DIR=./data npm start # http://localhost:8080
+```
+Windows: `JANIQUIZITION-STARTEN.bat` (prüft Node, installiert/baut bei Bedarf, wählt die WLAN-Adresse, zeigt alle Links).
+
+## Umgebungsvariablen
+`PORT` (8080) · `DATA_DIR` (./data) · `ADMIN_PASSWORD` (nur Online/Vercel; lokal legt jeder Nutzer sein Passwort beim ersten Start im Browser fest) · `HOST_PASSWORD` (optional, schützt das Erstellen von Räumen) · `OUTPLAY_HOST` / `PUBLIC_URL` (feste Adresse für QR-Codes, z. B. `http://192.168.0.23:8080`). Online zusätzlich: `BLOB_READ_WRITE_TOKEN` (setzt Vercel automatisch beim Verbinden des Blob-Speichers) und `ADMIN_PASSWORD` (Pflicht).
+
+## Spielregeln & Punkte
+- **Startguthaben:** Jeder Spieler startet mit **200 Punkten** (pro Paket einstellbar). Das gilt für alle gleich.
+- **Kachel-Maxima:** Kachel 1.000, Überraschung 1.000, Finale 2.000 Punkte (ohne Startguthaben). Theoretisches Gesamtmaximum = Startguthaben + 6 × 1.000 + 1.000 + 2.000.
+- **Setz auf mich:** bester Tipp bis 300 Punkte (Rangfolge nach |ln(Tipp/Lösung)|, fair auch bei großen Zahlen), danach Einsatz 0/100/200 (Finale 500 + 0/250/500).
+- **Einsätze (SETZ AUF MICH):** nur bis zum **tatsächlichen Punktestand**. Wer 0 Punkte hat, schätzt weiter mit, kann aber nichts setzen. Gewonnen: +Einsatz, verloren: −Einsatz. Der Stand wird nie negativ. (Einen früheren „Mindesteinsatz von 100“ gibt es nicht mehr.) Finale: Einsatz ≤ vorhandene Punkte (max. 500).
+- **Wo zur Hölle:** Platzierung nach Entfernung (100/80/65/50/35/20/10 % bei 7 Spielern, sonst interpoliert; Gleichstand = gleicher Platz).
+- **Matchmaker:** 6 Paare, 50 Punkte je richtigem Paar (max. 300), keine Minuspunkte, kein Zeitbonus, 60 s; Antippen verbindet, Ändern bis zur endgültigen Abgabe (der zuletzt gespeicherte Stand zählt bei Zeitablauf).
+- **Die Verbindung:** 4 Hinweise (sofort, dann alle 12 s), eine endgültige Antwort je Spieler; richtig nach Hinweis 1/2/3/4 = 300/225/150/75, falsch/keine = 0. Der Server bestimmt Zeit und Hinweisstufe; unklare Antworten (Tippfehler) entscheidet der Host.
+- **Blind Rank:** Budget × richtige Paare ÷ 10. **Glitch:** Treffer 70–100 %, knapp daneben bis 15 %. **Einzigartig:** 500 einmalig / 150 mehrfach / 0 ungültig (Host entscheidet bei Unklarem).
+- Gleichstand am Ende: mehr Finalpunkte, dann frühere Anmeldung.
+- Verteilung bei freier Wahl: pro Paket max. Fußball-Kacheln (Standard 2) und max. Kacheln je Modus (Standard 2).
+
+## Spielerplatz wiederherstellen
+Gleicher Browser: automatisch. Anderes Gerät: `/play/CODE` → „Platz wiederherstellen“ → 6-stelliger Code (unten im Controller; der Host sieht alle) – oder der Host gibt den Platz frei (📱).
+
+## Admin (`/admin`)
+Fragenbibliothek (7 Modus-Editoren, Suche, Filter, Duplizieren, Archiv), Kategorien, Spielepakete (Prüfung, Analyse Spielzeit erwartet/maximal, Fußballanteil, Veröffentlichen als unveränderliche Version, Rollback), Szenen-Vorlagen für Glitch, **👀 Vorschau** (echte Engine, TV + Handy + Auflösung + Punkteberechnung), Import/Export, Backup. Ein laufender Raum behält seinen Paketstand (`bookId`), egal was im Admin geändert wird.
+
+### Sicherheit
+Serverseitig geprüfte Anmeldung (Passwort nur als Hash bzw. Konstantzeit-Vergleich), zufällige Sitzungstoken in **HttpOnly + SameSite=Strict (+ Secure bei HTTPS)** Cookies, CSRF-Header + Herkunftsprüfung für alle Schreib-APIs, Fehlversuch-Sperre (8 / 10 min, in der Datenbank), Pakete sind erst nach Veröffentlichung für Räume sichtbar; die öffentliche Paketliste enthält keine Lösungen. Keine Zugangsdaten im Repository; `data/`, `.env` und Backups sind gitignoriert und werden nie ausgeliefert (Tests).
+
+## Backups
+- **A) Inhalts-Backup (JSON):** Admin → Import/Export → „Alles (Inhalte)“ / Paket / Fragen. Prüfsumme in der Datei.
+- **B) Voll-Backup (.db):** Admin → „Voll-Backup herunterladen“ (SQLite `VACUUM INTO`, auch im WAL-Betrieb konsistent). Lokal zusätzlich automatisch alle 10 Minuten nach `data/backups` (letzte 30). **Eine laufende `outplay.db` einfach zu kopieren ist NICHT zuverlässig** (ungesicherte Daten in der `-wal`-Datei können fehlen).
+- **Wiederherstellen:** Server beenden → Backup-Datei auf `JANIQUIZITION-WIEDERHERSTELLEN.bat` ziehen (oder `npm run restore -- backup.db`). Das Skript prüft die Datei, verweigert bei laufendem Server und sichert die alte Datenbank als `outplay.db.vor-restore-…`.
+
+## Kosten & Hosting
+Lokal: keine. Online-Admin: Vercel Hobby (kostenlos) + Vercel Blob (im Hobby-Tarif enthaltenes Kontingent). Details und Einrichtung: **docs/ONLINE-SETUP.md**. Es gibt keine kostenpflichtige Konfiguration im Repository (die frühere `render.yaml` mit bezahltem Tarif wurde entfernt; das `Dockerfile` ist optional und kostenlos nutzbar). Cloudflare-Alternative: `docs/cloudflare.md`.
+
+## Tests
+`npm test` (Wertungen, Multiplayer über echte WebSockets, komplette Show mit Bots, Admin-API, Online-Adapter, Transfer, Backup, Netzwerk). Browser-E2E (Playwright; Server vorher starten bzw. Skript startet selbst): `tests/e2e/play.mjs`, `modes.mjs`, `admin.mjs`, `transfer.mjs` und für die komplette Show `node --import tsx tests/e2e/show.mjs` (startet den Server selbst). Ehrlicher Stand: siehe `docs/TESTBERICHT.md`.
+
+## Karte
+Vektorkarte auf OpenStreetMap-Basis, offline-fähig: siehe [docs/KARTE.md](docs/KARTE.md). Vorbereitung einmalig mit `JANIQUIZITION-KARTE-LADEN.bat`. Ohne diese Datei läuft eine einfache SVG-Karte (Natural Earth, gemeinfrei; GeoNames CC BY 4.0).
+
+## Spielmodi (aktiv) und Altbestand
+Aktiv sind sieben Modi: WO ZUR HÖLLE?, BLIND RANK, SETZ AUF MICH, GLITCH, EINZIGARTIG, MATCHMAKER, DIE VERBINDUNG. **CODEBREAK wird nicht mehr angeboten.** Bereits gespeicherte CODEBREAK-Fragen, ältere Pakete und Backups bleiben erhalten (lesbar, in alten Paketversionen spielbar), lassen sich aber nicht neu anlegen oder in neu veröffentlichte Pakete übernehmen.
+
+> **Update nach dem Praxistest:** Neue Regeln, Proberunden, Paket „Reus 65 Mio“ und die Update-Anleitung für den Windows-Laptop (ohne Datenverlust): [docs/PRAXISTEST-UPDATE.md](docs/PRAXISTEST-UPDATE.md).
+
+## Showmodus (fester Ablauf) und Klassischer Modus
+Beim Erstellen eines Raums wählt der Showmaster: **🎬 Showmodus – fester Ablauf (Standard)** oder **🧱 Klassisch – Kategorienwand**. Der Showmodus spielt das Paket `show-1` (31 Aufgaben, 6 Runden + Überraschung + Finale, alle sieben Modi, ca. 80 min) in fester Reihenfolge ohne Wand; nach jeder Auflösung führt „Weiter“ automatisch zur nächsten Station, jede Aufgabe gibt der Showmaster aber selbst frei. Der Klassische Modus (`standard-2`, Kategorienwand) bleibt als Fallback. Bereits laufende Räume und alte Pakete funktionieren unverändert (Räume ohne Ablaufangabe sind „klassisch“). Der Ablauf liegt im Paket (`show`-Schritte) und wird beim Export/Import mit Reihenfolge übertragen.
+
+**Showpaket im Online-Admin aktivieren:** Admin → **Daten** → Hinweis „Neues Showpaket & Fragenpool verfügbar“ → „Zuerst Voll-Backup laden“ → „Showpaket & Fragenpool installieren“. Nichts wird beim Deploy automatisch geändert; die Installation legt nur Fehlendes an (nie überschreiben, wiederholbar ohne Duplikate). Danach unter **Pakete → Showpaket** Ablauf prüfen (Reihenfolge, Modi, Punkte, Dauer), Aufgaben tauschen und **Prüfen & Veröffentlichen**. Export (JSON) → Import auf dem Laptop übernimmt Paket inkl. Ablauf.
+
+## Neues Standardpaket in einer bestehenden Datenbank aktivieren
+Das mitgelieferte Paket „Standardpaket – Spieleabend“ (`standard-2`) ist bei einer **frischen** Datenbank sofort vorhanden. In einer **bestehenden** (online oder lokal) passiert beim Deployen nichts automatisch. Aktivierung: Admin → **Daten** → Hinweis „Neues Standardpaket verfügbar“ → (empfohlen) „Zuerst Voll-Backup laden“ → „Neues Standardpaket installieren“. Es werden nur fehlende Fragen/Kategorien/Szenen/Paket angelegt (nie überschrieben, keine Duplikate bei Wiederholung); das bisherige Standardpaket wird **archiviert**, nicht gelöscht (jederzeit wieder aktivierbar). Online wird vor der Installation zusätzlich automatisch eine Kopie unter `outplay/backups/` im Blob-Speicher abgelegt. Inhalte und Quellen: [docs/INHALTE-REDAKTION.md](docs/INHALTE-REDAKTION.md).

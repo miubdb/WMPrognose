@@ -14,7 +14,7 @@
 5. **TV:** Laptop per HDMI an den Fernseher, im Browser `http://localhost:8080/tv/RAUMCODE` öffnen (Raumcode erscheint nach „Spielraum erstellen“), **einmal klicken** (Ton + Vollbild). Der **QR-Code auf dem TV enthält automatisch die WLAN-Adresse** (nie `localhost`).
 6. Beim Fernseher-Browser `F11` für Vollbild. Der Showmaster kann am selben Laptop in einem zweiten Browserfenster/Tab arbeiten oder (besser) auf Handy/Tablet.
 
-Datenbank: `data\outplay.db` · Automatische Backups: `data\backups` (alle 10 min, die letzten 30) · Admin-Passwort beim ersten Start: `data\admin-passwort.txt` (notieren, Datei danach löschen).
+Datenbank: `data\outplay.db` · Automatische Backups: `data\backups` (alle 10 min, die letzten 30) · Admin-Passwort: beim ersten Start im Browser selbst festlegen (Passwort vergessen: `JANIQUIZITION-PASSWORT-ZURUECKSETZEN.bat`).
 
 ## Inhalte vom Online-Admin übernehmen
 1. Online: Paket veröffentlichen → **📤 Spieleabend exportieren** → JSON-Datei speichern und auf den Laptop bringen (Mail, Cloud, USB).

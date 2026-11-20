@@ -40,7 +40,7 @@ export const AFTERSHOW_NEW: PoolQuestion[] = [
     'Meine Trainerkarriere begann auch damit, dass ich für einen englischen Trainer übersetzte.',
     'Später gewann ich die Champions League mit zwei unterschiedlichen Vereinen.',
     'Nach meinem Wechsel nach England gab ich mir einen selbstbewussten Spitznamen.',
-    'Ich bin José Mourinho – „The Special One“.',
+    'Ich trainierte unter anderem Chelsea, Inter Mailand, Real Madrid und Manchester United.',
   ], 'José Mourinho', ['Mourinho', 'Jose Mourinho'],
     'Mourinho übersetzte anfangs für Bobby Robson, gewann die Champions League mit Porto (2004) und Inter (2010) und nannte sich „The Special One“.'),
 

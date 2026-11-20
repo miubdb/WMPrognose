@@ -22,7 +22,7 @@ function HostLogin({ code, onSession }: { code?: string; onSession: (s: HostSess
   const [packs, setPacks] = useState<{ id: string; name: string; version: number; description: string; show?: boolean; classic?: boolean }[]>([]);
   const [pack, setPack] = useState('');
   const [flow, setFlow] = useState<'show' | 'classic'>('show');
-  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { const l = r.data as any[]; setPacks(l); const f = l.some(p => p.show) ? 'show' : 'classic'; setFlow(f); setPack((l.find(p => p.id === 'show-5' && p[f]) ?? [...l].filter(p => p[f]).sort((a, b) => b.id.localeCompare(a.id))[0] ?? l[0])?.id ?? '');   } }); }, []);
+  useEffect(() => { api('/api/packs').then(r => { if (r.ok) { const l = r.data as any[]; setPacks(l); const f = l.some(p => p.show) ? 'show' : 'classic'; setFlow(f); setPack((l.find(p => p[f]) ?? l[0])?.id ?? '');   /* Server sortiert: Hauptversion zuerst */   } }); }, []);
   const usable = packs.filter(p => (p as any)[flow] !== false).sort((a, b) => b.id.localeCompare(a.id));
   const pickFlow = (f: 'show' | 'classic') => { setFlow(f); const l = packs.filter(p => (p as any)[f] !== false).sort((a, b) => b.id.localeCompare(a.id)); if (!l.some(p => p.id === pack)) setPack(l[0]?.id ?? ''); };
   const create = async () => {

@@ -16,7 +16,7 @@ export const NEWGAMES_POOL: PoolQuestion[] = [
   corridor('ng-corr-1', 'Wie hoch ist der Mount Everest laut offizieller Vermessung (Gipfelhöhe über dem Meeresspiegel)?', 'Meter', 8849, 'Die offizielle Höhe wurde 2020 mit 8.848,86 m festgelegt.'),
   corridor('ng-corr-2', 'Wie lang ist der Rhein vom Ursprung bis zur Mündung?', 'Kilometer', 1233, 'Der Rhein ist rund 1.233 Kilometer lang.'),
   corridor('ng-corr-3', 'Wie hoch ist das Burj Khalifa in Dubai, das höchste Gebäude der Welt?', 'Meter', 828, 'Das Burj Khalifa ist 828 Meter hoch.'),
-  twist('ng-twist-1', 'Langsame und Neugierige', 'Fast & Furious', ['Fast and Furious', 'The Fast and the Furious', 'Fast Furious', 'Fast & Furious'], 'Verdreht: schnell → langsam, wütend → neugierig.'),
+  twist('ng-twist-1', 'Langsame und Gelassene', 'Fast & Furious', ['Fast and Furious', 'The Fast and the Furious', 'Fast Furious', 'Fast & Furious'], 'Verdreht: schnell → langsam, wütend → gelassen.'),
   twist('ng-twist-2', 'Hässlicher Mann', 'Pretty Woman', [], 'Verdreht: hübsch → hässlich, Frau → Mann.'),
   twist('ng-twist-3', 'Lebe schnell', 'Stirb langsam', ['Die Hard'], 'Verdreht: stirb → lebe, langsam → schnell.'),
   twist('ng-twist-4', 'Vorwärts in die Vergangenheit', 'Zurück in die Zukunft', ['Back to the Future'], 'Verdreht: zurück → vorwärts, Zukunft → Vergangenheit.'),

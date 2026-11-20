@@ -1,0 +1,26 @@
+name: Release (Windows-Paket)
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: node scripts/build-release.mjs
+      - name: Release anlegen
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-out/JANIQUIZITION-Windows.zip release-out/JANIQUIZITION-Windows.zip.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-out/JANIQUIZITION-Windows.zip release-out/JANIQUIZITION-Windows.zip.sha256 \
+              --title "JANIQUIZITION $GITHUB_REF_NAME" --notes-file release/NOTES.md
+          fi

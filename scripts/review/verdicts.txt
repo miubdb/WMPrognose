@@ -1,0 +1,169 @@
+# id | status (k=korrekt, c=korrigiert, u=ungeklärt) | Problem | Änderung | Prüfnachweis
+# Kürzel im Nachweis: [W] Websuche (Quelle genannt) · [N] nachgerechnet · [A] Abgleich mit gesichertem Fach-/Allgemeinwissen · [T] technisch/Spiellogik geprüft
+after-final-breweries|k|||[A] Sechs Wiesn-Brauereien (Augustiner, Hacker-Pschorr, Hofbräu, Löwenbräu, Paulaner, Spaten) = Festsatzung der Stadt München; Liste vollständig, geschlossen (closed) [T]
+after-final-fax|k|||[A] Bain 1843, Bell 1876, Coca-Cola 1886, Eiffelturm 1889, Titanic 1912; Reihenfolge der Items = chronologisch [T]
+after-final-gspon|k|||[W] Wikipedia „Ottmar Hitzfeld Arena“: 46°13′39″N 7°54′08″E (= 46,2275/7,9022), ca. 2.000 m, nur per Seilbahn erreichbar
+after-final-tv2014|k|||[A] ARD-Schnitt 34,65 Mio., 86,3 % Marktanteil (Quotenmeter/ARD-Mitteilung 2014); zeitlos, da abgeschlossenes Ereignis
+after-link-dassler|k|||[A] Adolf/Rudolf Dassler, Adidas & Puma, beide Herzogenaurach; Akzeptierte Schreibweisen (Adidas/Puma, &, und) vollständig [T]
+after-unique-meister|k|||[A] 13 Meistervereine der Bundesliga-Ära (Bayern, BVB, Gladbach, Bremen, HSV, Stuttgart, Köln, FCK, Wolfsburg, Leverkusen, Nürnberg, Braunschweig, 1860) nachgezählt [N]; Stand Nov. 2026: kein neuer Meisterverein bekannt
+after2-geo-dance1518|k|||[A] Tanzwahn 1518 in Straßburg (Chroniken); Koordinate Straßburg 48,584/7,746 [T]
+after2-link-bttf|k|||[A] Eric Stoltz ersetzt durch Michael J. Fox, 88 mph, 1985→1955→2015, DeLorean
+after2-link-mourinho|c|Letzter Hinweis nannte den Namen „Ich bin José Mourinho“ – Lösung stand in der Aufgabe|Hinweis 4 ersetzt durch „Ich trainierte unter anderem Chelsea, Inter Mailand, Real Madrid und Manchester United.“|[A] Übersetzer für Bobby Robson, CL-Siege Porto 2004/Inter 2010, „The Special One“; neue Hinweise faktisch korrekt
+after2-match-exclubs|k|||[A] Boateng Barcelona (Leihe 2019), Matthäus MetroStars (2000), Ribéry Salernitana, Şahin Real Madrid, Balotelli Adana Demirspor, Ronaldo Corinthians; Mischung gültig [T]
+after2-match-sameyear|k|||[A] 1997 Titanic/BVB-CL, 1999 Star Wars I/ManUnited, 2009 Avatar/Wolfsburg, 2014 Ice Bucket/WM, 2016 Pokémon GO/EM Portugal, 2023 Barbie/Man City
+after2-unique-bayernfinals|k|||[A] Bayern-Finalsiege: Atlético 1974, Leeds 1975, St-Étienne 1976, Valencia 2001, Dortmund 2013, PSG 2020; [W] 2026 gewann PSG (Bayern nicht im Finale)
+b42-est-c18|k|||[A] FIFA: Pokal 6,175 kg (18 Karat Gold) = 6175 g
+b42-est-c19|c|Erklärtext nannte „spätere städtische Auswertung 6,7 Mio. Maß“ – diese Zahl gehört zur Wiesn 2026, für 2025 nicht belegt|Erklärtext korrigiert (Festwirte-Schätzung 6,5 Mio. Maß; 2024 ca. 7 Mio.)|[W] tageskarte.io/muenchen.de „Bilanz Wiesn 2025“: 6,5 Mio. Besucher, ca. 6,5 Mio. Maß (Festwirte-Schätzung)
+b42-est-t09|k|||[W] BVB-Profil: 141 Tore in 88 Spielen für U17/U19 (bvb.de); 141/88 = 1,6 [N]
+b42-est-t10|k|||[W] Guinness World Records „Shortest domestic scheduled flight“: 2,74 km (1,7 mi), Rekordflug 53 s
+b42-geo-c02|k|||[A] MLS-Cup 7.12.2024 LA Galaxy–NY Red Bulls 2:1, Dignity Health Sports Park Carson; Reus geb. 31.5.1989 → 35 [N]
+b42-geo-c04|k|||[W] Cooper’s Hill 2025: Tom Kopke (YouTuber aus München) gewann zum 2. Mal in Folge das erste Männer-Rennen (AP/Sky); Koordinate geprüft [T]. Dublette zu b43-geo-c04
+b42-geo-c05|k|||[A] Point Nemo 48°52′S 123°23′W; NOAA: ca. 2.688 km zum nächsten Land
+b42-geo-t01|k|||[A] Estádio Municipal de Braga (EM 2004, „A Pedreira“, Steinbruch-Felswand), 41,5625/−8,43
+b42-glitch-c14|k|||[T] Szene table2: Differenzspalte Nordstern +14 → −14 (22:8 = +14 nachgerechnet [N])
+b42-glitch-c16|k|||[T] Szene kiosk1: „Bier 0,5 l“ → „0,4 l“ stimmt mit Erklärtext
+b42-glitch-t07|k|||[T] Szene transfer1: Reus-Preis 6,5 → 65,0 Mio. € stimmt mit Erklärtext
+b42-glitch-t08|k|||[T] Szene receipt2: Summe 52,50 → 525,00 €; Einzelposten summieren zu 52,50 [N]
+b42-kk-1|k|||Meinungsfrage (Gruppen-Konsens), kein Faktenanspruch
+b42-kk-2|k|||Meinungsfrage (Gruppen-Konsens), kein Faktenanspruch
+b42-kk-3|k|||Meinungsfrage (Gruppen-Konsens), kein Faktenanspruch
+b42-link-c22|u|VW-Teilenummer „199 398 500 A“ per Websuche nicht belegbar (Chillup-Marke 1959 dagegen bestätigt)|keine – Hinweis 1 vor Einsatz ersetzen oder selbst prüfen|[W] DPMA „Spirit of Currywurst“: Marke „Chillup“ Nr. 721319, eingetragen 21.1.1959; Rest [A]
+b42-link-c23|k|||[A] Game-Boy-Exemplar überstand 1991 Bombenanschlag im Golfkrieg (Nintendo-Ausstellung), 4 Graustufen, Tetris, Pokémon Rot/Blau
+b42-link-c24|k|||[A] Tofiq Bahramov (Baku), Wembley 1966, Pokal-Diebstahl März 1966 (Hund Pickles), Lampard 2010
+b42-link-t11|k|||[A] FCK: Abstieg & Pokalsieg 1996, Meister 1998 unter Rehhagel als Aufsteiger, Fritz-Walter-Stadion/Betzenberg. Dublette zu b44-link-t11
+b42-match-c06|k|||[W] Hoffi = Elch (tsg-hoffenheim.de); Fritzle Krokodil, Emma Biene, Jünter Fohlen, Bulli Bulle, Berni Bär [A]; Mischung gültig [T]
+b42-match-c07|k|||[A] Audi=Horch!, LEGO=leg godt, HARIBO=Hans Riegel Bonn, IKEA-Initialen, Nivea=niveus, Häagen-Dazs erfunden
+b42-match-c08|k|||[A] Play-Doh (Tapetenreiniger), Luftpolsterfolie (Struktur-Tapete), Slinky (Schiffsinstrumente), Listerine (Antiseptikum), Viagra (Angina pectoris), Coca-Cola (Apothekentonikum); Primärquellen je Produkt nicht einzeln recherchiert
+b42-match-t03|k|||[A] Haaland Molde→Salzburg, Salah Basel→Chelsea, Bellingham Birmingham→BVB, De Bruyne Genk→Chelsea, Lewandowski Lech→BVB, Son HSV→Leverkusen
+b42-rank-c09|c|Sancho-Ablöse 20,59 Mio. € falsch (Transfer 2017 ca. 7,84 Mio.); Kagawa war nicht ablösefrei (ca. 0,35 Mio. €); Reihenfolge ändert sich|Werte und Reihenfolge korrigiert (Kagawa 0,35 · Sancho 7,84 · Haaland 20,00 · Bellingham 30,15 · Hummels 30,50), Erklärtext angepasst|[W] Wikipedia Kagawa (350.000 €), 7,84 Mio. € für Sancho (ligainsider/90min: knapp 8 Mio.); Haaland/Bellingham/Hummels laut Transfermarkt [A]
+b42-rank-c10|k|||[A] Cheops ca. 2560 v. Chr., Wrangel-Mammuts ca. 2000 v. Chr., Kleopatra 51 v. Chr., Oxford ab 1096, Tenochtitlan 1325; Abstände groß, Reihenfolge stabil
+b42-rank-t05|c|Bischof-Wert 263 Tage; korrekt 16 J. 264 T. (Debüt 19.3.2022)|264 Tage; Reihenfolge unverändert|[W] Quellen nennen 263/264, Nachrechnung ab Geburtsdatum ergibt 264; Güther 3 oder 4 Tage je nach Quelle (Bundesliga.com 3, Sport1 4) – Rest [W] Iličević 1.11.2026 (Bundesliga.com), Lemke 214 T. (Stuttgarter Zeitung/hsv.de)
+b42-unique-c27|u|Liste der Doppel-Profis (Bayern+BVB) nicht vollständig belegbar; Nerlinger-Zeiträume widersprüchlich|keine (Frage ist offen: Showmaster entscheidet unbekannte Antworten)|[W] Feulner (BVB 2009–11) und Nerlinger (Bayern 1992–98, BVB ab 1998) bestätigt; Rest [A]
+b42-unique-p20|k|||[A] 13 Vereine nachgezählt; [W] PSG gewann 2025 und 2026 (UEFA/Euronews, 30.5.2026 vs. Arsenal i. E.) [N]
+b42-unique-t13|k|||[A] 19 Gastgeberländer 1930–2026 nachgezählt (Kanada neu 2026) [N]
+b42-unique-t14|k|||[A] Elemente mit 1-Buchstaben-Symbol: H B C N O F P S K V Y I W U = 14 [N]
+b43-geo-2028|k|||[W] UEFA-Beschluss 15.9.2026 (Thessaloniki): CL-Finale 2028 in der Münchner Allianz Arena („Munich Football Arena“), 3. Finale nach 2012 und 2025
+b43-geo-c04|k|||[W] siehe b42-geo-c04; Karte „Welt“ bewusst (Variante)
+b43-rank-t05|u|Güther 3 oder 4 Tage je nach Quelle; Moukoko/Iličević sind laut Bundesliga.com gleichauf (hier nur Moukoko genannt)|keine|[W] Bundesliga.com: Iličević 1.11.2026 gleichauf mit Moukoko; Reihenfolge der fünf Karten sicher
+b44-kk-1|k|||Meinungsfrage, kein Faktenanspruch
+b44-kk-2|k|||Meinungsfrage, kein Faktenanspruch
+b44-kk-3|k|||Meinungsfrage, kein Faktenanspruch
+b44-kk-4|k|||Meinungsfrage, kein Faktenanspruch
+b44-kk-5|k|||Meinungsfrage, kein Faktenanspruch
+b44-link-t11|k|||siehe b42-link-t11 (verbesserter Hinweis 1)
+b44-match-t03|k|||siehe b42-match-t03
+b44-match-tier|k|||[A] Gepard, Blauwal, Strauß, Giraffe, Bienenelfe (ca. 2 g), Grönlandhai (>250 J.); Dublette zu s4-match-tierrekorde
+b44-rank-t05|u|Güther 3 oder 4 Tage je nach Quelle (Reihenfolge nicht betroffen)|keine|[W] Moukoko & Iličević 16 J. 1 T. (Bundesliga.com, 1.11.2026), Wanner 15 T., Lemke 214 T., Bischof 264 T. (Nachrechnung)
+b44-unique-p20|k|||siehe b42-unique-p20
+b45-rank-c09|c|wie b42-rank-c09: Kagawa nicht ablösefrei|Kagawa 0,35 Mio. €, Erklärtext angepasst (Sancho 7,84 war bereits korrigiert)|[W] Wikipedia Kagawa 350.000 €; Rest siehe b42-rank-c09
+ng-bluff-1|k|||[A] @ = „chiocciola“ (Schnecke) im Italienischen
+ng-bluff-2|k|||[A] Nepal: einzige nicht-rechteckige Nationalflagge
+ng-bluff-3|k|||[A] Oktopus: 3 Herzen (2 Kiemen-, 1 Körperherz)
+ng-corr-1|k|||[A] Everest 8.848,86 m (2020, China/Nepal)
+ng-corr-2|k|||[A] Rhein 1.233 km (WSV-Angabe; andere Quellen ≈1.230)
+ng-corr-3|k|||[A] Burj Khalifa 828 m, Stand Nov. 2026 weiterhin höchstes Gebäude
+ng-twist-1|c|Erklärtext „wütend → neugierig“ ist kein Gegenteil|Verdreht jetzt „Langsame und Gelassene“|[A] Originaltitel Fast & Furious; Gegenteil von „wütend“ = „gelassen“
+ng-twist-2|k|||[A] Pretty Woman → „Hässlicher Mann“
+ng-twist-3|k|||[A] Stirb langsam → „Lebe schnell“
+ng-twist-4|k|||[A] Zurück in die Zukunft → „Vorwärts in die Vergangenheit“
+ng-twist-5|k|||[A] Das Schweigen der Lämmer → „Das Gebrüll der Wölfe“
+nm-arena-1|k|||[A] CL 2004: Porto–Monaco 3:0, Trainer Mourinho, Finale Gelsenkirchen; je 1 richtige Option [T]
+nm-arena-2|k|||[A] 32 Zähne, Saturn (meiste bekannte Monde, 2026 weiter Saturn), Wolga längster Fluss Europas
+nm-arena-3|k|||[A] Johnny Depp, Titanic (11 Oscars bei der Verleihung 1998), Tarantino
+nm-duel-1|k|||[A] Brasilien 5 Titel (bis 2022), WM 2010 Südafrika, BVB–Bayern 2013 Wembley
+nm-duel-2|k|||[A] Queen, Canberra, 3 Herzen (Dublette zu ng-bluff-3)
+nm-duel-3|k|||[A] Vatikanstadt, Fe = Eisen, Ankara
+nm-imp-1|k|||Wortspiel: Wort „Abseits“ zum Thema Fußball, Varianten plausibel
+nm-imp-2|k|||Wortspiel: „Currywurst“ zum Thema Essen
+nm-imp-3|k|||Wortspiel: „Campingplatz“ zum Thema Urlaub
+nm-panic-1|k|||[N] 7 Tore, 4 Eckfahnen halbiert = 2, 4 → Code 724
+nm-panic-2|k|||[N] Quersumme 90 = 9, 1 Torwart, 5 Schützen → Code 915
+nm-panic-3|k|||[N] 3 Punkte, 6 Würfelseiten, 2 Halbzeiten → Code 362
+nm-pix-1|k|||[T] Bild (Noto Color Emoji „Trophäe“, Apache-2.0) angesehen: Pokal; Bildrechte unproblematisch
+nm-pix-2|k|||[T] Bild (Noto Color Emoji „Tor“, Apache-2.0) angesehen: Fußballtor mit Netz (wirkt wie Eishockeytor, Lösung „Tor“ bleibt eindeutig)
+nm-pix-3|k|||[T] Bild (Noto Color Emoji „Freiheitsstatue“, Apache-2.0) angesehen
+nm-sound-1|u|Tondatei (synthetisiert, 2,6 s) technisch gültig, aber hier nicht abhörbar – Erkennbarkeit nicht bestätigt|keine – vor dem Abend im Admin „Testen“ anhören|[T] gültige WAV (12 kHz, mono); Töne selbst synthetisiert → keine Rechteprobleme
+nm-sound-2|u|wie nm-sound-1 (Modem-Einwahl)|keine – vor dem Abend anhören|[T] gültige WAV (2,8 s)
+nm-sound-3|u|wie nm-sound-1 (Torjubel)|keine – vor dem Abend anhören|[T] gültige WAV (3,0 s)
+nm-time-1|k|||[A] YouTube gegründet 14.2.2005; Ankerjahre 1990/1998/2006/2014 korrekt
+nm-time-2|k|||[A] iPhone Juni 2007; Anker Mauerfall 1989, Google 1998, Euro-Bargeld 2002, WM 2014
+nm-time-3|k|||[A] Bundesliga-Start Saison 1963/64; Anker WM 1954/1974/1990/2014
+nm-time-4|k|||[A] Griechenland EM-Titel 2004; Anker 1990, 1996, 2006, 2014
+s3-est-dombau|k|||[N] 1880 − 1248 = 632; Bauunterbrechung ab 1473 [A]
+s3-est-isner|k|||[A] 11 h 5 min = 665 min, 70:68 im 5. Satz, drei Tage [N]
+s3-est-saarland|k|||[N] 2.570 km² / 7.140 m² ≈ 360.000
+s3-geo-anfield|k|||[A] Anfield 53,4308/−2,9608
+s3-geo-helgoland|k|||[A] Helgoland ca. 46 km vor der Küste
+s3-geo-maracana|k|||[A] Maracanã Rio; WM-Finale 1950 und 2014
+s3-geo-montsaintmichel|k|||[A] Tidenhub bis ca. 14 m
+s3-geo-ushuaia|k|||[A] Ushuaia −54,80/−68,30
+s3-geo-zugspitze|k|||[A] 2.962 m, Wetterstein
+s3-glitch-abfahrt|k|||[T] Szene timetable1: IC 2012 Gleis 7 → 12 stimmt mit Erklärtext
+s3-glitch-kassenzettel|k|||[N] 2,49+2,19+3,29+1,15+2,99+1,29 = 13,40; [T] Butter 2,19 → 2,91
+s3-glitch-marktwerte|k|||[T] Szene market1: Kowalczyk 18,0 → 28,0; Reihenfolge bleibt plausibel
+s3-glitch-tabelle|k|||[N] Punkte = 3·S + U für alle 8 Zeilen nachgerechnet; Dynamo Süd 24 → 26 [T]
+s3-link-everest|k|||[A] Sagarmatha/Chomolungma, Hillary & Norgay 1953, 8.849 m
+s3-link-mozart|k|||[A] Maria Theresia 1762, †1791 mit 35, Mozartkugel seit 1890
+s3-link-oktoberfest|k|||[A] 1810 Hochzeit Ludwig/Therese, O’zapft is
+s3-link-pele|k|||[A] 3 WM-Titel, 1958-Finale 5:2 mit 17 J. 249 T.
+s3-match-baender|k|||[A] Queen England, ABBA Schweden, Rammstein Deutschland, U2 Irland, AC/DC Australien, Metallica USA
+s3-match-spiele|k|||[A] Master Chief–Halo, Kratos–God of War, Geralt–The Witcher, Link–Zelda, Samus–Metroid, Lara Croft–Tomb Raider
+s3-match-spitznamen|k|||[A] Fohlen, Knappen, Geißböcke, Adler, Alte Dame, Kiezkicker
+s3-rank-berge|k|||[A] 8.849 · 8.611 · 4.806 · 2.962 · 1.141 m, absteigend [T]
+s3-rank-olympia|k|||[A] 1936 · 1964 · 1972 · 1984 · 2000
+s3-rank-tech|c|Erklärtext „drei der vier jüngeren Meilensteine…“ missverständlich|Erklärtext: „Facebook, YouTube und iPhone liegen nur drei Jahre auseinander“|[A] Web 1991, Google 1998, Facebook 2004, YouTube 2005, iPhone 2007
+s3-unique-fluesse|c|„durch Deutschland fließt“ ist für Grenzflüsse (Oder, Neiße) unscharf|Aufgabentext: „Fluss in Deutschland (Grenzflüsse zählen mit)“|[A] Liste der 36 gültigen Flüsse plausibel
+s3-unique-orchester|k|||[A] gängige Orchesterinstrumente inkl. Celesta, Englischhorn
+s3-unique-spanisch|k|||[A] 20 Staaten mit Spanisch als Amtssprache (einige de facto)
+s4-match-tierrekorde|k|||siehe b44-match-tier (Dublette)
+s4-probe-estimate|k|||[A] 16 Bundesländer
+s4-probe-geo|k|||[A] Allianz Arena 48,2188/11,6247
+s4-probe-glitch|k|||[T] Szene pitch2: ein Spieler fehlt, Ball verschoben
+s4-probe-link|k|||[A] Mond: 384.000 km, Ebbe/Flut, Armstrong 1969
+s4-probe-match|k|||[A] Tierlaute
+s4-probe-rank|k|||[A] Merkur 58 · Venus 108 · Erde 150 · Mars 228 · Jupiter 778 Mio. km
+s4-probe-unique|k|||[A] Schwarz-Rot-Gold
+s5-kk-1|k|||Meinungsfrage
+s5-kk-2|k|||Meinungsfrage
+s5-kk-3|k|||Meinungsfrage
+s5-probe-estimate|k|||Dublette zu s4-probe-estimate
+s5-probe-geo|k|||Dublette zu s4-probe-geo
+s5-probe-glitch|k|||Dublette zu s4-probe-glitch
+s5-probe-link|k|||Dublette zu s4-probe-link
+s5-probe-match|k|||Dublette zu s4-probe-match
+s5-probe-rank|k|||Dublette zu s4-probe-rank
+s5-probe-unique|k|||Dublette zu s4-probe-unique
+v2-alles-im-blick-1|k|||[T] Szene menu1: Schnitzel 14,90 → 19,40
+v2-alles-im-blick-2|k|||[T] Szene chat1: Nordeingang → Südeingang
+v2-alles-im-blick-3|k|||[T] Szene ticket1: Reihe 12 → 21
+v2-alles-im-blick-4|k|||[T] Szene pitch1: ein Spieler um 80 Einheiten verschoben
+v2-einzigartig-1|k|||[A] Donau durch 10 Länder
+v2-einzigartig-2|k|||[A] 19 WM-Gastgeber (inkl. Kanada 2026); Dublette zu b42-unique-t13
+v2-final-1|k|||[A] Tristan da Cunha −37,11/−12,28; ca. 2.400 km bis St. Helena, über 2.700 km bis Kapstadt
+v2-final-2|k|||[A] Tetris 1984 Moskau, Paschitnow, Korobeiniki
+v2-final-3|k|||[A] WM-Gastgeber 1958/1966/1978/1994/2010
+v2-final-4|k|||[N] Großkreisentfernung Berlin–Sydney ≈ 16.100 km
+v2-fussball-zeitreise-1|k|||[A] 1878 · 1897 · 1899 · 1900 · 1902
+v2-fussball-zeitreise-2|k|||[A] 1960 · 1963 · 1991 · 1992 · 2017
+v2-fussball-zeitreise-3|k|||[A] Matthäus 150 · Klose 137 · Podolski 130 · Schweinsteiger 121 · Lahm 113
+v2-heimspiel-1|k|||[A] Allianz Arena, A9, Fröttmaning
+v2-heimspiel-2|k|||[A] CL-Finale 31.5.2025 PSG–Inter 5:0 (höchster Finalsieg)
+v2-heimspiel-3|k|||[A] Bodø 67,28/14,40, ca. 80 km nördlich des Polarkreises [N]
+v2-heimspiel-4|k|||[A] Estadio Centenario, Finale 1930 Uruguay–Argentinien 4:2
+v2-orte-mit-geschichte-1|k|||[A] Neuschwanstein, Baubeginn 1869
+v2-orte-mit-geschichte-2|k|||[A] Wacken 54,02/9,38, ca. 2.000 Einwohner, 85.000 Festivalgäste
+v2-orte-mit-geschichte-3|k|||[A] Santa Claus Village (66,54/25,85), am Polarkreis
+v2-orte-mit-geschichte-4|k|||[A] Timbuktu 16,77/−3,01
+v2-passt-zusammen-1|k|||[A] Nintendo Hanafuda 1889, BMW Flugmotoren 1916, Nokia Papier 1865, Toyota Webstühle, Samsung 1938, LEGO Holz 1932
+v2-passt-zusammen-2|k|||[A] Gutenberg, Röntgen 1895, Melitta Bentz 1908, Drais 1817, Zuse Z3 1941, Diesel
+v2-passt-zusammen-3|k|||[A] Spielberg–Jurassic Park, Nolan–Inception, Tarantino–Pulp Fiction, Cameron–Titanic, Jackson–Herr der Ringe, Gerwig–Barbie
+v2-sport-und-pop-1|c|„damals WM-Rekord“ ungenau: 1998 gab es ebenfalls 171 Tore|Erklärtext: gleichauf mit dem Rekord von 1998|[A] 171 Tore 2014, 172 Tore 2022
+v2-sport-und-pop-2|k|||[A] Bohemian Rhapsody 5:55 = 355 s [N]
+v2-wahnsinnszahlen-1|k|||[A] 533 Stufen, Plattform ca. 97 m
+v2-wahnsinnszahlen-2|k|||[W] 18.038 Eisenteile, 2,5 Mio. Nieten, davon 1.050.846 vor Ort (Structurae)
+v2-wer-oder-was-1|k|||[A] Venedig: Holzpfähle, Canal Grande ca. 3,8 km, Karneval, Seufzerbrücke
+v2-wer-oder-was-2|k|||[A] Post-it: Spencer Silver 1968, Art Fry, gelbes Notizpapier
+v2-wer-oder-was-3|k|||[A] Marie Curie: zwei Nobelpreise (1903 Physik, 1911 Chemie), Polonium, Notizbücher in Bleikisten
+v2-wer-war-zuerst-1|k|||[A] Coca-Cola 1886 · Nintendo 1889 · LEGO 1932 · PlayStation 1994 · Netflix 1997
+v2-wer-war-zuerst-2|k|||[A] 1869 · 1896 · 1903 · 1912 · 1961
+v2-wer-war-zuerst-3|k|||[A] 828 · ca. 330 · 157 · 96 · 56 m

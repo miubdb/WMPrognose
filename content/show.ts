@@ -51,7 +51,7 @@ export const POOL: PoolQuestion[] = [
   'Pelé gewann die WM 1958, 1962 und 1970. Im Finale 1958 (5:2 gegen Schweden) war er mit 17 Jahren und 249 Tagen der jüngste Torschütze eines WM-Finales.'),
   rank('s3-rank-tech', 'Technik & Internet', 'Technik-Zeitreise – das früheste Ereignis zuerst', 'am längsten her', 'am jüngsten', [
     ['Die erste Webseite geht online', '1991'], ['Google wird gegründet', '1998'], ['Facebook wird gegründet', '2004'], ['YouTube wird gegründet', '2005'], ['Das erste iPhone kommt auf den Markt', '2007'],
-  ], [3, 0, 4, 2, 1], 'Web (1991), Google (1998), Facebook (2004), YouTube (2005) und iPhone (2007) – drei der vier jüngeren Meilensteine liegen nur drei Jahre auseinander.', 500, 14),
+  ], [3, 0, 4, 2, 1], 'Web (1991), Google (1998), Facebook (2004), YouTube (2005) und iPhone (2007) – Facebook, YouTube und iPhone liegen nur drei Jahre auseinander.', 500, 14),
 
   // ---------------------------------------------------------------- Alternativen: WO ZUR HÖLLE?
   geo('s3-geo-helgoland', 'Geografie', 'germany', 30, 250, 'Deutschlands einzige Hochseeinsel: Wo liegt Helgoland?', 54.1792, 7.8917, 'Helgoland, Nordsee', 'Helgoland liegt rund 45 km vor der Küste in der Nordsee – man erreicht die rote Felsinsel nur per Schiff oder Flugzeug.'),
@@ -120,7 +120,7 @@ export const POOL: PoolQuestion[] = [
     ['Guatemala', []], ['Kuba', ['Cuba']], ['Bolivien', ['Bolivia']], ['Dominikanische Republik', ['Dom Rep']], ['Honduras', []], ['Paraguay', []], ['El Salvador', []],
     ['Nicaragua', []], ['Costa Rica', []], ['Panama', []], ['Uruguay', []], ['Äquatorialguinea', ['Aequatorialguinea', 'Equatorial Guinea']],
   ], 'Spanisch ist Amtssprache in 20 Staaten – von Spanien über Mexiko und Argentinien bis nach Äquatorialguinea in Afrika.'),
-  unique('s3-unique-fluesse', 'Geografie', 'Ein deutscher Fluss …', 'Nenne einen Fluss, der durch Deutschland fließt.', [
+  unique('s3-unique-fluesse', 'Geografie', 'Ein deutscher Fluss …', 'Nenne einen Fluss in Deutschland (Grenzflüsse wie Oder und Neiße zählen mit).', [
     ['Rhein', []], ['Elbe', []], ['Donau', []], ['Main', []], ['Weser', []], ['Oder', []], ['Neckar', []], ['Mosel', []], ['Spree', []], ['Isar', []], ['Ruhr', []], ['Saale', []],
     ['Ems', []], ['Lahn', []], ['Inn', []], ['Lech', []], ['Havel', []], ['Fulda', []], ['Werra', []], ['Iller', []], ['Saar', []], ['Neiße', ['Neisse']], ['Aller', []],
     ['Leine', []], ['Lippe', []], ['Nahe', []], ['Regnitz', []], ['Eider', []], ['Trave', []], ['Warnow', []], ['Peene', []], ['Mulde', []], ['Weiße Elster', ['Weisse Elster']], ['Tauber', []], ['Kinzig', []], ['Altmühl', ['Altmuehl']], ['Naab', []],
